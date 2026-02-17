@@ -1,0 +1,31 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Data (keep structure, ignore runtime data)
+data/market_snapshots/*.json
+data/ml_model.pkl
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Exports
+*.xlsx
+trade_export_*.csv
+
+# Pytest
+.pytest_cache/

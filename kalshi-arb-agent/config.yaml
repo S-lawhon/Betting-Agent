@@ -1,0 +1,68 @@
+# === TRADING PARAMETERS ===
+trading:
+  mode: "paper"                    # "paper" (log only, no real trades) or "live"
+  min_edge_pct: 3.0                # Minimum edge % to trigger a trade
+  max_edge_pct: 25.0               # Skip if edge > this (likely stale/bad data)
+  min_market_volume: 100000        # Minimum Kalshi market volume in dollars
+  max_position_size_usd: 500       # Max $ per single trade
+  max_total_exposure_usd: 5000     # Max total $ across all open positions
+  max_positions: 20                # Max number of concurrent positions
+  max_daily_loss_usd: 500          # Stop trading if daily loss exceeds this
+  cooldown_after_loss_minutes: 30  # Pause after a losing trade
+
+# === MARKET FILTERS ===
+filters:
+  sports: ["basketball_nba", "icehockey_nhl", "basketball_ncaab", "soccer_epl"]
+  event_horizon_hours: 168         # Only consider events within 7 days
+  exclude_live_markets: true       # Skip in-progress games (faster moving, riskier)
+  min_sportsbook_consensus: 3      # Require at least N books agreeing on odds
+
+# === ODDS SOURCES ===
+odds_api:
+  regions: ["us", "us2"]           # US-regulated sportsbooks
+  markets: ["h2h", "spreads", "totals"]
+  bookmakers_priority:             # Weight sharp books higher
+    - "pinnacle"
+    - "betonlineag"
+    - "bovada"
+    - "draftkings"
+    - "fanduel"
+
+# === LEARNING PARAMETERS ===
+learning:
+  enabled: true
+  min_trades_before_adjust: 50     # Don't adjust until N trades logged
+  recalibrate_interval_hours: 24   # How often to re-fit the model
+  features:                        # What the learner tracks
+    - "sport"
+    - "market_type"                # moneyline, spread, total
+    - "time_to_event_hours"
+    - "kalshi_volume"
+    - "edge_at_entry"
+    - "num_books_agreeing"
+    - "line_movement_direction"
+    - "hour_of_day"
+  edge_adjustment_method: "bayesian" # "bayesian", "rolling_avg", or "none"
+
+# === EXECUTION ===
+execution:
+  order_type: "limit"              # "limit" or "market"
+  limit_offset_cents: 1            # Place limit 1 cent better than current price
+  max_slippage_cents: 2            # Cancel if price moves more than this
+  retry_attempts: 3
+  retry_delay_seconds: 5
+
+# === SCANNING ===
+scanning:
+  interval_seconds: 60             # How often to scan for opportunities
+  kalshi_rate_limit_per_min: 30    # Respect Kalshi API rate limits
+  batch_size: 50                   # Markets to fetch per API call
+
+# === ALERTS ===
+alerts:
+  enabled: false
+  method: "console"                # "console", "file", or "webhook"
+  webhook_url: ""
+  alert_on_trade: true
+  alert_on_edge_gt: 8.0            # Alert when edge exceeds this
+  alert_on_daily_pnl_loss: -200

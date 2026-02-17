@@ -1,0 +1,8 @@
+{
+  "bayesian_priors": {},
+  "rolling_stats": {},
+  "ml_model_path": null,
+  "last_recalibration": null,
+  "total_trades": 0,
+  "version": 1
+}

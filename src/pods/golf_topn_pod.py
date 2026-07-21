@@ -38,9 +38,17 @@ Rules:
   * optional skip of signature-event weeks (attention exception)
   * hard cap on concurrent open positions
 
-Validation plan: paper mode. ~30-60 bets per tournament expected. Kill
-if realized hit rate / net edge falls below half the backtest baseline
-over a rolling window (edges from inattention can decay).
+Validation plan: paper mode. Kill if realized hit rate / net edge falls
+below half the backtest baseline over a rolling window (edges from
+inattention can decay).
+
+Expected volume — NOTE the cap interaction. The backtest averaged ~93
+bets/tournament (926 over 10 events), and a live 3M Open board offered
+174 names clearing the band. max_open_positions (40) therefore BINDS
+hard: the pod owns roughly 40% of the validated strategy, chosen by
+_select_candidates. Earlier docs claiming "~30-60 bets/tournament" were
+wrong and are what the cap appears to have been sized against — revisit
+the cap if the paper sample proves too thin for the 8-tournament gate.
 """
 from __future__ import annotations
 
@@ -183,17 +191,47 @@ class GolfTopNPod(BasePod):
         event_close = self._resolve_event_closes(markets)
 
         now = self._now_fn()
-        n_hits = 0
+
+        # Pass 1 — price every market with no side effects.
+        #
+        # The band rule qualifies far more names than max_open_positions
+        # allows (a live 3M Open board offered 174 candidates against a
+        # cap of 40). Placing in API discovery order would spend the whole
+        # cap on whichever tickers happened to come back first — in
+        # practice all top-10, none top-20, even though top-20 is the
+        # stronger leg in the backtest (+8.3c vs +4.9c). Rank first so the
+        # truncation is deliberate rather than incidental.
+        candidates: List[tuple] = []
         for m in markets:
             try:
                 close = event_close.get(m.get("event_ticker") or "")
-                r = self._evaluate_market(m, now, close)
+                priced = self._price_market(m, now, close)
+                if priced is not None:
+                    candidates.append((m, priced))
+            except Exception as exc:
+                logger.error("P-017: pricing error %s: %s",
+                             m.get("ticker", "?"), exc)
+
+        candidates = self._select_candidates(candidates)
+
+        # Pass 2 — commit in selection order until the cap binds.
+        n_hits = 0
+        for m, priced in candidates:
+            try:
+                r = self._evaluate_market(m, now, priced["close"], priced=priced)
                 if r is not None:
                     results.append(r)
                     if r.action == "PLACED":
                         n_hits += 1
             except Exception as exc:
                 logger.error("P-017: eval error %s: %s", m.get("ticker", "?"), exc)
+
+        if n_hits and len(candidates) > n_hits:
+            logger.info(
+                "P-017: %d candidates cleared the band, placed top %d by net "
+                "edge (cap=%d)", len(candidates), n_hits,
+                self.max_open_positions,
+            )
         logger.info("P-017: scanned %d top-N markets, %d placed",
                     len(markets), n_hits)
         return results
@@ -240,8 +278,18 @@ class GolfTopNPod(BasePod):
 
     # ── Strategy ─────────────────────────────────────────────────────
 
-    def _evaluate_market(self, m: Dict[str, Any], now: datetime,
-                         close: Optional[float] = None) -> Optional[ScanResult]:
+    def _price_market(self, m: Dict[str, Any], now: datetime,
+                      close: Optional[float] = None) -> Optional[Dict[str, Any]]:
+        """Structural gates + pricing for one market. NO side effects.
+
+        Returns None when the market is not tradeable at all (wrong
+        window, no two-sided quote, outside the band). Otherwise returns
+        the pricing dict — including markets whose net edge misses the
+        gate, so the caller can still log them as SKIPPED_EDGE.
+
+        Split out from _evaluate_market so scan_once can rank the whole
+        candidate set by net edge BEFORE spending the position cap.
+        """
         ticker = m.get("ticker", "")
         if not ticker:
             return None
@@ -270,7 +318,92 @@ class GolfTopNPod(BasePod):
 
         fee = fee_per_contract(ask, maker=False)  # quadratic taker
         fair_prob, source, gate = self._fair_prob(m, ticker, bid, ask)
-        net = fair_prob - ask - fee
+        return {
+            "ticker": ticker, "close": close, "days_to_close": days_to_close,
+            "bid": bid, "ask": ask, "fee": fee, "fair_prob": fair_prob,
+            "source": source, "gate": gate,
+            "net": fair_prob - ask - fee,
+        }
+
+    def _select_candidates(self, candidates: List[tuple]) -> List[tuple]:
+        """Order candidates so the position cap truncates deliberately.
+
+        The band rule qualifies far more names than max_open_positions
+        allows (a live 3M Open board offered 174 against a cap of 40), so
+        SOMETHING decides which ones get bought. Discovery order is the
+        wrong answer — it spent the whole cap on top-10 and skipped
+        top-20 entirely, despite top-20 being the stronger backtest leg.
+
+        Ranking by net edge is ALSO wrong in structural mode. With a
+        constant edge_bump, net = edge_bump - fee(ask), and the quadratic
+        fee rises with ask, so net edge decreases monotonically in price:
+        sorting by it is exactly "buy the cheapest names". That is a
+        different, higher-variance strategy than the one that returned
+        +6.8c — the backtest bought the band uniformly, not its cheap
+        tail.
+
+        So:
+          * structural mode — no per-name quality signal exists (every
+            name in the band carries the same thesis-implied edge), so
+            take a systematic sample spread evenly across the ask range,
+            stratified by series. This preserves the backtest's band and
+            series composition under a cap. Deterministic, no RNG.
+          * model mode (DataGolf live) — fair_prob genuinely varies by
+            golfer, so net edge IS a quality signal and we rank by it.
+        """
+        slots = self.max_open_positions - self._open_count
+        if slots <= 0 or len(candidates) <= slots:
+            return candidates
+
+        model_priced = sum(
+            1 for _, p in candidates if p["source"] == "datagolf"
+        )
+        if model_priced > len(candidates) / 2:
+            ranked = sorted(candidates, key=lambda c: c[1]["net"], reverse=True)
+            logger.info(
+                "P-017: %d candidates, %d slots — ranking by model net edge",
+                len(candidates), slots,
+            )
+            return ranked
+
+        # Systematic sample across the ask range, per series.
+        by_series: Dict[str, List[tuple]] = {}
+        for m, p in candidates:
+            by_series.setdefault(p["ticker"].split("-")[0], []).append((m, p))
+
+        picked: List[tuple] = []
+        total = len(candidates)
+        for series, group in sorted(by_series.items()):
+            group.sort(key=lambda c: c[1]["ask"])
+            # proportional allocation, at least one slot per series
+            k = max(1, round(slots * len(group) / total))
+            k = min(k, len(group))
+            step = len(group) / k
+            picked.extend(group[int(i * step)] for i in range(k))
+
+        logger.info(
+            "P-017: %d candidates, %d slots — systematic band sample "
+            "(structural mode, no per-name signal to rank on)",
+            len(candidates), slots,
+        )
+        return picked
+
+    def _evaluate_market(self, m: Dict[str, Any], now: datetime,
+                         close: Optional[float] = None,
+                         priced: Optional[Dict[str, Any]] = None,
+                         ) -> Optional[ScanResult]:
+        if priced is None:
+            priced = self._price_market(m, now, close)
+        if priced is None:
+            return None
+
+        ticker = priced["ticker"]
+        close = priced["close"]
+        days_to_close = priced["days_to_close"]
+        bid, ask = priced["bid"], priced["ask"]
+        fee, fair_prob = priced["fee"], priced["fair_prob"]
+        source, gate, net = priced["source"], priced["gate"], priced["net"]
+
         if net < gate:
             return self._skip(m, ask, fair_prob, "SKIPPED_EDGE",
                               f"net {net:.3f} < {gate} ({source})")

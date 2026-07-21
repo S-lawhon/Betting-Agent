@@ -161,3 +161,99 @@ def test_no_duplicate_second_scan():
     first = [r for r in pod.scan_once() if r.action == "PLACED"]
     second = [r for r in pod.scan_once() if r.action == "PLACED"]
     assert len(first) == 1 and len(second) == 0
+
+
+# ── Candidate selection under the position cap ───────────────────────
+#
+# The band rule qualifies far more names than max_open_positions allows
+# (174 candidates vs a cap of 40 on a live 3M Open board), so the
+# selection rule decides what the pod actually owns.
+
+
+def _band_markets(n_top10, n_top20, close, lo=0.08, hi=0.45):
+    """Candidates spread evenly across the ask band in both series."""
+    out = []
+    for series, n in (("KXPGATOP10", n_top10), ("KXPGATOP20", n_top20)):
+        for i in range(n):
+            ask = lo + (hi - lo) * i / max(n - 1, 1)
+            out.append(_market(
+                f"{series}-XYZ26-P{i:03d}", f"{series}-XYZ26",
+                round(ask - 0.01, 4), round(ask, 4), close,
+            ))
+    return out
+
+
+def test_cap_does_not_skim_only_the_cheapest_names():
+    """Regression: ranking by net edge == sorting by ask ascending.
+
+    net = edge_bump - taker_fee(ask), and the quadratic fee rises with
+    ask, so net edge decreases monotonically in price.  Ranking on it
+    would buy only the cheap tail — a higher-variance strategy than the
+    band-uniform buy the backtest validated.
+    """
+    now = _now()
+    close = now + timedelta(days=6)
+    pod = _pod(_band_markets(60, 60, close), now, max_open_positions=20)
+    placed = [r for r in pod.scan_once() if r.action == "PLACED"]
+
+    assert len(placed) == 20
+    asks = [r.venue_prob for r in placed]
+    # must reach into the expensive half of the band, not stop at the tail
+    assert max(asks) > 0.30, f"selection skimmed the cheap tail: max ask {max(asks)}"
+    assert min(asks) < 0.15, "selection missed the cheap end entirely"
+
+
+def test_cap_preserves_both_series():
+    """Discovery order spent the whole cap on top-10; top-20 is the
+    stronger backtest leg (+8.3c vs +4.9c) and must not be shut out."""
+    now = _now()
+    close = now + timedelta(days=6)
+    pod = _pod(_band_markets(60, 60, close), now, max_open_positions=20)
+    placed = [r for r in pod.scan_once() if r.action == "PLACED"]
+
+    series = {r.market_id.split("-")[0] for r in placed}
+    assert series == {"KXPGATOP10", "KXPGATOP20"}
+
+
+def test_series_representation_is_proportional():
+    """A 3:1 candidate imbalance should carry into the selection."""
+    now = _now()
+    close = now + timedelta(days=6)
+    pod = _pod(_band_markets(90, 30, close), now, max_open_positions=20)
+    placed = [r for r in pod.scan_once() if r.action == "PLACED"]
+
+    n10 = sum(1 for r in placed if r.market_id.startswith("KXPGATOP10"))
+    assert 12 <= n10 <= 17, f"expected ~15 of 20 from top-10, got {n10}"
+
+
+def test_no_selection_when_cap_not_binding():
+    """Fewer candidates than slots — everything qualifying gets placed."""
+    now = _now()
+    close = now + timedelta(days=6)
+    pod = _pod(_band_markets(5, 5, close), now, max_open_positions=40)
+    placed = [r for r in pod.scan_once() if r.action == "PLACED"]
+    assert len(placed) == 10
+
+
+def test_selection_is_deterministic():
+    """No RNG — two identical pods must pick identically (reproducible
+    paper runs, and a backtest that can be replayed)."""
+    now = _now()
+    close = now + timedelta(days=6)
+    a = [r.market_id for r in _pod(_band_markets(50, 50, close), now,
+                                   max_open_positions=15).scan_once()
+         if r.action == "PLACED"]
+    b = [r.market_id for r in _pod(_band_markets(50, 50, close), now,
+                                   max_open_positions=15).scan_once()
+         if r.action == "PLACED"]
+    assert a == b
+
+
+def test_close_utc_recorded_for_settler():
+    """The settler's stale guard needs an absolute close reference."""
+    now = _now()
+    close = now + timedelta(days=6)
+    m = _market("KXPGATOP20-XYZ26-SCHE", "KXPGATOP20-XYZ26", 0.18, 0.20, close)
+    placed = [r for r in _pod([m], now).scan_once() if r.action == "PLACED"]
+    assert len(placed) == 1
+    assert placed[0].extra["close_utc"].startswith("2026-07-21")

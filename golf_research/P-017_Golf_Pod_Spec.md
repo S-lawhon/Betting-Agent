@@ -23,6 +23,24 @@ Two components, both paper, both reusing existing infrastructure (BasePod, Kalsh
 
 Make-cut leg (only 12 two-sided pre-tournament quotes in-sample — insufficient); top-5 (backtest ~0, matches literature); top-40 (1 event); outright winner markets (efficient, maker-fee'd, institutional MM — benchmark only). Live round-leader in-play (large build; the R1-leader flow of 30M contracts/major is a future P-018 candidate).
 
+## Correction — expected volume (2026-07-20)
+
+Earlier drafts of this spec said "~30–60 bets per tournament". That is
+**wrong**. Leg A's backtest placed 926 bets across 10 events — **~93 per
+tournament** — and a live 3M Open board offered **174** names clearing the
+band. `max_open_positions: 40` therefore binds hard, and the pod trades
+roughly 40% of the validated strategy. The cap appears to have been sized
+against the incorrect 30–60 figure; revisit it if the paper sample proves
+too thin for the 8-tournament gate.
+
+Because the cap binds, the *selection rule* is now part of the strategy.
+Ranking by net edge is degenerate in structural mode — `net = edge_bump −
+fee(ask)` falls monotonically in price, so it reduces to "buy the cheapest
+names", a higher-variance bet than the band-uniform buy that produced
++6.8¢. `GolfTopNPod._select_candidates` instead takes a deterministic
+systematic sample across the ask range, stratified by series, and only
+ranks by net edge once DataGolf supplies a real per-name signal.
+
 ## Validation & kill criteria (unchanged from methodology)
 
 Paper-first. Go/no-go after ~8 tournaments treating **each tournament as one observation** (within-event outcomes correlate). P-017 validates if forward net CLV / realized net edge stays > half the backtest baseline; P-017M validates on fill quality (≥30% of quoted names fill) AND positive markout-implied net. Kill any leg whose measured edge drops below half baseline (inattention edges decay). Only then consider small real money per the v2 Phase-3 rules.

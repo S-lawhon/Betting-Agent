@@ -63,14 +63,18 @@ class KalshiTennisSettler:
     def __init__(
         self,
         client: Optional[KalshiTennisClient] = None,
-        log_path: Path = Path("data/pods/P-015.jsonl"),
+        log_path: Path = Path("data/trade_logs/trade_log.jsonl"),
         pod_id: str = "P-015",
         _now_fn: Optional[Callable[[], datetime]] = None,
+        trade_store=None,
     ) -> None:
         self._client = client or KalshiTennisClient()
         self._log_path = Path(log_path)
         self._pod_id = pod_id
         self._now = _now_fn or (lambda: datetime.now(tz=timezone.utc))
+        # Set post-construction by main.py — the TradeStore is built after
+        # build_shared_deps(). See _open_placed_entries.
+        self.trade_store = trade_store
 
     # ── Public API (called from engine loop) ─────────────────────────
 
@@ -125,7 +129,30 @@ class KalshiTennisSettler:
     # ── Internals ────────────────────────────────────────────────────
 
     def _open_placed_entries(self) -> Dict[str, Dict[str, Any]]:
-        """Unresolved PLACED entries from the P-015 log."""
+        """Unresolved PLACED entries for this pod.
+
+        Prefer the TradeStore. This settler previously read
+        data/pods/P-015.jsonl, which is NEVER written when a TradeStore
+        is attached: BasePod.write_log delegates to store.append() and
+        everything lands in the shared trade_log.jsonl instead. A
+        file-reading settler therefore finds zero positions and settles
+        nothing, silently. P-015 had not yet placed a trade, so the bug
+        was latent; P-017 hit it in production (27 placements, empty
+        data/pods/) which is how it surfaced. PolymarketSettler avoided
+        it by pointing at paths.trade_log all along.
+
+        The file path (now defaulting to the shared log, not the per-pod
+        one) remains as a fallback for standalone/offline use.
+        """
+        store = self.trade_store
+        if store is not None:
+            out: Dict[str, Dict[str, Any]] = {}
+            for e in store.get_open_trades(self._pod_id):
+                mid = e.get("market_id") or e.get("market_ticker", "")
+                if mid and float(e.get("position_size_usd") or 0) > 0:
+                    out[mid] = e
+            return out
+
         if not self._log_path.exists():
             return {}
         placed: Dict[str, Dict[str, Any]] = {}
@@ -187,7 +214,13 @@ class KalshiTennisSettler:
             "timestamp_utc": now.isoformat(),
             "resolution_source": resolution_source,
         }
-        self._append_log(record)
+        # Persist where the placement came from. append() indexes and
+        # fsyncs to the shared log, so the settlement survives a restart;
+        # writing to data/pods/ would not, since nothing reads it back.
+        if self.trade_store is not None:
+            self.trade_store.append(record)
+        else:
+            self._append_log(record)
         logger.info(
             "kalshi_tennis_settler: settled %s | result=%s outcome=%s pnl=%.2f",
             market_id, result, outcome, pnl_usd,
@@ -204,9 +237,16 @@ class KalshiTennisSettler:
 
     @classmethod
     def from_config(cls, config: dict, **overrides) -> "KalshiTennisSettler":
-        log_dir = Path(config.get("paths", {}).get("pod_logs", "data/pods"))
+        # paths.trade_log (shared), NOT paths.pod_logs — the per-pod file
+        # is never written when a TradeStore is attached. Matches the
+        # PolymarketSettler convention.
+        default_log = Path(
+            config.get("paths", {}).get(
+                "trade_log", "data/trade_logs/trade_log.jsonl"
+            )
+        )
         return cls(
             client=overrides.get("client") or KalshiTennisClient.from_config(config),
-            log_path=Path(overrides.get("log_path") or log_dir / "P-015.jsonl"),
+            log_path=Path(overrides.get("log_path") or default_log),
             _now_fn=overrides.get("_now_fn"),
         )

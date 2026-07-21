@@ -770,11 +770,11 @@ def _run_guarded_loop(
                                         pod.on_settlement(market_id)
                                     except Exception:
                                         pass
-                        if trade_store is not None:
-                            try:
-                                trade_store.index_only(rec)
-                            except Exception:
-                                pass
+                        # NOTE: no trade_store.index_only() here — the
+                        # tennis settler persists through
+                        # trade_store.append(), which has already indexed
+                        # the record. Indexing again would double it in
+                        # the in-memory lists.
             except Exception as exc:
                 logger.warning("settlement.tennis: settle_cycle failed: %s", exc)
 

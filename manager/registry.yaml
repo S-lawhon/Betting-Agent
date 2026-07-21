@@ -295,19 +295,66 @@ workstreams:
         Archived to data/trade_logs/contaminated_2026-07-20/ and EXCLUDED from
         the gate. Any fill counter must start after this timestamp or it will
         report a phantom 484-fill head start.
+    marginal_result_rule:
+      registered: 2026-07-21
+      text: >
+        PRE-REGISTERED BEFORE THE RESULT IS KNOWN. At ~1,045 fills to detect
+        1c at 80% power (per-fill sd 11.54c), the 500-fill gate resolves only
+        a ~1.4-1.5c effect. The reading at 282/500 is -1.32c — almost exactly
+        at the edge of what the gate can distinguish, so "marginal and
+        ambiguous" is the LIKELY outcome at n=500, and that is precisely where
+        post-hoc reasoning creeps in. Therefore, decided in advance:
+        if the fee-adjusted +5m markout at 500 clean fills lands in
+        [-1.5c, 0c] — i.e. negative but not separable from zero — the pod is
+        NOT promoted and NOT killed. It EXTENDS to 1,000 clean fills at
+        unchanged parameters, one extension only. A second marginal result at
+        1,000 is a kill. Positive-and-separable promotes; below -1.5c kills.
     open_questions:
       - id: markout-vs-settlement
-        blocked_on: human
-        text: >
-          Is +5m markout the right adaptation target at all? It is the gate
-          metric, but for a maker holding to SETTLEMENT, realized settlement P&L
-          is ground truth and markout is a proxy assuming we could exit at mid.
-          If the two diverge materially once settlements accumulate, the GATE
-          METRIC itself needs revisiting — that is explicitly a human decision.
-        trigger: Surface once >=100 settled maker positions exist to compare.
+        blocked_on: nothing
+        resolved: 2026-07-21
+        resolution: >
+          RESOLVED — keep +5m markout as the gate metric. The trigger itself
+          was mis-specified and has been restated (see trigger below).
+
+          The 107 settled positions came from just 5 GAMES. Settlement P&L per
+          fill is a deterministic function of one binary outcome, so the
+          effective n on the settlement side was 5, not 107 — too small to
+          distinguish the hypotheses. Fill-level and game-level estimates of
+          the difference disagree in SIGN (+1.005c vs -0.11c), the signature
+          of unmodelled clustering; cluster-bootstrap CI [-4.30, +2.68]c
+          against a question whose scale is ~1-2c.
+
+          Markout survives on its merits: unbiased as far as measurable (OLS
+          slope +1.264, CI [0.94, 1.79] contains 1), directionally informative
+          (74.8% sign agreement vs a 50.0% chance baseline; +5m beats +1m's
+          51.4%), and ~10x more sample-efficient (per-fill sd 11.54c vs
+          35.68c). Settlement is not a viable gate metric at pilot scale.
+
+          Counting FILLS stays valid for markout specifically — a 5-minute
+          price move varies within a game, whereas settlement P&L does not.
+          The clustering objection applies to settlement, not to markout.
+
+          Trap recorded: settled positions are a biased subset (markout -0.82c
+          settled vs -2.25c still-open), so comparing settlement's +0.18c
+          against the headline -1.32c manufactures ~1.4c of spurious
+          divergence. Only the paired comparison is valid.
+
+          Full analysis: live_agent_research/MARKOUT_VS_SETTLEMENT_2026-07-20.md
+        trigger: >
+          RESTATED 2026-07-21 (was ">=100 settled maker positions"). The
+          original counted the wrong unit — fills, not independent outcomes.
+          Any future settlement-vs-markout comparison requires
+          >=40 DISTINCT SETTLED GAMES (~8 clean slates at the observed rate),
+          which gives ~+/-1c resolution and makes the cluster bootstrap valid.
     watch:
       - divergence-guard pulls (|fair - mid| > 0.15)
       - one-sided fill ratio (the anchor-contamination signature)
+      - >
+        markout is NEGATIVE (-1.32c over 253 measured fills at 56% of sample).
+        Not a verdict — do not act on it — but do not let "not a verdict"
+        quietly become optimism either. The marginal_result_rule above exists
+        because this is trending toward an ambiguous finish.
 
   - id: P-017
     name: Golf Top-N Prop Pod
@@ -343,8 +390,59 @@ workstreams:
         If PLACED keeps climbing and settled stays 0 past that, the settler is
         not wired in — the failure mode is silent.
       - Deliberate cap truncation (SKIPPED_RISK volume) once several events overlap.
+    leg_b_decision:
+      subject: P-017M golf fade maker (Leg B)
+      verdict: SHELVED — do not start, do not kill
+      decided: 2026-07-21
+      decided_by: Sam
+      provisional_on: >
+        Numbers below are hand-computed contract-weighted figures. A background
+        session is fixing the underlying weighting bug; CONFIRM against the
+        corrected backtest before acting further. The shelve call itself is
+        robust either way (it is a decision NOT to invest), but the kill/keep
+        boundary depends on the corrected numbers.
+      rationale: >
+        The +9.1c headline was ALWAYS an artifact of a weighting bug, not a
+        real edge that later degraded. leg_fade_maker appends one entry per
+        fill EVENT regardless of contract count, and line 355 overwrites the
+        correctly contract-weighted mean with that unweighted figure.
+        Contract-weighted, the 4-event number was +5.85c — barely above the
+        +4.55c maker half-baseline it was being judged against. At 6 events it
+        is +3.34c, BELOW baseline. (Unweighted, for reference: +9.1c -> +4.90c,
+        CI [-1.69, +10.81], now straddling zero.)
+
+        The degradation is concentrated in THOC26 — a major, and the event with
+        the MOST trade data in the sample. Degradation driven by the
+        best-sampled event is the opposite of a noise story, and was checked:
+        it is not a settlement artifact, since Leg A is positive on both new
+        events off the same data pull.
+
+        NOT killed, because 6 events against a pre-registered 8-10 event gate
+        is stopping early on unfavourable data — the mirror image of the
+        discipline this project runs on — and the CI is genuinely too wide to
+        justify it.
+
+        NOT started, because P-017M is not currently running
+        (scripts/run_golf_maker.py was never launched), so there is no sunk
+        cost and no data accruing. The validated TAKER leg carries P-017
+        through its 8-tournament gate; attention belongs there.
+      revisit_when: >
+        The taker leg clears its 8-tournament gate AND there is appetite to
+        extend. Do not restart collection before then merely because the CI is
+        wide.
     note: >
-      THOC26/COPC26 excluded from backtest — settlement not populated at pull date.
+      THOC26/COPC26 folded into the backtest 2026-07-21 (both now settled).
+      Leg A holds: 12 events, n=1117, +6.92c/ct, CI [+3.79, +9.92], 11/12
+      positive. The estimate moved 0.11c, which is noise, and sqrt(10/12)~0.91
+      accounts for most of the 14% CI narrowing — confirmation, not new
+      information, and it does NOT satisfy the 8-live-tournament gate above,
+      which is about live paper fills.
+      Band drift found and resolved: docs said 8-45c, the VALIDATING backtest
+      ran 8-40c, and the shipped pod runs 8-45c (ask_cap 0.45) — so the pod has
+      been trading a band that was never validated. On 12 events 8-45c gives
+      +7.14c [+4.30, +9.90], slightly better, so no config change is needed.
+      That is luck rather than process; the params and the backtest that
+      authorised them should not have been allowed to drift apart.
       Registry corrected 2026-07-21: this entry previously read "FULLY BUILT AND
       BACKTESTED, NOT DEPLOYED / the golf pod CODE is not on the droplet either",
       which was false and was asking Sam for a decision he had already made.
@@ -466,17 +564,40 @@ workstreams:
         also that the pooled cohort would be ~161 trades/month against P-015's
         34, so the lower tours would dominate the blended number while
         contributing the negative point estimates.
-    action_required: >
-      OPEN ITEM FOR SAM — the drop/keep call on P-015b is yours, not the
-      registry's. The evidence points to DROPPING P-015b: the mechanism did not
-      replicate out of sample and the pooled CI includes zero. This entry does
-      NOT kill it unilaterally, because P-015b is a registered research track.
-      Per tennis_research/P015_DECISION_RULE.md:83-87, adding lower-tour series
-      is a NEW strategy version with its own n counter and separate
-      registration — it can never be folded into P-015's counter, so nothing
-      here affects the running P-015 validation either way.
-      Decide: (a) drop P-015b and close this track, or (b) state what further
-      evidence would change the answer and what would be gathered to get it.
+    decision:
+      verdict: DROPPED
+      decided: 2026-07-21
+      decided_by: Sam
+      rationale: >
+        P-015b is dropped and this track is closed. Three reasons, in order of
+        weight:
+
+        1. CONTAMINATION, not EV, is decisive. P-015 is at 0/120 and locked.
+        The lower tours would supply ~127 of ~161 trades/month (79% of volume)
+        from the two cohorts with NEGATIVE point estimates. Trading P-015b
+        would swamp the tour-level signal and leave us measuring the pooled
+        thing instead of the validated thing — destroying the ability to test
+        the original hypothesis at all.
+
+        2. The mechanism did not replicate. Both lower tiers have negative
+        point estimates; the pooled CI includes zero. That is absence of
+        evidence for P-015b, not evidence of a smaller edge.
+
+        3. Opportunity cost is near zero. P-015 is time-blocked on US Open
+        quals (Aug 17-21) regardless, so dropping P-015b forfeits nothing that
+        was otherwise available.
+
+        The tour-level P-015 edge (+4.06c/ct, CI [+1.44, +6.34]) is UNAFFECTED
+        and its validation continues unchanged. Per
+        tennis_research/P015_DECISION_RULE.md:83-87 the two were always
+        separately registered with separate n counters, so this decision
+        touches nothing in the running P-015 gate.
+      what_would_reopen: >
+        A materially larger lower-tour sample whose point estimates turn
+        positive — not merely CIs that widen to include positive values. The
+        current reading is not "underpowered and promising", it is "negative
+        on both cohorts". Reopening on anything less would be selecting on
+        noise. No collection is scheduled and none should be started.
     note: >
       Registry corrected 2026-07-21: this entry previously said the analysis was
       "in flight". It had already finished the night before.

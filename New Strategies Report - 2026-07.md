@@ -104,7 +104,9 @@ What's left is a pure market-structure edge: **cheap YES on neglected prop books
 | Daily net SD | 9.1¢ (27% of days negative) |
 | Displayed depth at ask (median) | 784 contracts |
 
-The edge is real and replicated across two windows and at real ask prints, but it is **small and capacity-limited** — realistic capture is on the order of **$10–35/day** at current prop liquidity. This is a satellite book worth running to validate execution mechanics and to be positioned if Kalshi prop volume grows, not a fund-scale allocation. The open question is no longer "is there an edge" but "can we get filled at these prices live" — which needs ~27 game-days of collector data (a droplet timer is now accumulating toward that).
+The edge is real and replicated across two windows and at real ask prints, but it is **small and capacity-limited** — realistic capture is on the order of **$10–35/day** at current prop liquidity. This is a satellite book worth running to validate execution mechanics and to be positioned if Kalshi prop volume grows, not a fund-scale allocation. The open question is no longer "is there an edge" but "can we get filled at these prices live" — which needs ~27 game-days of collector data.
+
+> **Collection status (corrected 2026-07-21).** An earlier draft of this line said a droplet timer "is now accumulating," which overstated it: the `mlb-props-collector` timer was only installed at 03:00 UTC on 2026-07-21 and first fired at 14:00 UTC the same day. The 07-19 and 07-20 files were manual local runs, not scheduled collection. As of 2026-07-21 the count is **3 game-days of 27**, targeting **~2026-08-17**. The execution test is blocked on that sample and should not be run before it lands — PHASE3_REPORT.md:115 already flags the 2-day Test A as underpowered and not a refutation.
 
 ---
 

@@ -20,6 +20,33 @@ _last_request_ts = [0.0]
 _throttle_lock = threading.Lock()
 MIN_INTERVAL = 0.22  # ~4.5 req/s, well under the basic-tier limit
 
+# Kalshi throttles on SHARED PER-IP rate, not per-process.  A script that is
+# "well under the limit" on its own can still push the host over it: on the
+# droplet this module runs alongside betting-pod-shop, betting-live-maker and
+# betting-book-capture.  Long-running collectors must therefore lower
+# MIN_INTERVAL to their share of the host budget rather than trusting the
+# single-process default — see mlb_props_research/collector.py --rate.
+ON_STATUS = None  # optional callable(status_code) -> None; observability hook
+
+
+def set_min_interval(seconds):
+    """Set the global inter-request spacing (seconds). Returns the new value."""
+    global MIN_INTERVAL
+    MIN_INTERVAL = float(seconds)
+    return MIN_INTERVAL
+
+
+def set_on_status(cb):
+    """Register a callback invoked with every HTTP status code received.
+
+    Exists because `get()` retries 429s internally, which makes rate-limit
+    pressure INVISIBLE to callers — the retry succeeds and nothing is logged.
+    A collector sharing an IP budget with trading services needs to see them.
+    """
+    global ON_STATUS
+    ON_STATUS = cb
+    return cb
+
 
 def _throttle():
     # Reserve the next send slot under the lock (thread-safe token spacing),
@@ -43,6 +70,11 @@ def get(path, params=None, retries=4):
                 time.sleep(3 * (2 ** attempt))
                 continue
             raise
+        if ON_STATUS is not None:
+            try:
+                ON_STATUS(resp.status_code)
+            except Exception:
+                pass                      # observability must never break a fetch
         if resp.status_code == 200:
             return resp.json()
         if resp.status_code in (429, 500, 502, 503, 504) and attempt < retries:

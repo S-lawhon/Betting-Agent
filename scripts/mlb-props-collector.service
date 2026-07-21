@@ -1,0 +1,84 @@
+[Unit]
+# DEPLOY PATH IS /opt/mlb-props, NOT /opt/betting-pod-shop.
+#
+# That is deliberate — scripts/deploy.sh rsyncs only into
+# /opt/betting-pod-shop, so collected data here can never be clobbered by a
+# deploy (deploy.sh also excludes data/ and *.jsonl, but this tree is not even
+# in its path). The tradeoff is that the deployed code DRIFTS from the repo:
+# deploy.sh will not update it. After editing collector.py or
+# kalshi-ev-map/src/kalshi_client.py, push by hand:
+#
+#   scp mlb_props_research/collector.py \
+#       root@129.212.176.202:/opt/mlb-props/mlb_props_research/collector.py
+#   scp kalshi-ev-map/src/kalshi_client.py \
+#       root@129.212.176.202:/opt/mlb-props/kalshi-ev-map/src/kalshi_client.py
+#   ssh root@129.212.176.202 'chown -R bettingbot:bettingbot /opt/mlb-props'
+#
+# Kill switch (idles the loop without unloading the unit; survives a restart,
+# which `systemctl stop` does not since the timer refires next morning):
+#   touch /opt/mlb-props/mlb_props_research/data/KILL_COLLECTOR
+Description=MLB Props Research — daily Kalshi order-book snapshot collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# ONESHOT + TIMER, not a long-running service, because collector.py is built
+# for a daily window: it self-terminates at its end_hour argument. Under
+# Restart=always it would exit at 23:45 local and be restarted into an
+# immediate re-exit, looping until midnight. The timer models the actual
+# design — one run per slate.
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+Environment=TZ=America/New_York
+WorkingDirectory=/opt/mlb-props/mlb_props_research
+
+# --rate 2.0 is DELIBERATELY below kalshi_client's 4.5 req/s default.
+# Kalshi throttles on shared per-IP rate; this host also runs
+# betting-pod-shop (2 req/s), betting-live-maker and betting-book-capture
+# (2.5 req/s) against a ~7 req/s pain threshold.
+#
+# A cycle is ~570 requests. At 4.5 req/s that is a 123s BURST inside a 300s
+# cycle — 1.9 req/s average but 4.5 peak, and the peak is what trips the
+# shared limiter. Measured 2026-07-21: betting-book-capture logged zero 429s
+# all day until this collector started at 14:00 UTC, then took 7 and
+# self-throttled 2.5 -> 1.25 req/s. At 2.0 the same 570 requests spread
+# across the full cycle: identical throughput, peak cut 56%, no data lost.
+#
+# P-016 is mid-gate (282/500 fills) — pushing the host into 429s would
+# contaminate a running pre-registered sample. Raise only after confirming
+# 429 counts hold at zero.
+ExecStart=/usr/bin/python3 /opt/mlb-props/mlb_props_research/collector.py 23.75 --rate 2.0
+
+# Night-slate first pitches end ~22:10 ET; hard ceiling well past that.
+TimeoutStartSec=16h
+
+# Transient network failure should not cost a whole game-day of collection.
+# oneshot + on-failure is safe here: a restarted run resumes appending to the
+# same daily file and still stops at end_hour.
+Restart=on-failure
+RestartSec=60
+
+StandardOutput=append:/opt/mlb-props/mlb_props_research/data/live/collector.log
+StandardError=append:/opt/mlb-props/mlb_props_research/data/live/collector.log
+SyslogIdentifier=mlb-props-collector
+
+# Research collection is strictly lower priority than trading: if the box
+# gets tight, this is what should yield.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=512M
+
+# ── Security hardening (mirrors betting-book-capture.service) ───────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/mlb-props/mlb_props_research/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

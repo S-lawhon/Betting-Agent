@@ -1,0 +1,18 @@
+[Unit]
+Description=Run MLB props collector daily before the afternoon slate
+
+[Timer]
+# 10:00 ET is ahead of the earliest regular first pitch (~12:35 ET), so the
+# pre-game ramp is captured from the start. The run self-terminates at 23:45
+# ET, after the night slate.
+OnCalendar=*-*-* 10:00:00 America/New_York
+
+# Persistent=true so a droplet reboot or a missed timer window during the day
+# still starts collection rather than silently skipping a game-day. Every
+# missed day is a game-day that never comes back — the sample is calendar
+# bound, not throughput bound.
+Persistent=true
+Unit=mlb-props-collector.service
+
+[Install]
+WantedBy=timers.target

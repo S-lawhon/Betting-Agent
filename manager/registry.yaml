@@ -514,14 +514,44 @@ workstreams:
     name: MLB Props Research (Phase 3)
     stage: build
     owner_dir: mlb_props_research
-    blocked_on: human
+    blocked_on: time
     action_required: >
       PHASE 3 COMPLETE 2026-07-20 with two NEGATIVE results (PHASE3_REPORT.md).
       Next step is a live paper EXECUTION test, NOT more modelling: every edge so
       far was measured against trade prints, never against a live book. Must
       measure whether fills are actually available at the ask near first pitch,
       using the collector orderbook snapshots in mlb_props_research/data/live/.
-      Decide whether ~$10-35/day justifies building that execution test.
+
+      BLOCKED ON DATA UNTIL ~2026-08-17 — do not run the execution test before
+      then. PHASE3_REPORT.md:115 is explicit that the existing 2-day / 170-market
+      Test A is badly underpowered and must NOT be read as a refutation; running
+      it again on the same thin sample would only relaunder that error. See
+      collection_status below. Nothing is required of a human until the sample
+      lands; the standing decision (does ~$10-35/day justify the build) is then
+      taken against a properly powered result.
+    collection_status:
+      script: mlb_props_research/collector.py
+      unit: mlb-props-collector.timer -> .service (droplet, 10:00 ET daily)
+      data_path: /opt/mlb-props/mlb_props_research/data/live/snapshots_YYYYMMDD.jsonl
+      started: 2026-07-21
+      game_days_collected: 3      # 07-19, 07-20 (local), 07-21 (droplet, first full day)
+      game_days_target: 27
+      expected_complete: 2026-08-17   # +/- rainouts and off-days
+      note: >
+        CORRECTION 2026-07-21: the timer was installed at 03:00 UTC 2026-07-21
+        and first fired at 14:00 UTC that day, so any claim of a droplet timer
+        "accumulating" before 2026-07-21 is wrong — 07-19 and 07-20 were manual
+        local runs. Day count is calendar-bound, not throughput-bound: a missed
+        day is a game-day that never comes back, hence Persistent=true on the
+        timer and Restart=on-failure on the service.
+
+        The collector was also unthrottled until 2026-07-21: it burst at the
+        client default 4.5 req/s for 123s of every 300s cycle. Kalshi throttles
+        on shared per-IP rate, and betting-book-capture (the only consumer that
+        logs 429s explicitly) went from zero 429s all day to 7 within hours of
+        the collector starting, self-throttling 2.5 -> 1.25 req/s. Collector now
+        runs --rate 2.0, which spreads the same ~570 requests across the full
+        cycle: same throughput, peak cut 56%.
     summary: >
       Phase 3 killed two things. (1) The batter-hits model FAILS: well calibrated
       in isolation but loses to market on Brier (0.2236 vs 0.2210) at every

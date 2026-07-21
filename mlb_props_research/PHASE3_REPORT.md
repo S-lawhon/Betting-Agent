@@ -121,6 +121,22 @@ Test A is also **badly underpowered and should not be treated as a refutation**:
 - **Required before any capital:** 2–3 weeks of collector data for a properly powered, multi-day live execution sample, with the activity filter applied and paper fills logged. Two days cannot settle this.
 - The model remains shelved; none of this depends on it.
 
+### Collection status (added 2026-07-21)
+
+Scheduled collection now exists and is the thing the execution test waits on.
+
+| | |
+|---|---|
+| Unit | `mlb-props-collector.timer` → `.service`, daily 10:00 ET, droplet |
+| Data | `/opt/mlb-props/mlb_props_research/data/live/snapshots_YYYYMMDD.jsonl` |
+| Started | 2026-07-21 (first timer fire 14:00 UTC) |
+| Collected | 3 of ~27 game-days |
+| Expected complete | ~2026-08-17, ± rainouts and off-days |
+
+Two corrections to the record. First, 07-19 and 07-20 were **manual local runs**, not scheduled collection — the timer did not exist until 2026-07-21, so any earlier claim that a droplet timer was "accumulating" is wrong. Second, the collector was **unthrottled** until 2026-07-21: it burst at the client-default 4.5 req/s for 123 s of every 300 s cycle. Because Kalshi throttles on shared per-IP rate, `betting-book-capture` went from zero HTTP 429s all day to 7 within hours of the collector starting, self-throttling 2.5 → 1.25 req/s. The collector now runs `--rate 2.0`, spreading the same ~570 requests across the full cycle — same throughput, peak cut 56%.
+
+**Do not re-run Test A until the sample lands.** Its 170 markets / 2 days is exactly the underpowered sample flagged above; re-running it on the same data would relaunder that error as a fresh result rather than answer the question.
+
 ---
 
 # ADDENDUM 2 — Phase 3c: Re-examining the negative live result (2026-07-20)

@@ -1,43 +1,72 @@
 {
-  "_comment": "Validated P-017 golf pod parameters from backtest_golf.py + refine_golf.py, H1-2026 Kalshi data (10 tournaments; Leg B 4 tournaments of tick data). THOC26/COPC26 excluded (settlement lag on pull date). edge_bump values are the CONSERVATIVE lower-CI convention (matching qualifier_favorite_pod P-015), NOT point estimates. Regenerate after each new event via re-pull + backtest.",
+  "_comment": "Validated P-017 golf pod parameters. UPDATED 2026-07-20: extended from 10 to 12 tournaments by folding in THOC26 + COPC26, whose settlement was unpopulated on the original pull date and is now populated. The original 10-event Leg A result reproduced BIT-EXACT from a fresh data pull, so the harness is verified faithful. edge_bump values remain the CONSERVATIVE lower-CI convention (matching qualifier_favorite_pod P-015), NOT point estimates. Full detail + audit trail in backtest/REPORT_Golf_TopN_2026-07.md (EXTENSION section); raw numbers in backtest_results_extended.json. Regenerate after each new event via re-pull + backtest.",
+  "_previous_10_event_values": {
+    "leg_A_measured_net_per_contract": 0.068,
+    "leg_A_ci95": [0.031, 0.102],
+    "leg_A_n_events": 10,
+    "leg_B_measured_net_per_contract": 0.091,
+    "leg_B_ci95": [0.045, 0.135],
+    "leg_B_n_events": 4,
+    "note": "Kept for audit. Leg A barely moved; Leg B degraded materially - see below."
+  },
   "leg_A_pre_tourn_taker": {
     "status": "VALIDATED",
     "series": ["KXPGATOP10", "KXPGATOP20"],
     "ask_band": [0.08, 0.45],
+    "ask_band_backtest_canonical": [0.08, 0.40],
+    "_ask_band_note": "The SHIPPED pod and config use ask_cap 0.45 (golf_topn_pod.py, config_multi_pod.yaml); the canonical backtest run uses 0.40. That mismatch is now RESOLVED in the pod's favour: on 12 events the 0.08-0.45 band returns +0.0714 CI [+0.0430,+0.0990] (n=1149), slightly better than 0.08-0.40 and also excluding zero. No config change needed. Follow-up: align backtest_golf.py's canonical band to 0.45 (or parameterise it) so future re-runs report the band the pod actually trades.",
+    "measured_net_per_contract_at_shipped_band_0_45": 0.0714,
+    "ci95_at_shipped_band_0_45": [0.0430, 0.0990],
     "max_spread": 0.06,
     "anchor_days_to_close": [4.0, 10.0],
-    "measured_net_per_contract": 0.068,
-    "ci95": [0.031, 0.102],
-    "gross_per_contract": 0.078,
-    "n_bets": 926,
-    "n_events": 10,
-    "positive_events": "9/10 (TRAV26 the lone negative at -4.9c)",
+    "measured_net_per_contract": 0.0692,
+    "ci95": [0.0379, 0.0992],
+    "gross_per_contract": 0.0795,
+    "hit_rate": 0.270,
+    "n_bets": 1117,
+    "n_events": 12,
+    "positive_events": "11/12 (TRAV26 the lone negative at -4.9c)",
+    "new_events_2026_07_20": {"THOC26": 0.1172, "COPC26": 0.0239},
     "edge_bump": 0.04,
     "min_net_edge": 0.02,
     "depth_haircut": 0.5,
-    "notes": "top-20 (+8.3c) stronger than top-10 (+4.9c); band-robust +6.6..+7.4c. Exclude signature-event weeks initially (TRAV26 exception). fair_prob = min(ask + edge_bump, cap); with DataGolf later, replace edge_bump with model prob."
+    "notes": "Estimate essentially unchanged (+6.81c -> +6.92c); CI narrowed 7.12c -> 6.13c, which is roughly the mechanical gain from two more clusters. This is CONFIRMATION, not new information, and does NOT satisfy the ~8-live-tournament go/no-go gate (that gate is about live paper fills). top-20 (+9.15c [+4.68,+13.41]) stronger than top-10 (+4.04c [+1.57,+6.46]); band-robust +6.62..+7.19c across 5 bands. edge_bump 0.04 remains comfortably conservative. Exclude signature-event weeks initially (TRAV26 exception). result='scalar' (competitor withdrew) VERIFIED not to affect this leg: of 134 scalar records, zero clear the entry gate."
   },
   "leg_B_fade_maker": {
-    "status": "PROMISING_UNDERPOWERED",
+    "status": "DOWNGRADED_PAPER_ONLY",
+    "_status_change": "Was PROMISING_UNDERPOWERED at +9.1c on 4 events. On 6 events the CI now straddles zero. Do NOT treat +9.1c as a live expectation.",
     "series": ["KXPGATOP10", "KXPGATOP20"],
     "mid_band": [0.08, 0.40],
     "fade_window_hours_before_close": [36.0, 6.0],
     "quote_offset_above_mid": 0.03,
     "quote_size": 25.0,
     "maker_fee": 0.0,
-    "measured_net_per_contract": 0.091,
-    "ci95": [0.045, 0.135],
-    "fill_rate": 0.675,
-    "n_events": 4,
-    "notes": "REAL edge but only 4 tournaments of tick data. CRITICAL: window must start at 36h, NOT 48h. The 48-24h slice is NEGATIVE (-3.1c) - fading Friday loses because YES is still climbing; edge is Sat->Sun-AM. offset 0.03 minimizes adverse selection. Deploy paper-only to confirm before any real money."
+    "measured_net_per_contract_as_coded": 0.0490,
+    "ci95_as_coded": [-0.0169, 0.1081],
+    "measured_net_per_contract_contract_weighted": 0.0334,
+    "fill_rate": 0.589,
+    "n_events": 6,
+    "positive_events": "3/6",
+    "per_event_net": {"USO26": 0.1304, "GESO26": 0.0712, "PGC26": 0.0489, "THOC26": -0.0207, "COPC26": -0.0847, "TRAV26": -0.1481},
+    "_KNOWN_BUG": "backtest_golf.py leg_fade_maker mislabels its output: line 318 appends one per_bet entry per through-print FILL EVENT regardless of contract count, and line 355 OVERWRITES the correctly contract-weighted mean computed at line 332 with that unweighted fill-event mean. The 'as_coded' figures above preserve the original methodology for apples-to-apples comparison; 'contract_weighted' is the correct per-contract number. Fixing this is a recommended follow-up.",
+    "notes": "Degradation investigated before reporting: not a settlement artifact (Leg A is positive on both new events using the same settlement data); COPC26 is genuinely illiquid (7.6 trades/market vs 67-207 elsewhere) but carries only 6% of contracts, so most of the drop comes from THOC26, a major with the most trade data in the sample. Leg B also does not reproduce bit-exactly (+8.62c vs +9.15c on the same 4 events) - the trades endpoint is unstable under re-pagination, so treat Leg B as +/-0.5c. Contract-weighted +3.3c is BELOW the +4.55c maker half-baseline. Window timing finding stands: 48-24h is negative; edge is Sat->Sun-AM. Keep paper-only; collect live fills."
   },
   "leg_C_makecut": {
     "status": "SHELVED_INSUFFICIENT_DATA",
-    "notes": "Only 12 two-sided pre-tournament make-cut quotes in sample (median ask 0.36, clustered 0.3-0.7). Cannot validate. Revisit after live paper collection."
+    "notes": "NOT re-run in the 2026-07-20 extension (KXPGAMAKECUT not re-pulled - rate limits). Original verdict stands: only 12 two-sided pre-tournament quotes in sample. Revisit after live paper collection."
   },
   "rejected": {
-    "top5": "net +0.5c, CI [-0.7,+1.8] straddles zero - matches literature (top-5 not soft). Do not trade.",
-    "top40": "only 1 event with data - insufficient.",
+    "top5": "NOT re-run in the 2026-07-20 extension (only 1051/1677 markets re-pulled; a partial pull is a biased subset because jobs are event-ordered, so it must not be quoted). Original verdict stands: net +0.5c, CI [-0.7,+1.8] straddles zero. Do not trade.",
+    "top40": "NOT re-run (not re-pulled). Original verdict stands: only 1 event with data - insufficient.",
     "outright_winner": "efficient + maker fees + institutional MM (0.2c spreads). Benchmark only, per GOLF_KALSHI_RESEARCH.md."
+  },
+  "_data_provenance": {
+    "pulled": "2026-07-20",
+    "events": 12,
+    "complete_series": ["KXPGATOP10 (1677)", "KXPGATOP20 (1677)", "trades for 6 events (1724 markets, 0 errors)"],
+    "incomplete_series": ["KXPGATOP5 (1051/1677)", "KXPGAMAKECUT (0)", "KXPGATOP40 (0)"],
+    "reproduction_check": "10-event Leg A reproduced to 4dp: n=926, +0.0681, CI [+0.0306,+0.1018]",
+    "kalshi_rate_limit_note": "Kalshi throttles by CONCURRENCY, not aggregate rate. 12 threads -> constant 429s; a single connection at 0.15s interval -> zero 429s. Use sequential pulls.",
+    "data_files": "golf_research/candles.jsonl + trades.jsonl (gitignored by *.jsonl; regenerate settled_markets.json via collect_settled.py before re-pulling)"
   }
 }

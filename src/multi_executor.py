@@ -47,12 +47,16 @@ class MultiExecutor:
         aggregate_risk=None,
         mode: str = "paper",
         live_trading_confirmed: bool = False,
+        max_scan_workers: Optional[int] = None,
     ):
         self.venue_clients = venue_clients
         self.risk_manager = risk_manager
         self.aggregate_risk = aggregate_risk
         self.mode = mode
         self.live_trading_confirmed = live_trading_confirmed
+        # Cap on concurrent pod scans.  None = one thread per pod (the old
+        # behaviour).  See run_cycle for why this matters.
+        self.max_scan_workers = max_scan_workers
 
     def execute(self, result: ScanResult) -> MultiExecutionResult:
         """Execute a single ScanResult on its target venue."""
@@ -161,8 +165,19 @@ class MultiExecutor:
                          Each pod's scan_once() is I/O-bound (HTTP calls), so
                          threading is highly effective.  Execution of results
                          happens serially to preserve aggregate risk ordering.
-            max_workers: Max threads for concurrent scanning.  Defaults to the
+            max_workers: Max threads for concurrent scanning.  Falls back to
+                         self.max_scan_workers (from config), then to the
                          number of pods.
+
+                         KEEP THIS SMALL.  Kalshi throttles on CONCURRENT
+                         CONNECTIONS, not requests/second — 12 threads produce
+                         constant 429s while a single connection at ~6.7 req/s
+                         produces none.  Unbounded, this opens one connection
+                         per active pod and was measured (2026-07-20/21)
+                         producing 829 HTTP 429s/24h, ~118/hr sustained at
+                         peak, on 6 active pods.  The 5-minute cycle has ample
+                         headroom to absorb the serialisation: measured cycles
+                         complete in 30-46s of the 300s budget.
 
         Returns:
             List of MultiExecutionResult for all pods.
@@ -170,7 +185,10 @@ class MultiExecutor:
         if not concurrent or len(pods) <= 1:
             return self._run_cycle_sequential(pods)
 
-        return self._run_cycle_concurrent(pods, max_workers)
+        return self._run_cycle_concurrent(
+            pods, max_workers if max_workers is not None
+            else self.max_scan_workers
+        )
 
     def _run_cycle_sequential(self, pods: List[BasePod]) -> List[MultiExecutionResult]:
         """Original sequential scan + execute loop."""
@@ -215,6 +233,15 @@ class MultiExecutor:
         from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 
         workers = max_workers or len(pods)
+        if max_workers is None:
+            # Unbounded concurrency is the 429 bug — surface it rather than
+            # letting a missing config key silently reintroduce the problem.
+            logger.warning(
+                "multi_executor: max_scan_workers unset — scanning %d pods "
+                "with %d concurrent connections. Kalshi throttles on "
+                "concurrency; set execution.max_scan_workers in config.",
+                len(pods), workers,
+            )
         all_results = []
 
         # Phase 1: Scan all pods concurrently with per-pod timeout
@@ -365,10 +392,23 @@ class MultiExecutor:
         env = config.get("environment", "demo")
         import os
         confirmed = os.environ.get("I_UNDERSTAND_LIVE_TRADING", "").lower() == "true"
+        execution = config.get("execution") or {}
+        raw_workers = execution.get("max_scan_workers")
+        max_scan_workers = None
+        if raw_workers is not None:
+            try:
+                max_scan_workers = max(1, int(raw_workers))
+            except (TypeError, ValueError):
+                logger.warning(
+                    "multi_executor: execution.max_scan_workers=%r is not an "
+                    "int — falling back to unbounded concurrency",
+                    raw_workers,
+                )
         return cls(
             venue_clients=venue_clients,
             risk_manager=risk_manager,
             aggregate_risk=aggregate_risk,
             mode=mode_map.get(env, "paper"),
             live_trading_confirmed=confirmed,
+            max_scan_workers=max_scan_workers,
         )

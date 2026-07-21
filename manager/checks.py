@@ -126,9 +126,25 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
     out: List[Finding] = []
     for job in snap.get("jobs", []):
         jid = job.get("id", "?")
+        if job.get("state") == "uncheckable":
+            # We did not look, so we know nothing. Say that out loud. Staying
+            # silent here is what let the Mac-hosted weather jobs report a
+            # confident "does not exist" from the droplet for weeks.
+            out.append(Finding(
+                key="job.{}.uncheckable".format(jid),
+                severity="info",
+                title="{} could not be checked (state unknown)".format(jid),
+                detail=("{}\nHost: {}\nSchedule: {}\n\n{}\n\n"
+                        "This is an admitted gap, NOT a healthy result and NOT "
+                        "a missing output. Run manager/refresh.py from the Mac "
+                        "so local jobs are measured where they actually live."
+                        .format(job.get("description", ""), job.get("host"),
+                                job.get("schedule"),
+                                job.get("uncheckable_reason", ""))),
+                value=None))
+            continue
         if not job.get("measurable"):
-            # Output lives on a host we can't see from here. Silent by design —
-            # the Mac-side jobs are checked when the brief runs on the Mac.
+            # Output path is visible from here but nothing is there to measure.
             continue
         if job.get("stale"):
             sev = {"critical": "critical", "warn": "warn"}.get(

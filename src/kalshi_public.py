@@ -52,7 +52,15 @@ class KalshiPublic:
             time.sleep(delay)
 
     def get(self, path: str, params: Optional[dict] = None,
-            retries: int = 3) -> Optional[dict]:
+            retries: int = 3,
+            on_status: Optional[callable] = None) -> Optional[dict]:
+        """GET a public endpoint.
+
+        `on_status` is an optional callback invoked with each HTTP status code
+        seen.  It exists so a caller can react to 429s (the book-capture
+        daemon throttles itself down on them).  Default None preserves the
+        exact prior behaviour for P-016 and every other existing caller.
+        """
         for attempt in range(retries + 1):
             self._throttle()
             try:
@@ -65,6 +73,11 @@ class KalshiPublic:
                     continue
                 logger.warning("kalshi_public %s failed: %s", path, exc)
                 return None
+            if on_status is not None:
+                try:
+                    on_status(resp.status_code)
+                except Exception:       # a bad hook must never break a fetch
+                    logger.debug("on_status hook raised", exc_info=True)
             if resp.status_code == 200:
                 try:
                     return resp.json()

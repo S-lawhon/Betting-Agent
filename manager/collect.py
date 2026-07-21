@@ -213,6 +213,18 @@ def file_age(path: Path) -> Optional[float]:
         return None
 
 
+def is_local_job(job: Dict[str, Any]) -> bool:
+    """True for registry jobs whose output lives on the Mac, not the droplet.
+
+    Two independent markers, either sufficient: `host: mac` (where it runs) and
+    `output.root: local` (where its output is rooted). They agree today, but a
+    job declared with only one of them must still be routed to the Mac.
+    """
+    if str(job.get("host", "")).lower() in ("mac", "local", "laptop"):
+        return True
+    return str((job.get("output") or {}).get("root", "")).lower() == "local"
+
+
 def safe(label: str):
     """Decorator: turn any collector exception into a recorded fault."""
     def wrap(fn):
@@ -317,60 +329,103 @@ class Collector:
     # ---- scheduled jobs --------------------------------------------------
     @safe("jobs")
     def jobs(self) -> List[Dict[str, Any]]:
-        out = []
-        for job in self.registry.get("jobs", []):
-            spec = job.get("output", {})
-            root_kind = spec.get("root", "project")
-            age_min: Optional[float] = None
-            exists = False
-            target = None
+        return [self.job_record(job) for job in self.registry.get("jobs", [])]
 
-            content_age_min: Optional[float] = None
-            if spec.get("file"):
-                target = self.resolve(spec["file"], root_kind)
-                exists = target.exists()
-                age_min = file_age(target)
-                # mtime lies. clv_settlement's file was touched 31h ago but its
-                # newest ROW is ~50h old: the cron ran, opened the file, and
-                # appended nothing. For .jsonl outputs the last row timestamp is
-                # the only honest measure of whether the job did any work.
-                if exists and str(target).endswith(".jsonl"):
-                    last = last_json_row(target)
-                    dt = row_ts(last) if last else None
-                    if dt:
-                        content_age_min = (now() - dt).total_seconds() / 60.0
-                        age_min = max(age_min or 0.0, content_age_min)
-            elif spec.get("glob"):
-                base = self.resolve(spec["glob"], root_kind)
-                matches = sorted(base.parent.glob(base.name),
-                                 key=lambda p: p.stat().st_mtime if p.exists() else 0)
-                if matches:
-                    target, exists = matches[-1], True
-                    age_min = file_age(matches[-1])
+    def job_record(self, job: Dict[str, Any]) -> Dict[str, Any]:
+        """Measure one registry job on THIS machine.
 
-            max_hours = spec.get("max_stale_hours")
-            stale = (age_min is not None and max_hours is not None
-                     and age_min > max_hours * 60)
+        A Mac-hosted job measured on the droplet must never come back as
+        `exists: False`. Its output path (/Users/samlawhon/...) cannot exist
+        there, so a plain stat() reports "missing" with total confidence for a
+        job that may be running perfectly. That false negative is the bug this
+        branch exists to prevent: R-EV-MAP Build 2 has a 30-day evidence gate,
+        and for as long as the droplet answered "does not exist" the brief was
+        structurally incapable of seeing evidence accumulate. When we cannot
+        look, we say so.
+        """
+        spec = job.get("output", {}) or {}
+        root_kind = spec.get("root", "project")
+        max_hours = spec.get("max_stale_hours")
 
-            out.append({
-                "id": job["id"],
-                "host": job.get("host", "droplet"),
-                "schedule": job.get("schedule"),
-                "description": job.get("description", ""),
-                "severity": job.get("severity", "info"),
-                "output": str(target) if target else None,
-                "exists": exists,
-                "age_hours": round(age_min / 60.0, 1) if age_min is not None else None,
-                "content_age_hours": (round(content_age_min / 60.0, 1)
-                                      if content_age_min is not None else None),
-                "max_stale_hours": max_hours,
-                "stale": stale,
-                # A job whose host we're not running on can't be measured if its
-                # output lives on the other machine — flag rather than fake it.
-                "measurable": exists or age_min is not None,
-                "note": job.get("note"),
+        base_rec: Dict[str, Any] = {
+            "id": job["id"],
+            "host": job.get("host", "droplet"),
+            "schedule": job.get("schedule"),
+            "description": job.get("description", ""),
+            "severity": job.get("severity", "info"),
+            "max_stale_hours": max_hours,
+            "note": job.get("note"),
+        }
+
+        if not self.can_check(job):
+            base_rec.update({
+                "output": None,
+                "exists": None,          # NOT False — we did not look
+                "age_hours": None,
+                "content_age_hours": None,
+                "stale": None,
+                "measurable": False,
+                "state": "uncheckable",
+                "uncheckable_reason": (
+                    "job runs on '{}' (paths under {}); this collector is on "
+                    "'{}' where that root is not present"
+                    .format(base_rec["host"], self.local_root, self.host)),
             })
-        return out
+            return base_rec
+
+        age_min: Optional[float] = None
+        content_age_min: Optional[float] = None
+        exists = False
+        target = None
+
+        if spec.get("file"):
+            target = self.resolve(spec["file"], root_kind)
+            exists = target.exists()
+            age_min = file_age(target)
+            # mtime lies. clv_settlement's file was touched 31h ago but its
+            # newest ROW is ~50h old: the cron ran, opened the file, and
+            # appended nothing. For .jsonl outputs the last row timestamp is
+            # the only honest measure of whether the job did any work.
+            if exists and str(target).endswith(".jsonl"):
+                last = last_json_row(target)
+                dt = row_ts(last) if last else None
+                if dt:
+                    content_age_min = (now() - dt).total_seconds() / 60.0
+                    age_min = max(age_min or 0.0, content_age_min)
+        elif spec.get("glob"):
+            base = self.resolve(spec["glob"], root_kind)
+            matches = sorted(base.parent.glob(base.name),
+                             key=lambda p: p.stat().st_mtime if p.exists() else 0)
+            if matches:
+                target, exists = matches[-1], True
+                age_min = file_age(matches[-1])
+
+        stale = (age_min is not None and max_hours is not None
+                 and age_min > max_hours * 60)
+
+        base_rec.update({
+            "output": str(target) if target else None,
+            "exists": exists,
+            "age_hours": round(age_min / 60.0, 1) if age_min is not None else None,
+            "content_age_hours": (round(content_age_min / 60.0, 1)
+                                  if content_age_min is not None else None),
+            "stale": stale,
+            "measurable": exists or age_min is not None,
+            "state": "measured",
+            "checked_on": self.host,
+        })
+        return base_rec
+
+    def can_check(self, job: Dict[str, Any]) -> bool:
+        """Can this machine honestly measure this job's output?
+
+        Local-rooted jobs are checkable only where local_root actually exists.
+        On the Mac local_root IS the checkout, so they resolve; on the droplet
+        it does not, so they do not.
+        """
+        if not is_local_job(job):
+            return True
+        return self.local_root.exists()
 
     # ---- trade log / pod activity ---------------------------------------
     @safe("trade_log")
@@ -770,6 +825,42 @@ class Collector:
             "faults": self.faults,
         }
         return snapshot
+
+
+def collect_local_jobs(registry_path: Path = HERE / "registry.yaml",
+                       local_root: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Measure only the Mac-hosted jobs, on the machine calling this.
+
+    refresh.py runs the main collector over SSH on the droplet, which cannot
+    see /Users/samlawhon/... — so the local jobs come back "uncheckable" from
+    there and are filled in here, on the Mac, where their output actually is.
+    """
+    col = Collector(registry_path, local_root=local_root)
+    return [col.job_record(job) for job in col.registry.get("jobs", [])
+            if is_local_job(job)]
+
+
+def merge_local_jobs(snapshot: Dict[str, Any],
+                     registry_path: Path = HERE / "registry.yaml",
+                     local_root: Optional[Path] = None) -> Dict[str, Any]:
+    """Overlay locally-measured job records onto a droplet-collected snapshot.
+
+    Only records that were actually measured here replace the remote ones; if
+    the Mac cannot see them either, the remote "uncheckable" entry stands. We
+    never downgrade a real measurement into a guess.
+    """
+    local = {rec["id"]: rec for rec in collect_local_jobs(registry_path, local_root)
+             if rec.get("state") == "measured"}
+    if not local:
+        return snapshot
+    merged = []
+    for job in snapshot.get("jobs", []):
+        rec = local.pop(job.get("id"), None)
+        merged.append(rec if rec else job)
+    merged.extend(local.values())  # local-only jobs absent from the remote run
+    snapshot["jobs"] = merged
+    snapshot["local_jobs_merged_at"] = iso(now())
+    return snapshot
 
 
 def write_state(snapshot: Dict[str, Any], state_dir: Path = STATE_DIR) -> Path:

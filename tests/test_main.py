@@ -325,6 +325,66 @@ class TestRunGuardedLoop(unittest.TestCase):
         reports = _run_guarded_loop(runner, guard, interval=0.0, max_cycles=2)
         self.assertEqual(len(reports), 0)
 
+    def test_golf_settler_is_polled_and_releases_pod_slot(self):
+        """Regression: P-017 shipped with a settler that was never called.
+
+        on_settlement() existed on the pod but nothing invoked it — the
+        generic Settler filters to P-001 and only the tennis branch
+        reached pod.on_settlement.  The failure was silent: bets placed,
+        nothing resolved, the open-position counter pegged at the cap,
+        and the pod went mute after one tournament.  Pin the wiring.
+        """
+        runner = MagicMock()
+        runner.run_once.return_value = _make_report()
+        guard = MagicMock()
+        guard.check_pre_cycle.return_value = True
+        guard.snapshot.return_value = MagicMock(halt_reason=None)
+
+        pod = MagicMock()
+        pod.pod_id = "P-017"
+        runner.pods = [pod]
+
+        golf_settler = MagicMock()
+        golf_settler.settle_cycle.return_value = [{
+            "pod_id": "P-017",
+            "market_id": "KXPGATOP10-3MO26-AAA",
+            "pnl_usd": 12.5,
+            "fingerprint": "fp1",
+        }]
+        allocator = MagicMock()
+
+        _run_guarded_loop(
+            runner, guard, interval=0.0, max_cycles=1,
+            golf_settler=golf_settler, allocator=allocator,
+        )
+
+        golf_settler.settle_cycle.assert_called()
+        # the pod's open-position slot must actually be released
+        pod.on_settlement.assert_called_once_with("KXPGATOP10-3MO26-AAA")
+        allocator.record_settlement.assert_called_once_with(
+            "P-017", 12.5, fingerprint="fp1",
+        )
+        guard.close_position.assert_called_once_with(
+            "KXPGATOP10-3MO26-AAA", 12.5,
+        )
+
+    def test_golf_settler_failure_does_not_break_cycle(self):
+        runner = MagicMock()
+        runner.run_once.return_value = _make_report()
+        runner.pods = []
+        guard = MagicMock()
+        guard.check_pre_cycle.return_value = True
+        guard.snapshot.return_value = MagicMock(halt_reason=None)
+
+        golf_settler = MagicMock()
+        golf_settler.settle_cycle.side_effect = RuntimeError("kalshi down")
+
+        reports = _run_guarded_loop(
+            runner, guard, interval=0.0, max_cycles=1,
+            golf_settler=golf_settler,
+        )
+        self.assertEqual(len(reports), 1)
+
 
 # ── TestMain ──────────────────────────────────────────────────────────
 

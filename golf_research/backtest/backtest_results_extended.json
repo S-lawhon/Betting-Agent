@@ -1,5 +1,5 @@
 {
-  "generated": "backtest_golf.py re-run 2026-07-20 (extension: +THOC26,+COPC26)",
+  "generated": "rerun_extension.py (driver for the 2026-07-20 extension)",
   "note": "Original 10-event Leg A reproduced BIT-EXACT from a fresh data pull.",
   "legs": [
     {
@@ -35,50 +35,7 @@
       "series": [
         "KXPGATOP10",
         "KXPGATOP20"
-      ],
-      "per_event": {
-        "CHSC26": {
-          "n": 115,
-          "net": 0.0456
-        },
-        "GESO26": {
-          "n": 82,
-          "net": 0.0627
-        },
-        "ISC26": {
-          "n": 62,
-          "net": 0.1157
-        },
-        "JODC26": {
-          "n": 99,
-          "net": 0.1016
-        },
-        "PGC26": {
-          "n": 101,
-          "net": 0.0538
-        },
-        "RBBCAN26": {
-          "n": 92,
-          "net": 0.0899
-        },
-        "THCCBN26": {
-          "n": 89,
-          "net": 0.1561
-        },
-        "THMTPBW26": {
-          "n": 84,
-          "net": 0.0722
-        },
-        "TRAV26": {
-          "n": 117,
-          "net": -0.0487
-        },
-        "USO26": {
-          "n": 85,
-          "net": 0.088
-        }
-      },
-      "positive_events": "9/10"
+      ]
     },
     {
       "leg": "A_KXPGATOP10_10ev_original",
@@ -154,7 +111,7 @@
       "n_filled_quotes": 295,
       "fill_rate": 0.657,
       "total_contracts_filled": 6783.4,
-      "mean_pnl_per_contract": 0.0862,
+      "mean_pnl_per_contract": 0.0585,
       "n_events": 4,
       "events": [
         "GESO26",
@@ -175,32 +132,30 @@
         "KXPGATOP10",
         "KXPGATOP20"
       ],
-      "note": "per-contract PnL; maker fee = 0 (quadratic series); pessimistic through-fill only.",
-      "ci95_lo": 0.0291,
-      "ci95_hi": 0.137,
+      "note": "CONTRACT-WEIGHTED per-contract PnL; maker fee = 0 (quadratic series); pessimistic through-fill only. CI is a contract-weighted bootstrap clustered by tournament.",
+      "ci95_lo": -0.0483,
+      "ci95_hi": 0.1108,
+      "n_fill_events": 636,
       "n_bets": 636,
-      "CONTRACT_WEIGHTED": {
-        "contract_weighted_net_per_contract": 0.0585,
-        "total_contracts": 6783.4,
-        "per_event": {
-          "GESO26": {
-            "contracts": 1902.3,
-            "net_per_contract": 0.0712
-          },
-          "PGC26": {
-            "contracts": 2006.8,
-            "net_per_contract": 0.0489
-          },
-          "TRAV26": {
-            "contracts": 758.4,
-            "net_per_contract": -0.1481
-          },
-          "USO26": {
-            "contracts": 2115.9,
-            "net_per_contract": 0.1304
-          }
+      "per_event": {
+        "GESO26": {
+          "contracts": 1902.3,
+          "net_per_contract": 0.0712
+        },
+        "PGC26": {
+          "contracts": 2006.8,
+          "net_per_contract": 0.0489
+        },
+        "TRAV26": {
+          "contracts": 758.4,
+          "net_per_contract": -0.1481
+        },
+        "USO26": {
+          "contracts": 2115.9,
+          "net_per_contract": 0.1304
         }
-      }
+      },
+      "mean_pnl_per_fill_event_unweighted": 0.0862
     },
     {
       "leg": "A_pre_tourn_yes_12ev_extended",
@@ -237,58 +192,7 @@
       "series": [
         "KXPGATOP10",
         "KXPGATOP20"
-      ],
-      "per_event": {
-        "CHSC26": {
-          "n": 115,
-          "net": 0.0456
-        },
-        "COPC26": {
-          "n": 87,
-          "net": 0.0239
-        },
-        "GESO26": {
-          "n": 82,
-          "net": 0.0627
-        },
-        "ISC26": {
-          "n": 62,
-          "net": 0.1157
-        },
-        "JODC26": {
-          "n": 99,
-          "net": 0.1016
-        },
-        "PGC26": {
-          "n": 101,
-          "net": 0.0538
-        },
-        "RBBCAN26": {
-          "n": 92,
-          "net": 0.0899
-        },
-        "THCCBN26": {
-          "n": 89,
-          "net": 0.1561
-        },
-        "THMTPBW26": {
-          "n": 84,
-          "net": 0.0722
-        },
-        "THOC26": {
-          "n": 104,
-          "net": 0.1172
-        },
-        "TRAV26": {
-          "n": 117,
-          "net": -0.0487
-        },
-        "USO26": {
-          "n": 85,
-          "net": 0.088
-        }
-      },
-      "positive_events": "11/12"
+      ]
     },
     {
       "leg": "A_KXPGATOP10_12ev_extended",
@@ -368,7 +272,7 @@
       "n_filled_quotes": 411,
       "fill_rate": 0.5888,
       "total_contracts_filled": 9276.9,
-      "mean_pnl_per_contract": 0.049,
+      "mean_pnl_per_contract": 0.0334,
       "n_events": 6,
       "events": [
         "COPC26",
@@ -391,40 +295,75 @@
         "KXPGATOP10",
         "KXPGATOP20"
       ],
-      "note": "per-contract PnL; maker fee = 0 (quadratic series); pessimistic through-fill only.",
-      "ci95_lo": -0.0169,
-      "ci95_hi": 0.1081,
+      "note": "CONTRACT-WEIGHTED per-contract PnL; maker fee = 0 (quadratic series); pessimistic through-fill only. CI is a contract-weighted bootstrap clustered by tournament.",
+      "ci95_lo": -0.0425,
+      "ci95_hi": 0.0861,
+      "n_fill_events": 901,
       "n_bets": 901,
-      "CONTRACT_WEIGHTED": {
-        "contract_weighted_net_per_contract": 0.0334,
-        "total_contracts": 9276.9,
-        "per_event": {
-          "COPC26": {
-            "contracts": 555.1,
-            "net_per_contract": -0.0847
-          },
-          "GESO26": {
-            "contracts": 1902.3,
-            "net_per_contract": 0.0712
-          },
-          "PGC26": {
-            "contracts": 2006.8,
-            "net_per_contract": 0.0489
-          },
-          "THOC26": {
-            "contracts": 1938.4,
-            "net_per_contract": -0.0207
-          },
-          "TRAV26": {
-            "contracts": 758.4,
-            "net_per_contract": -0.1481
-          },
-          "USO26": {
-            "contracts": 2115.9,
-            "net_per_contract": 0.1304
-          }
+      "per_event": {
+        "COPC26": {
+          "contracts": 555.1,
+          "net_per_contract": -0.0847
+        },
+        "GESO26": {
+          "contracts": 1902.3,
+          "net_per_contract": 0.0712
+        },
+        "PGC26": {
+          "contracts": 2006.8,
+          "net_per_contract": 0.0489
+        },
+        "THOC26": {
+          "contracts": 1938.4,
+          "net_per_contract": -0.0207
+        },
+        "TRAV26": {
+          "contracts": 758.4,
+          "net_per_contract": -0.1481
+        },
+        "USO26": {
+          "contracts": 2115.9,
+          "net_per_contract": 0.1304
         }
-      }
+      },
+      "mean_pnl_per_fill_event_unweighted": 0.049
+    },
+    {
+      "leg": "A_shipped_band_0_45_12ev_extended",
+      "n_bets": 1149,
+      "n_events": 12,
+      "mean_pnl_per_contract": 0.0714,
+      "ci95_lo": 0.043,
+      "ci95_hi": 0.099,
+      "total_pnl_per_contract_units": 82.01,
+      "events": [
+        "CHSC26",
+        "COPC26",
+        "GESO26",
+        "ISC26",
+        "JODC26",
+        "PGC26",
+        "RBBCAN26",
+        "THCCBN26",
+        "THMTPBW26",
+        "THOC26",
+        "TRAV26",
+        "USO26"
+      ],
+      "hit_rate": 0.2785,
+      "gross_mean": 0.0818,
+      "band": [
+        0.08,
+        0.45
+      ],
+      "days_window": [
+        4.0,
+        10.0
+      ],
+      "series": [
+        "KXPGATOP10",
+        "KXPGATOP20"
+      ]
     }
   ]
 }

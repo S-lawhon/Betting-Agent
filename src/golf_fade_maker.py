@@ -9,15 +9,19 @@ way, holders of mid-tier top-N YES contracts don't mark down fast enough
 as players fall off the pace ("hope premium"). Resting an offer (selling
 YES) in the 36h→6h-before-close window, filling only on prints that go
 strictly THROUGH the quote (pessimistic, adverse-selection-inclusive),
-returned +9.1c/contract net — zero maker fee (prop series are the
-`quadratic` fee type). CRITICAL: the edge is Sat→Sun-AM only; the
-48h→24h slice is NEGATIVE (YES still climbing Friday). Hence the 36h
-start gate.
+returned +3.3c/contract net, CI [-4.25c, +8.61c] on 6 tournaments —
+zero maker fee (prop series are the `quadratic` fee type). CRITICAL:
+the edge is Sat→Sun-AM only; the 48h→24h slice is NEGATIVE (YES still
+climbing Friday). Hence the 36h start gate.
 
-⚠️ Backtest rests on only 4 tournaments of tick data. This engine exists
-to COLLECT live paper fills + markouts over more events and confirm the
-edge before any real money — mirroring P-016's methodology, not a
-validated strategy. Fills are simulated pessimistically; this client
+⚠️ The backtest CI STRADDLES ZERO — this is an unproven hypothesis, not
+a measured edge. (It read +9.1c until 2026-07-21, when a contract-
+weighting bug in leg_fade_maker was fixed: it counted each through-print
+fill equally regardless of size. Correctly weighted the edge never
+cleared zero, including on the original 4-event sample.) This engine
+exists to COLLECT live paper fills + markouts over more events and
+establish whether an edge exists at all before any real money —
+mirroring P-016's methodology, not a validated strategy. Fills are simulated pessimistically; this client
 cannot place real orders.
 
 Design mirrors src/pods/live_maker_pod.py (LiveMakerEngine): standalone

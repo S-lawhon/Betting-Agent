@@ -1,5 +1,5 @@
 {
-  "_comment": "Validated P-017 golf pod parameters. UPDATED 2026-07-20: extended from 10 to 12 tournaments by folding in THOC26 + COPC26, whose settlement was unpopulated on the original pull date and is now populated. The original 10-event Leg A result reproduced BIT-EXACT from a fresh data pull, so the harness is verified faithful. edge_bump values remain the CONSERVATIVE lower-CI convention (matching qualifier_favorite_pod P-015), NOT point estimates. Full detail + audit trail in backtest/REPORT_Golf_TopN_2026-07.md (EXTENSION section); raw numbers in backtest_results_extended.json. Regenerate after each new event via re-pull + backtest.",
+  "_comment": "Validated P-017 golf pod parameters. UPDATED 2026-07-20: extended from 10 to 12 tournaments by folding in THOC26 + COPC26, whose settlement was unpopulated on the original pull date and is now populated. The original 10-event Leg A result reproduced BIT-EXACT from a fresh data pull, so the harness is verified faithful. edge_bump values remain the CONSERVATIVE lower-CI convention (matching qualifier_favorite_pod P-015), NOT point estimates. Full detail + audit trail in backtest/REPORT_Golf_TopN_2026-07.md (EXTENSION section); raw numbers in backtest_results_extended.json. Regenerate after each new event via re-pull + `python3 golf_research/backtest/rerun_extension.py`. UPDATED 2026-07-21: fixed the Leg B contract-weighting bug (see leg_B_fade_maker._BUG_FIXED_2026_07_21); Leg A figures are unaffected and unchanged.",
   "_previous_10_event_values": {
     "leg_A_measured_net_per_contract": 0.068,
     "leg_A_ci95": [0.031, 0.102],
@@ -34,22 +34,33 @@
   },
   "leg_B_fade_maker": {
     "status": "DOWNGRADED_PAPER_ONLY",
-    "_status_change": "Was PROMISING_UNDERPOWERED at +9.1c on 4 events. On 6 events the CI now straddles zero. Do NOT treat +9.1c as a live expectation.",
+    "_status_change": "Was PROMISING_UNDERPOWERED at +9.1c on 4 events. Two things changed: 6 events instead of 4, AND the contract-weighting bug was fixed 2026-07-21. Correctly weighted the CI straddles zero on BOTH the 4-event and 6-event sets, so +9.1c was never significant, independent of the new tournaments. Do NOT treat +9.1c as a live expectation.",
     "series": ["KXPGATOP10", "KXPGATOP20"],
     "mid_band": [0.08, 0.40],
     "fade_window_hours_before_close": [36.0, 6.0],
     "quote_offset_above_mid": 0.03,
     "quote_size": 25.0,
     "maker_fee": 0.0,
-    "measured_net_per_contract_as_coded": 0.0490,
-    "ci95_as_coded": [-0.0169, 0.1081],
-    "measured_net_per_contract_contract_weighted": 0.0334,
+    "measured_net_per_contract": 0.0334,
+    "ci95": [-0.0425, 0.0861],
+    "_headline_basis": "CONTRACT-WEIGHTED, contract-weighted cluster bootstrap over tournaments. This is the number to quote.",
+    "measured_net_per_contract_4ev_weighted": 0.0585,
+    "ci95_4ev_weighted": [-0.0483, 0.1108],
+    "superseded_unweighted": {
+      "measured_net_per_contract_as_coded": 0.0490,
+      "ci95_as_coded": [-0.0169, 0.1081],
+      "as_coded_4ev": 0.0862,
+      "ci95_as_coded_4ev": [0.0291, 0.1370],
+      "note": "Pre-2026-07-21 methodology: mean over FILL EVENTS, ignoring size. Retained for audit only - do NOT quote."
+    },
     "fill_rate": 0.589,
     "n_events": 6,
     "positive_events": "3/6",
+    "total_contracts_filled": 9276.9,
     "per_event_net": {"USO26": 0.1304, "GESO26": 0.0712, "PGC26": 0.0489, "THOC26": -0.0207, "COPC26": -0.0847, "TRAV26": -0.1481},
-    "_KNOWN_BUG": "backtest_golf.py leg_fade_maker mislabels its output: line 318 appends one per_bet entry per through-print FILL EVENT regardless of contract count, and line 355 OVERWRITES the correctly contract-weighted mean computed at line 332 with that unweighted fill-event mean. The 'as_coded' figures above preserve the original methodology for apples-to-apples comparison; 'contract_weighted' is the correct per-contract number. Fixing this is a recommended follow-up.",
-    "notes": "Degradation investigated before reporting: not a settlement artifact (Leg A is positive on both new events using the same settlement data); COPC26 is genuinely illiquid (7.6 trades/market vs 67-207 elsewhere) but carries only 6% of contracts, so most of the drop comes from THOC26, a major with the most trade data in the sample. Leg B also does not reproduce bit-exactly (+8.62c vs +9.15c on the same 4 events) - the trades endpoint is unstable under re-pagination, so treat Leg B as +/-0.5c. Contract-weighted +3.3c is BELOW the +4.55c maker half-baseline. Window timing finding stands: 48-24h is negative; edge is Sat->Sun-AM. Keep paper-only; collect live fills."
+    "per_event_contracts": {"USO26": 2115.9, "GESO26": 1902.3, "PGC26": 2006.8, "THOC26": 1938.4, "COPC26": 555.1, "TRAV26": 758.4},
+    "_BUG_FIXED_2026_07_21": "The weighting bug is FIXED. backtest_golf.py leg_fade_maker now carries fill size in per_bet ((event, pnl, contracts)) and reports a contract-weighted mean with a matching weighted cluster bootstrap (bootstrap_ci_weighted), still clustered by tournament. The old overwrite at line 355 and the dead CI at 334-336 are removed; the unweighted figure survives as mean_pnl_per_fill_event_unweighted for audit. Verified: weighted means reproduce the hand-computed +5.85c/+3.34c exactly, per-event contracts match to 4dp, and Leg A is unchanged. Regression tests: tests/test_golf_backtest_weighting.py. Regenerate via golf_research/backtest/rerun_extension.py.",
+    "notes": "Degradation investigated before reporting: not a settlement artifact (Leg A is positive on both new events using the same settlement data); COPC26 is genuinely illiquid (7.6 trades/market vs 67-207 elsewhere) but carries only 6% of contracts, so most of the drop comes from THOC26, a major with the most trade data in the sample. Leg B also does not reproduce bit-exactly (+8.62c vs +9.15c on the same 4 events) - the trades endpoint is unstable under re-pagination, so treat Leg B as +/-0.5c. IMPORTANT: once correctly weighted, the CI straddles zero even on the ORIGINAL 4 events (+5.85c [-4.83,+11.08]) - Leg B's apparent significance was a weighting artifact, not something the two new tournaments destroyed. Weighted +3.3c is BELOW the +4.55c maker half-baseline. Window timing finding stands: 48-24h is negative; edge is Sat->Sun-AM. Keep paper-only; collect live fills."
   },
   "leg_C_makecut": {
     "status": "SHELVED_INSUFFICIENT_DATA",

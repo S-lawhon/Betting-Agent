@@ -92,11 +92,20 @@ Secondary cuts, 12 events (all consistent with the original):
 
 ## Leg B — degrades materially and no longer clears zero
 
+*Numbers below are the CONTRACT-WEIGHTED figures produced by the fixed harness (see "Weighting bug — FIXED" below). The unweighted fill-event figures the original run reported are kept in the second table for audit.*
+
+| | events | net /contract (weighted) | 95% CI (weighted) | fill rate |
+|---|---|---|---|---|
+| Reproduction | 4 | +5.85¢ | [−4.83, +11.08] | 0.657 |
+| **Extended** | **6** | **+3.34¢** | **[−4.25¢, +8.61¢]** | 0.589 |
+
+Superseded, unweighted (one entry per fill event, any size — the pre-2026-07-21 methodology):
+
 | | events | net /contract (as coded) | 95% CI | fill rate |
 |---|---|---|---|---|
 | Original | 4 | +9.15¢ | [+4.52, +13.49] | 0.675 |
 | Reproduction | 4 | +8.62¢ | [+2.91, +13.70] | 0.657 |
-| **Extended** | **6** | **+4.90¢** | **[−1.69¢, +10.81¢]** | 0.589 |
+| Extended | 6 | +4.90¢ | [−1.69¢, +10.81¢] | 0.589 |
 
 Both new events are negative: **THOC26 −2.07¢**, **COPC26 −8.47¢**. So 3/6 events positive, down from 3/4.
 
@@ -106,18 +115,24 @@ Investigated before reporting, per the "is it signal or artifact?" rule:
 2. **COPC26 is genuinely thin, not a truncated pull.** It has 2,317 trades across 304 markets (7.6/market) against 67–207/market for every other event, and 368 prints in the 36→6h window against 6,922–18,083. It is a low-tier/opposite-field event with real illiquidity; the pull completed with zero errors on the same code path. Its weight is small anyway — 555 of 9,277 contracts (6%). **Most of the degradation comes from THOC26** (1,938 contracts, −2.07¢), which is a major with the *most* trade data in the sample and cannot be dismissed.
 3. **Leg B does not reproduce bit-exactly** (+8.62¢ vs +9.15¢ on the same 4 events), unlike Leg A. The trades endpoint is evidently not perfectly stable under re-pagination. Treat Leg B numbers as ±0.5¢ regardless of event count.
 
-### ⚠ Flagged: a pre-existing weighting bug in `leg_fade_maker`
+### Weighting bug in `leg_fade_maker` — FIXED 2026-07-21
 
-The row labelled `mean_pnl_per_contract` is **not** per-contract. `backtest_golf.py:318` appends one entry to `per_bet` per *through-print fill event* regardless of how many contracts that print filled, and line 355 then **overwrites** the correctly contract-weighted `mean_per_contract` (computed at line 332) with that unweighted fill-event mean. Small fills therefore count as much as large ones.
+The row labelled `mean_pnl_per_contract` was **not** per-contract. `backtest_golf.py:318` appended one entry to `per_bet` per *through-print fill event* regardless of how many contracts that print filled, and line 355 then **overwrote** the correctly contract-weighted `mean_per_contract` (computed at line 332) with that unweighted fill-event mean. Small fills counted as much as large ones.
 
-I did **not** change the code — the table above uses the original methodology so the comparison is apples-to-apples. But the contract-weighted numbers are materially lower:
+**Now fixed.** `per_bet` entries carry their fill size as `(event, pnl_per_contract, contracts)`, and a new `bootstrap_ci_weighted` computes `Σ(pnl·contracts)/Σcontracts` with a cluster bootstrap that still resamples **tournaments** (per the project convention — outcomes within an event correlate). The dead intermediate CI at the old lines 334–336 and the overwrite at 355 are gone. The unweighted figure survives as `mean_pnl_per_fill_event_unweighted` for audit continuity only.
 
 | | as coded (unweighted) | contract-weighted (correct) |
 |---|---|---|
-| 4 events | +8.62¢ | **+5.85¢** |
-| 6 events | +4.90¢ | **+3.34¢** |
+| 4 events | +8.62¢ [+2.91, +13.70] | **+5.85¢ [−4.83, +11.08]** |
+| 6 events | +4.90¢ [−1.69, +10.81] | **+3.34¢ [−4.25, +8.61]** |
 
-So the honest read on Leg B is **+3.3¢ contract-weighted over 6 events, with a CI straddling zero** — well below the +9.1¢ that reached the spec, and below the maker half-baseline of +4.55¢. This does not kill Leg B, but it removes its claim to being "validated-adjacent" and makes the paper-collection step mandatory rather than confirmatory. Fixing the weighting is a recommended follow-up.
+Two independent checks that the fix is right: the weighted means reproduce **exactly** the +5.85¢ / +3.34¢ computed by hand during the 2026-07-20 investigation, and every per-event contract count and net matches that hand computation to 4dp. Leg A is byte-for-byte unchanged (+6.81¢ / +6.92¢, same CIs), confirming the change is contained to Leg B.
+
+**The correction is larger than the "Leg B degraded" finding it sits inside.** Note what the weighted 4-event row shows: on the *original* data, with no new events at all, the correctly weighted CI **already straddled zero** ([−4.83, +11.08]). Leg B's apparent significance was an artifact of the weighting, not something the two new tournaments destroyed. The +9.1¢ that reached `P-017_Golf_Pod_Spec.md` never had a CI excluding zero once size was accounted for.
+
+So the honest read on Leg B is **+3.3¢ contract-weighted over 6 events, CI straddling zero** — well below the +9.1¢ in the spec, and below the maker half-baseline of +4.55¢. This does not kill Leg B, but it removes any claim to being "validated-adjacent" and makes paper collection mandatory rather than confirmatory.
+
+Regression tests pinning the estimator: `tests/test_golf_backtest_weighting.py` (8 tests, including one where the unweighted mean gets the *sign* wrong).
 
 ## Scope limits of this re-run
 
@@ -133,7 +148,7 @@ Therefore **top-5, top-40 and make-cut are NOT re-stated here** and their origin
 ## Verdict change
 
 - **Leg A: confidence UP, modestly.** Bit-exact reproduction of the original, stable point estimate, 11/12 events positive, CI tighter. The +6.8¢ baseline is sound; call it **+6.9¢ [+3.8, +9.9]**. The `edge_bump = 0.04` conservative lower-CI convention still holds comfortably.
-- **Leg B: confidence DOWN, materially.** +9.1¢ → +4.9¢ as coded, +3.3¢ contract-weighted, CI straddles zero, 3/6 events positive. Keep it paper-only; do not treat +9.1¢ as a live expectation.
+- **Leg B: confidence DOWN, materially.** +9.1¢ → **+3.3¢ contract-weighted [−4.25, +8.61]**, CI straddles zero, 3/6 events positive. And the weighting fix shows it never cleared zero on the original 4 events either. Keep it paper-only; do not treat +9.1¢ as a live expectation.
 
 ## Band drift found — and resolved
 

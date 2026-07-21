@@ -71,13 +71,26 @@ class MultiExecutor:
                 skipped=True,
             )
 
-        # Aggregate risk gate — check portfolio/venue/pod exposure limits
+        # Aggregate risk gate — check portfolio/venue/pod exposure limits.
+        # Reserve rather than merely check: exposure is only registered in
+        # post_cycle, so a pod executing N results in one cycle would
+        # otherwise have every one of them checked against stale numbers.
         if self.aggregate_risk is not None:
-            if not self.aggregate_risk.check_trade(
-                pod_id=result.pod_id,
-                venue=result.venue,
-                position_size_usd=result.position_size_usd,
-            ):
+            reserve = getattr(self.aggregate_risk, "reserve_trade", None)
+            if callable(reserve):
+                approved = reserve(
+                    pod_id=result.pod_id,
+                    venue=result.venue,
+                    market_id=result.market_id,
+                    position_size_usd=result.position_size_usd,
+                )
+            else:
+                approved = self.aggregate_risk.check_trade(
+                    pod_id=result.pod_id,
+                    venue=result.venue,
+                    position_size_usd=result.position_size_usd,
+                )
+            if not approved:
                 logger.info(
                     "multi_executor.risk_rejected: pod=%s venue=%s market=%s size=%.2f",
                     result.pod_id, result.venue, result.market_id,

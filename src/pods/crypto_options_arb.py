@@ -773,7 +773,9 @@ class CryptoOptionsArbPod(BasePod):
             )
 
         # Aggregate risk check
-        if not self.check_aggregate_risk("kalshi", position_size):
+        if not self.check_aggregate_risk(
+            "kalshi", position_size, market_id=contract.ticker
+        ):
             return ScanResult(
                 fingerprint=fp,
                 timestamp_utc=self._now_fn().isoformat(),

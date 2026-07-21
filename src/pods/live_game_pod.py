@@ -535,7 +535,9 @@ class LiveGamePod(BasePod):
             return None
 
         # Aggregate risk check
-        if not self.check_aggregate_risk("kalshi", position_size):
+        if not self.check_aggregate_risk(
+            "kalshi", position_size, market_id=market_id
+        ):
             return self._build_signal_result(
                 snapshot, game_state, kalshi_match, side, fair_prob,
                 venue_prob, edge, now_str, fv_result,

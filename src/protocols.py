@@ -122,7 +122,14 @@ class ForecastExClientProtocol(Protocol):
 
 @runtime_checkable
 class AggregateRiskProtocol(Protocol):
-    """Interface used by MultiExecutor and pods for portfolio-level checks."""
+    """Interface used by MultiExecutor and pods for portfolio-level checks.
+
+    A full guard also offers the intra-cycle reservation API —
+    ``reserve_trade(pod_id, venue, market_id, position_size_usd) -> bool``
+    and ``release_reservation(market_id)``.  These are deliberately NOT
+    part of the protocol: callers probe for them with ``getattr`` and
+    fall back to ``check_trade``, so a minimal double stays conformant.
+    """
 
     def check_trade(
         self, pod_id: str, venue: str, position_size_usd: float,

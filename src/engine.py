@@ -102,6 +102,36 @@ def build_venue_clients(
     return clients
 
 
+# Settlers that resolve a single pod expose it as ``_pod_id``.  The
+# generic Kalshi Settler predates that convention and filters on
+# pod_ids=("P-001", ""), so it is mapped explicitly.
+_SETTLER_DEP_PODS: Dict[str, tuple] = {
+    "settler": ("P-001", ""),
+}
+
+
+def _settled_pod_ids(deps: Dict[str, Any]) -> set:
+    """Pod IDs with a live settler among the built dependencies.
+
+    AggregateRiskGuard uses this to decide whose paper positions to track
+    on bootstrap: a pod that settles will have close_position called for
+    it, so its open paper exposure is real and should count against the
+    limits.  A pod with no settler would accumulate forever.
+    """
+    settled: set = set()
+    for name, inst in deps.items():
+        if inst is None or not name.endswith("settler"):
+            continue
+        explicit = _SETTLER_DEP_PODS.get(name)
+        if explicit is not None:
+            settled.update(explicit)
+            continue
+        pod_id = getattr(inst, "_pod_id", None) or getattr(inst, "pod_id", None)
+        if pod_id:
+            settled.add(pod_id)
+    return settled
+
+
 def build_shared_deps(
     config: Dict[str, Any],
     clients: Optional[Dict[str, Any]] = None,
@@ -230,6 +260,10 @@ def build_shared_deps(
             logger.info("build_shared_deps: KalshiGolfSettler module not available")
         except Exception as exc:
             logger.warning("build_shared_deps: KalshiGolfSettler build failed: %s", exc)
+
+    # Record which pods can actually settle, so the risk guard knows
+    # whose paper positions will drain (see settled_pod_ids below).
+    deps["settled_pod_ids"] = _settled_pod_ids(deps)
 
     # CrossVenueMatcher for P-002
     try:

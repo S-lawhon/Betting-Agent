@@ -324,3 +324,86 @@ def test_cap_falls_back_to_counter_without_store():
     close = now + timedelta(days=6)
     pod = _pod(_band_markets(60, 60, close), now, max_open_positions=12)
     assert len([r for r in pod.scan_once() if r.action == "PLACED"]) == 12
+
+# ── Aggregate risk actually binds intra-cycle ────────────────────────────
+# P-017 places its whole book in ONE scan (every candidate is visible at
+# once, 4-10 days before close).  The guard only registers exposure in
+# post_cycle, so before reservations existed every name in the burst was
+# checked against zero pod exposure and approved — the guard rejected
+# nothing, and only the pod's own max_open_positions prevented a breach.
+
+def _guard(bankroll=1_000.0, max_pod_exposure_pct=0.25):
+    from src.aggregate_risk import AggregateRiskGuard
+    return AggregateRiskGuard(
+        bankroll=bankroll,
+        max_pod_exposure_pct=max_pod_exposure_pct,
+        max_total_exposure_pct=1.0,
+        max_venue_exposure_pct=1.0,
+        max_open_positions=10_000,
+    )
+
+
+def test_burst_respects_pod_exposure_cap():
+    now = _now()
+    close = now + timedelta(days=6)
+    guard = _guard()
+    pod = _pod(_band_markets(90, 90, close), now,
+               max_open_positions=500, aggregate_risk=guard)
+
+    results = pod.scan_once()
+    placed = [r for r in results if r.action == "PLACED"]
+    exposure = sum(r.position_size_usd for r in placed)
+
+    # The 25% per-pod cap on a $1000 bankroll is $250.
+    assert exposure <= 250.0
+    # ...and the guard is what stopped it, not the pod's own cap.
+    assert len(placed) < 180
+    assert any(r.skip_reason == "aggregate risk guard"
+               for r in results if r.action == "SKIPPED_RISK")
+
+
+def test_burst_exposure_scales_with_the_cap_not_the_position_count():
+    """Raising max_open_positions must no longer raise exposure.
+
+    Measured before the fix, on a live board with a $1000 bankroll:
+        cap 40  ->  28 placed, $247   (24.7% of the fund)
+        cap 93  ->  71 placed, $612   (61%)
+        cap 174 -> 134 placed, $1122  (112%)
+    The guard rejected nothing in any of those runs.
+    """
+    now = _now()
+    close = now + timedelta(days=6)
+
+    def _exposure(cap):
+        pod = _pod(_band_markets(90, 90, close), now,
+                   max_open_positions=cap, aggregate_risk=_guard())
+        return sum(r.position_size_usd
+                   for r in pod.scan_once() if r.action == "PLACED")
+
+    for cap in (40, 93, 174):
+        assert _exposure(cap) <= 250.0
+
+
+def test_positions_dropped_after_approval_do_not_leak_reservations():
+    """Sub-$1 sizes are dropped BEFORE the guard is consulted.
+
+    P-017 applies the depth cap and the $1 floor first, so an abandoned
+    candidate never holds a reservation.  Whatever the pod did reserve is
+    exactly what it placed.
+    """
+    now = _now()
+    close = now + timedelta(days=6)
+    guard = _guard()
+    # ask_size=1 → depth cap crushes most sizes under the $1 floor.
+    markets = [
+        _market(f"KXPGATOP20-XYZ26-P{i:03d}", "KXPGATOP20-XYZ26",
+                0.18, 0.20, close, ask_size=1)
+        for i in range(40)
+    ]
+    pod = _pod(markets, now, max_open_positions=500, aggregate_risk=guard)
+    results = pod.scan_once()
+
+    placed = [r for r in results if r.action == "PLACED"]
+    reserved = sum(res["usd"] for res in guard._reservations.values())
+    assert reserved == pytest.approx(sum(r.position_size_usd for r in placed))
+    assert len(guard._reservations) == len(placed)

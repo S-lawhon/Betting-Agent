@@ -474,8 +474,12 @@ class GolfTopNPod(BasePod):
             return self._skip(m, ask, fair_prob, "SKIPPED_RISK",
                               "size < $1 after caps")
 
+        # Passing market_id RESERVES the exposure on approval, so the rest of
+        # this scan sees it. Without that, P-017 — which places its whole book
+        # in one scan — has every trade checked against the previous cycle's
+        # exposure and the guard approves all of them.
         if self.aggregate_risk is not None and not self.check_aggregate_risk(
-            "kalshi", size
+            "kalshi", size, market_id=ticker
         ):
             return self._skip(m, ask, fair_prob, "SKIPPED_RISK",
                               "aggregate risk guard")

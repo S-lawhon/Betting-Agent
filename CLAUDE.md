@@ -66,6 +66,35 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
   `GET /trade-api/v2/series/?category=Sports&limit=200` (`fee_type` field); this
   table has drifted twice.
 
+## Aggregate risk — reservations (added 2026-07-20)
+
+`AggregateRiskGuard` registers positions in `update_post_cycle`, so a pod
+placing its whole book in ONE scan (P-017 golf: all candidates visible at
+once, 4–10 days out) had every trade checked against the *previous* cycle's
+exposure — the guard rejected nothing, and only the pod's own
+`max_open_positions` prevented a breach ($1122 of a $1000 bankroll at cap 174).
+
+- **Reserve, don't just check.** `reserve_trade(pod_id, venue, market_id, usd)`
+  holds the exposure on approval so the rest of the scan sees it.
+  `check_trade` stays read-only but now *counts* live reservations.
+  `BasePod.check_aggregate_risk(venue, usd, market_id=...)` reserves when
+  given a market_id; `MultiExecutor` always reserves.
+- **Reservations cannot leak.** `update_post_cycle` converts them to
+  positions using actual sizes and sweeps the rest (rejected, errored, or
+  dropped post-approval); `check_pre_cycle` is a backstop for a cycle that
+  died before its callback. Never hand-unwind one.
+- Both are optional-by-`getattr` at every call site, so a test double
+  implementing only `check_trade` still works. They are deliberately NOT on
+  `AggregateRiskProtocol` (it is `runtime_checkable`).
+- `_add_position` is idempotent by market_id and `close_position` credits
+  the venue/pod buckets back — they used to only ever go up. Do not call
+  `_add_position` from a pod (P-006 used to; it double-counted).
+- **Bootstrap tracks paper positions for pods that have a settler**
+  (`settled_pod_ids`, derived by `engine._settled_pod_ids`). The old blanket
+  paper-skip predated the P-015/P-017 settlers and, since the whole engine
+  runs `mode: paper`, meant the guard started every process at zero exposure.
+  Pods with no settler are still skipped — they never drain.
+
 ## Conventions
 
 - Paper-first, CLV-gated. New pods are validated in a `*_research/` folder

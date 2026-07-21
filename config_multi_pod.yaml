@@ -449,7 +449,19 @@ odds_api:
     - americanfootball_nfl
     - basketball_nba
     - basketball_ncaab          # NCAA Men's — March Madness is peak volume
-    - basketball_ncaaw          # NCAA Women's — shares school abbreviation map with NCAAB
+    # - basketball_ncaaw        # REMOVED 2026-07-21. NOT a valid Odds API sport
+    #   key: the endpoint answers "HTTP 404: Unknown sport", which is a rejection
+    #   of the key itself, not an empty in-season result (a valid-but-idle sport
+    #   returns 200 with zero events). Fired ~1,164 times in 24h on the droplet
+    #   and poisoned every error count. Season-date gating was considered and
+    #   rejected — it would silence the noise now and resume 404ing the moment
+    #   NCAAW season opened, because the key would still be wrong.
+    #   The same 404 is already documented in Legacy/Kalshi Arb Project/config.yaml.
+    #   To re-enable: first confirm the real key by querying /v4/sports (P-006's
+    #   tennis auto-discovery below does exactly this), then add THAT key.
+    #   NOTE: the Kalshi-side NCAAW support (scanner prefixes, matcher school-code
+    #   expansion, P-006 league map) is untouched and still works — only the Odds
+    #   API pull is disabled.
     - baseball_mlb
     - icehockey_nhl
     # Tennis keys are NOT listed here — they are auto-discovered at startup

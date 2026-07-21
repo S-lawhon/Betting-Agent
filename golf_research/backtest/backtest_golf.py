@@ -173,6 +173,48 @@ def bootstrap_ci(per_bet: List[Tuple[str, float]], n_boot: int = 5000,
     return mean, lo, hi
 
 
+def bootstrap_ci_weighted(per_bet: List[Tuple[str, float, float]],
+                          n_boot: int = 5000,
+                          seed_calls: int = 0) -> Tuple[float, float, float]:
+    """CONTRACT-WEIGHTED mean PnL and 95% CI, resampling TOURNAMENTS with
+    replacement (same cluster convention as bootstrap_ci — outcomes within an
+    event are correlated, so each tournament is one observation).
+
+    Entries are (event, pnl_per_contract, contracts). The mean is
+    sum(pnl*contracts) / sum(contracts), so a 500-contract fill counts 500x a
+    1-contract fill; the unweighted bootstrap_ci counts them equally, which
+    is only correct when every entry represents the same size.
+
+    Returns (mean, lo95, hi95)."""
+    if not per_bet:
+        return 0.0, 0.0, 0.0
+    by_event: Dict[str, List[Tuple[float, float]]] = defaultdict(list)
+    for ev, pnl, w in per_bet:
+        by_event[ev].append((pnl, w))
+    events = list(by_event.keys())
+    total_w = sum(w for _, _, w in per_bet)
+    if total_w <= 0:
+        return 0.0, float("nan"), float("nan")
+    mean = sum(pnl * w for _, pnl, w in per_bet) / total_w
+    if len(events) < 2:
+        return mean, float("nan"), float("nan")
+    rng = random.Random(12345 + seed_calls)
+    means = []
+    for _ in range(n_boot):
+        num = 0.0
+        den = 0.0
+        for _ in range(len(events)):
+            for pnl, w in by_event[events[rng.randrange(len(events))]]:
+                num += pnl * w
+                den += w
+        if den > 0:
+            means.append(num / den)
+    means.sort()
+    lo = means[int(0.025 * len(means))]
+    hi = means[int(0.975 * len(means))]
+    return mean, lo, hi
+
+
 def summarize(name: str, per_bet: List[Tuple[str, float]],
               extra: Optional[Dict[str, Any]] = None,
               seed: int = 0) -> Dict[str, Any]:
@@ -270,7 +312,9 @@ def leg_fade_maker(trades: List[Dict[str, Any]],
     (quadratic series). PnL per contract sold = quote_price - result.
     """
     lo_px, hi_px = band
-    per_bet: List[Tuple[str, float]] = []       # per FILLED contract
+    # (event, pnl_per_contract, contracts) — one entry per through-print fill,
+    # CARRYING ITS SIZE so the aggregate is contract-weighted.
+    per_bet: List[Tuple[str, float, float]] = []
     per_quote: List[Tuple[str, float]] = []     # per quote (0 if unfilled)
     n_quotes = 0
     n_filled_quotes = 0
@@ -315,7 +359,7 @@ def leg_fade_maker(trades: List[Dict[str, Any]],
                     continue
                 # sold YES at quote_px; zero maker fee on prop series
                 pnl = (quote_px - result)
-                per_bet.append((event_of(rec), pnl))  # per contract
+                per_bet.append((event_of(rec), pnl, take))  # weighted by size
                 filled += take
                 remaining -= take
                 if remaining <= 1e-9:
@@ -328,12 +372,26 @@ def leg_fade_maker(trades: List[Dict[str, Any]],
         else:
             per_quote.append((event_of(rec), 0.0))
 
-    # Contract-weighted mean via per_quote / total_contracts
-    mean_per_contract = (sum(p for _, p in per_quote) / total_contracts
-                         if total_contracts else 0.0)
-    _, lo, hi = bootstrap_ci(
-        [(ev, (p / (total_contracts / max(n_filled_quotes, 1))))
-         for ev, p in per_quote], seed_calls=7) if total_contracts else (0, None, None)
+    # Headline = CONTRACT-WEIGHTED mean with a matching weighted cluster
+    # bootstrap (resamples tournaments, weights by contracts).
+    mean_per_contract, clo, chi = bootstrap_ci_weighted(per_bet, seed_calls=9)
+
+    # Per-event contract-weighted breakdown (each tournament = one cluster).
+    ev_num: Dict[str, float] = defaultdict(float)
+    ev_den: Dict[str, float] = defaultdict(float)
+    for ev, pnl, w in per_bet:
+        ev_num[ev] += pnl * w
+        ev_den[ev] += w
+    per_event = {ev: {"contracts": round(ev_den[ev], 1),
+                      "net_per_contract": round(ev_num[ev] / ev_den[ev], 4)}
+                 for ev in sorted(ev_den) if ev_den[ev] > 0}
+
+    # Retained for audit continuity: the pre-2026-07-21 headline, which was
+    # the mean over FILL EVENTS (a 1-contract and a 500-contract fill counted
+    # equally). Reported alongside, never as the headline.
+    unweighted_mean, _, _ = bootstrap_ci(
+        [(ev, pnl) for ev, pnl, _ in per_bet], seed_calls=9)
+
     row = {
         "leg": "B_fade_maker",
         "n_quotes": n_quotes,
@@ -346,16 +404,16 @@ def leg_fade_maker(trades: List[Dict[str, Any]],
         "band": list(band), "quote_offset": quote_offset,
         "fade_window_h": [fade_start_h, fade_end_h],
         "series": list(series),
-        "note": "per-contract PnL; maker fee = 0 (quadratic series); "
-                "pessimistic through-fill only.",
+        "note": "CONTRACT-WEIGHTED per-contract PnL; maker fee = 0 "
+                "(quadratic series); pessimistic through-fill only. CI is a "
+                "contract-weighted bootstrap clustered by tournament.",
     }
-    # Simpler, robust CI: cluster per-contract fills by event
-    per_contract_bets = per_bet  # each entry is one filled contract's pnl
-    m, clo, chi = bootstrap_ci(per_contract_bets, seed_calls=9)
-    row["mean_pnl_per_contract"] = round(m, 4)
     row["ci95_lo"] = round(clo, 4) if not math.isnan(clo) else None
     row["ci95_hi"] = round(chi, 4) if not math.isnan(chi) else None
-    row["n_bets"] = len(per_contract_bets)
+    row["n_fill_events"] = len(per_bet)
+    row["n_bets"] = len(per_bet)          # kept: same meaning as before
+    row["per_event"] = per_event
+    row["mean_pnl_per_fill_event_unweighted"] = round(unweighted_mean, 4)
     return row
 
 
@@ -418,7 +476,7 @@ def main() -> None:
         hit = f"{100*r['hit_rate']:.1f}" if r.get("hit_rate") is not None else "-"
         print(f"{r['leg']:22} {r['n_bets']:>5} {r['n_events']:>3} {hit:>6} "
               f"{r['mean_pnl_per_contract']:>+8.3f} {fmt_ci(r):>18} "
-              f"{r.get('gross_mean',0):>+9.3f}")
+              f"{(r.get('gross_mean') or 0.0):>+9.3f}")
 
     print("\n=== MAKER LEG (rest ask in-tournament, pessimistic through-fill, 0 maker fee) ===")
     r = b_fade

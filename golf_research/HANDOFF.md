@@ -55,8 +55,15 @@ Research / validation (context, not runtime)
       (10 tournaments for the taker leg, 4 for the maker). THOC26/COPC26 were
       excluded on the original pull (settlement lag) — fold them in now.
 - [ ] **Go/no-go after ~8 tournaments.** Keep the leg if forward net edge / CLV holds
-      above half the backtest baseline (taker +6.8¢, maker +9.1¢); kill otherwise.
-      Only then consider small real money per the v2 Phase-3 rules.
+      above half the backtest baseline (taker +6.9¢ → threshold +3.45¢; maker
+      **+3.3¢ → threshold +1.65¢**). Kill otherwise. Only then consider small real
+      money per the v2 Phase-3 rules.
+      ⚠️ The maker baseline was **+9.1¢ until 2026-07-21**, when a contract-weighting
+      bug in `leg_fade_maker` was fixed (+3.3¢ weighted, CI [−4.25, +8.61] straddling
+      zero on 6 events — and on the original 4 too). A +4.55¢ threshold derived from
+      the old figure would have killed a leg that was performing *at* its true
+      baseline. Leg B is now paper-only with an unproven edge; treat the maker
+      go/no-go as "is there any edge at all", not "does it hold up".
 
 ## Gotchas the next agent must not relearn (also in CLAUDE.md)
 

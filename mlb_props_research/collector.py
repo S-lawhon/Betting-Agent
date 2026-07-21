@@ -7,7 +7,28 @@ Every CYCLE_SECS:
      (today's slate), capped per cycle, prioritized by series.
 
 Output: data/live/snapshots_YYYYMMDD.jsonl — one record per market per cycle.
-Run:    python collector.py [end_hour_local_24h] [--rate REQ_PER_S]
+Run:    python collector.py [end_hour_ET_24h] [--rate REQ_PER_S]
+
+TIMEZONE — the schedule is ET, NOT host-local
+    Both the stop condition and the output filename are anchored to
+    America/New_York, because the thing being measured is an MLB slate and
+    slates are scheduled in ET.  This used to use a naive datetime.now(),
+    which silently inherited whatever timezone the host had:
+
+        Mac  (CDT): end_hour 23.75 -> 23:45 CT -> full slate captured
+        droplet (UTC): end_hour 23.75 -> 23:45 UTC -> 19:45 ET -> QUIT EARLY
+
+    Measured 2026-07-21 on an 11-start-slot board (1840..2140 ET), the UTC
+    interpretation stopped before first pitch for 5 of 11 slots — every West
+    Coast game.  The execution test this data feeds is specifically about
+    fill availability NEAR FIRST PITCH, so that truncation biased exactly the
+    measurement it exists to make, and the lost windows are unrecoverable.
+
+    Anchoring to ET also makes files from different hosts directly
+    comparable: the same game-day now lands in the same filename regardless
+    of where the collector ran.  (Records carry a UTC `ts` field, so analysis
+    can always re-bucket; the filename is a convenience, not the source of
+    truth.)
 
 RATE LIMITING — READ BEFORE RAISING --rate
     Kalshi throttles on CONCURRENT CONNECTIONS and a SHARED PER-IP rate, not
@@ -35,6 +56,24 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+try:
+    from zoneinfo import ZoneInfo
+    ET = ZoneInfo("America/New_York")
+except Exception:                       # no tzdata on this host
+    ET = None
+
+
+def now_et() -> datetime:
+    """Current time in ET — the timezone MLB slates are scheduled in.
+
+    Falls back to host-local time only if tzdata is unavailable, and the
+    caller warns loudly in that case: on a UTC host the fallback silently
+    truncates collection at 19:45 ET (see the module docstring).
+    """
+    if ET is not None:
+        return datetime.now(ET)
+    return datetime.now()
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kalshi-ev-map" / "src"))
 import kalshi_client as kc
@@ -182,19 +221,29 @@ def cycle(out_path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("end_hour", nargs="?", type=float, default=23.75,
-                    help="local hour (24h decimal) to stop at; default 23.75")
+                    help="ET hour (24h decimal) to stop at; default 23.75. "
+                         "Anchored to America/New_York, NOT host-local — the "
+                         "latest first pitch is ~21:40 ET, so 23.75 covers "
+                         "the full slate from either host")
     ap.add_argument("--rate", type=float, default=DEFAULT_RATE,
                     help=f"max requests/sec (default {DEFAULT_RATE}); shared "
                          "per-IP budget — see module docstring before raising")
     args = ap.parse_args()
 
+    if ET is None:
+        print("[WARN] zoneinfo/tzdata unavailable — falling back to HOST-LOCAL "
+              "time. On a UTC host this stops collection at "
+              f"{args.end_hour:.2f} UTC, which is "
+              f"{(args.end_hour - 4) % 24:.2f} ET and truncates the slate. "
+              "Install tzdata.", flush=True)
+
     throttle = Throttle(args.rate)
-    print(f"collector starting: end_hour={args.end_hour} rate={args.rate} req/s "
+    print(f"collector starting: end_hour={args.end_hour} ET rate={args.rate} req/s "
           f"cycle={CYCLE_SECS}s max_books={MAX_BOOKS_PER_CYCLE} out={OUT_DIR}",
           flush=True)
 
     while True:
-        loc = datetime.now()
+        loc = now_et()
         if loc.hour + loc.minute / 60 >= args.end_hour:
             print(f"[{loc:%H:%M}] end hour reached, exiting "
                   f"({throttle.n_429} HTTP 429s this run)", flush=True)

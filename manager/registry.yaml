@@ -596,9 +596,34 @@ workstreams:
       unit: mlb-props-collector.timer -> .service (droplet, 10:00 ET daily)
       data_path: /opt/mlb-props/mlb_props_research/data/live/snapshots_YYYYMMDD.jsonl
       started: 2026-07-21
-      game_days_collected: 3      # 07-19, 07-20 (local), 07-21 (droplet, first full day)
+      game_days_collected: 3      # 07-19, 07-20, 07-21 — verified by ET bucket
       game_days_target: 27
       expected_complete: 2026-08-17   # +/- rainouts and off-days
+      consolidated: >
+        All data now lives on the droplet at the data_path above. The two
+        historical Mac runs were copied 2026-07-21 as
+        snapshots_20260719_mac.jsonl / snapshots_20260720_mac.jsonl — suffixed
+        so they cannot clobber the droplet's own 07-20 sliver, and picked up by
+        any snapshots_*.jsonl glob. Safe to merge because every record carries
+        a UTC `ts`, so the FILENAME is a convenience and analysis can re-bucket
+        at will. Verified after the copy: 3 distinct ET game-days present.
+      truncation_bug_fixed: >
+        FOUND AND FIXED 2026-07-21, and it was silently losing ~45% of the
+        thing the study measures. collector.py used a naive datetime.now() for
+        BOTH the stop condition and the output filename, so it inherited the
+        host timezone. end_hour=23.75 therefore meant 23:45 CT on the Mac
+        (full slate) but 23:45 UTC on the droplet — which is 19:45 ET.
+        Measured against an 11-start-slot board (1840..2140 ET), that quit
+        before first pitch for 5 of 11 slots, every West Coast game among
+        them. The execution test this feeds is specifically about fill
+        availability NEAR FIRST PITCH, so the truncation biased exactly the
+        measurement it exists to make, and the lost windows are unrecoverable.
+        Fix: anchor both to America/New_York via zoneinfo, with a loud warning
+        if tzdata is missing (the silent fallback IS the bug). Redeployed and
+        restarted 2026-07-21 ~20:15 UTC; the run now covers to 23:45 ET.
+        CONSEQUENCE FOR ANALYSIS: 07-21 data before ~20:15 UTC was collected
+        under the truncated window. Treat 07-22 onward as the first clean
+        full-slate days, and check per-day coverage before pooling.
       note: >
         CORRECTION 2026-07-21: the timer was installed at 03:00 UTC 2026-07-21
         and first fired at 14:00 UTC that day, so any claim of a droplet timer

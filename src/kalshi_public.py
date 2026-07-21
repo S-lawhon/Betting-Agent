@@ -98,6 +98,19 @@ class KalshiPublic:
             params["cursor"] = cursor
         return out
 
+    def get_market(self, ticker: str) -> Optional[Dict[str, Any]]:
+        """Single market by ticker, or None.
+
+        Use this — NOT /markets list filtering — to read settlement state.
+        The LIST endpoints null out price/volume (and are unreliable for
+        `result`) on settled markets; the per-ticker GET carries the real
+        `status` / `result`.
+        """
+        data = self.get(f"/markets/{ticker}")
+        if not data:
+            return None
+        return data.get("market") or None
+
     def orderbook(self, ticker: str, depth: int = 5) -> Optional[dict]:
         """Best bid/ask (YES perspective, dollars) + top-level depth.
 

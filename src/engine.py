@@ -214,6 +214,23 @@ def build_shared_deps(
         except Exception as exc:
             logger.warning("build_shared_deps: KalshiTennisSettler build failed: %s", exc)
 
+    # Build KalshiGolfSettler for automatic P-017 settlement polling.
+    # Without this, P-017 positions never resolve: no P&L, no CLV, and
+    # the pod's open-position counter never releases — so it goes silent
+    # after its first tournament fills the cap.
+    if "P-017" in (config.get("pods", {}).get("active") or []):
+        try:
+            from src.kalshi_golf_settler import KalshiGolfSettler
+            deps["golf_settler"] = KalshiGolfSettler.from_config(config)
+            logger.info(
+                "build_shared_deps: KalshiGolfSettler loaded — "
+                "will poll Kalshi public API for P-017 results"
+            )
+        except ImportError:
+            logger.info("build_shared_deps: KalshiGolfSettler module not available")
+        except Exception as exc:
+            logger.warning("build_shared_deps: KalshiGolfSettler build failed: %s", exc)
+
     # CrossVenueMatcher for P-002
     try:
         from src.cross_venue_matcher import CrossVenueMatcher
@@ -657,6 +674,7 @@ def _run_guarded_loop(
     settler=None,
     polymarket_settler=None,
     tennis_settler=None,
+    golf_settler=None,
     allocator: Optional["CapitalAllocator"] = None,
     trade_store: Optional["TradeStore"] = None,
 ) -> List[CycleReport]:
@@ -759,6 +777,39 @@ def _run_guarded_loop(
                                 pass
             except Exception as exc:
                 logger.warning("settlement.tennis: settle_cycle failed: %s", exc)
+
+        if golf_settler is not None:
+            try:
+                settled = golf_settler.settle_cycle()
+                if settled:
+                    logger.info(
+                        "settlement.golf: %d positions resolved this cycle",
+                        len(settled),
+                    )
+                    for rec in settled:
+                        pod_id = rec.get("pod_id", "P-017")
+                        pnl = float(rec.get("pnl_usd", 0) or 0)
+                        fp = rec.get("fingerprint", "")
+                        market_id = rec.get("market_id", "")
+                        if allocator is not None:
+                            allocator.record_settlement(pod_id, pnl, fingerprint=fp)
+                        if market_id:
+                            guard.close_position(market_id, pnl)
+                            # release the pod's open-position slot
+                            for pod in getattr(runner, "pods", []) or []:
+                                if getattr(pod, "pod_id", "") == pod_id and \
+                                        hasattr(pod, "on_settlement"):
+                                    try:
+                                        pod.on_settlement(market_id)
+                                    except Exception:
+                                        pass
+                        if trade_store is not None:
+                            try:
+                                trade_store.index_only(rec)
+                            except Exception:
+                                pass
+            except Exception as exc:
+                logger.warning("settlement.golf: settle_cycle failed: %s", exc)
 
         if guard.check_pre_cycle():
             try:

@@ -331,6 +331,10 @@ class GolfTopNPod(BasePod):
                 "series": ticker.split("-")[0],
                 "event_code": _event_code(m),
                 "days_to_close": round(days_to_close, 2),
+                # absolute event close — the settler's stale guard needs a
+                # fixed reference, not one relative to placement time
+                "close_utc": datetime.fromtimestamp(
+                    close, tz=timezone.utc).isoformat(),
                 "bid": bid, "ask": ask, "spread": round(ask - bid, 4),
                 "taker_fee": round(fee, 4),
                 "edge_bump": self.edge_bump,

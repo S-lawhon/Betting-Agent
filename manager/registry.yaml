@@ -213,6 +213,21 @@ workstreams:
         bet, 74% void rate, and arb-in-paper systematically overstates edge by
         assuming both legs fill. Do NOT treat its historical P&L as evidence of
         anything.
+      void_rate_likely_explained: >
+        Found 2026-07-21, after the shelve decision. P-002 runs on MLB via
+        cross_venue_matcher._SPORT_TICKER_PREFIXES, and that matcher is
+        title-only with skip_time_check=true. MLB plays 3-4 game series against
+        the same opponent, so Polymarket lists three IDENTICALLY TITLED events
+        on different dates — and 32 of 58 measured MLB matches paired a Kalshi
+        market with a Polymarket event for a DIFFERENT GAME DAY. More than half
+        the MLB "arbs" were comparing tomorrow's price against today's fair
+        value: phantom edges that then void.
+        That is a plausible mechanical cause of the 74% void rate, and it means
+        the historical P&L is not merely underpowered but partly measuring a
+        bug. Fix key exists: markets[0].gameStartTime matches Odds API
+        commence_time to the minute, and the slug carries the date.
+        Anyone reviving this pod must fix the date key BEFORE re-measuring —
+        otherwise they will re-derive the same phantom edge.
       reversible: >
         Removed from pods.active only. Kalshi-side support is untouched.
         Re-enable if US Polymarket access opens — but the fill-realism
@@ -243,15 +258,53 @@ workstreams:
         attention. Record this so nobody later reads "shelved" as "refuted".
       known_defect_at_shelve_time: >
         SANITY_SKIP rate of 5-11 markets/cycle, which the pod's own message
-        calls a "probable mapping error". Never root-caused. If P-006 is ever
-        revived, fix this FIRST — its historical numbers were produced with the
-        defect present.
+        calls a "probable mapping error". LIKELY ROOT-CAUSED 2026-07-21 — see
+        real_blockers below. Its historical numbers were produced with the
+        defect present, so do not trust them even though the edge looked good.
+      real_blockers: >
+        Found 2026-07-21 on the first end-to-end exercise of the MLB path.
+        These are the reasons MLB was never safe here, and they supersede the
+        long-standing "pending Polymarket regular-season markets" note, which
+        was STALE — series_id=3 now lists current games (109 live) and Kalshi
+        KXMLBGAME is open (68 markets), with title matching scoring 100.0.
+
+        (A) NON-MONEYLINE CONTAMINATION. tag_id=100639 does not exclude
+        derivatives: of 127 events, 20 are "First 5 Innings Winner" and 19 are
+        "Player Props". They clear the 55.0 fuzzy threshold against the
+        full-game Odds API event and get priced AS the moneyline — 63 matches
+        collapse onto just 15 distinct games. F5 sits 6-13c BELOW the game line
+        (median ~9c), so each contaminated event shows a large one-directional
+        phantom edge, far above min_edge_pct 0.008. Their outcomes are
+        ['Yes','No'] / ['Over','Under'], so _infer_yes_team has no signal.
+
+        (B) DATE COLLISION. MLB plays 3-4 game series against one opponent, so
+        Polymarket lists three IDENTICALLY TITLED events on different dates.
+        Matching is title-only with skip_time_check=true: 32 of 58
+        cross_venue_matcher MLB matches pair a Kalshi market with a Polymarket
+        event for a DIFFERENT DAY. Tomorrow's price against today's fair value
+        is a phantom edge. Fix key exists and is reliable —
+        markets[0].gameStartTime matches Odds API commence_time to the minute,
+        and the slug carries the date.
+
+        Either mechanism produces exactly the "probable mapping error" symptom
+        above, so treat the SANITY_SKIP defect as explained rather than open.
+      liquidity_belief_corrected: >
+        LIQUIDITY IS NOT A BLOCKER, and the earlier belief that it was is
+        wrong. Today-slate game-winner books show a 1c spread and $88k-176k of
+        depth within +/-3c. The thin ~$700-900 / 40c books sampled previously
+        were alt-lines and derivatives (Spread -1.5, 1st 5 Innings O/U, Extra
+        Innings, median ~$900) plus far-future stale events. P-006 reads
+        markets[0], which is consistently the true moneyline.
+        NOTE: this also corrects the caveat recorded against build3-gate on
+        2026-07-21, which cited ~40c Polymarket spreads as a reason a
+        cross-venue basis study would mostly measure Polymarket's own spread.
+        That sampling was of the wrong markets.
       reversible: >
         Removed from pods.active only; code and matcher support untouched.
-        Note baseball_mlb sport_override was disabled pending Polymarket
-        regular-season markets — those markets are now confirmed LIVE
-        (research/OPEN_QUESTIONS_2026-07-20.md Q3), so that particular blocker
-        is stale and should not be cited as a reason it cannot be revived.
+        If revived, the order of work is: fix blockers A and B above FIRST
+        (filter derivative events, and key matching on gameStartTime rather
+        than title), then re-measure. Do NOT cite "pending Polymarket
+        regular-season markets" as the blocker — that is stale.
 
   - id: P-014
     name: Live Game Agent
@@ -754,12 +807,23 @@ workstreams:
           Polymarket having live MLB regular-season markets, which was
           unverified at build time. It has since been confirmed live
           (research/OPEN_QUESTIONS_2026-07-20.md, Q3), so the second leg is now
-          buildable — but read the caveat there first: Polymarket MLB books
-          show ~40c top-of-book spreads, so a naive basis measurement would
-          largely be measuring Polymarket's own spread rather than cross-venue
-          disagreement. Record midpoint, depth-weighted price AND spread per
-          row so thin quotes can be filtered in analysis, and reassess after
-          one week rather than committing to three.
+          buildable.
+
+          CAVEAT WITHDRAWN 2026-07-21. This entry previously warned that
+          Polymarket MLB books show ~40c top-of-book spreads, so a basis study
+          would mostly measure Polymarket's own spread. That was measured on
+          the WRONG MARKETS — alt-lines and derivatives (Spread -1.5, 1st 5
+          Innings O/U, Extra Innings, median ~$900 depth) plus far-future
+          stale events. The true today-slate game-winner books show a 1c
+          spread and $88k-176k of depth within +/-3c. Liquidity is fine.
+
+          The real hazards for a cross-venue study are the two matching
+          blockers recorded under P-006: derivative events (First 5 Innings,
+          Player Props) passing the fuzzy threshold and being priced as the
+          moneyline, and identically-titled events on different dates under
+          title-only matching. Key on markets[0].gameStartTime and filter to
+          markets[0], and still record midpoint, depth-weighted price AND
+          spread per row so thin quotes can be filtered in analysis.
         kalshi_leg_started: 2026-07-21
     standing_debt: >
       90-day API history horizon: every week not archived is calibration data

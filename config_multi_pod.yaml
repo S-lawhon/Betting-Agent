@@ -70,6 +70,24 @@ aggregate_risk:
   exempt_pods:                   # Pods that bypass aggregate exposure cap
     - P-014                      # Live Game Agent — trades even when portfolio is over 50%
 
+# ── Execution ───────────────────────────────────────────────────────
+execution:
+  # Cap on CONCURRENT pod scans. Kalshi throttles on concurrent connections,
+  # NOT requests/second: 12 threads produce constant 429s, one connection at
+  # ~6.7 req/s produces none. Left unset, the executor opens one connection
+  # per active pod — measured 2026-07-20/21 at 829 HTTP 429s/24h (~118/hr
+  # sustained at peak MLB) across 6 active pods, while the single-threaded
+  # P-016 maker on the same box took zero.
+  #
+  # 2 is safe on headroom: measured cycles complete in 30-46s of the 300s
+  # budget, and serialising 6 pods across 2 workers lands near ~105s worst
+  # case. Much of the current per-pod time IS 429 retry backoff, so real
+  # cycles should get FASTER, not slower.
+  #
+  # Raise only with evidence: watch cycle duration against the 300s budget
+  # and `status_code=429` counts in the journal.
+  max_scan_workers: 2
+
 # ── Pod configuration ───────────────────────────────────────────────
 
 pods:

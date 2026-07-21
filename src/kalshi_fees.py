@@ -4,15 +4,17 @@ Kalshi taker fee = round_up_to_cent(0.07 * C * P * (1-P)); maker = 0.0175 * ...
 The P*(1-P) term peaks at P=0.5, so fees bite hardest on ~50c game contracts —
 exactly where competitive moneylines cluster. Net edge MUST clear fee + spread.
 
-SERIES-AWARE MAKER FEES (added 2026-07 for P-017 golf):
+SERIES-AWARE MAKER FEES (added 2026-07 for P-017 golf; MLB added 2026-07-20):
 Not all series charge maker fees. Kalshi's `quadratic` fee_type charges
 makers ZERO; `quadratic_with_maker_fees` charges makers the 0.0175 rate.
-Golf derivative series (top-N, make-cut, H2H, 3-ball, round leaders) are
-`quadratic` → zero maker fee; golf winner/outright series are
-`quadratic_with_maker_fees`. Pass `series_ticker` to fee_per_contract /
-fee_total to get the correct maker treatment. Backward compatible: with no
-series_ticker, maker fees fall back to the general 0.0175 rate (so existing
-callers, e.g. P-016, are unchanged).
+The split runs along props-vs-outcomes, not along sports: derivative series
+(golf top-N/make-cut/H2H; MLB hits, K's, totals, total bases, HR, SB, RFI,
+F5) are `quadratic` → zero maker fee, while game-winner and league-outcome
+series (KXPGA, KXMLBGAME, KXMLB, ...) are `quadratic_with_maker_fees`.
+Pass `series_ticker` to fee_per_contract / fee_total to get the correct maker
+treatment. Backward compatible: with NO series_ticker, maker fees fall back to
+the general 0.0175 rate. P-016 relies on that fallback (it makes on KXMLBGAME,
+which does charge) and must not be perturbed while its gate sample is running.
 """
 from __future__ import annotations
 import math
@@ -20,42 +22,84 @@ import math
 TAKER_COEF = 0.07
 MAKER_COEF = 0.0175
 
-# Series that charge maker fees (fee_type == "quadratic_with_maker_fees").
-# Verified against live /series metadata (2026-07-19). Everything NOT matching
-# these prefixes is treated as a zero-maker-fee (`quadratic`) series.
-_MAKER_FEE_SERIES_PREFIXES = (
-    "KXPGATOUR", "KXTHEOPEN", "KXPGARYDER", "KXPGASOLHEIM",
-    "KXLPGATOUR", "KXLIVTOUR", "KXCHAMPTOUR",
-)
-# Exact matches that need special handling (KXPGA is the PGA Championship
-# winner series; guard against matching KXPGATOP*, KXPGAMAKECUT, etc.).
-_MAKER_FEE_SERIES_EXACT = ("KXPGA",)
+# Series family -> does it charge maker fees? True == "quadratic_with_maker_fees"
+# (0.0175 maker rate), False == "quadratic" (ZERO maker fee).
+#
+# Matching is LONGEST-PREFIX-WINS, which is what makes the overlapping families
+# resolve correctly: "KXMLB" (game winner, charges) is a prefix of "KXMLBHR"
+# (home-run prop, free) which is in turn a prefix of "KXMLBHRDERBY" (charges).
+# A naive `any(startswith(...))` over two flat tuples gets all three wrong.
+#
+# Verified against live /series metadata:
+#   golf 2026-07-19; MLB 2026-07-20 via
+#   GET /trade-api/v2/series/?category=Sports&limit=200  (per-series `fee_type`)
+# Re-verify with that call before adding entries — this table has drifted twice.
+_SERIES_MAKER_FEE: dict[str, bool] = {
+    # ---- Golf: winner / outright series charge makers ----
+    "KXPGA": True,            # PGA Championship winner
+    "KXPGATOUR": True,
+    "KXTHEOPEN": True,
+    "KXPGARYDER": True,
+    "KXPGASOLHEIM": True,
+    "KXLPGATOUR": True,
+    "KXLIVTOUR": True,
+    "KXCHAMPTOUR": True,
+    # ---- Golf: derivative/prop series are maker-free ----
+    "KXPGATOP": False,
+    "KXPGAMAKECUT": False,
+    "KXPGAH2H": False,
+    "KXGOLFH2H": False,
+    "KXPGA3BALL": False,
+    "KXPGA5BALL": False,
+    "KXPGAR1LEAD": False,
+    "KXPGAR2LEAD": False,
+    "KXPGAR3LEAD": False,
+    "KXPGAUNDERPAR": False,
+    "KXDPWTH2H": False,
+    "KXLIVH2H": False,
+    "KXPGACUTLINE": False,
+    # ---- MLB: game//league outcome series charge makers ----
+    "KXMLB": True,            # league-level (also the conservative MLB default)
+    "KXMLBGAME": True,
+    "KXMLBAL": True,
+    "KXMLBNL": True,
+    "KXMLBASGAME": True,
+    "KXMLBHRDERBY": True,     # longer than KXMLBHR, so it wins — intentional
+    # ---- MLB: prop/derivative series are maker-free ----
+    "KXMLBHIT": False,
+    "KXMLBKS": False,
+    "KXMLBTOTAL": False,
+    "KXMLBSPREAD": False,
+    "KXMLBTEAMTOTAL": False,
+    "KXMLBTB": False,
+    "KXMLBHR": False,
+    "KXMLBHRR": False,
+    "KXMLBSB": False,
+    "KXMLBRFI": False,
+    "KXMLBF5": False,
+}
 
 
 def series_maker_charges_fee(series_ticker: str) -> bool:
     """True if this series charges maker fees (quadratic_with_maker_fees).
 
-    Golf prop series (top-N, make-cut, H2H, 3-ball, round leaders) return
-    False → maker fee is zero. Winner/outright series return True. Unknown
-    non-golf series also return True (conservative: assume maker fees).
+    Prop/derivative series (golf top-N, make-cut, H2H; MLB hits, K's, totals,
+    total bases, HR, HRR, SB, RFI, F5, spreads) return False → maker fee is
+    zero. Game-winner and league-outcome series return True.
+
+    Series tickers are matched by LONGEST prefix, so a market's full series
+    ticker ("KXPGATOP20", "KXMLBHRR") resolves to its family. An unrecognised
+    series returns True — conservative, since over-charging a fee only makes
+    the net-edge gate stricter.
     """
     s = (series_ticker or "").upper()
     if not s:
         return True  # unknown → conservative (charge)
-    if s in _MAKER_FEE_SERIES_EXACT:
-        return True
-    if any(s.startswith(p) for p in _MAKER_FEE_SERIES_PREFIXES):
-        return True
-    # Known zero-maker-fee golf prop families
-    _ZERO_MAKER_GOLF = (
-        "KXPGATOP", "KXPGAMAKECUT", "KXPGAH2H", "KXGOLFH2H", "KXPGA3BALL",
-        "KXPGA5BALL", "KXPGAR1LEAD", "KXPGAR2LEAD", "KXPGAR3LEAD",
-        "KXPGAUNDERPAR", "KXDPWTH2H", "KXLIVH2H", "KXPGACUTLINE",
-    )
-    if any(s.startswith(p) for p in _ZERO_MAKER_GOLF):
-        return False
-    # Any other golf-ish prop or unknown series: default to charging (safe).
-    return True
+    best: tuple[int, bool] | None = None
+    for prefix, charges in _SERIES_MAKER_FEE.items():
+        if s.startswith(prefix) and (best is None or len(prefix) > best[0]):
+            best = (len(prefix), charges)
+    return best[1] if best is not None else True
 
 
 def _roundup_cent(x: float) -> float:

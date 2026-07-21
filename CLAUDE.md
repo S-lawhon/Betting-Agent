@@ -54,10 +54,17 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
 - **Settled-market LIST endpoints null out** volume/price/last — use candlesticks
   for historical prices. Freshly-settled events leave `result` unpopulated ~1 day.
 - **Fees are series-aware** (`src/kalshi_fees.py`): taker = 0.07·P·(1−P) always;
-  maker = 0 for `quadratic` series (all golf props: top-N, make-cut, H2H, 3-ball,
-  round leaders) and 0.0175·P·(1−P) for `quadratic_with_maker_fees` (winner
-  series). Pass `series_ticker` to `fee_per_contract`. No arg → general maker rate
-  (backward-compatible for P-016).
+  maker = 0 for `quadratic` series and 0.0175·P·(1−P) for
+  `quadratic_with_maker_fees`. The split is props-vs-outcomes, NOT per-sport:
+  derivative series are maker-free (golf top-N, make-cut, H2H, 3-ball, round
+  leaders; MLB hits, K's, totals, team totals, TB, HR, HRR, SB, RFI, F5,
+  spreads), game-winner/league series charge (KXPGA, KXMLBGAME, KXMLB, KXMLBAL/NL,
+  KXMLBASGAME, KXMLBHRDERBY). Pass `series_ticker` to `fee_per_contract`. No arg
+  → general maker rate (backward-compatible for P-016).
+  `_SERIES_MAKER_FEE` matches by LONGEST prefix — required because KXMLB (charges)
+  ⊂ KXMLBHR (free) ⊂ KXMLBHRDERBY (charges). Verify new entries against
+  `GET /trade-api/v2/series/?category=Sports&limit=200` (`fee_type` field); this
+  table has drifted twice.
 
 ## Conventions
 

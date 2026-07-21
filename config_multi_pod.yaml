@@ -401,7 +401,15 @@ pods:
       skip_events:
         - TRAV26
     risk:
-      max_open_positions: 40
+      # Sized to the per-pod exposure policy, NOT to strategy volume.
+      # aggregate_risk.max_pod_exposure_pct 0.25 x $1000 = $250, and
+      # measured live the pod averages ~$8.38/position, so 30 open
+      # positions ~= $251. Raising this to reach the backtest's ~93
+      # bets/tournament would put 60-110% of the fund in one pod; more
+      # coverage needs a bigger paper bankroll instead. The aggregate
+      # guard will NOT stop a breach — it only registers exposure in
+      # post_cycle, and P-017 places its whole book inside one scan.
+      max_open_positions: 30
       depth_haircut: 0.5
 
   P-017M:

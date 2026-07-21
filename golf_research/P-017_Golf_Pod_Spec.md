@@ -28,24 +28,33 @@ Make-cut leg (only 12 two-sided pre-tournament quotes in-sample — insufficient
 Earlier drafts of this spec said "~30–60 bets per tournament". That is
 **wrong**. Leg A's backtest placed 926 bets across 10 events — **~93 per
 tournament** — and a live 3M Open board offered **174** names clearing the
-band. `max_open_positions: 40` therefore binds hard, and the pod trades
-roughly 40% of the validated strategy.
+band. `max_open_positions: 30` therefore binds hard, and the pod trades
+roughly a third of the validated strategy.
 
-**The cap is nevertheless correct — do not raise it on volume grounds.**
-Measured against a live board, it is calibrated to the fund's own per-pod
-exposure policy (`aggregate_risk.max_pod_exposure_pct: 0.25` × $1,000 =
-$250):
+**Do not raise the cap on volume grounds.** It is sized to the fund's
+per-pod exposure policy (`aggregate_risk.max_pod_exposure_pct: 0.25` ×
+$1,000 = $250), at a live-measured ~$8.38 per position:
 
-| cap | placed | P-017 exposure | % of bankroll |
-|---|---|---|---|
-| **40** | 28 | **$247** | 24.7% |
-| 93 | 71 | $612 | 61% |
-| 174 | 134 | $1,122 | 112% |
+| cap | steady-state exposure | % of bankroll |
+|---|---|---|
+| **30** | **~$251** | 25% — at policy |
+| 40 | ~$335 | 34% |
+| 93 | ~$779 | 78% |
+| 174 | ~$1,458 | 146% |
 
-And the aggregate guard would not catch a breach: it registers exposure in
-`post_cycle`, while P-017 places its whole book inside a single scan, so
-intra-cycle `check_trade` always sees zero pod exposure. Accepting ~40% of
-the strategy is fine for the gate — it is **event-clustered**, so the
+**A trap worth recording**, because it bit during the deploy: the cap
+bounds *open positions*, which is not the same as *placements in one
+scan*. A fresh scan places fewer than the cap, because `_select_candidates`
+truncates to exactly the free slots and some then fall below the $1
+minimum after depth capping. An initial cap of 40 was chosen off a
+single scan's 28 placements ($247) and looked compliant; steady state was
+really ~$335 (34%). P-017 ran at 31.8% for a few cycles before this was
+corrected. Size the cap from expected *open positions* × average size.
+
+The aggregate guard would not catch a breach either: it registers exposure
+in `post_cycle`, while P-017 places its whole book inside a single scan, so
+intra-cycle `check_trade` always sees zero pod exposure. Accepting ~a third
+of the strategy is fine for the gate — it is **event-clustered**, so the
 sample size is 8 *tournaments*, not bet count. More coverage requires
 raising the paper bankroll (which rescales every pod), not the cap.
 

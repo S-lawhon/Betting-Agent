@@ -44,19 +44,29 @@ inattention can decay).
 
 Expected volume — NOTE the cap interaction. The backtest averaged ~93
 bets/tournament (926 over 10 events), and a live 3M Open board offered
-174 names clearing the band. max_open_positions (40) therefore BINDS
-hard: the pod owns roughly 40% of the validated strategy, chosen by
+~185 names clearing the band. max_open_positions (30) therefore BINDS
+hard: the pod owns roughly a third of the validated strategy, chosen by
 _select_candidates. (Earlier docs claiming "~30-60 bets/tournament" were
 simply wrong.)
 
-DO NOT raise max_open_positions on volume grounds alone. It is the
-binding INTRA-CYCLE risk control for this pod, and it is already
-calibrated to the fund's per-pod exposure policy:
+DO NOT raise max_open_positions on volume grounds. It is the binding
+INTRA-CYCLE exposure control for this pod, and it is sized to the fund's
+per-pod exposure policy — not to strategy volume:
 
     aggregate_risk.max_pod_exposure_pct 0.25 x $1000 bankroll = $250
-    measured on a live board: cap 40 -> 28 placed -> $247 exposure
-                              cap 93 -> 71 placed -> $612  (61% of fund)
-                              cap 174 -> 134 placed -> $1122 (112%)
+    measured live: ~$8.38 per position
+        cap  30 ->  ~$251   (25%, at policy)
+        cap  40 ->  ~$335   (34%, over)
+        cap  93 ->  ~$779   (78%)
+        cap 174 -> ~$1458   (146%)
+
+Careful reading the cap this way: it bounds OPEN POSITIONS, which is not
+the same as placements in one scan. A fresh scan places fewer than the
+cap because _select_candidates truncates to exactly the free slots and
+some of those then drop out under the $1 minimum after depth capping.
+Sizing the cap off a single scan's placement count understates steady
+-state exposure by ~30% — that error is how this pod briefly ran at 33%
+of bankroll against a 25% policy.
 
 The aggregate guard will NOT catch a breach here: it registers exposure
 in post_cycle, and P-017 places its entire book within a single scan

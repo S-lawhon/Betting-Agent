@@ -283,3 +283,116 @@ def test_settlement_appended_to_log(tmp_path):
 def test_calc_outcome_labels(result, expected):
     outcome, _ = _calc_outcome_pnl("YES", result, 100.0, 0.25)
     assert outcome == expected
+
+
+# ── TradeStore is the real source/sink ───────────────────────────────
+#
+# Regression: the settler originally read data/pods/P-017.jsonl, copying
+# the tennis settler.  With a TradeStore attached, BasePod.write_log
+# delegates to store.append() and that per-pod file is NEVER written —
+# verified in production, where 27 P-017 placements landed in the shared
+# trade_log.jsonl and data/pods/ was empty.  A file-reading settler finds
+# nothing and settles nothing, silently.
+
+
+class FakeStore:
+    """Minimal stand-in for TradeStore."""
+
+    def __init__(self, open_trades):
+        self._open = list(open_trades)
+        self.appended = []
+
+    def get_open_trades(self, pod_id=None):
+        return [e for e in self._open
+                if pod_id is None or e.get("pod_id") == pod_id]
+
+    def append(self, entry):
+        self.appended.append(entry)
+        fp = entry.get("fingerprint")
+        if (entry.get("outcome") or "").upper() in ("WIN", "LOSS", "VOID"):
+            self._open = [e for e in self._open
+                          if e.get("fingerprint") != fp]
+
+
+def test_reads_open_positions_from_trade_store(tmp_path):
+    """The per-pod log file is empty in production — use the store."""
+    entry = {**_placed("KXPGATOP10-3MO26-AAA"), "fingerprint": "fp1"}
+    store = FakeStore([entry])
+    s = KalshiGolfSettler(
+        client=FakeClient(
+            {"KXPGATOP10-3MO26-AAA": {"status": "finalized", "result": "yes"}}
+        ),
+        log_path=tmp_path / "never-written.jsonl",   # deliberately absent
+        _now_fn=lambda: NOW,
+        trade_store=store,
+    )
+    out = s.settle_cycle()
+    assert len(out) == 1
+    assert out[0]["outcome"] == "WIN"
+
+
+def test_settlement_persists_through_trade_store(tmp_path):
+    """append() fsyncs to the shared log; the per-pod file would be lost."""
+    entry = {**_placed("KXPGATOP10-3MO26-AAA"), "fingerprint": "fp1"}
+    store = FakeStore([entry])
+    s = KalshiGolfSettler(
+        client=FakeClient(
+            {"KXPGATOP10-3MO26-AAA": {"status": "finalized", "result": "no"}}
+        ),
+        log_path=tmp_path / "never-written.jsonl",
+        _now_fn=lambda: NOW,
+        trade_store=store,
+    )
+    s.settle_cycle()
+    assert len(store.appended) == 1
+    assert store.appended[0]["outcome"] == "LOSS"
+    # nothing should have been written to the per-pod file
+    assert not (tmp_path / "never-written.jsonl").exists()
+
+
+def test_store_backed_settler_does_not_resettle(tmp_path):
+    entry = {**_placed("KXPGATOP10-3MO26-AAA"), "fingerprint": "fp1"}
+    store = FakeStore([entry])
+    s = KalshiGolfSettler(
+        client=FakeClient(
+            {"KXPGATOP10-3MO26-AAA": {"status": "finalized", "result": "yes"}}
+        ),
+        log_path=tmp_path / "never-written.jsonl",
+        _now_fn=lambda: NOW,
+        trade_store=store,
+    )
+    assert len(s.settle_cycle()) == 1
+    assert s.settle_cycle() == []
+
+
+def test_store_lag_window_still_respected(tmp_path):
+    """The closed-but-unsettled guard must hold on the store path too."""
+    entry = {**_placed("KXPGATOP10-3MO26-AAA"), "fingerprint": "fp1"}
+    store = FakeStore([entry])
+    s = KalshiGolfSettler(
+        client=FakeClient(
+            {"KXPGATOP10-3MO26-AAA": {"status": "closed", "result": ""}}
+        ),
+        log_path=tmp_path / "never-written.jsonl",
+        _now_fn=lambda: NOW,
+        trade_store=store,
+    )
+    assert s.settle_cycle() == []
+    assert store.appended == []
+
+
+def test_store_path_filters_by_pod(tmp_path):
+    mine = {**_placed("KXPGATOP10-3MO26-AAA"), "fingerprint": "fp1"}
+    other = {**_placed("KXTENNIS-X"), "pod_id": "P-015", "fingerprint": "fp2"}
+    store = FakeStore([mine, other])
+    s = KalshiGolfSettler(
+        client=FakeClient({
+            "KXPGATOP10-3MO26-AAA": {"status": "finalized", "result": "yes"},
+            "KXTENNIS-X": {"status": "finalized", "result": "yes"},
+        }),
+        log_path=tmp_path / "never-written.jsonl",
+        _now_fn=lambda: NOW,
+        trade_store=store,
+    )
+    out = s.settle_cycle()
+    assert [r["market_id"] for r in out] == ["KXPGATOP10-3MO26-AAA"]

@@ -104,11 +104,15 @@ class KalshiGolfSettler:
         log_path: Path = Path("data/pods/P-017.jsonl"),
         pod_id: str = "P-017",
         _now_fn: Optional[Callable[[], datetime]] = None,
+        trade_store=None,
     ) -> None:
         self._client = client or KalshiPublic()
         self._log_path = Path(log_path)
         self._pod_id = pod_id
         self._now = _now_fn or (lambda: datetime.now(tz=timezone.utc))
+        # Set post-construction by main.py — the TradeStore is built after
+        # build_shared_deps(). See the note on _open_placed_entries.
+        self.trade_store = trade_store
 
     # ── Public API (called from engine loop) ─────────────────────────
 
@@ -206,7 +210,29 @@ class KalshiGolfSettler:
         )
 
     def _open_placed_entries(self) -> Dict[str, Dict[str, Any]]:
-        """Unresolved PLACED entries from the P-017 log."""
+        """Unresolved PLACED entries for this pod.
+
+        Prefer the TradeStore. When one is attached, BasePod.write_log
+        delegates to store.append() and NOTHING is ever written to
+        data/pods/<pod>.jsonl — the per-pod file stays empty and a
+        file-reading settler silently finds zero positions to settle.
+        (Verified in production: 27 P-017 placements landed in the shared
+        trade_log.jsonl; data/pods/ was empty.) The store is also the only
+        source that survives log rotation, which matters here because
+        golf positions are opened 4-10 days before close and the active
+        log holds ~1.5 days.
+
+        The file path remains as a fallback for standalone/offline use.
+        """
+        store = self.trade_store
+        if store is not None:
+            out: Dict[str, Dict[str, Any]] = {}
+            for e in store.get_open_trades(self._pod_id):
+                mid = e.get("market_id") or e.get("market_ticker", "")
+                if mid and float(e.get("position_size_usd") or 0) > 0:
+                    out[mid] = e
+            return out
+
         if not self._log_path.exists():
             return {}
         placed: Dict[str, Dict[str, Any]] = {}
@@ -281,7 +307,14 @@ class KalshiGolfSettler:
             "timestamp_utc": now.isoformat(),
             "resolution_source": resolution_source,
         }
-        self._append_log(record)
+        # Persist to the same place the placement came from. append()
+        # both indexes and fsyncs to the shared log, so the settlement
+        # survives a restart — writing to data/pods/ would not, since
+        # nothing reads it back.
+        if self.trade_store is not None:
+            self.trade_store.append(record)
+        else:
+            self._append_log(record)
         logger.info(
             "kalshi_golf_settler: settled %s | result=%s outcome=%s "
             "pnl_net=%.2f (gross=%.2f fees=%.2f)",

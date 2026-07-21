@@ -143,6 +143,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     shared["trade_store"] = trade_store
 
+    # The golf settler reads open positions from the store, not from
+    # data/pods/P-017.jsonl — with a TradeStore attached, BasePod.write_log
+    # delegates to store.append() and the per-pod file is never written.
+    # The store is built after build_shared_deps(), so attach it here.
+    _golf_settler = shared.get("golf_settler")
+    if _golf_settler is not None:
+        _golf_settler.trade_store = trade_store
+
     dash_renderer: Optional[DashboardRenderer] = None
     if getattr(args, "dashboard", False):
         dash_renderer = DashboardRenderer(use_color=True, width=80)

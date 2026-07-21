@@ -138,8 +138,25 @@ execution:
 pods:
   active:
     - P-001                   # Kalshi Moneyline Value (legacy scanner)
-    - P-002                   # Kalshi-Polymarket Cross-Venue Arb (dual-leg)
-    - P-006                   # Sportsbook-Polymarket Consensus (re-enabled w/ CID verification)
+# ── SHELVED 2026-07-21 — no Polymarket execution access ──────────────────
+#   Both pods depend on executing ON Polymarket, which this project cannot do.
+#   Polymarket US (api.polymarket.us, CFTC-regulated DCM) shares NOTHING
+#   technically with the offshore CLOB: different host, auth (Ed25519 API keys,
+#   not wallet/EIP-712), SDK and settlement. The international API lists the US
+#   as CLOSE-ONLY on both frontend and API, so src/polymarket_client.py's
+#   place_order()/cancel_order() are unusable from here. Execution would mean a
+#   rewrite plus KYC only Sam can complete.
+#   See research/OPEN_QUESTIONS_2026-07-20.md Q2.
+#
+#   P-002 executes on kalshi + polymarket + multi — the dual-leg arb cannot be
+#   completed one-legged, and one-legged is not the strategy.
+#   P-006 executes on polymarket ONLY — it can never trade at all without
+#   access, so it can never graduate regardless of how well it validates.
+#
+#   REVERSIBLE: re-enable if US access opens. Kalshi-side support for both is
+#   untouched; this only removes them from the scan loop.
+#    - P-002                   # Kalshi-Polymarket Cross-Venue Arb (dual-leg)
+#    - P-006                   # Sportsbook-Polymarket Consensus
 #    - P-009                   # Sign-Up Bonus Blitz (promo hedging)   # disabled 2026-07-18 pivot
 #    - P-010                   # Daily Odds Boost Grind (boost EV)   # disabled 2026-07-18 pivot
 #    - P-013                   # Kalshi-Deribit Crypto Options Arb   # disabled 2026-07-18 pivot

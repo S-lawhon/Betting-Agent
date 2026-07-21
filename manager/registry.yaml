@@ -189,26 +189,66 @@ workstreams:
 
   - id: P-002
     name: Kalshi-Polymarket Cross-Venue Arb
-    stage: paper
-    blocked_on: human
-    action_required: >
-      Needs realistic-fill validation. Best raw P&L (+$1,268) but day-level
-      insignificant (p=0.17), ~2/3 of profit from a single $816 bet, and a 74%
-      void rate. Arb-in-paper systematically overstates edge because it assumes
-      both legs fill. Decide: build a fill-realism simulator, or stop counting
-      P-002 P&L as evidence of anything.
-    summary: KEEP but VALIDATE.
+    stage: shelved
+    blocked_on: nothing
+    shelved:
+      decided: 2026-07-21
+      decided_by: Sam
+      reason: >
+        NO POLYMARKET EXECUTION ACCESS. P-002 is a dual-leg arb executing on
+        kalshi + polymarket + multi, and a dual-leg arb cannot be completed
+        one-legged — one-legged is a different (and unvalidated) strategy.
+        Polymarket US (api.polymarket.us, CFTC-regulated DCM) shares nothing
+        technically with the offshore CLOB: different host, auth (Ed25519 API
+        keys, not wallet/EIP-712), SDK and settlement, and the international
+        API lists the US as CLOSE-ONLY on both frontend and API. So
+        src/polymarket_client.py's place_order()/cancel_order() are unusable
+        from here. Evidence: research/OPEN_QUESTIONS_2026-07-20.md Q2.
+      also_note: >
+        This supersedes the fill-realism question rather than answering it. The
+        pod was already unpersuasive on its own terms — best raw P&L (+$1,268)
+        but day-level insignificant (p=0.17), ~2/3 of profit from a single $816
+        bet, 74% void rate, and arb-in-paper systematically overstates edge by
+        assuming both legs fill. Do NOT treat its historical P&L as evidence of
+        anything.
+      reversible: >
+        Removed from pods.active only. Kalshi-side support is untouched.
+        Re-enable if US Polymarket access opens — but the fill-realism
+        validation would still be owed before believing any of its numbers.
 
   - id: P-006
     name: Sportsbook-Polymarket Consensus
-    stage: paper
+    stage: shelved
     blocked_on: nothing
-    summary: >
-      Most trustworthy edge in the lifetime analysis — per-bet CI [+5.4%,+21.2%]
-      above zero, well calibrated, no outlier dependence. KEEP + INVEST.
-    watch:
-      - SANITY_SKIP rate (5-11/cycle, pod's own message says "probable mapping error")
-    note: baseball_mlb sport_override disabled pending Polymarket regular-season markets.
+    shelved:
+      decided: 2026-07-21
+      decided_by: Sam
+      reason: >
+        NO POLYMARKET EXECUTION ACCESS, and P-006 executes on polymarket ONLY
+        (verified: venue="polymarket" is its sole execution venue). Unlike
+        P-002 it has no Kalshi leg at all, so it cannot trade AT ALL without
+        access — meaning it can never graduate to live regardless of how well
+        it validates in paper. Continuing to accumulate paper evidence for a
+        strategy that has no executable path is the clearest case for shelving
+        in the book. Same access evidence as P-002:
+        research/OPEN_QUESTIONS_2026-07-20.md Q2.
+      cost_of_shelving: >
+        This was the most trustworthy edge in the lifetime analysis — per-bet
+        CI [+5.4%, +21.2%] above zero, well calibrated, no outlier dependence.
+        Shelving it is NOT a judgement on the edge, which may well be real. It
+        is a judgement that an unexecutable edge is not worth API budget or
+        attention. Record this so nobody later reads "shelved" as "refuted".
+      known_defect_at_shelve_time: >
+        SANITY_SKIP rate of 5-11 markets/cycle, which the pod's own message
+        calls a "probable mapping error". Never root-caused. If P-006 is ever
+        revived, fix this FIRST — its historical numbers were produced with the
+        defect present.
+      reversible: >
+        Removed from pods.active only; code and matcher support untouched.
+        Note baseball_mlb sport_override was disabled pending Polymarket
+        regular-season markets — those markets are now confirmed LIVE
+        (research/OPEN_QUESTIONS_2026-07-20.md Q3), so that particular blocker
+        is stale and should not be cited as a reason it cannot be revived.
 
   - id: P-014
     name: Live Game Agent

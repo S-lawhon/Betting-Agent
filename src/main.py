@@ -220,6 +220,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 settler=shared.get("settler"),
                 polymarket_settler=shared.get("polymarket_settler"),
                 tennis_settler=shared.get("tennis_settler"),
+                golf_settler=shared.get("golf_settler"),
                 allocator=allocator,
                 trade_store=trade_store,
             )

@@ -1,8 +1,10 @@
 # CLAUDE.md — Betting Pod Shop
 
 Multi-pod sports betting engine (Kalshi-focused) in **paper/demo mode**. Runs on a
-DigitalOcean VPS (129.212.176.202) as systemd service `bettingbot`; also runnable
-locally. Python 3.12. This file orients a fresh Claude Code session — deeper detail
+DigitalOcean VPS (129.212.176.202) as systemd service `betting-pod-shop` (NOT
+`bettingbot` — that is the unix user the service runs as; `systemctl status
+bettingbot` reports "unit could not be found"). The P-016 live maker is a second
+unit, `betting-live-maker`. Also runnable locally. Python 3.12. This file orients a fresh Claude Code session — deeper detail
 lives in the docs linked below.
 
 ## Run / test / deploy
@@ -82,6 +84,26 @@ Built, backtested, tested (19 golf tests pass), wired to `pods.active` in paper.
 Open next steps: deploy so the engine picks up P-017; start `run_golf_maker.py`;
 wire DataGolf key when available; re-run `golf_research/backtest/backtest_golf.py`
 after each event to extend the sample.
+
+### Golf settlement (added 2026-07-20) — `src/kalshi_golf_settler.py`
+
+P-017 shipped with NO settler, which made `on_settlement` dead code: the generic
+Kalshi `Settler` filters to `pod_ids=("P-001","")` and only the tennis branch
+calls `pod.on_settlement`. Symptom would have been silent — bets placed, nothing
+resolved, `_open_count` pegged at the cap, pod mute after one tournament.
+`KalshiGolfSettler` fixes it. Three golf-specific rules, each verified live:
+
+- **`status="closed"` is NOT settled.** Top-N markets sit closed with an empty
+  `result` for ~a day post-tournament (156/156 observed). The tennis settler's
+  `result or "void"` idiom would VOID a whole tournament. Settle only on a
+  populated `result`; the stale guard (10d after `close_utc`) backstops.
+- **`result="scalar"` is a real third value** (9/200 settled) — competitor never
+  teed off, market cancelled not resolved. VOID, labelled `kalshi_withdrawn`.
+- **P&L is booked NET of the taker fee**, since the go/no-go compares against a
+  fee-net baseline (+6.8¢/ct). `pnl_gross_usd`/`fees_usd` recorded alongside.
+
+Use `KalshiPublic.get_market(ticker)` for settlement state — LIST endpoints null
+out fields on settled markets.
 
 ## Canonical docs
 

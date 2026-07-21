@@ -23,6 +23,40 @@ Two components, both paper, both reusing existing infrastructure (BasePod, Kalsh
 
 Make-cut leg (only 12 two-sided pre-tournament quotes in-sample — insufficient); top-5 (backtest ~0, matches literature); top-40 (1 event); outright winner markets (efficient, maker-fee'd, institutional MM — benchmark only). Live round-leader in-play (large build; the R1-leader flow of 30M contracts/major is a future P-018 candidate).
 
+## Correction — expected volume (2026-07-20)
+
+Earlier drafts of this spec said "~30–60 bets per tournament". That is
+**wrong**. Leg A's backtest placed 926 bets across 10 events — **~93 per
+tournament** — and a live 3M Open board offered **174** names clearing the
+band. `max_open_positions: 40` therefore binds hard, and the pod trades
+roughly 40% of the validated strategy.
+
+**The cap is nevertheless correct — do not raise it on volume grounds.**
+Measured against a live board, it is calibrated to the fund's own per-pod
+exposure policy (`aggregate_risk.max_pod_exposure_pct: 0.25` × $1,000 =
+$250):
+
+| cap | placed | P-017 exposure | % of bankroll |
+|---|---|---|---|
+| **40** | 28 | **$247** | 24.7% |
+| 93 | 71 | $612 | 61% |
+| 174 | 134 | $1,122 | 112% |
+
+And the aggregate guard would not catch a breach: it registers exposure in
+`post_cycle`, while P-017 places its whole book inside a single scan, so
+intra-cycle `check_trade` always sees zero pod exposure. Accepting ~40% of
+the strategy is fine for the gate — it is **event-clustered**, so the
+sample size is 8 *tournaments*, not bet count. More coverage requires
+raising the paper bankroll (which rescales every pod), not the cap.
+
+Because the cap binds, the *selection rule* is now part of the strategy.
+Ranking by net edge is degenerate in structural mode — `net = edge_bump −
+fee(ask)` falls monotonically in price, so it reduces to "buy the cheapest
+names", a higher-variance bet than the band-uniform buy that produced
++6.8¢. `GolfTopNPod._select_candidates` instead takes a deterministic
+systematic sample across the ask range, stratified by series, and only
+ranks by net edge once DataGolf supplies a real per-name signal.
+
 ## Validation & kill criteria (unchanged from methodology)
 
 Paper-first. Go/no-go after ~8 tournaments treating **each tournament as one observation** (within-event outcomes correlate). P-017 validates if forward net CLV / realized net edge stays > half the backtest baseline; P-017M validates on fill quality (≥30% of quoted names fill) AND positive markout-implied net. Kill any leg whose measured edge drops below half baseline (inattention edges decay). Only then consider small real money per the v2 Phase-3 rules.

@@ -123,6 +123,53 @@ Test A is also **badly underpowered and should not be treated as a refutation**:
 
 ---
 
+# ADDENDUM 2 — Phase 3c: Re-examining the negative live result (2026-07-20)
+
+Three things were tested. **Two corrections to the addendum above resulted.**
+
+## Correction 1 — the live negative is ONE day, not two samples
+
+The addendum described the live order-book test and the paper ledger as separate negative results. They are not independent: the entire settled live sample is **a single day (2026-07-19, n=170)**; July 20's markets had not settled at fetch time, and the 23-entry paper ledger is a *subset of that same day*. One day = one cluster = zero degrees of freedom. **It carries no statistical weight whatsoever** and should not have been presented as corroborating evidence.
+
+## Correction 2 — the informed-flow hypothesis is REFUTED
+
+The worry was that pricing entries off `taker_side='yes'` prints conditions on *informed traders buying YES*, so the measured edge would be theirs, not ours. Testing hit rates by type of late flow, matched on **pregame** price (an earlier version of this test used settled `last_price` and was invalid — winners trade toward $1.00 and get excluded by the price filter, leaving mostly losers, producing absurd ~1.5% hit rates):
+
+| Late flow in market | n | Pregame price | Hit rate | Bias |
+|---|---|---|---|---|
+| Late BUY only | 1,730 | 0.266 | 0.343 | **+7.7pp** |
+| No late trade | 1,121 | 0.252 | 0.422 | **+16.9pp** |
+| Late SELL only | 122 | 0.264 | 0.393 | +13.0pp |
+| Both | 173 | 0.288 | 0.341 | +5.3pp |
+
+If informed YES-buying drove the edge, buy-conditioned markets would show the *largest* bias. They show the **smallest**. The mispricing is greatest in the most *neglected* books — an inattention story, not an informed-flow story. The +7.7pp gross on actively-traded markets maps directly onto the +6.4¢ net figure, confirming that number comes from the **conservative** subgroup. (The +16.9pp on never-traded books is partly the staleness artifact and is not executable.)
+
+## The properly day-clustered estimate — the headline number
+
+Clustering by game-day, which is the correct unit of independence (59 qualifying days, buy-at-ask, ≤30m window, price 0.15–0.45):
+
+- **Mean +5.51¢/contract, clustered SE 1.19¢, 95% CI +3.18¢ to +7.84¢**
+- Daily net SD **9.13¢**; **27% of days are negative**; deciles of daily net: −5.7 / −0.2 / +5.0 / +10.1 / +15.5¢
+
+The edge survives correct clustering. This is the number to quote.
+
+## Where July 19 sits
+
+- A day at or below −4.64¢ occurs **12% of the time** historically.
+- A day with hit rate ≤0.212 occurs **7% of the time**.
+
+July 19 was an unremarkable bad day, comfortably inside normal variation. It is not evidence against the edge.
+
+## Power requirement
+
+At a daily net SD of 9.13¢, detecting a +5¢ edge at 80% power requires **~27 game-days**. The droplet collector (systemd timer, 10:00 ET daily) is now running toward that target; ~4 weeks of slates.
+
+## Net effect on the verdict
+
+The edge is **stronger and better-established** than the main report concluded: +5.51¢ [+3.18, +7.84] properly clustered, with the informed-flow objection tested and refuted. What remains genuinely unresolved is **live execution** — whether displayed asks can be lifted at these prices at scale — and that needs the full 27-day sample, not the single day currently in hand.
+
+---
+
 ## Caveats
 
 The model-vs-market comparison sample conditions on the batter having started (box-score rows only exist for players who played), which inflates realized rates for model *and* market alike; the apples-to-apples comparison on identical rows is unaffected and still favors the market. Edge estimates use last-trade prices with a synthetic 1.5–3¢ execution penalty, not observed asks. Two windows within one 2026 season; no cross-season validation. The IS→OOS decline (+5.5¢→+3.7¢) is unexplained and should be monitored. Capacity figures assume the observed final-30-minute flow is the addressable pool.

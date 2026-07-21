@@ -35,6 +35,30 @@ risk:
 
 # ── New sections ────────────────────────────────────────────────────
 
+kalshi:
+  rate_limit:
+    # Shared token bucket for the legacy KalshiClient — the client used by
+    # P-001 (scanner), P-002 (cross-venue arb) and the Settler.
+    #
+    # Measured 2026-07-21: 100% of HTTP 429s on the droplet (98 of 98 in a
+    # 40-minute window) came from THIS client. Zero came from KalshiPublic,
+    # which the golf pod, the book-capture daemon and the P-016 maker use.
+    #
+    # It was already rate-limited and correctly wired — KalshiClient.from_config
+    # reads this block — but with no block present it defaulted to 5 req/s
+    # burst 10, and 5 req/s is simply too high given everything else sharing
+    # the per-IP budget (Kalshi throttles per IP, not per process).
+    #
+    # Two earlier attempts moved this number only slightly, so treat any
+    # further change as requiring a measured before/after rather than a
+    # plausible story: concurrency cap 137->120/hr, settlement gate 120->116/hr.
+    #
+    # Cost of lowering: scans take longer. There is ample room — cycles
+    # complete in ~29s of the 300s budget. Some of the loss is also recovered,
+    # since each 429 currently costs a 1s backoff and up to 4 attempts.
+    requests_per_second: 2
+    burst: 5
+
 polymarket:
   environment: paper          # paper until US access opens
   host: https://clob.polymarket.com

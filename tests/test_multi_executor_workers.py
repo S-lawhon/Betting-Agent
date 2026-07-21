@@ -189,3 +189,23 @@ class TestFromConfig(TestCase):
         self.assertIsNotNone(workers, "execution.max_scan_workers is missing")
         self.assertLessEqual(workers, 3)
         self.assertGreaterEqual(workers, 1)
+
+    def test_shipped_config_pins_the_kalshi_rate_limit(self):
+        """kalshi.rate_limit must be present and below the 5 req/s default.
+
+        The block being ABSENT is the actual failure mode: KalshiClient
+        silently falls back to 5 req/s burst 10, which is where 100% of the
+        droplet's 429s came from (measured 2026-07-21). An absent block looks
+        identical to a configured one unless something asserts on it.
+        """
+        import yaml
+        with open("config_multi_pod.yaml") as fh:
+            cfg = yaml.safe_load(fh)
+        rl = (cfg.get("kalshi") or {}).get("rate_limit")
+        self.assertIsNotNone(rl, "kalshi.rate_limit is missing — defaults to 5 req/s")
+        self.assertLessEqual(
+            rl.get("requests_per_second", 5), 4,
+            "rate is at or above the default that caused the 429 storm",
+        )
+        self.assertGreaterEqual(rl.get("requests_per_second", 0), 1)
+        self.assertLessEqual(rl.get("burst", 10), 10)

@@ -327,5 +327,285 @@ class TestFromConfig(unittest.TestCase):
         self.assertAlmostEqual(guard.max_total_exposure_pct, 0.50)
 
 
+# ── Intra-cycle reservations ────────────────────────────────────────
+
+class _SizedResult(_MockResult):
+    """_MockResult that also carries the USD actually put at risk."""
+
+    def __init__(self, position_size_usd=0.0, **kw):
+        super().__init__(**kw)
+        self.position_size_usd = position_size_usd
+
+
+def _burst_guard(**kw):
+    """Guard where only the per-pod cap ($250 of $1000) can bind."""
+    defaults = dict(
+        bankroll=1_000,
+        max_pod_exposure_pct=0.25,
+        max_total_exposure_pct=1.0,
+        max_venue_exposure_pct=1.0,
+        max_open_positions=10_000,
+        _now_fn=lambda: _NOW,
+    )
+    defaults.update(kw)
+    return AggregateRiskGuard(**defaults)
+
+
+class TestIntraCycleReservations(unittest.TestCase):
+    """A pod placing its whole book in ONE scan must still be capped.
+
+    Exposure is only registered in update_post_cycle, so without
+    reservations every trade in a burst is checked against the previous
+    cycle's (usually zero) exposure and all of them are approved.  This is
+    the P-017 golf case: all candidates become visible together, 4-10 days
+    before close, so the pod places everything in a single scan.
+    """
+
+    def test_burst_is_cut_off_at_pod_exposure_cap(self):
+        guard = _burst_guard()
+        approved = [
+            m for m in range(100)
+            if guard.reserve_trade("P-017", "kalshi", f"MKT-{m}", 10.0)
+        ]
+        # $250 cap / $10 per trade = 25 trades, not all 100.
+        self.assertEqual(len(approved), 25)
+        self.assertAlmostEqual(guard._reserved(pod_id="P-017"), 250.0)
+
+    def test_unreserved_check_trade_is_the_old_leaky_behaviour(self):
+        """check_trade alone stays read-only — this is what the bug was."""
+        guard = _burst_guard()
+        approved = [
+            m for m in range(100)
+            if guard.check_trade("P-017", "kalshi", 10.0)
+        ]
+        self.assertEqual(len(approved), 100)
+
+    def test_venue_cap_also_binds_within_a_cycle(self):
+        guard = _burst_guard(max_venue_exposure_pct=0.10, max_pod_exposure_pct=1.0)
+        approved = [
+            m for m in range(100)
+            if guard.reserve_trade("P-017", "kalshi", f"MKT-{m}", 10.0)
+        ]
+        self.assertEqual(len(approved), 10)
+
+    def test_total_cap_also_binds_within_a_cycle(self):
+        guard = _burst_guard(max_total_exposure_pct=0.05, max_pod_exposure_pct=1.0)
+        approved = [
+            m for m in range(100)
+            if guard.reserve_trade("P-017", "kalshi", f"MKT-{m}", 10.0)
+        ]
+        self.assertEqual(len(approved), 5)
+
+    def test_position_count_cap_counts_reservations(self):
+        guard = _burst_guard(max_open_positions=3)
+        approved = [
+            m for m in range(100)
+            if guard.reserve_trade("P-017", "kalshi", f"MKT-{m}", 1.0)
+        ]
+        self.assertEqual(len(approved), 3)
+
+    def test_exempt_pod_still_capped_per_pod_within_a_cycle(self):
+        guard = _burst_guard(exempt_pods=["P-014"])
+        approved = [
+            m for m in range(100)
+            if guard.reserve_trade("P-014", "kalshi", f"MKT-{m}", 10.0)
+        ]
+        self.assertEqual(len(approved), 25)
+
+    def test_reserving_same_market_twice_does_not_compound(self):
+        """Pod pre-check then executor re-check must not double-count."""
+        guard = _burst_guard()
+        self.assertTrue(guard.reserve_trade("P-017", "kalshi", "MKT-1", 100.0))
+        self.assertTrue(guard.reserve_trade("P-017", "kalshi", "MKT-1", 100.0))
+        self.assertAlmostEqual(guard._reserved(pod_id="P-017"), 100.0)
+        self.assertEqual(len(guard._reservations), 1)
+
+    def test_reserve_without_market_id_falls_back_to_plain_check(self):
+        guard = _burst_guard()
+        self.assertTrue(guard.reserve_trade("P-017", "kalshi", "", 10.0))
+        self.assertEqual(guard._reservations, {})
+
+
+class TestReservationsDoNotLeak(unittest.TestCase):
+    """An approved trade the pod later drops must give its capacity back.
+
+    P-017 drops positions under $1 once depth caps apply, and the executor
+    can reject or error after approval.  If those reservations stuck, the
+    pod would starve itself a little more every cycle.
+    """
+
+    def test_post_cycle_releases_reservations_that_never_placed(self):
+        guard = _burst_guard()
+        for m in range(25):
+            guard.reserve_trade("P-017", "kalshi", f"MKT-{m}", 10.0)
+        self.assertEqual(len(guard._reservations), 25)
+
+        # Only one of them actually became a position.
+        guard.update_post_cycle(_MockReport(results=[
+            _SizedResult(pod_id="P-017", market_id="MKT-0",
+                         position_size_usd=10.0),
+        ]))
+
+        self.assertEqual(guard._reservations, {})
+        self.assertEqual(list(guard._open_positions), ["MKT-0"])
+        self.assertAlmostEqual(guard._pod_exposure["P-017"], 10.0)
+
+        # Capacity is back: the pod can fill the cap again next cycle.
+        approved = [
+            m for m in range(100)
+            if guard.reserve_trade("P-017", "kalshi", f"NEXT-{m}", 10.0)
+        ]
+        self.assertEqual(len(approved), 24)  # 240 more on top of the 10 held
+
+    def test_errored_result_does_not_become_a_position(self):
+        guard = _burst_guard()
+        guard.reserve_trade("P-017", "kalshi", "MKT-1", 10.0)
+        guard.update_post_cycle(_MockReport(results=[
+            _SizedResult(pod_id="P-017", market_id="MKT-1",
+                         position_size_usd=10.0, success=False,
+                         error="boom"),
+        ]))
+        self.assertEqual(guard._reservations, {})
+        self.assertNotIn("MKT-1", guard._open_positions)
+        self.assertAlmostEqual(guard._pod_exposure.get("P-017", 0.0), 0.0)
+
+    def test_pre_cycle_clears_reservations_from_a_cycle_that_never_reported(self):
+        guard = _burst_guard()
+        for m in range(25):
+            guard.reserve_trade("P-017", "kalshi", f"MKT-{m}", 10.0)
+        # No update_post_cycle — the cycle died before its callback ran.
+        guard.check_pre_cycle()
+        self.assertEqual(guard._reservations, {})
+
+    def test_explicit_release_frees_capacity_mid_scan(self):
+        guard = _burst_guard()
+        self.assertTrue(guard.reserve_trade("P-017", "kalshi", "MKT-1", 250.0))
+        self.assertFalse(guard.reserve_trade("P-017", "kalshi", "MKT-2", 10.0))
+        guard.release_reservation("MKT-1")
+        self.assertTrue(guard.reserve_trade("P-017", "kalshi", "MKT-2", 10.0))
+
+
+class TestPositionAccountingIsReversible(unittest.TestCase):
+    """Venue/pod buckets used to only ever go up."""
+
+    def test_close_position_credits_back_venue_and_pod(self):
+        guard = _burst_guard()
+        guard._add_position("P-017", "kalshi", "MKT-1", 200.0)
+        self.assertAlmostEqual(guard._pod_exposure["P-017"], 200.0)
+
+        guard.close_position("MKT-1", pnl=5.0)
+        self.assertAlmostEqual(guard._pod_exposure["P-017"], 0.0)
+        self.assertAlmostEqual(guard._venue_exposure["kalshi"], 0.0)
+        self.assertNotIn("MKT-1", guard._open_positions)
+
+    def test_pod_is_not_muted_after_its_positions_settle(self):
+        guard = _burst_guard()
+        for m in range(25):
+            guard._add_position("P-017", "kalshi", f"MKT-{m}", 10.0)
+        self.assertFalse(guard.check_trade("P-017", "kalshi", 10.0))
+
+        for m in range(25):
+            guard.close_position(f"MKT-{m}", pnl=0.0)
+        self.assertTrue(guard.check_trade("P-017", "kalshi", 10.0))
+
+    def test_add_position_is_idempotent(self):
+        guard = _burst_guard()
+        guard._add_position("P-017", "kalshi", "MKT-1", 100.0)
+        guard._add_position("P-017", "kalshi", "MKT-1", 100.0)
+        self.assertAlmostEqual(guard._pod_exposure["P-017"], 100.0)
+        self.assertAlmostEqual(guard._venue_exposure["kalshi"], 100.0)
+
+    def test_add_position_replaces_a_resized_market(self):
+        guard = _burst_guard()
+        guard._add_position("P-017", "kalshi", "MKT-1", 100.0)
+        guard._add_position("P-017", "kalshi", "MKT-1", 30.0)
+        self.assertAlmostEqual(guard._pod_exposure["P-017"], 30.0)
+
+
+# ── Bootstrap: paper positions from pods that settle ────────────────
+
+class _StubStore:
+    def __init__(self, positions):
+        self._positions = positions
+
+    def get_open_positions_for_bootstrap(self):
+        return self._positions
+
+
+_PAPER_POSITIONS = [
+    {"pod_id": "P-017", "venue": "kalshi", "market_id": "GOLF-1",
+     "position_size_usd": 10.0, "mode": "paper"},
+    {"pod_id": "P-002", "venue": "kalshi", "market_id": "ARB-1",
+     "position_size_usd": 20.0, "mode": "paper"},
+    {"pod_id": "P-001", "venue": "kalshi", "market_id": "LIVE-1",
+     "position_size_usd": 30.0, "mode": "live"},
+]
+
+
+class TestBootstrapPaperSkip(unittest.TestCase):
+    """Paper positions count for pods that can actually settle them.
+
+    The blanket paper-skip predates the P-015/P-017 settlers.  Since the
+    whole engine runs mode: paper, it meant the guard started every
+    process believing it had zero exposure.
+    """
+
+    def test_none_skips_all_paper(self):
+        guard = _burst_guard()
+        guard.bootstrap_from_store(_StubStore(_PAPER_POSITIONS))
+        self.assertEqual(set(guard._open_positions), {"LIVE-1"})
+
+    def test_paper_tracked_only_for_pods_with_a_settler(self):
+        guard = _burst_guard()
+        guard.bootstrap_from_store(
+            _StubStore(_PAPER_POSITIONS), settled_pod_ids={"P-017", "P-001"},
+        )
+        # P-017 settles → tracked.  P-002 has no settler → still skipped.
+        self.assertEqual(set(guard._open_positions), {"GOLF-1", "LIVE-1"})
+        self.assertAlmostEqual(guard._pod_exposure["P-017"], 10.0)
+
+    def test_bootstrapped_exposure_constrains_the_next_burst(self):
+        guard = _burst_guard()
+        guard.bootstrap_from_store(
+            _StubStore([
+                {"pod_id": "P-017", "venue": "kalshi", "market_id": f"G-{i}",
+                 "position_size_usd": 10.0, "mode": "paper"}
+                for i in range(20)
+            ]),
+            settled_pod_ids={"P-017"},
+        )
+        # $200 already at risk against a $250 cap → only 5 more $10 trades.
+        approved = [
+            m for m in range(100)
+            if guard.reserve_trade("P-017", "kalshi", f"NEW-{m}", 10.0)
+        ]
+        self.assertEqual(len(approved), 5)
+
+
+class TestSettledPodIds(unittest.TestCase):
+
+    def test_collects_pod_ids_from_built_settlers(self):
+        from src.engine import _settled_pod_ids
+
+        class _S:
+            def __init__(self, pod_id):
+                self._pod_id = pod_id
+
+        deps = {
+            "settler": object(),              # generic Kalshi settler
+            "golf_settler": _S("P-017"),
+            "tennis_settler": _S("P-015"),
+            "polymarket_settler": None,       # not built
+            "nowcast_client": object(),       # not a settler
+        }
+        self.assertEqual(
+            _settled_pod_ids(deps), {"P-001", "", "P-017", "P-015"},
+        )
+
+    def test_empty_when_no_settlers(self):
+        from src.engine import _settled_pod_ids
+        self.assertEqual(_settled_pod_ids({"nowcast_client": object()}), set())
+
+
 if __name__ == "__main__":
     unittest.main()

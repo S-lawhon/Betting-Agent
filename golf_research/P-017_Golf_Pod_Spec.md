@@ -42,12 +42,24 @@ $250):
 | 93 | 71 | $612 | 61% |
 | 174 | 134 | $1,122 | 112% |
 
-And the aggregate guard would not catch a breach: it registers exposure in
-`post_cycle`, while P-017 places its whole book inside a single scan, so
-intra-cycle `check_trade` always sees zero pod exposure. Accepting ~40% of
-the strategy is fine for the gate — it is **event-clustered**, so the
-sample size is 8 *tournaments*, not bet count. More coverage requires
-raising the paper bankroll (which rescales every pod), not the cap.
+At the time those numbers were measured the aggregate guard could not
+catch the breach: it registered exposure only in `post_cycle`, while P-017
+places its whole book inside a single scan, so intra-cycle `check_trade`
+always saw zero pod exposure and **rejected nothing in any of the three
+runs above**.
+
+**Fixed 2026-07-20.** `AggregateRiskGuard.reserve_trade` now holds a
+trade's exposure from the moment it is approved, so the per-pod cap binds
+*within* a scan: all three rows above are cut off at $250. Reservations
+that never become positions are released at the cycle boundary, so an
+approval the pod later abandons costs nothing. The position cap is no
+longer the only thing preventing a breach — but raising it still buys
+little, because the exposure cap becomes the binding constraint instead.
+
+Accepting ~40% of the strategy is fine for the gate — it is
+**event-clustered**, so the sample size is 8 *tournaments*, not bet count.
+More coverage requires raising the paper bankroll (which rescales every
+pod), not the cap.
 
 Because the cap binds, the *selection rule* is now part of the strategy.
 Ranking by net edge is degenerate in structural mode — `net = edge_bump −

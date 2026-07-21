@@ -327,8 +327,13 @@ class CrossVenueArbPod(BasePod):
         if position_size <= 0:
             return results
 
-        # Aggregate risk check
-        if not self.check_aggregate_risk("multi", position_size * 2):
+        # Aggregate risk check.  Both legs are reserved under one
+        # synthetic key holding the combined size — the two real legs
+        # register separately in post_cycle, and this hold is swept at
+        # the cycle boundary rather than converted.
+        if not self.check_aggregate_risk(
+            "multi", position_size * 2, market_id=f"{event_key}:arb",
+        ):
             return results
 
         # ── Place BOTH legs ────────────────────────────────────────

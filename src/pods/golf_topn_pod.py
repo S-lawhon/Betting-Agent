@@ -49,21 +49,29 @@ hard: the pod owns roughly 40% of the validated strategy, chosen by
 _select_candidates. (Earlier docs claiming "~30-60 bets/tournament" were
 simply wrong.)
 
-DO NOT raise max_open_positions on volume grounds alone. It is the
-binding INTRA-CYCLE risk control for this pod, and it is already
-calibrated to the fund's per-pod exposure policy:
+max_open_positions is calibrated to the fund's per-pod exposure policy:
 
     aggregate_risk.max_pod_exposure_pct 0.25 x $1000 bankroll = $250
     measured on a live board: cap 40 -> 28 placed -> $247 exposure
-                              cap 93 -> 71 placed -> $612  (61% of fund)
-                              cap 174 -> 134 placed -> $1122 (112%)
 
-The aggregate guard will NOT catch a breach here: it registers exposure
-in post_cycle, and P-017 places its entire book within a single scan
-(every candidate becomes visible at once, 4-10 days before close), so
-intra-cycle check_trade always sees zero pod exposure and approves.
-More strategy coverage requires more CAPITAL (raise the paper bankroll,
-which rescales every pod), not a bigger cap.
+It is no longer the ONLY thing standing between this pod and a breach.
+The aggregate guard used to register exposure only in post_cycle, and
+P-017 places its entire book within a single scan (every candidate
+becomes visible at once, 4-10 days before close), so intra-cycle
+check_trade saw zero pod exposure and approved everything:
+
+    cap 93  ->  71 placed -> $612  (61% of fund)   guard rejected nothing
+    cap 174 -> 134 placed -> $1122 (112%)          guard rejected nothing
+
+AggregateRiskGuard now RESERVES exposure on approval (see
+`reserve_trade`), so the per-pod cap binds within a single scan and
+those breaches are cut off at $250 regardless of the position cap —
+see tests/test_golf_topn.py::test_burst_respects_pod_exposure_cap.
+
+Raising max_open_positions is therefore no longer a solvency risk, but
+it still buys nothing on its own: the exposure cap, not the position
+cap, is what limits coverage. More strategy coverage requires more
+CAPITAL (raise the paper bankroll, which rescales every pod).
 """
 from __future__ import annotations
 
@@ -443,8 +451,11 @@ class GolfTopNPod(BasePod):
             return self._skip(m, ask, fair_prob, "SKIPPED_RISK",
                               "size < $1 after caps")
 
+        # Reserves on approval (market_id), so the rest of this scan sees
+        # the exposure.  P-017 places its entire book in one cycle, so
+        # without the reservation every name is checked against zero.
         if self.aggregate_risk is not None and not self.check_aggregate_risk(
-            "kalshi", size
+            "kalshi", size, market_id=ticker
         ):
             return self._skip(m, ask, fair_prob, "SKIPPED_RISK",
                               "aggregate risk guard")

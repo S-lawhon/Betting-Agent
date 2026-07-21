@@ -156,9 +156,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         )
         web_server.start()
 
-    # Bootstrap from store (no disk I/O)
+    # Bootstrap from store (no disk I/O).  Paper positions from pods that
+    # have a settler DO count — they get closed on settlement, so the
+    # guard should start the process knowing about them.
     allocator.bootstrap_from_store(trade_store)
-    guard.bootstrap_from_store(trade_store)
+    guard.bootstrap_from_store(
+        trade_store, settled_pod_ids=shared.get("settled_pod_ids"),
+    )
 
     callback = make_cycle_callback(
         guard,

@@ -574,7 +574,10 @@ class PolymarketConsensusPod(BasePod):
                 continue
 
             # ── Aggregate risk gate ─────────────────────────────────────
-            if not self.check_aggregate_risk("polymarket", position_size):
+            if not self.check_aggregate_risk(
+                "polymarket", position_size,
+                market_id=match.polymarket_condition_id,
+            ):
                 result = ScanResult(
                     fingerprint=fp,
                     timestamp_utc=self._now_fn().isoformat(),
@@ -675,13 +678,11 @@ class PolymarketConsensusPod(BasePod):
             results.append(result)
             self.mark_position_open(match.polymarket_condition_id)
 
-            # Notify aggregate risk guard so subsequent trades this cycle
-            # see the updated exposure (prevents over-allocation within a cycle)
-            if self.aggregate_risk is not None:
-                self.aggregate_risk._add_position(
-                    self.pod_id, "polymarket",
-                    match.polymarket_condition_id, position_size,
-                )
+            # (The guard already holds this trade's exposure — the risk
+            # gate above reserved it under polymarket_condition_id.  This
+            # used to poke aggregate_risk._add_position directly, which
+            # double-counted the venue/pod buckets once post_cycle added
+            # the same market again.)
 
             # Mark event as placed this cycle
             if event_id:

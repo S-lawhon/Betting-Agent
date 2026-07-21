@@ -183,19 +183,55 @@ class BasePod(ABC):
 
         return min(kelly_fraction * bankroll, max_pos)
 
-    def check_aggregate_risk(self, venue: str, position_size_usd: float) -> bool:
+    def check_aggregate_risk(
+        self, venue: str, position_size_usd: float,
+        market_id: Optional[str] = None,
+    ) -> bool:
         """Check portfolio-level risk limits before placing a trade.
 
         Returns True if the trade is approved, False if it would breach limits.
         If no aggregate_risk guard is set, always returns True.
+
+        Args:
+            market_id: Pass this when the pod will place the trade right
+                after approval.  It RESERVES the exposure, so the rest of
+                this scan sees it — without a reservation, a pod placing
+                its whole book in one cycle has every trade checked
+                against the previous cycle's exposure and the guard
+                approves all of them.  Unconverted reservations are
+                released at the cycle boundary, so an approval the pod
+                later abandons costs nothing.
         """
         if self.aggregate_risk is None:
             return True
+
+        reserve = getattr(self.aggregate_risk, "reserve_trade", None)
+        if market_id and callable(reserve):
+            return reserve(
+                pod_id=self.pod_id,
+                venue=venue,
+                market_id=market_id,
+                position_size_usd=position_size_usd,
+            )
+
         return self.aggregate_risk.check_trade(
             pod_id=self.pod_id,
             venue=venue,
             position_size_usd=position_size_usd,
         )
+
+    def release_aggregate_risk(self, market_id: str) -> None:
+        """Release a reservation for a trade the pod decided not to place.
+
+        Optional — ``update_post_cycle`` sweeps unconverted reservations
+        anyway.  Use this when a pod abandons a trade and wants the
+        capacity back within the SAME scan.
+        """
+        if self.aggregate_risk is None or not market_id:
+            return
+        release = getattr(self.aggregate_risk, "release_reservation", None)
+        if callable(release):
+            release(market_id)
 
     def write_log(self, result: ScanResult) -> None:
         """Append ScanResult to JSONL trade log.

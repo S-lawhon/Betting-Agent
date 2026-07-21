@@ -2,11 +2,48 @@
 
 Sequencing principle: build the thing with measured edge first, reuse its plumbing for everything after, and never build a model for a family whose book can't pay for the build.
 
+> **STATUS 2026-07-21 — the sequencing below has changed. Read this first.**
+>
+> **Build 1 (MLB props / totals fade) is KILLED as written.** Its Phase 0
+> kill-test #1 FAILED on 2026-07-19: the +60%/trade totals fade was a
+> close-anchoring selection artifact, and MLB totals are well calibrated both
+> pre-game and in-play. See **[03_validation.md § "2026-07-19 addendum —
+> kill-test results for the MLB totals fade"](03_validation.md)** for the
+> re-pull and the numbers that killed it. Do NOT start Build 1 on the premise
+> stated below — the "measured edge" it is sequenced first for does not exist.
+>
+> **Build 2 (weather maker) is now the front of the queue** and is the live
+> track: paper quote collection is running, working toward its 30-day evidence
+> gate. Its findings are explicitly *unaffected* by the contamination that
+> killed Build 1 — weather markets close at a fixed daily time regardless of
+> outcome, so close-anchoring is selection-free there.
+>
+> The Build 1 section is preserved below, unedited except for this marker,
+> because its kill is itself the most valuable result in this document: it is
+> the reason every other close-anchored T-1h sports number here is suspect.
+
 ---
 
-## Build 1 — MLB props engine (totals first) — **start now**
+## ~~Build 1 — MLB props engine (totals first) — start now~~ — **KILLED 2026-07-19**
 
-**Why first:** the only *measured, net-of-fee, statistically defensible* edge in this survey (03): in-play MLB totals favorites realized 41% vs 80¢ priced; cheap prop longshots underpriced across every series tested. Year-round liquidity (World Cup flow disappears in two weeks; MLB runs through October, then NBA/NFL props use the same engine). Aligns with the existing Kalshi-sports pivot plan (MLB first, CLV-validated).
+> **KILLED.** Kill-test #1 (selection-free anchoring) FAILED — see
+> [03_validation.md](03_validation.md). The "why first" claim immediately below
+> is the *original, now-refuted* premise; it is retained as history, not as
+> instruction. Kill-test #2 (fill realism) passed, so the liquidity claim still
+> stands; the *edge* claim does not.
+>
+> **What survives:** MLB in-play books have real institutional-grade liquidity
+> for a model-driven strategy. **What does not:** any free calibration bias to
+> harvest. Per 03's revised premise, a future MLB build must earn its edge from
+> forecasting (run-environment simulation + sharp-line anchor, CLV-validated),
+> and that forecasting edge is *unproven* — it must clear its own validation
+> before this section is un-killed.
+>
+> **Contamination scope:** every close-anchored T-1h sports result cited below
+> and in 03 (UFC MOV, WC props cheap-side, pooled props tables) carries the same
+> methodology risk and is unverified until re-run with event-start anchoring.
+
+**Why first [REFUTED — see kill notice above]:** the only *measured, net-of-fee, statistically defensible* edge in this survey (03): in-play MLB totals favorites realized 41% vs 80¢ priced; cheap prop longshots underpriced across every series tested. Year-round liquidity (World Cup flow disappears in two weeks; MLB runs through October, then NBA/NFL props use the same engine). Aligns with the existing Kalshi-sports pivot plan (MLB first, CLV-validated).
 
 **Phase 0 — kill-tests (3–5 days, do before any model):**
 1. Early-close selection audit: re-run the totals calibration with horizons anchored to scheduled game end (Statcast/MLB API game clocks), not market close. If the edge halves, halve conviction; if it vanishes, the finding was an artifact and Build 1 becomes the longshot-side only.
@@ -19,9 +56,13 @@ Sequencing principle: build the thing with measured edge first, reuse its plumbi
 
 **Done =** paper CLV positive over 200+ trades AND live pilot ($50/trade) net ROI > +10%/trade over 100 trades.
 
-**Expected economics [estimated]:** +20–60%/trade on ~20¢ collateral, holds of hours, 5–15 trades/day in season → even at the conservative end and $300 average size, ~$1.5–4k/wk P&L on <$25k working collateral; annualized return on collateral in the hundreds of percent *at small size*. Capacity ceiling near ~$30–50k/wk deployed before you are the book.
+**Expected economics [estimated — VOID, these follow from the refuted +60%/trade fade]:** +20–60%/trade on ~20¢ collateral, holds of hours, 5–15 trades/day in season → even at the conservative end and $300 average size, ~$1.5–4k/wk P&L on <$25k working collateral; annualized return on collateral in the hundreds of percent *at small size*. Capacity ceiling near ~$30–50k/wk deployed before you are the book.
 
-## Build 2 — Weather maker (2 weeks, parallel-friendly)
+*(end of killed Build 1 section)*
+
+---
+
+## Build 2 — Weather maker (2 weeks, parallel-friendly) — **NOW FIRST**
 
 **Why:** verified structural retail longshot bias + free professional-grade input data + mechanical settlement + cheap build. It's also the lowest-risk live laboratory for maker infrastructure (Build 3's prerequisite), because books are slow.
 

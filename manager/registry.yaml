@@ -311,30 +311,43 @@ workstreams:
 
   - id: P-017
     name: Golf Top-N Prop Pod
-    stage: parked
+    stage: paper
     owner_dir: golf_research
-    blocked_on: human
-    action_required: >
-      FULLY BUILT AND BACKTESTED, NOT DEPLOYED. Config overlay is preserved at
-      golf_research/p017_config_block.yaml (refreshed 2026-07-21 with the
-      DataGolf params — strategy.min_net_edge_model, strategy.model_weight, and
-      the datagolf section — that were rescued from the stale local config
-      before it was reconciled to the droplet). P-017 is absent from both the
-      local and live configs by design.
-      NOTE: the golf pod CODE is not on the droplet either. Deploy code before
-      adding P-017 to pods.active, or the engine will fail its pod load.
-      Decide: deploy and start paper collection through the next event (3M Open
-      week), or explicitly shelve it so it stops appearing here.
+    blocked_on: nothing
+    summary: >
+      DEPLOYED AND LIVE IN PAPER as of 2026-07-21 (verified on the droplet:
+      /opt/betting-pod-shop/src/pods/golf_topn_pod.py present, P-017 in
+      pods.active with the config comment "restored 2026-07-21"). Currently
+      trading its first event, the 3M Open — 38 PLACED rows in the droplet
+      trade log, alongside 1077 SKIPPED_RISK (the position cap doing its job,
+      not a fault). Config overlay reference stays at
+      golf_research/p017_config_block.yaml.
+      Gate progress: tournament 1 of 8. Nothing is owed by Sam right now; the
+      pod needs event weeks to accumulate, not decisions.
     gate:
       question: Does forward net CLV hold above half the backtest baseline?
       metric: tournaments
       threshold: 8
+      progress: 1          # 3M Open (2026-07-21), in flight
       decision: >
         Go/no-go after ~8 tournaments, treating EACH TOURNAMENT as one
         observation (not each bet — bets within a tournament are correlated).
         P-017M validates separately on fill quality (>=30% of quoted names fill)
         AND positive markout-implied net.
-    note: THOC26/COPC26 excluded from backtest — settlement not populated at pull date.
+    watch:
+      - >
+        Settlement actually resolving. P-017 shipped with no settler; that was
+        fixed 2026-07-20 by src/kalshi_golf_settler.py. Top-N markets sit
+        status="closed" with an empty result for ~a day post-tournament, so
+        the first real settlement signal is not expected until ~2026-07-28.
+        If PLACED keeps climbing and settled stays 0 past that, the settler is
+        not wired in — the failure mode is silent.
+      - Deliberate cap truncation (SKIPPED_RISK volume) once several events overlap.
+    note: >
+      THOC26/COPC26 excluded from backtest — settlement not populated at pull date.
+      Registry corrected 2026-07-21: this entry previously read "FULLY BUILT AND
+      BACKTESTED, NOT DEPLOYED / the golf pod CODE is not on the droplet either",
+      which was false and was asking Sam for a decision he had already made.
 
   # ---------------------------------------------------------------------------
   # DISABLED / KILLED
@@ -434,25 +447,58 @@ workstreams:
     stage: research
     owner_dir: tennis_research
     blocked_on: human
+    summary: >
+      ANALYSIS COMPLETE. analyze_lower_tour.py finished 2026-07-20 21:07;
+      results in tennis_research/lower_tour_results.txt. The P-015 tour-level
+      qualifier edge does NOT replicate out of sample on the lower tours.
+    finding:
+      question: Does the P-015 qualifier-favorite edge extend to Challenger/ITF?
+      answer: "No — it does not replicate."
+      evidence:
+        - "tour quals (P-015 basis, the reference): n=238, +4.06c/ct, CI [+1.44, +6.34] — excludes zero"
+        - "challenger quals: n=282, -1.98c/ct, CI [-5.24, +1.15] — crosses zero, point estimate NEGATIVE"
+        - "ITF (all, no qual split available): n=312, -2.33c/ct, CI [-5.48, +0.59] — crosses zero, point estimate NEGATIVE"
+        - "pooled ALL quals (tour+challenger+ITF): n=520, +0.78c/ct, CI [-1.44, +2.80] — includes zero"
+      reading: >
+        Pooling does not rescue it. The pooled +0.78c is the tour-level edge
+        diluted by two negative cohorts, and its CI includes zero — that is an
+        absence of evidence for P-015b, not evidence of a smaller edge. Note
+        also that the pooled cohort would be ~161 trades/month against P-015's
+        34, so the lower tours would dominate the blended number while
+        contributing the negative point estimates.
     action_required: >
-      analyze_lower_tour.py (the P-015b Challenger/ITF mechanism test) was
-      written 2026-07-20 20:27 and is in flight. Per the locked decision rule
-      clause 5, enabling lower-tour series is a NEW strategy version requiring
-      separate registration and its own n counter — it cannot be folded into
-      P-015. Finish the analysis, then register P-015b properly or drop it.
+      OPEN ITEM FOR SAM — the drop/keep call on P-015b is yours, not the
+      registry's. The evidence points to DROPPING P-015b: the mechanism did not
+      replicate out of sample and the pooled CI includes zero. This entry does
+      NOT kill it unilaterally, because P-015b is a registered research track.
+      Per tennis_research/P015_DECISION_RULE.md:83-87, adding lower-tour series
+      is a NEW strategy version with its own n counter and separate
+      registration — it can never be folded into P-015's counter, so nothing
+      here affects the running P-015 validation either way.
+      Decide: (a) drop P-015b and close this track, or (b) state what further
+      evidence would change the answer and what would be gathered to get it.
+    note: >
+      Registry corrected 2026-07-21: this entry previously said the analysis was
+      "in flight". It had already finished the night before.
 
   - id: R-EV-MAP
     name: Kalshi EV Opportunity Map
     stage: build
     owner_dir: kalshi-ev-map
-    blocked_on: human
-    action_required: >
-      DOCUMENT CONTRADICTION — 05_build_roadmap.md still opens with "Build 1 —
-      MLB props engine (totals first) — start now", but the newer 03_validation.md
-      records that Build 1's kill-test FAILED: the +60%/trade MLB totals fade was
-      a close-anchoring selection artifact. The main deliverable now contradicts
-      its own validation doc. Anyone (including a future you, or an agent) reading
-      the roadmap first will build a dead strategy. Fix the roadmap.
+    blocked_on: nothing
+    summary: >
+      Document contradiction RESOLVED 2026-07-21. 05_build_roadmap.md previously
+      opened with "Build 1 — MLB props engine (totals first) — start now" while
+      03_validation.md recorded that Build 1's kill-test had FAILED (the
+      +60%/trade MLB totals fade was a close-anchoring selection artifact). The
+      roadmap now carries a status banner at the top, Build 1 is struck through
+      and marked KILLED 2026-07-19 with a pointer to the validation that killed
+      it, and Build 2 (weather maker) is labelled as the front of the queue.
+      Build 1's text is preserved, not deleted — its kill is the reason every
+      other close-anchored result in the map is suspect.
+      Build 2's evidence gate is now actually observable from the brief: the
+      Mac-hosted weather jobs used to report "does not exist" because the
+      collector ran on the droplet (fixed 2026-07-21 in manager/collect.py).
     contamination_warning: >
       EVERY close-anchored T-1h sports result in 03_validation.md carries the same
       methodology risk (UFC MOV, WC props cheap-side, pooled props tables) and is
@@ -489,11 +535,21 @@ suppress:
   - pattern: "HTTP 404: Unknown sport"
     match: "basketball_ncaaw"
     reason: >
-      NCAA women's basketball is out of season but still in the configured scan
-      list. Logged at ERROR level once per 5-min cycle, deterministically. Left
-      unsuppressed it fires ~288 times/day and poisons every error count.
-    fix: Remove basketball_ncaaw from the scan list, or gate it on season dates.
-    expires: 2026-11-01   # re-evaluate when NCAAW season starts
+      CORRECTED 2026-07-21 — the original reason ("out of season") was wrong,
+      and acting on it would have produced a fix that failed in November.
+      The Odds API returns "HTTP 404: Unknown sport" for basketball_ncaaw: it
+      is rejecting the sport KEY as invalid, not reporting an empty in-season
+      result. A valid-but-idle sport returns 200 with zero events. Measured at
+      1,164 occurrences in 24h on the droplet, once per 5-min cycle.
+    fix: >
+      DONE (locally) 2026-07-21: basketball_ncaaw commented out of
+      odds_api.sports in config_multi_pod.yaml. Season-date gating was
+      considered and rejected — the key is invalid year-round, so gating would
+      have masked the noise until NCAAW season opened and then resumed 404ing.
+      NEEDS DEPLOY: the droplet still runs the old config and will keep
+      emitting this until scripts/deploy.sh runs. Keep this suppression until
+      then. To genuinely re-enable NCAAW, confirm the real key via /v4/sports.
+    expires: 2026-11-01   # re-evaluate if a valid NCAAW key is identified
 
   - pattern: "SANITY_SKIP"
     reason: >

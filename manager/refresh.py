@@ -26,6 +26,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import collect  # noqa: E402  (local module, needs the path above)
+
 HERE = Path(__file__).resolve().parent
 STATE = HERE / "state"
 HOST = "root@129.212.176.202"
@@ -77,6 +80,29 @@ def main() -> int:
     except (OSError, json.JSONDecodeError) as exc:
         sys.stderr.write("[refresh] fetched snapshot is unreadable: {}\n".format(exc))
         return 1
+
+    # The remote collector cannot see /Users/samlawhon/... — Mac-hosted jobs
+    # (weather_paper_maker, weather_archiver) come back marked "uncheckable".
+    # Measure them here, where their output lives, and overlay the results.
+    # Without this the brief was blind to R-EV-MAP Build 2's evidence gate.
+    try:
+        n_before = sum(1 for j in snap.get("jobs", [])
+                       if j.get("state") == "uncheckable")
+        snap = collect.merge_local_jobs(snap)
+        n_after = sum(1 for j in snap.get("jobs", [])
+                      if j.get("state") == "uncheckable")
+        dest.write_text(json.dumps(snap, indent=2, default=collect.jsonable),
+                        encoding="utf-8")
+        print("[refresh] local jobs measured on this Mac: {} of {} filled in"
+              .format(n_before - n_after, n_before))
+        if n_after:
+            sys.stderr.write(
+                "[refresh] {} job(s) remain UNCHECKABLE from here — reported as "
+                "unknown, not as healthy.\n".format(n_after))
+    except Exception as exc:  # noqa: BLE001 - never fail the refresh over this
+        sys.stderr.write(
+            "[refresh] local job merge failed ({}: {}); Mac-hosted jobs stay "
+            "UNCHECKABLE in this snapshot.\n".format(type(exc).__name__, exc))
 
     collected = snap.get("collected_at", "?")
     age = ""

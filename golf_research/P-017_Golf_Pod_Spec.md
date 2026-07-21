@@ -29,9 +29,25 @@ Earlier drafts of this spec said "~30–60 bets per tournament". That is
 **wrong**. Leg A's backtest placed 926 bets across 10 events — **~93 per
 tournament** — and a live 3M Open board offered **174** names clearing the
 band. `max_open_positions: 40` therefore binds hard, and the pod trades
-roughly 40% of the validated strategy. The cap appears to have been sized
-against the incorrect 30–60 figure; revisit it if the paper sample proves
-too thin for the 8-tournament gate.
+roughly 40% of the validated strategy.
+
+**The cap is nevertheless correct — do not raise it on volume grounds.**
+Measured against a live board, it is calibrated to the fund's own per-pod
+exposure policy (`aggregate_risk.max_pod_exposure_pct: 0.25` × $1,000 =
+$250):
+
+| cap | placed | P-017 exposure | % of bankroll |
+|---|---|---|---|
+| **40** | 28 | **$247** | 24.7% |
+| 93 | 71 | $612 | 61% |
+| 174 | 134 | $1,122 | 112% |
+
+And the aggregate guard would not catch a breach: it registers exposure in
+`post_cycle`, while P-017 places its whole book inside a single scan, so
+intra-cycle `check_trade` always sees zero pod exposure. Accepting ~40% of
+the strategy is fine for the gate — it is **event-clustered**, so the
+sample size is 8 *tournaments*, not bet count. More coverage requires
+raising the paper bankroll (which rescales every pod), not the cap.
 
 Because the cap binds, the *selection rule* is now part of the strategy.
 Ranking by net edge is degenerate in structural mode — `net = edge_bump −

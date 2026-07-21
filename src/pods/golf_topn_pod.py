@@ -46,9 +46,24 @@ Expected volume — NOTE the cap interaction. The backtest averaged ~93
 bets/tournament (926 over 10 events), and a live 3M Open board offered
 174 names clearing the band. max_open_positions (40) therefore BINDS
 hard: the pod owns roughly 40% of the validated strategy, chosen by
-_select_candidates. Earlier docs claiming "~30-60 bets/tournament" were
-wrong and are what the cap appears to have been sized against — revisit
-the cap if the paper sample proves too thin for the 8-tournament gate.
+_select_candidates. (Earlier docs claiming "~30-60 bets/tournament" were
+simply wrong.)
+
+DO NOT raise max_open_positions on volume grounds alone. It is the
+binding INTRA-CYCLE risk control for this pod, and it is already
+calibrated to the fund's per-pod exposure policy:
+
+    aggregate_risk.max_pod_exposure_pct 0.25 x $1000 bankroll = $250
+    measured on a live board: cap 40 -> 28 placed -> $247 exposure
+                              cap 93 -> 71 placed -> $612  (61% of fund)
+                              cap 174 -> 134 placed -> $1122 (112%)
+
+The aggregate guard will NOT catch a breach here: it registers exposure
+in post_cycle, and P-017 places its entire book within a single scan
+(every candidate becomes visible at once, 4-10 days before close), so
+intra-cycle check_trade always sees zero pod exposure and approves.
+More strategy coverage requires more CAPITAL (raise the paper bankroll,
+which rescales every pod), not a bigger cap.
 """
 from __future__ import annotations
 

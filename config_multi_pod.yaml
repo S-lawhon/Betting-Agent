@@ -70,6 +70,27 @@ aggregate_risk:
   exempt_pods:                   # Pods that bypass aggregate exposure cap
     - P-014                      # Live Game Agent — trades even when portfolio is over 50%
 
+# ── Settlement ──────────────────────────────────────────────────────
+settlement:
+  # Run the settlement pass every Nth scan cycle. At the 5-minute cycle
+  # interval, 6 = every 30 minutes.
+  #
+  # All four settlers (Kalshi, Polymarket, tennis, golf) used to poll on
+  # EVERY cycle. With ~115 open positions that is ~1,380 Kalshi requests/hour
+  # in bursts, and it was measured 2026-07-21 as the DOMINANT source of HTTP
+  # 429s on the droplet: every 429 cluster fell in a settler-pass minute or
+  # the one after it, and none fell anywhere else.
+  #
+  # Nothing in the book resolves on a 5-minute boundary — golf Top-N sits
+  # `closed` with an empty `result` for ~a day (CLAUDE.md), tennis and MLB
+  # resolve on hour scales — so ~11 of every 12 passes/hour found nothing.
+  #
+  # TRADE-OFF: settlement latency rises to 30 min, and open positions stay
+  # counted against pod caps that much longer (P-017 derives its cap from
+  # the TradeStore). Keep this well under the fastest real settlement time.
+  # Lower it if a pod is ever seen blocked at its cap by stale open counts.
+  interval_cycles: 6
+
 # ── Execution ───────────────────────────────────────────────────────
 execution:
   # Cap on CONCURRENT pod scans. Kalshi throttles on concurrent connections,

@@ -307,6 +307,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 settler=shared.get("settler"),
                 polymarket_settler=shared.get("polymarket_settler"),
                 allocator=allocator,
+                settlement_interval_cycles=int(
+                    (config.get("settlement") or {}).get("interval_cycles", 1)
+                ),
             )
 
     except KeyboardInterrupt:

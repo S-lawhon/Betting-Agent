@@ -232,6 +232,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 golf_settler=shared.get("golf_settler"),
                 allocator=allocator,
                 trade_store=trade_store,
+                settlement_interval_cycles=int(
+                    (config.get("settlement") or {}).get("interval_cycles", 1)
+                ),
             )
 
     except KeyboardInterrupt:

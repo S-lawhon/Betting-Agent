@@ -677,21 +677,55 @@ def _run_guarded_loop(
     golf_settler=None,
     allocator: Optional["CapitalAllocator"] = None,
     trade_store: Optional["TradeStore"] = None,
+    settlement_interval_cycles: int = 1,
 ) -> List[CycleReport]:
     """Run scan cycles in a guarded loop.
 
     Guards each cycle with check_pre_cycle().  If the guard halts, waits
     one interval and tries again on the next iteration.
+
+    Args:
+        settlement_interval_cycles:
+            Run the settlement pass every Nth cycle.  1 = every cycle (the
+            historical behaviour, and the default so nothing changes for a
+            caller that does not set it).
+
+            WHY THIS EXISTS.  All four settlers used to poll on EVERY cycle.
+            With a 5-minute interval and ~115 open positions that is ~1,380
+            Kalshi requests/hour in bursts, and it was measured (2026-07-21)
+            to be the dominant source of HTTP 429s on the droplet — every
+            429 cluster fell in a settler-pass minute or the one after it,
+            and none fell anywhere else.
+
+            Nothing in the book can resolve on a 5-minute boundary: golf
+            Top-N sits `closed` with an empty `result` for ~a day
+            (see CLAUDE.md), and tennis/MLB resolve on hour scales.  So ~11
+            of every 12 passes per hour were guaranteed to find nothing.
+
+            TRADE-OFF: settlement latency rises to N*interval, and open
+            positions stay counted against pod caps for that much longer
+            (P-017 derives its cap from the TradeStore).  Keep N*interval
+            well below the fastest real settlement time.
     """
     reports: List[CycleReport] = []
     iteration = 0
+    settle_every = max(1, int(settlement_interval_cycles or 1))
 
     while max_cycles is None or iteration < max_cycles:
         cycle_start = time.monotonic()
         iteration += 1
 
+        # Always settle on the first pass so a restart reconciles immediately,
+        # then every Nth cycle thereafter.
+        do_settle = (iteration - 1) % settle_every == 0
+        if not do_settle:
+            logger.debug(
+                "settlement: skipped on cycle %d (every %d cycles)",
+                iteration, settle_every,
+            )
+
         # ── Settlement: poll venues for resolved markets BEFORE scanning ──
-        if settler is not None:
+        if do_settle and settler is not None:
             try:
                 settled = settler.settle_cycle()
                 if settled:
@@ -719,7 +753,7 @@ def _run_guarded_loop(
             except Exception as exc:
                 logger.warning("settlement.kalshi: settle_cycle failed: %s", exc)
 
-        if polymarket_settler is not None:
+        if do_settle and polymarket_settler is not None:
             try:
                 settled = polymarket_settler.settle_cycle()
                 if settled:
@@ -745,7 +779,7 @@ def _run_guarded_loop(
             except Exception as exc:
                 logger.warning("settlement.polymarket: settle_cycle failed: %s", exc)
 
-        if tennis_settler is not None:
+        if do_settle and tennis_settler is not None:
             try:
                 settled = tennis_settler.settle_cycle()
                 if settled:
@@ -778,7 +812,7 @@ def _run_guarded_loop(
             except Exception as exc:
                 logger.warning("settlement.tennis: settle_cycle failed: %s", exc)
 
-        if golf_settler is not None:
+        if do_settle and golf_settler is not None:
             try:
                 settled = golf_settler.settle_cycle()
                 if settled:

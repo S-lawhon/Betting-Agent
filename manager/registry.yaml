@@ -503,11 +503,33 @@ workstreams:
         is a live paper execution test against real book depth.
     open_questions:
       - id: websocket-capture
-        blocked_on: human
+        blocked_on: time
         text: >
-          Sizing the repricing-lag edge needs 1-minute or websocket book capture
-          for a two-week window. Currently sampled at 5 min, which is
-          underpowered. Nothing is scheduled to collect this.
+          COLLECTION STARTED 2026-07-21. Sizing the repricing-lag edge needs
+          1-minute or websocket book capture for a two-week window; 5-minute
+          sampling is underpowered. This is no longer unscheduled — the
+          betting-book-capture systemd unit is live on the droplet writing
+          data/book_capture/ at 60s cadence.
+
+          REST polling, not websocket, and that is a constraint not a shortcut:
+          Kalshi's websocket requires PRODUCTION API credentials and this
+          project holds demo-only keys (.env KALSHI_ENVIRONMENT=demo), so demo
+          carries no real book data. The on-disk schema is websocket-shaped
+          (rows keyed by ticker+epoch) so an authenticated feed could later
+          write the same records with no migration.
+
+          COVERAGE CAVEAT — do not read the capture as complete. It runs at
+          2.5 req/s, which caps it at 45 markets and truncates ~23 of ~68
+          discovered (lowest 24h volume first, mostly next-day games). Each
+          truncation is logged AND written into the data as a DISCOVERY record,
+          so analysis can see the gap rather than assume full coverage. The
+          rate was set conservatively during the 429 investigation; now that
+          the root cause is fixed (kalshi.rate_limit 5->2), it can be raised
+          toward 5.0 req/s to cover the full slate — check the unit's 429
+          count first.
+        started: 2026-07-21
+        eta: two weeks of capture -> ~2026-08-04
+        build_notes: research/BOOK_CAPTURE_2026-07-20.md
     note: >
       NEVER use last_price for calibration — it is settlement-contaminated.
       Use pregame trade prices.
@@ -638,10 +660,28 @@ workstreams:
       - id: build3-gate
         blocked_on: data
         text: >
-          Build 3 needs 2 weeks of websocket quote capture measuring fill rates
-          at +/-1c around Poly mid, post-fill adverse selection, and effective
-          spread capture. If capture < 1c/contract after adverse selection, stop
-          at Build 1+2.
+          Build 3 needs 2 weeks of quote capture measuring fill rates at +/-1c
+          around Poly mid, post-fill adverse selection, and effective spread
+          capture. If capture < 1c/contract after adverse selection, stop at
+          Build 1+2.
+
+          PARTIALLY UNBLOCKED 2026-07-21: the Kalshi leg is now collecting via
+          the betting-book-capture unit (see the websocket-capture question
+          under R-MLB-PROPS — same daemon serves both).
+
+          STILL BLOCKED on the POLYMARKET leg, which this gate specifically
+          needs — "fill rates around POLY MID" cannot be measured from Kalshi
+          books alone. That leg was deliberately NOT built: it depends on
+          Polymarket having live MLB regular-season markets, which was
+          unverified at build time. It has since been confirmed live
+          (research/OPEN_QUESTIONS_2026-07-20.md, Q3), so the second leg is now
+          buildable — but read the caveat there first: Polymarket MLB books
+          show ~40c top-of-book spreads, so a naive basis measurement would
+          largely be measuring Polymarket's own spread rather than cross-venue
+          disagreement. Record midpoint, depth-weighted price AND spread per
+          row so thin quotes can be filtered in analysis, and reassess after
+          one week rather than committing to three.
+        kalshi_leg_started: 2026-07-21
     standing_debt: >
       90-day API history horizon: every week not archived is calibration data
       lost forever. The weekly archiver runs on Mac cron and silently skips

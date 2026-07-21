@@ -1,0 +1,51 @@
+[Unit]
+Description=Betting Pod Shop — Book Capture (1-min Kalshi order-book collector)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+
+# Data collector only — public unauthenticated endpoints, places no orders.
+# Separate unit from betting-pod-shop / betting-live-maker so a capture bug
+# cannot take down trading, and a trading restart cannot gap the capture.
+#
+# --rate 2.5 is DELIBERATELY below the module default of 5.0.  Measured on
+# this host 2026-07-20: betting-pod-shop already takes 829 HTTP 429s/24h,
+# escalating to ~134/hr at 03:00 UTC (peak MLB).  betting-live-maker takes
+# zero, and P-016 is mid-gate (282/500 fills) — pushing it into 429s would
+# contaminate a running pre-registered sample.  Capture therefore runs at
+# ~1/3 of the ~7 req/s pain threshold and halves itself on any 429.
+# Raise this only after the main engine's rate-limit problem is fixed.
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_book_capture --rate 2.5
+
+Restart=always
+RestartSec=30
+ExecStartPre=/bin/sleep 5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=betting-book-capture
+
+# Capture is strictly lower priority than trading: if the box gets tight,
+# this is what should yield.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=384M
+
+# ── Security hardening (mirrors betting-live-maker.service) ─────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

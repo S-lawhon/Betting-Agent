@@ -168,6 +168,7 @@ workstreams:
   - id: P-001
     name: Kalshi Moneyline Value
     stage: paper
+    tier: validating
     owner_dir: src/pods/kalshi_moneyline.py
     blocked_on: time
     summary: >
@@ -190,6 +191,7 @@ workstreams:
   - id: P-002
     name: Kalshi-Polymarket Cross-Venue Arb
     stage: shelved
+    tier: none
     blocked_on: nothing
     shelved:
       decided: 2026-07-21
@@ -219,6 +221,7 @@ workstreams:
   - id: P-006
     name: Sportsbook-Polymarket Consensus
     stage: shelved
+    tier: none
     blocked_on: nothing
     shelved:
       decided: 2026-07-21
@@ -253,6 +256,7 @@ workstreams:
   - id: P-014
     name: Live Game Agent
     stage: paper
+    tier: validating
     blocked_on: time
     summary: INCONCLUSIVE — not significant but excellently calibrated. Hold, do not scale.
     gate:
@@ -265,6 +269,7 @@ workstreams:
   - id: P-015
     name: Tennis Qualifier Favorite
     stage: paper
+    tier: validating
     blocked_on: time
     summary: >
       Buy heavy favorites (0.85-0.975 ask) in ATP/WTA QUALIFYING matches.
@@ -314,6 +319,7 @@ workstreams:
   - id: P-016
     name: Live In-Play Maker
     stage: paper
+    tier: validating
     service: betting-live-maker
     blocked_on: time
     summary: >
@@ -399,6 +405,7 @@ workstreams:
   - id: P-017
     name: Golf Top-N Prop Pod
     stage: paper
+    tier: validating
     owner_dir: golf_research
     blocked_on: nothing
     summary: >
@@ -493,6 +500,7 @@ workstreams:
   - id: P-013
     name: Kalshi-Deribit Crypto Options
     stage: killed
+    tier: none
     blocked_on: nothing
     summary: >
       KILLED. Significant NEGATIVE edge (-$2,094; per-bet CI [-51%,-11%]),
@@ -504,6 +512,7 @@ workstreams:
   - id: P-009-P-010
     name: Promo pods (Sign-Up Bonus / Odds Boost)
     stage: parked
+    tier: none
     blocked_on: nothing
     summary: Loaded but zero settled history, disabled at the 2026-07-18 pivot. Not analyzed.
 

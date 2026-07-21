@@ -91,8 +91,26 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
         if age is not None and limit and age > limit:
             # Some heartbeats are only meaningful in a time window (P-016 only
             # quotes during live MLB games; silence at 4am is correct).
-            if hb.get("only_during") == "mlb_games_window" and not _in_games_window():
-                continue
+            if hb.get("only_during") == "mlb_games_window":
+                if not _in_games_window():
+                    continue
+                # Inside the window is not sufficient. _in_games_window opens at
+                # 16:00 UTC to cover possible noon-ET day games, but a typical
+                # slate's first pitch is 18:40 ET = 22:40 UTC — so for ~7 hours
+                # the maker is correctly silent and this check fired CRITICAL
+                # anyway (observed 2026-07-21: "silent for 912 min").
+                #
+                # The check exists to catch a WEDGED LOOP. A loop that has not
+                # started yet is not wedged. So: if the heartbeat is older than
+                # the window itself, the maker simply has not begun quoting
+                # today — say nothing. Once it HAS quoted inside the window and
+                # then goes quiet past the limit, that is the real failure and
+                # it still fires.
+                #
+                # Deliberately does not hardcode a later start hour: that would
+                # just replace one guess with another, and day games do exist.
+                if age > _minutes_since_window_open():
+                    continue
             out.append(Finding(
                 key="service.{}.stale".format(sid),
                 severity="critical",
@@ -116,10 +134,27 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
     return out
 
 
+WINDOW_OPEN_HOUR_UTC = 16      # noon ET — earliest a day game could start
+
+
 def _in_games_window(at: Optional[datetime] = None) -> bool:
     """Rough MLB slate window, 16:00-06:00 UTC (noon-2am ET)."""
     hour = (at or datetime.now(UTC)).hour
-    return hour >= 16 or hour < 6
+    return hour >= WINDOW_OPEN_HOUR_UTC or hour < 6
+
+
+def _minutes_since_window_open(at: Optional[datetime] = None) -> float:
+    """How long the games window has been open, in minutes.
+
+    Used to distinguish "hasn't started quoting yet" from "started and
+    stalled". Overnight (hour < 6) the window opened at 16:00 UTC the previous
+    day, so the elapsed time carries across midnight.
+    """
+    now = at or datetime.now(UTC)
+    hours = now.hour - WINDOW_OPEN_HOUR_UTC
+    if hours < 0:                       # past midnight, window opened yesterday
+        hours += 24
+    return hours * 60 + now.minute
 
 
 def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
@@ -351,6 +386,101 @@ def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]
     return out
 
 
+def check_registry_reconciliation(snap: Dict[str, Any],
+                                  registry: Dict[str, Any]) -> List[Finding]:
+    """Does what the registry SAYS is trading match what IS trading?
+
+    Real incidents this guards against, all on 2026-07-20/21:
+      - The registry said P-017 was "built but NOT deployed" while it was live
+        and had placed 38 positions. Nobody noticed for about a day.
+      - It said "nothing is scheduled" for the book capture hours after the
+        capture daemon was deployed.
+      - It said the MLB props collector had no timer while a timer was running.
+
+    Three misses in two days, each one a confident statement that was false.
+    Note the direction of the fix: runtime config stays AUTHORITATIVE and the
+    registry is checked against it. Making the registry drive what loads would
+    have turned that same staleness into an outage rather than a bad report —
+    see research/SPEC_Pod_Tiers_2026-07-21.md section 3.
+    """
+    out: List[Finding] = []
+    fp = (snap.get("invariants", {}) or {}).get("config_fingerprint") or {}
+    if not fp.get("exists") or "active" not in fp:
+        return out           # nothing measured; check_config_drift says so
+
+    active = set(fp["active"] or [])
+    pods = {w.get("id"): w for w in registry.get("workstreams", [])
+            if str(w.get("id", "")).startswith("P-")}
+    svc_state = {s.get("id"): s.get("active") for s in snap.get("services", [])}
+
+    # (a) trading but unregistered — we cannot report on what we don't know
+    for pid in sorted(active - set(pods)):
+        out.append(Finding(
+            key="registry.unregistered.{}".format(pid),
+            severity="error",
+            title="{} is in pods.active but has no registry entry".format(pid),
+            detail=("The engine is loading this pod, so it can place trades, "
+                    "but the manager has no gate, tier or owner recorded for "
+                    "it. Nothing will report on it."),
+            workstream=pid,
+            fix="Add a workstream entry for {} to manager/registry.yaml".format(pid)))
+
+    # (b) recorded as trading, isn't. This is the P-017 miss, inverted.
+    for pid, w in sorted(pods.items()):
+        tier = w.get("tier")
+        if tier not in ("validating", "production"):
+            continue
+        if pid in active or w.get("service"):
+            continue
+        out.append(Finding(
+            key="registry.not_running.{}".format(pid),
+            severity="error",
+            title="{} is tier={} but is not running".format(pid, tier),
+            detail=("The registry records this pod as trading, but it is "
+                    "absent from pods.active and declares no `service:`. "
+                    "Either it should be running and isn't, or its tier is "
+                    "stale — both are wrong and only one is obvious."),
+            workstream=pid,
+            fix="Either add {} to pods.active, or set tier: none".format(pid)))
+
+    # (c) declares a service that isn't up
+    for pid, w in sorted(pods.items()):
+        svc = w.get("service")
+        if not svc:
+            continue
+        state = svc_state.get(svc)
+        if state is None or state in ("active", "n/a"):
+            continue
+        out.append(Finding(
+            key="registry.service_down.{}".format(pid),
+            severity="critical",
+            title="{} declares service {} which is {}".format(pid, svc, state),
+            workstream=pid,
+            fix="ssh root@129.212.176.202 'systemctl status {} --no-pager'".format(svc)))
+
+    # (d) gate cleared but still validating — promotion is a DECISION, and a
+    #     decision nobody is prompted to make is a decision that never happens.
+    for pid, w in sorted(pods.items()):
+        if w.get("tier") != "validating":
+            continue
+        gate = w.get("gate") or {}
+        threshold, progress = gate.get("threshold"), gate.get("progress")
+        if not isinstance(threshold, (int, float)):
+            continue
+        if not isinstance(progress, (int, float)) or progress < threshold:
+            continue
+        out.append(Finding(
+            key="registry.promotion_due.{}".format(pid),
+            severity="info",
+            title="{} has reached its gate ({}/{}) and is still tier=validating"
+                  .format(pid, progress, threshold),
+            detail=gate.get("question", ""),
+            workstream=pid,
+            fix="Evaluate the gate and set tier: production, or record why not"))
+
+    return out
+
+
 def check_workstreams(snap: Dict[str, Any]) -> List[Finding]:
     """The 'what needs me' list. Driven entirely by registry blocked_on."""
     out: List[Finding] = []
@@ -454,6 +584,7 @@ def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
     findings += check_config_drift(snap, local_config_fp)
     findings += check_jobs(snap)
     findings += check_gates(snap, registry)
+    findings += check_registry_reconciliation(snap, registry)
     findings += check_errors(snap)
     findings += check_faults(snap)
     findings += check_workstreams(snap)

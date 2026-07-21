@@ -27,6 +27,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from src.et_time import et_date_tag
 from src.fuzzy_utils import token_sort_ratio, team_name_in_text, both_teams_present
 
 logger = logging.getLogger(__name__)
@@ -280,14 +281,20 @@ class KalshiLiveDiscovery:
         When multiple date variants exist (same teams, different days),
         strongly prefers today's market via a date-match bonus.
         """
-        from datetime import datetime, timezone
-
         game_str = f"{home_team} {away_team}"
         game_norm = _normalize_title(game_str)
 
-        # Today's date tag as it appears in Kalshi tickers: "26MAR28"
-        now = datetime.now(timezone.utc)
-        today_tag = now.strftime("%y%b%d").upper()  # e.g. "26MAR28"
+        # Today's date tag as it appears in Kalshi tickers: "26MAR28".
+        #
+        # This MUST be the ET date, not the UTC date. Kalshi encodes the ET
+        # calendar day, and between 00:00 and 04:00 UTC (20:00-00:00 ET) the
+        # UTC date has already rolled over while the ticker tag has not — so
+        # a UTC-derived tag was wrong for exactly the evening slate, which is
+        # most of the board. The tag only drives a scoring BONUS, so the
+        # symptom was a weakened same-day preference (and a possible wrong-day
+        # match when the same teams play consecutive days), not an outright
+        # discovery failure.
+        today_tag = et_date_tag()
 
         best_match: Optional[KalshiMarketMatch] = None
         best_score = 0.0

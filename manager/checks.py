@@ -95,10 +95,10 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
                 if not _in_games_window():
                     continue
                 # Inside the window is not sufficient. _in_games_window opens at
-                # 16:00 UTC to cover possible noon-ET day games, but a typical
-                # slate's first pitch is 18:40 ET = 22:40 UTC — so for ~7 hours
-                # the maker is correctly silent and this check fired CRITICAL
-                # anyway (observed 2026-07-21: "silent for 912 min").
+                # noon ET to cover possible day games, but a typical slate's
+                # first pitch is 18:40 ET — so for ~7 hours the maker is
+                # correctly silent and this check fired CRITICAL anyway
+                # (observed 2026-07-21: "silent for 912 min").
                 #
                 # The check exists to catch a WEDGED LOOP. A loop that has not
                 # started yet is not wedged. So: if the heartbeat is older than
@@ -134,27 +134,58 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
     return out
 
 
-WINDOW_OPEN_HOUR_UTC = 16      # noon ET — earliest a day game could start
+# The MLB slate window is defined in ET, because that is the timezone MLB
+# schedules games in — NOT in UTC.
+#
+# This was originally WINDOW_OPEN_HOUR_UTC = 16, described as "noon ET". That
+# is only true under EDT. Once DST ends (2026-11-01) 16:00 UTC is 11:00 EST,
+# so the window would silently open an hour early and every elapsed-time
+# calculation would be 60 minutes too large — which, in the one place this
+# feeds (the "has the maker started quoting yet" test in check_services), errs
+# toward firing CRITICAL on a maker that is correctly still idle.
+#
+# Anchoring to America/New_York makes the boundary follow the actual clock the
+# schedule uses, at DST and forever after.
+WINDOW_OPEN_HOUR_ET = 12       # noon ET — earliest a day game could start
+WINDOW_CLOSE_HOUR_ET = 2       # 2am ET — latest a west-coast game could run to
+
+try:
+    from zoneinfo import ZoneInfo
+    ET = ZoneInfo("America/New_York")
+except Exception:               # pragma: no cover - no tzdata on this host
+    ET = None
+
+
+def _to_et(at: Optional[datetime] = None) -> datetime:
+    """Current (or supplied) time expressed in ET.
+
+    Falls back to a fixed UTC-4 only if tzdata is missing, which reproduces
+    the old EDT-only behaviour rather than crashing the monitor.
+    """
+    now = at or datetime.now(UTC)
+    if now.tzinfo is None:      # defensive: treat naive input as UTC
+        now = now.replace(tzinfo=UTC)
+    return now.astimezone(ET if ET is not None else timezone(timedelta(hours=-4)))
 
 
 def _in_games_window(at: Optional[datetime] = None) -> bool:
-    """Rough MLB slate window, 16:00-06:00 UTC (noon-2am ET)."""
-    hour = (at or datetime.now(UTC)).hour
-    return hour >= WINDOW_OPEN_HOUR_UTC or hour < 6
+    """Rough MLB slate window, noon-2am ET."""
+    hour = _to_et(at).hour
+    return hour >= WINDOW_OPEN_HOUR_ET or hour < WINDOW_CLOSE_HOUR_ET
 
 
 def _minutes_since_window_open(at: Optional[datetime] = None) -> float:
     """How long the games window has been open, in minutes.
 
     Used to distinguish "hasn't started quoting yet" from "started and
-    stalled". Overnight (hour < 6) the window opened at 16:00 UTC the previous
-    day, so the elapsed time carries across midnight.
+    stalled". Past midnight ET the window opened at noon ET the previous day,
+    so the elapsed time carries across midnight.
     """
-    now = at or datetime.now(UTC)
-    hours = now.hour - WINDOW_OPEN_HOUR_UTC
-    if hours < 0:                       # past midnight, window opened yesterday
+    et = _to_et(at)
+    hours = et.hour - WINDOW_OPEN_HOUR_ET
+    if hours < 0:                       # past midnight ET, window opened yesterday
         hours += 24
-    return hours * 60 + now.minute
+    return hours * 60 + et.minute
 
 
 def check_jobs(snap: Dict[str, Any]) -> List[Finding]:

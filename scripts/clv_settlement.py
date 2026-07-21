@@ -8,15 +8,19 @@ from datetime import datetime,timezone,timedelta
 ROOT="/opt/betting-pod-shop"; sys.path.insert(0,ROOT)
 from src.devig import devig_two_way, american_to_prob
 from src.kalshi_fees import fee_per_contract
+from src.et_time import parse_mlb_ticker_start
 CLV_LOG=f"{ROOT}/data/trade_logs/clv_log.jsonl"
 KEY=re.search(r'ODDS_API_KEY=([^\n\r"\']+)',open(f"{ROOT}/.env").read()).group(1).strip()
 BASE="https://api.the-odds-api.com/v4"
-MON=dict(JAN=1,FEB=2,MAR=3,APR=4,MAY=5,JUN=6,JUL=7,AUG=8,SEP=9,OCT=10,NOV=11,DEC=12)
 def get(u):
     with urllib.request.urlopen(u,timeout=30) as r: return json.load(r)
-def parse_ticker(tk):
-    b=tk.split('-')[1]; m=re.match(r'(\d{2})([A-Z]{3})(\d{2})(\d{2})(\d{2})',b); yy,mo,dd,hh,mm=m.groups()
-    return datetime(2000+int(yy),MON[mo],int(dd),int(hh),int(mm),tzinfo=timezone.utc)+timedelta(hours=4)
+# Kalshi tickers encode ET WALL-CLOCK time. This used to be
+# `datetime(..., tzinfo=utc) + timedelta(hours=4)` -- a hardcoded EDT offset,
+# an hour wrong from 2026-11-01 (EDT->EST) onward. The expected time it
+# produces is handed to the Odds API historical endpoint and used to pick the
+# nearest game, so drift there can mis-select or miss a game outright.
+# Now delegated to src.et_time, which resolves the offset from tzdata.
+parse_ticker = parse_mlb_ticker_start
 def norm(s): return re.sub(r'[^a-z]','',s.lower())
 def close_fair(expected,names):
     try: d=get(f"{BASE}/historical/sports/baseball_mlb/odds?apiKey={KEY}&regions=eu&markets=h2h&oddsFormat=american&date={expected.strftime('%Y-%m-%dT%H:%M:%SZ')}")
@@ -87,7 +91,11 @@ for r in new.values(): games['-'.join(r['market_ticker'].split('-')[:2])].append
 written=0
 with open(CLV_LOG,"a") as out:
     for gid,rs in games.items():
-        res=close_fair(parse_ticker(rs[0]['market_ticker']),[norm(x) for x in rs[0]['event'].split(' vs ')])
+        expected=parse_ticker(rs[0]['market_ticker'])
+        if expected is None:
+            print(f"clv_settlement: WARNING unparseable ticker {rs[0]['market_ticker']}",file=sys.stderr)
+            continue
+        res=close_fair(expected,[norm(x) for x in rs[0]['event'].split(' vs ')])
         if not res: continue
         home,away,fh,com=res
         for r in rs:

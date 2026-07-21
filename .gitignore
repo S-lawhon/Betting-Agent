@@ -1,0 +1,38 @@
+# ── Credentials — NEVER commit these ──────────────────────────────
+.env
+*.pem
+*_private_key*
+*_secret*
+
+# ── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# ── Runtime data (pod logs, trade logs) ───────────────────────────
+data/
+*.jsonl
+*.log
+*.parquet
+
+# ── OS / editor noise ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+~$*
+.~lock.*#
+
+# Fund manager — secrets and generated state
+manager/manager.env
+manager/state/

@@ -1,0 +1,123 @@
+---
+# cowork/run-backtest.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+# Automation: Replay edge_history.csv and produce performance reports.
+#
+# What it does
+# ────────────
+#   1. Checks that edge_history.csv exists and has at least one row.
+#   2. Runs the backtester in RECORDED mode (real outcomes) and prints a
+#      formatted summary: win rate, P&L, ROI, Sharpe, max drawdown, by-sport.
+#   3. Optionally simulates PENDING rows using fair_prob Bernoulli draws so
+#      the user can see expected performance before all bets resolve.
+#   4. Exports equity_curve.csv and backtest_report.csv to data/exports/.
+#
+# Scheduling
+# ──────────
+#   Daily at 11:00 pm local time so the report is ready each morning.
+#   Can also be triggered manually at any time (type: manual).
+#
+# No live credentials required — runs entirely from local CSV data.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: run-backtest
+display_name: "Run Backtester"
+description: >
+  Replay all recorded trades in edge_history.csv, compute aggregate performance
+  statistics (win rate, P&L, ROI, Sharpe ratio, max drawdown), break results
+  down by sport, and export equity_curve.csv and backtest_report.csv to
+  data/exports/.  No live credentials required.
+version: "1.0"
+category: analysis
+
+trigger:
+  type: scheduled
+  cron: "0 23 * * *"    # 11 pm local time, every day
+  timezone: local
+
+environment:
+  working_directory: "."
+  python_executable: python3
+  required_files:
+    - config.yaml
+    - scripts/run_backtest.py
+
+steps:
+  - id: check_data
+    name: "Verify edge_history.csv exists"
+    description: >
+      Confirm the data file is present and non-empty before spending time on
+      computation.  Print a helpful message if it is missing (agent has not
+      yet recorded any edges).
+    command: python3
+    args:
+      - "-c"
+      - |
+        import sys
+        from pathlib import Path
+        p = Path('data/edge_history.csv')
+        if not p.exists():
+            print("[SKIP] data/edge_history.csv not found — no trades to replay.")
+            print("       Start a paper-mode scan cycle to generate data.")
+            sys.exit(0)
+        lines = [l for l in p.read_text(encoding='utf-8').splitlines() if l.strip()]
+        if len(lines) <= 1:   # header only
+            print("[SKIP] edge_history.csv has no data rows yet.")
+            sys.exit(0)
+        print(f"[OK] {len(lines) - 1} trade row(s) found in edge_history.csv")
+    on_failure: abort
+
+  - id: recorded_backtest
+    name: "Replay recorded trades"
+    description: >
+      Run the backtester on trades that have known WIN/LOSS outcomes and print
+      the full performance summary to stdout.
+    command: python3
+    args:
+      - "scripts/run_backtest.py"
+      - "data/edge_history.csv"
+      - "--export-dir"
+      - "data/exports"
+    on_failure: notify
+
+  - id: simulate_pending
+    name: "Simulate PENDING trades (probabilistic)"
+    description: >
+      Re-run the backtester including PENDING rows resolved via fair_prob
+      Bernoulli draws (seed=42 for reproducibility).  This gives an expected
+      P&L estimate before all open bets settle.
+    command: python3
+    args:
+      - "scripts/run_backtest.py"
+      - "data/edge_history.csv"
+      - "--simulate"
+      - "--seed"
+      - "42"
+    on_failure: continue   # simulation is supplementary; don't block on failure
+
+  - id: confirm_exports
+    name: "Confirm export files were written"
+    description: >
+      Check that data/exports/equity_curve.csv and
+      data/exports/backtest_report.csv were created and print their row counts.
+    command: python3
+    args:
+      - "-c"
+      - |
+        from pathlib import Path
+        for fname in ('equity_curve.csv', 'backtest_report.csv'):
+            p = Path('data/exports') / fname
+            if p.exists():
+                rows = len(p.read_text(encoding='utf-8').splitlines()) - 1
+                print(f"[OK] {fname}: {rows} data row(s)")
+            else:
+                print(f"[WARN] {fname} was not created")
+    on_failure: continue
+
+notifications:
+  on_success: true
+  on_failure: true
+  success_message: "Backtest complete. Reports saved to data/exports/."
+  failure_message: >
+    Backtest failed.  Check that data/edge_history.csv is readable and that
+    all Python dependencies (numpy, pyyaml) are installed.

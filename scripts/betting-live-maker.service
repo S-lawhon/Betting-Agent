@@ -1,0 +1,36 @@
+[Unit]
+Description=Betting Pod Shop — P-016 Live Maker (Kalshi MLB paper pilot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+
+# Fast-cycle standalone loop — separate from the 5-minute engine so a
+# maker bug can never take down the main service (and vice versa).
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_live_maker
+
+Restart=on-failure
+RestartSec=30
+ExecStartPre=/bin/sleep 5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=betting-live-maker
+
+# ── Security hardening (mirrors betting-pod-shop.service) ───────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

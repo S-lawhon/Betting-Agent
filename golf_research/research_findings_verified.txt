@@ -1,0 +1,1709 @@
+SUMMARY
+The verified evidence supports a clear strategy hierarchy for golf betting on Kalshi: outright-winner markets are the hardest to beat (academically efficient since at least 2002, structurally prone to classic favorite-longshot pricing, and the category where even DataGolf's own model lost money), while derivative markets — make/miss cut, top-10/20, matchups, and especially 3-balls — are demonstrably softer and were the only consistently profitable segments in DataGolf's published records. However, the single most robust cross-cutting finding is that model-implied edges are heavily overstated: DataGolf's realized ROI ran at roughly 15-30% of modeled EV (e.g., +1.45% realized vs +10.65% expected; +5.0% vs +16.6% in 2021), and naive positive-EV betting was outright unprofitable, so a solo operator should demand large modeled edges (8%+), shade heavily toward market prices, and expect Pinnacle-close-calibrated numbers to leave almost nothing at the sharpest reference prices. On the exchange-microstructure facet, the key insight is that declining longshot returns arise mechanically from spreads/margins around an unbiased midpoint, meaning "fade the longshots" is not a free edge on Kalshi — the exploitable version of the pattern lives in bookmaker margin allocation, and exchanges price long odds tighter than books. No surviving claim directly measured Kalshi's golf liquidity, fee drag, or counterparty composition, so the Kalshi-specific execution economics remain the largest evidence gap; the out-of-sample death of a published soccer-sentiment strategy (2020-2023) is a further warning that any published golf edge may already be arbitraged away by 2026.
+
+--- FINDING 0 [high] vote=3-0 (both merged claims)
+Golf outright-winner betting markets are largely efficient, and this holds even when tested for star-player/sentiment distortion: Shmanske's peer-reviewed study of the full 2002 PGA Tour season found no systematically exploitable biases in posted odds, and explicitly tested a 'Tiger Woods effect' (thin-vs-thick market) by splitting the sample on Tiger's participation — direct academic precedent showing the star-player-sentiment facet was examined and efficiency propositions still held up.
+EVIDENCE: Abstract verified verbatim: 'On the whole, efficient markets propositions hold up, but the overwhelming share of the variation in the tournament outcome remains unexplained' and 'By splitting the sample based on whether or not Tiger Woods is in the tournament, a Tiger Woods effect or a thin market versus thick market effect can be examined.' (Shmanske 2005, Journal of Economics and Finance 29(3):391-402.) Merges claims [0] and [1]. Note: a companion claim that the unexplained variance implies room for a superior model was refuted 0-3 — the efficiency finding does NOT license that inference.
+SOURCES: ['https://link.springer.com/article/10.1007/BF02761583']
+
+--- FINDING 1 [high] vote=3-0 (both merged claims)
+Market structure predicts the direction of bias: multi-outcome markets where the favorite's win probability is below 0.5 (golf outright winners) tend to exhibit classic favorite-longshot bias (longshots overbet), while two-outcome markets where the favorite exceeds 0.5 (golf head-to-heads, most Kalshi yes/no contracts) often exhibit the reverse — favorite bias, with favorites overbet. This gives a structural prior for which side to lean in each Kalshi golf market type.
+EVIDENCE: Newall & Cortis (2021), Risks 9(1):22, peer-reviewed literature review, verified verbatim: 'Sports betting markets with multiple outcomes, where the favorite's probability is usually <0.5, appear more consistent with longshot bias' and 'Sports betting markets with only two potential outcomes... often produce favorite bias.' Verifiers note the review cites Woodland & Woodland's reverse-FLB findings in MLB/NHL and flags tennis as a two-outcome exception. Merges claims [5] and [6].
+SOURCES: ['https://ideas.repec.org/a/gam/jrisks/v9y2021i1p22-d478780.html', 'https://www.mdpi.com/2227-9091/9/1/22']
+
+--- FINDING 2 [high] vote=3-0 (all three merged claims)
+The favorite-longshot bias is not a directly exploitable edge on an exchange: DataGolf argues (with a heterogeneous-bettor price-formation model) that declining returns at longer odds are the natural product of margin/spread applied around an unbiased midpoint — an unbiased bid-ask midpoint mathematically implies worse realized returns as odds lengthen — so observed poor longshot returns do not prove midpoint probabilities are mispriced, and systematically fading longshots does not capture a 'bias'. This directly applies to Kalshi, where 1-cent tick floors make spreads proportionally huge at low prices.
+EVIDENCE: All three merged claims verified verbatim against the primary source: 'the favourite-longshot bias — as it's traditionally defined — is not a market inefficiency or a bias'; 'the absence of a bias in the midpoint of the bid-ask spread implies that the rate of return declines as odds lengthen'; 'declining returns at long odds says nothing about the efficiency of market prices.' Verifiers independently confirmed the math (EV of buying at ask p+s is -s/(p+s), worsening as p→0). Merges claims [2], [3], [4]. Caveat: the rational-market interpretation is contested — Snowberg & Wolfers (JPE 2010) find misperception fits racetrack data better, and Whelan's Kalshi paper finds Kalshi's FLB is not FULLY explained by fees/spreads (some belief bias exists) — so a residual behavioral longshot bias on Kalshi may exist but is smaller than raw return patterns suggest.
+SOURCES: ['https://datagolf.com/fav-longshot-not-a-bias']
+
+--- FINDING 3 [high] vote=3-0
+Bookmakers concentrate their margin on longshots: the gap between bookmaker odds and betting-exchange prices widens rapidly as event probability falls, meaning exchanges price long odds much tighter than sportsbooks. For golf — where nearly all outright prices are longshots — this implies Kalshi-style exchange prices should carry less longshot markup than book odds, and that cross-venue comparisons (book vs exchange) are most informative at long odds.
+EVIDENCE: Metsola (2010), Journal of Prediction Markets, abstract verified verbatim: 'the disparity between bookmaker odds and betting exchange prices increases rapidly as the implied probability of the event decreases.' Corroborated by Smith, Paton & Vaughan Williams (2006, Economica) finding FLB substantially lower on exchanges than in bookmaker odds. Claim [8]. Note: the stronger companion claim — that FLB is primarily supply-side, so exchanges like Kalshi should show less longshot mispricing — was refuted 0-3; only the narrower empirical gap finding survived. Data is 2010, not golf-specific.
+SOURCES: ['https://www.ubplj.org/index.php/jpm/article/view/473']
+
+--- FINDING 4 [medium] vote=2-1
+Pinnacle's closing golf matchup/3-ball prices are essentially fully calibrated (bets flagged +4% EV by Pinnacle's margin-free closing prices realized ~4%), making Pinnacle close the sharpest benchmark among 11 tracked books and implying almost no exploitable edge remains at Pinnacle close — so a Kalshi golf strategy should treat de-vigged Pinnacle closing prices as the efficiency reference and only trade Kalshi quotes that deviate from it.
+EVIDENCE: Verified verbatim in DataGolf's study of 106,204 PGA/European Tour matchups and 3-balls since Jan 2019: 'When Pinnacle says that a bet has an expected value of 4%, the realized return (averaged over many +4% EV bets) is about 4%' with a roughly 1:1 expected-to-actual ROI relationship. Corroborated by football-data.co.uk's independent Pinnacle closing-line study (87,960 odds pairs, slope ~1.00). Claim [9], vote 2-1 — hence medium despite high verifier evidence. Related refuted claim (1-2): that nearly all predictive weight across 11 books' closing odds goes to Pinnacle alone. DataGolf's Part II follow-up also found Betcris OPENED sharper than Pinnacle, so Pinnacle's supremacy is a closing-line, not opening-line, phenomenon. Data is 2019-2022.
+SOURCES: ['https://datagolf.com/how-sharp-are-bookmakers', 'https://datagolf.com/analyzing-betting-odds']
+
+--- FINDING 5 [high] vote=3-0
+The vig hurdle varies roughly 2x across books: in the same 106,204-matchup/3-ball dataset, blindly betting all sides lost only ~3.3% at Pinnacle versus ~7% at soft books (Bet365 -7.08%, DraftKings -7.01%, Bovada -6.80%). For a Kalshi operator this quantifies the realizable-edge sensitivity to effective take: an edge that survives a 3.3% hurdle can die at a 7% one, making Kalshi's fee-plus-spread total the decisive economic variable.
+EVIDENCE: All figures verified verbatim on the primary source: 'A bettor who is betting randomly at Pinnacle can expect to lose a meager 3.3 cents per dollar bet. Conversely... at Bet365, you will be dishing out just over 7 cents on the dollar.' Blind returns: Pinnacle -3.31%, Bet365 -7.08%, DraftKings -7.01%, Bovada -6.80%. Claim [16]. Margins are mechanical calculations on collected odds, not model-marketing. Data from 2019-2020 collection window.
+SOURCES: ['https://datagolf.com/analyzing-betting-odds']
+
+--- FINDING 6 [high] vote=3-0 (both merged claims)
+Model edges against bookmaker prices are real but heavily overstated — realized returns run at roughly 15-40% of model-implied EV, and naive betting of every positive edge loses money. In DataGolf's matchup/3-ball backtest (2019-2020, 11 books): betting every positive model edge lost -0.9% ROI over 45,866 bets; a 5% EV threshold yielded 16,420 bets at only +1.45% realized vs +10.65% expected; an 8%+ EV threshold yielded +4.43% realized vs +14.12% expected. Practical implication for a solo Kalshi quant: only large modeled edges (roughly 8%+) survived to positive realized ROI, and even those must then clear exchange fees.
+EVIDENCE: All figures verified verbatim on the primary source: '-420 units... 45866 bets... ROI of -0.9%'; '16,420 bets | 10.65% expected ROI | 237.5 profit | 1.45% actual ROI'; 8%+ threshold: 9,103 bets, 402.9 units, 4.43% realized vs 14.12% expected. DataGolf's Part II (2021-2022 data) independently confirms the same realized-vs-expected gap pattern. These are self-critical, against-interest disclosures by a model vendor. Merges claims [10] and [18]. Note: the specific 45/55 model-vs-market blending prescription was refuted 1-2 — the qualitative 'shade toward market prices' direction is supported but the exact weights are not a verified claim.
+SOURCES: ['https://datagolf.com/how-sharp-are-bookmakers', 'https://datagolf.com/analyzing-betting-odds', 'https://datagolf.com/how-sharp-are-bookmakers-part-2']
+
+--- FINDING 7 [high] vote=3-0 (both merged claims)
+DataGolf's publicly posted 2021 betting record independently confirms the overstated-edge pattern at retail books: 4,220 bets, 1,466.3 units wagered, +73.4 units profit (+5.0% realized ROI) against bet365/sportsbook.ag odds, versus a model-implied +16.6% expected ROI (~244 units of modeled EV converting to ~73 realized) — i.e., realized profit was under one-third of modeled edge even in a profitable year.
+EVIDENCE: Verified against the live page's embedded JSON: {"bet_type": "All Bets", "ev": 243.93, "ev_roi": 0.1664, "num_bets": 4220, "profit": 73.43, "roi": 0.0501, "wager": 1466.32}; ROI independently recomputed (73.43/1466.32 = 5.008%); page references exactly two sportsbook logos (bet365, sportsbook.ag). Merges claims [11] and [12]. Self-reported and unaudited, but the unflattering EV-vs-realized gap disclosure argues against cherry-picking; part of the gap could be variance given correlated longshot golf bets.
+SOURCES: ['https://datagolf.com/betting-results-2021']
+
+--- FINDING 8 [high] vote=3-0
+Derivative/prop golf markets are materially softer than outright-style markets — the core prioritization finding for a Kalshi golf operation. In DataGolf's 2021 record by bet type: Outrights/Futures -19.6% ROI (1,011 bets) and Top 5 -48.6% (501 bets) LOST money, while Props/make-miss-cut +14.6% (555 bets), Top 10/Top 20 +11.9% (706 bets), Tournament Match-Ups +12.5% (125 bets), 3-Balls +8.1% (630 bets), and 2-Ball Match-Ups +5.6% (692 bets) were all profitable. Priority order for a small operation: cut-line props, top-10/20, matchups, and 3-balls first; outrights and top-5 last.
+EVIDENCE: Every figure verified against the page's embedded JSON, including bet-level verification that Props = 404 Miss Cut + 151 Make Cut = 555 bets. Claim [13], vote 3-0. Self-reported single-season data; small samples per category (125-1,011 bets) mean individual-category ROIs carry wide error bars, but the profitable-derivatives / losing-outrights split is consistent across seven categories.
+SOURCES: ['https://datagolf.com/betting-results-2021']
+
+--- FINDING 9 [medium] vote=2-1
+Within derivatives, 3-balls are the least efficiently priced golf bet type in DataGolf's data — weaker odds-setting than 72-hole or single-round matchups — partly because 3-balls are only offered by softer bookmakers. At an 8% EV threshold on 2019-2020 data, model ROI was 0.1% on 72-hole matchups, 1.7% on 1-round matchups, and 9.7% on 3-balls.
+EVIDENCE: Verified verbatim: 'it's clear that 3-balls have the weakest odds-setting of the bet types we considered; this is at least in part because they are only offered by softer bookmakers,' with the quantitative ROI breakdown confirmed by the verifier. Claim [17], vote 2-1 (a near-duplicate phrasing was separately refuted 1-2, apparently over the 'props softer than headline markets' generalization — the source did not test outright markets, so the softness comparison is only among matchup/3-ball types). Relevant to Kalshi if it lists 3-ball-style contracts: the soft-book-only provenance suggests reference prices for such markets are themselves weak.
+SOURCES: ['https://datagolf.com/analyzing-betting-odds']
+
+--- FINDING 10 [high] vote=3-0 (both merged claims)
+For a solo quant building a golf model: (a) the four strokes-gained categories have unequal predictive power — DataGolf weights off-the-tee roughly twice as heavily as putting (regression coefficients ~1.2 OTT, 1.0 approach, 0.9 around-green, 0.6 putting), making putting-driven recent results the least persistent signal and a candidate source of market overreaction; (b) DataGolf itself acknowledges that model specifications with near-identical overall accuracy (cross-validated MSE) still disagree substantially on individual predictions, so assuming your model's odds are 'truth' is an unrealistic best case and roughly half of model-vs-market discrepancies will be the model's error.
+EVIDENCE: Both verified verbatim on the methodology page: 'The coefficients are, roughly, β₁ = 1.2, β₂ = 1, β₃ = 0.9, and β₄ = 0.6' and 'Putting is the least predictive of future performance'; and 'how similar they perform overall despite disagreeing in their predictions quite often. This is troubling if you plan to use your model to bet on golf... to assume your model's odds as truth is an unrealistic best-case scenario for calculating expected profits.' Merges claims [14] and [15]. Related refuted claim (0-3): a specific characterization of DataGolf's course-fit findings did not survive — do not cite the course-fit-adds-nothing framing.
+SOURCES: ['https://datagolf.com/predictive-model-methodology/']
+
+--- FINDING 11 [high] vote=3-0
+Published betting edges decay: when the sole surviving strategy from a peer-reviewed Twitter-sentiment mispricing study was re-tested on fresh 2020-2023 out-of-sample data, it produced no further profits, consistent with sportsbook markets becoming more efficient over time. This is a direct caution against expecting the DataGolf-documented derivative-market softness (measured 2019-2022) or any published sentiment/star-player edge to persist unchanged in 2026 golf markets.
+EVIDENCE: Verified verbatim in the Clegg & Cartlidge correction study (published in International Journal of Forecasting, correcting the 'Betting on a buzz' IJF 2023 paper): 'the competitive strategy generates no further profits, potentially suggesting markets have become more efficient.' Claim [7]. The hedge ('potentially suggesting') is preserved; the finding is from soccer attention/sentiment markets, applied here by analogy.
+SOURCES: ['https://arxiv.org/html/2306.01740v3']
+
+
+CAVEATS
+- 1
+- )
+-  
+- T
+- h
+- e
+-  
+- l
+- a
+- r
+- g
+- e
+- s
+- t
+-  
+- g
+- a
+- p
+- :
+-  
+- N
+- O
+-  
+- K
+- a
+- l
+- s
+- h
+- i
+- -
+- s
+- p
+- e
+- c
+- i
+- f
+- i
+- c
+-  
+- e
+- m
+- p
+- i
+- r
+- i
+- c
+- a
+- l
+-  
+- c
+- l
+- a
+- i
+- m
+-  
+- s
+- u
+- r
+- v
+- i
+- v
+- e
+- d
+-  
+- v
+- e
+- r
+- i
+- f
+- i
+- c
+- a
+- t
+- i
+- o
+- n
+- .
+-  
+- N
+- o
+- t
+- h
+- i
+- n
+- g
+-  
+- h
+- e
+- r
+- e
+-  
+- d
+- i
+- r
+- e
+- c
+- t
+- l
+- y
+-  
+- m
+- e
+- a
+- s
+- u
+- r
+- e
+- s
+-  
+- K
+- a
+- l
+- s
+- h
+- i
+- '
+- s
+-  
+- g
+- o
+- l
+- f
+-  
+- m
+- a
+- r
+- k
+- e
+- t
+-  
+- c
+- a
+- t
+- a
+- l
+- o
+- g
+- ,
+-  
+- l
+- i
+- q
+- u
+- i
+- d
+- i
+- t
+- y
+- ,
+-  
+- m
+- a
+- k
+- e
+- r
+- /
+- t
+- a
+- k
+- e
+- r
+-  
+- f
+- e
+- e
+-  
+- s
+- c
+- h
+- e
+- d
+- u
+- l
+- e
+- ,
+-  
+- p
+- o
+- s
+- i
+- t
+- i
+- o
+- n
+-  
+- l
+- i
+- m
+- i
+- t
+- s
+- ,
+-  
+- m
+- a
+- r
+- k
+- e
+- t
+- -
+- m
+- a
+- k
+- i
+- n
+- g
+-  
+- p
+- r
+- o
+- g
+- r
+- a
+- m
+- s
+- ,
+-  
+- o
+- r
+-  
+- c
+- o
+- u
+- n
+- t
+- e
+- r
+- p
+- a
+- r
+- t
+- y
+-  
+- c
+- o
+- m
+- p
+- o
+- s
+- i
+- t
+- i
+- o
+- n
+-  
+- —
+-  
+- t
+- h
+- o
+- s
+- e
+-  
+- f
+- a
+- c
+- e
+- t
+- s
+-  
+- o
+- f
+-  
+- t
+- h
+- e
+-  
+- r
+- e
+- s
+- e
+- a
+- r
+- c
+- h
+-  
+- q
+- u
+- e
+- s
+- t
+- i
+- o
+- n
+-  
+- r
+- e
+- s
+- t
+-  
+- o
+- n
+-  
+- i
+- n
+- f
+- e
+- r
+- e
+- n
+- c
+- e
+-  
+- f
+- r
+- o
+- m
+-  
+- b
+- o
+- o
+- k
+- m
+- a
+- k
+- e
+- r
+- /
+- e
+- x
+- c
+- h
+- a
+- n
+- g
+- e
+-  
+- a
+- n
+- a
+- l
+- o
+- g
+- u
+- e
+- s
+-  
+- (
+- t
+- h
+- e
+-  
+- W
+- h
+- e
+- l
+- a
+- n
+-  
+- K
+- a
+- l
+- s
+- h
+- i
+-  
+- F
+- L
+- B
+-  
+- p
+- a
+- p
+- e
+- r
+-  
+- s
+- u
+- r
+- f
+- a
+- c
+- e
+- d
+-  
+- o
+- n
+- l
+- y
+-  
+- a
+- s
+-  
+- v
+- e
+- r
+- i
+- f
+- i
+- e
+- r
+-  
+- c
+- o
+- n
+- t
+- e
+- x
+- t
+- ,
+-  
+- n
+- o
+- t
+-  
+- a
+- s
+-  
+- a
+-  
+- c
+- o
+- n
+- f
+- i
+- r
+- m
+- e
+- d
+-  
+- c
+- l
+- a
+- i
+- m
+- )
+- .
+-  
+- 2
+- )
+-  
+- H
+- e
+- a
+- v
+- y
+-  
+- r
+- e
+- l
+- i
+- a
+- n
+- c
+- e
+-  
+- o
+- n
+-  
+- a
+-  
+- s
+- i
+- n
+- g
+- l
+- e
+-  
+- v
+- e
+- n
+- d
+- o
+- r
+- :
+-  
+- r
+- o
+- u
+- g
+- h
+- l
+- y
+-  
+- h
+- a
+- l
+- f
+-  
+- t
+- h
+- e
+-  
+- f
+- i
+- n
+- d
+- i
+- n
+- g
+- s
+-  
+- c
+- o
+- m
+- e
+-  
+- f
+- r
+- o
+- m
+-  
+- D
+- a
+- t
+- a
+- G
+- o
+- l
+- f
+- '
+- s
+-  
+- o
+- w
+- n
+-  
+- p
+- u
+- b
+- l
+- i
+- s
+- h
+- e
+- d
+-  
+- b
+- a
+- c
+- k
+- t
+- e
+- s
+- t
+- s
+-  
+- a
+- n
+- d
+-  
+- s
+- e
+- l
+- f
+- -
+- r
+- e
+- p
+- o
+- r
+- t
+- e
+- d
+-  
+- b
+- e
+- t
+-  
+- r
+- e
+- c
+- o
+- r
+- d
+- s
+- ,
+-  
+- w
+- h
+- i
+- c
+- h
+-  
+- a
+- r
+- e
+-  
+- p
+- r
+- i
+- m
+- a
+- r
+- y
+-  
+- a
+- n
+- d
+-  
+- n
+- o
+- t
+- a
+- b
+- l
+- y
+-  
+- s
+- e
+- l
+- f
+- -
+- c
+- r
+- i
+- t
+- i
+- c
+- a
+- l
+-  
+- (
+- t
+- h
+- e
+- y
+-  
+- d
+- i
+- s
+- c
+- l
+- o
+- s
+- e
+-  
+- t
+- h
+- e
+- i
+- r
+-  
+- o
+- w
+- n
+-  
+- m
+- o
+- d
+- e
+- l
+-  
+- l
+- o
+- s
+- i
+- n
+- g
+-  
+- m
+- o
+- n
+- e
+- y
+-  
+- w
+- h
+- e
+- n
+-  
+- u
+- s
+- e
+- d
+-  
+- n
+- a
+- i
+- v
+- e
+- l
+- y
+- )
+-  
+- b
+- u
+- t
+-  
+- u
+- n
+- a
+- u
+- d
+- i
+- t
+- e
+- d
+-  
+- a
+- n
+- d
+-  
+- c
+- o
+- m
+- m
+- e
+- r
+- c
+- i
+- a
+- l
+- l
+- y
+-  
+- i
+- n
+- t
+- e
+- r
+- e
+- s
+- t
+- e
+- d
+- .
+-  
+- 3
+- )
+-  
+- T
+- i
+- m
+- e
+- -
+- s
+- e
+- n
+- s
+- i
+- t
+- i
+- v
+- i
+- t
+- y
+- :
+-  
+- t
+- h
+- e
+-  
+- D
+- a
+- t
+- a
+- G
+- o
+- l
+- f
+-  
+- d
+- a
+- t
+- a
+- s
+- e
+- t
+- s
+-  
+- c
+- o
+- v
+- e
+- r
+-  
+- 2
+- 0
+- 1
+- 9
+- -
+- 2
+- 0
+- 2
+- 2
+-  
+- a
+- n
+- d
+-  
+- t
+- h
+- e
+-  
+- a
+- c
+- a
+- d
+- e
+- m
+- i
+- c
+-  
+- g
+- o
+- l
+- f
+- -
+- e
+- f
+- f
+- i
+- c
+- i
+- e
+- n
+- c
+- y
+-  
+- e
+- v
+- i
+- d
+- e
+- n
+- c
+- e
+-  
+- u
+- s
+- e
+- s
+-  
+- 2
+- 0
+- 0
+- 2
+-  
+- s
+- e
+- a
+- s
+- o
+- n
+-  
+- d
+- a
+- t
+- a
+- ;
+-  
+- t
+- h
+- e
+-  
+- o
+- u
+- t
+- -
+- o
+- f
+- -
+- s
+- a
+- m
+- p
+- l
+- e
+-  
+- d
+- e
+- c
+- a
+- y
+-  
+- f
+- i
+- n
+- d
+- i
+- n
+- g
+-  
+- (
+- c
+- l
+- a
+- i
+- m
+-  
+- 7
+- )
+-  
+- i
+- s
+-  
+- i
+- t
+- s
+- e
+- l
+- f
+-  
+- e
+- v
+- i
+- d
+- e
+- n
+- c
+- e
+-  
+- t
+- h
+- a
+- t
+-  
+- t
+- h
+- e
+- s
+- e
+-  
+- m
+- e
+- a
+- s
+- u
+- r
+- e
+- d
+-  
+- s
+- o
+- f
+- t
+- n
+- e
+- s
+- s
+- e
+- s
+-  
+- m
+- a
+- y
+-  
+- h
+- a
+- v
+- e
+-  
+- c
+- o
+- m
+- p
+- r
+- e
+- s
+- s
+- e
+- d
+-  
+- b
+- y
+-  
+- m
+- i
+- d
+- -
+- 2
+- 0
+- 2
+- 6
+- .
+-  
+- 4
+- )
+-  
+- T
+- w
+- o
+-  
+- o
+- f
+-  
+- t
+- w
+- e
+- l
+- v
+- e
+-  
+- f
+- i
+- n
+- d
+- i
+- n
+- g
+- s
+-  
+- r
+- e
+- s
+- t
+-  
+- o
+- n
+-  
+- 2
+- -
+- 1
+-  
+- v
+- o
+- t
+- e
+- s
+-  
+- (
+- P
+- i
+- n
+- n
+- a
+- c
+- l
+- e
+-  
+- c
+- l
+- o
+- s
+- i
+- n
+- g
+-  
+- c
+- a
+- l
+- i
+- b
+- r
+- a
+- t
+- i
+- o
+- n
+- ;
+-  
+- 3
+- -
+- b
+- a
+- l
+- l
+- s
+- -
+- s
+- o
+- f
+- t
+- e
+- s
+- t
+- )
+-  
+- a
+- n
+- d
+-  
+- s
+- h
+- o
+- u
+- l
+- d
+-  
+- b
+- e
+-  
+- t
+- r
+- e
+- a
+- t
+- e
+- d
+-  
+- a
+- s
+-  
+- m
+- e
+- d
+- i
+- u
+- m
+-  
+- c
+- o
+- n
+- f
+- i
+- d
+- e
+- n
+- c
+- e
+- ;
+-  
+- n
+- e
+- a
+- r
+- -
+- d
+- u
+- p
+- l
+- i
+- c
+- a
+- t
+- e
+-  
+- p
+- h
+- r
+- a
+- s
+- i
+- n
+- g
+- s
+-  
+- o
+- f
+-  
+- b
+- o
+- t
+- h
+-  
+- w
+- e
+- r
+- e
+-  
+- r
+- e
+- f
+- u
+- t
+- e
+- d
+-  
+- i
+- n
+-  
+- s
+- e
+- p
+- a
+- r
+- a
+- t
+- e
+-  
+- v
+- o
+- t
+- e
+- s
+- ,
+-  
+- i
+- n
+- d
+- i
+- c
+- a
+- t
+- i
+- n
+- g
+-  
+- s
+- e
+- n
+- s
+- i
+- t
+- i
+- v
+- i
+- t
+- y
+-  
+- t
+- o
+-  
+- e
+- x
+- a
+- c
+- t
+-  
+- w
+- o
+- r
+- d
+- i
+- n
+- g
+- /
+- s
+- c
+- o
+- p
+- e
+- .
+-  
+- 5
+- )
+-  
+- S
+- i
+- x
+-  
+- r
+- e
+- l
+- a
+- t
+- e
+- d
+-  
+- c
+- l
+- a
+- i
+- m
+- s
+-  
+- w
+- e
+- r
+- e
+-  
+- r
+- e
+- f
+- u
+- t
+- e
+- d
+-  
+- o
+- u
+- t
+- r
+- i
+- g
+- h
+- t
+-  
+- —
+-  
+- n
+- o
+- t
+- a
+- b
+- l
+- y
+-  
+- t
+- h
+- e
+-  
+- s
+- u
+- p
+- p
+- l
+- y
+- -
+- s
+- i
+- d
+- e
+- -
+- F
+- L
+- B
+- -
+- i
+- m
+- p
+- l
+- i
+- e
+- s
+- -
+- c
+- l
+- e
+- a
+- n
+- -
+- e
+- x
+- c
+- h
+- a
+- n
+- g
+- e
+- s
+-  
+- i
+- n
+- f
+- e
+- r
+- e
+- n
+- c
+- e
+- ,
+-  
+- t
+- h
+- e
+-  
+- s
+- p
+- e
+- c
+- i
+- f
+- i
+- c
+-  
+- 4
+- 5
+- /
+- 5
+- 5
+-  
+- m
+- o
+- d
+- e
+- l
+- -
+- m
+- a
+- r
+- k
+- e
+- t
+-  
+- b
+- l
+- e
+- n
+- d
+- ,
+-  
+- a
+- n
+- d
+-  
+- t
+- h
+- e
+-  
+- r
+- o
+- o
+- m
+- -
+- f
+- o
+- r
+- -
+- a
+- -
+- b
+- e
+- t
+- t
+- e
+- r
+- -
+- m
+- o
+- d
+- e
+- l
+-  
+- r
+- e
+- a
+- d
+- i
+- n
+- g
+-  
+- o
+- f
+-  
+- S
+- h
+- m
+- a
+- n
+- s
+- k
+- e
+-  
+- —
+-  
+- s
+- o
+-  
+- t
+- h
+- o
+- s
+- e
+-  
+- p
+- o
+- p
+- u
+- l
+- a
+- r
+-  
+- f
+- r
+- a
+- m
+- i
+- n
+- g
+- s
+-  
+- s
+- h
+- o
+- u
+- l
+- d
+-  
+- n
+- o
+- t
+-  
+- b
+- e
+-  
+- r
+- e
+- p
+- e
+- a
+- t
+- e
+- d
+- .
+-  
+- 6
+- )
+-  
+- C
+- a
+- t
+- e
+- g
+- o
+- r
+- y
+- -
+- l
+- e
+- v
+- e
+- l
+-  
+- 2
+- 0
+- 2
+- 1
+-  
+- R
+- O
+- I
+- s
+-  
+- (
+- e
+- .
+- g
+- .
+- ,
+-  
+- T
+- o
+- p
+-  
+- 5
+-  
+- a
+- t
+-  
+- -
+- 4
+- 8
+- .
+- 6
+- %
+-  
+- o
+- v
+- e
+- r
+-  
+- 5
+- 0
+- 1
+-  
+- b
+- e
+- t
+- s
+- )
+-  
+- h
+- a
+- v
+- e
+-  
+- w
+- i
+- d
+- e
+-  
+- e
+- r
+- r
+- o
+- r
+-  
+- b
+- a
+- r
+- s
+-  
+- f
+- r
+- o
+- m
+-  
+- s
+- m
+- a
+- l
+- l
+- ,
+-  
+- c
+- o
+- r
+- r
+- e
+- l
+- a
+- t
+- e
+- d
+-  
+- s
+- a
+- m
+- p
+- l
+- e
+- s
+- ;
+-  
+- d
+- i
+- r
+- e
+- c
+- t
+- i
+- o
+- n
+-  
+- i
+- s
+-  
+- m
+- o
+- r
+- e
+-  
+- r
+- e
+- l
+- i
+- a
+- b
+- l
+- e
+-  
+- t
+- h
+- a
+- n
+-  
+- m
+- a
+- g
+- n
+- i
+- t
+- u
+- d
+- e
+- .
+
+OPEN QUESTIONS
+- What are Kalshi's actual 2026 golf market structures and economics — which series carry maker fees vs the quadratic taker formula, what are typical spreads and depth in golf winner/top-N/matchup contracts, and does the all-in cost land nearer Pinnacle's ~3.3% hurdle or the soft books' ~7%?
+- Do Kalshi golf midpoints systematically deviate from de-vigged Pinnacle closing prices (the calibrated benchmark), and is any deviation large enough to trade after fees — i.e., is simple benchmark-arbitrage against Pinnacle close the highest-EV strategy versus running an independent model?
+- Does the derivative-markets-softer pattern (cut props, top-10/20, 3-balls) replicate on an exchange with retail counterparties, or was it an artifact of soft-bookmaker odds-setting that vanishes when prices are set by order flow rather than by weak bookmakers?
+- No surviving evidence addressed live/in-play golf mispricing or weather/tee-time (AM-PM wave) information edges — do documented tee-time draw effects create predictable intraday repricing that a small automated operation could capture as a maker on Kalshi?
+
+REFUTED
+- {"claim": "Even where golf odds are efficient in the weak sense, they capture only a small fraction of the information needed to predict tournament outcomes \u2014 most of the variation in who wins a PGA Tour event is unexplained by the odds, implying substantial room for a superior forecasting model to add value.", "vote": "0-3", "source": "https://link.springer.com/article/10.1007/BF02761583"}
+- {"claim": "The favorite-longshot bias is primarily a supply-side phenomenon created by bookmaker pricing practices rather than by irrational bettor demand, implying that peer-to-peer exchanges (like Kalshi) should exhibit less longshot mispricing than bookmakers.", "vote": "0-3", "source": "https://www.ubplj.org/index.php/jpm/article/view/473"}
+- {"claim": "The best predictor of golf matchup outcomes is not the DataGolf model alone nor bookmaker odds alone, but a blend weighted roughly 45% DataGolf model and 55% bookmaker odds \u2014 i.e., a solo modeler should shade toward market prices rather than bet the raw model.", "vote": "1-2", "source": "https://datagolf.com/how-sharp-are-bookmakers"}
+- {"claim": "Among the golf derivative bet types studied (72-hole matchups, single-round matchups, 3-balls), 3-balls were the least efficiently priced by bookmakers, supporting the thesis that prop/derivative golf markets are softer than headline markets.", "vote": "1-2", "source": "https://datagolf.com/how-sharp-are-bookmakers"}
+- {"claim": "DataGolf reports that course-fit (course-history/player-course-similarity) adjustments, despite in-sample statistical significance across 30 courses, did not improve out-of-sample predictions, and they attribute this to small samples and crude similarity measures \u2014 a warning that a solo quant is unlikely to extract betting edge from course-fit features.", "vote": "0-3", "source": "
+- {"claim": "Pinnacle's closing golf matchup odds are effectively the sharpest available benchmark: combining closing odds across all 11 books optimally, nearly all predictive weight goes to Pinnacle alone, implying other books' closing prices add almost no information.", "vote": "1-2", "source": "https://datagolf.com/analyzing-betting-odds"}
+
+UNVERIFIED

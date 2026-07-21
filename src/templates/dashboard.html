@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Betting Pod Shop</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:100vh}
+
+/* ── Header ── */
+header{background:#161b22;border-bottom:1px solid #30363d;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.hdr-title{font-size:17px;font-weight:700;color:#58a6ff;letter-spacing:.5px}
+.hdr-right{display:flex;align-items:center;gap:14px;font-size:12px;color:#8b949e}
+.badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.badge-running{background:#0d2e17;color:#3fb950;border:1px solid #2ea043}
+.badge-halted{background:#2e0d0d;color:#f85149;border:1px solid #b22222}
+.badge-starting{background:#2e2a0d;color:#d29922;border:1px solid #7a6510}
+.pulse{width:8px;height:8px;border-radius:50%;background:#3fb950;animation:blink 2s ease-in-out infinite;display:inline-block}
+.pulse-off{background:#484f58;animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ── Tab nav ── */
+.tab-nav{background:#161b22;border-bottom:1px solid #30363d;padding:0 24px;display:flex;gap:0;overflow-x:auto}
+.tab-btn{padding:10px 18px;font-size:13px;font-weight:600;color:#8b949e;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
+.tab-btn:hover{color:#c9d1d9}
+.tab-btn.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.tab-id{font-family:'Consolas','Courier New',monospace;font-size:11px;color:#8b949e;margin-left:5px;background:#21262d;padding:1px 5px;border-radius:4px}
+
+/* ── Layout ── */
+main{padding:20px 24px;max-width:1200px;margin:0 auto}
+.view{display:none}
+.view.active{display:block}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:640px){.panels{grid-template-columns:1fr}.tab-btn{padding:10px 12px;font-size:12px}}
+
+/* ── Cards ── */
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;margin-bottom:16px}
+.card:last-child{margin-bottom:0}
+.card-title{font-size:10px;font-weight:700;color:#58a6ff;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #21262d;display:flex;align-items:center;gap:8px}
+.card-sub{color:#8b949e;font-weight:400;font-size:10px;letter-spacing:1px}
+.stat{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #21262d}
+.stat:last-child{border-bottom:none}
+.lbl{color:#8b949e;font-size:13px}
+.val{font-weight:600;font-size:13px}
+.pos{color:#3fb950}.neg{color:#f85149}.warn{color:#d29922}.dim{color:#8b949e}
+
+/* ── Pod hero row ── */
+.pod-hero{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+@media(max-width:640px){.pod-hero{grid-template-columns:1fr}}
+.hero-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;text-align:center}
+.hero-label{font-size:10px;font-weight:700;color:#8b949e;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.hero-value{font-size:28px;font-weight:700;letter-spacing:-0.5px}
+.hero-sub{font-size:12px;color:#8b949e;margin-top:4px}
+
+/* ── Win rate ring ── */
+.ring-wrap{display:flex;justify-content:center;align-items:center;flex-direction:column}
+.ring{position:relative;width:80px;height:80px;margin:4px auto 8px}
+.ring svg{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:#21262d;stroke-width:8}
+.ring-fg{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .6s ease}
+.ring-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700}
+
+/* ── Tables ── */
+table{width:100%;border-collapse:collapse;margin-top:4px}
+th{text-align:right;font-size:11px;color:#8b949e;font-weight:600;padding:6px 10px;border-bottom:1px solid #30363d;letter-spacing:.5px;white-space:nowrap}
+th:first-child{text-align:left}
+td{text-align:right;padding:7px 10px;border-bottom:1px solid #21262d;font-size:13px;transition:background .15s}
+td:first-child{text-align:left;font-weight:600;color:#c9d1d9;font-family:'Consolas','Courier New',monospace;font-size:12px}
+tbody tr:last-child td{border-bottom:none;font-weight:700;border-top:1px solid #30363d}
+tbody tr:not(:last-child):hover td{background:#1c2128}
+
+/* ── Settlement bar ── */
+.settle{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 18px;display:flex;flex-wrap:wrap;gap:20px;font-size:13px;color:#8b949e;margin-top:16px}
+.settle strong{font-weight:700}
+.empty{text-align:center;color:#8b949e;padding:28px 0;font-size:13px}
+.status-open{background:#0d2e17;color:#3fb950;border:1px solid #2ea043;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.status-win{background:#0d1e2e;color:#58a6ff;border:1px solid #1f6feb;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.status-loss{background:#2e0d0d;color:#f85149;border:1px solid #b22222;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.status-void{background:#21262d;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+
+/* ── Arb / venue badges ── */
+.venue-badge{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+.venue-kalshi{background:#1a1a2e;color:#a78bfa;border:1px solid #6d28d9}
+.venue-polymarket{background:#0d2233;color:#38bdf8;border:1px solid #0284c7}
+.arb-link{font-size:10px;color:#8b949e;opacity:.7;display:inline-block;margin-left:4px}
+.arb-spread{font-size:10px;color:#d29922;white-space:nowrap}
+.arb-pair-top td{border-bottom:none !important}
+.arb-pair-bot td{border-top:none !important;padding-top:2px !important}
+.arb-tag{background:#2e2a0d;color:#d29922;border:1px solid #7a6510;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.5px;margin-left:6px}
+.arb-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+@media(max-width:640px){.arb-summary-grid{grid-template-columns:repeat(2,1fr)}}
+.arb-stat{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px;text-align:center}
+.arb-stat-label{font-size:10px;font-weight:700;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
+.arb-stat-value{font-size:20px;font-weight:700}
+
+/* ── Portfolio analytics ── */
+.analytics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+@media(max-width:900px){.analytics-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.analytics-grid{grid-template-columns:1fr}}
+.metric-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;text-align:center}
+.metric-label{font-size:10px;font-weight:700;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
+.metric-value{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.metric-sub{font-size:11px;color:#8b949e;margin-top:3px}
+.equity-chart{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;margin-bottom:16px}
+.equity-chart canvas{width:100%;height:120px}
+.analytics-section-title{font-size:10px;font-weight:700;color:#58a6ff;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #21262d}
+
+/* ── Pod header bar ── */
+.pod-header{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.pod-hdr-name{font-size:18px;font-weight:700;color:#c9d1d9}
+.pod-hdr-id{font-family:'Consolas','Courier New',monospace;font-size:13px;color:#58a6ff;background:#0d1117;padding:3px 8px;border-radius:4px;margin-left:10px}
+.pod-hdr-meta{display:flex;gap:20px;font-size:12px;color:#8b949e}
+.pod-hdr-meta span{display:flex;align-items:center;gap:4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr-title">&#127919;&nbsp; BETTING POD SHOP</div>
+  <div class="hdr-right">
+    <span id="last-upd">&#8212;</span>
+    <span id="eng-badge" class="badge badge-starting">STARTING</span>
+    <span id="pulse" class="pulse pulse-off"></span>
+  </div>
+</header>
+
+<nav class="tab-nav" id="tab-nav">
+  <button class="tab-btn active" data-view="portfolio">Portfolio</button>
+</nav>
+
+<main>
+  <!-- ══════════════════ PORTFOLIO VIEW ══════════════════ -->
+  <div class="view active" id="view-portfolio">
+    <div class="panels">
+      <div class="card">
+        <div class="card-title">Risk Snapshot</div>
+        <div class="stat"><span class="lbl">Exposure</span><span class="val" id="exposure">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Daily P&amp;L</span><span class="val" id="daily-pnl">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Open Positions</span><span class="val" id="open-pos">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Engine Status</span><span class="val" id="status-txt">&#8212;</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Last Cycle&nbsp;<span class="card-sub" id="cycle-num"></span></div>
+        <div class="stat"><span class="lbl">Duration</span><span class="val" id="duration">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Pods Scanned</span><span class="val" id="pods-sc">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Placed</span><span class="val" id="placed">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Skipped</span><span class="val" id="skipped">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Errors</span><span class="val" id="errors">&#8212;</span></div>
+        <div class="stat"><span class="lbl">Success Rate</span><span class="val" id="success">&#8212;</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">All Pods — Performance Summary</div>
+      <table>
+        <thead><tr>
+          <th>Pod</th><th>Strategy</th><th>Placed</th><th>Wins</th><th>Losses</th>
+          <th>Win%</th><th>P&amp;L</th><th>Alloc%</th><th>Max Pos</th>
+        </tr></thead>
+        <tbody id="pod-rows"><tr><td colspan="9" class="empty">Waiting for first scan cycle&hellip;</td></tr></tbody>
+      </table>
+    </div>
+    <div class="settle" id="settle-bar">
+      <span>Settled P&amp;L: <strong id="s-pnl" class="dim">&#8212;</strong></span>
+      <span>Win Rate: <strong id="s-wr" class="dim">&#8212;</strong></span>
+      <span>Total Trades: <strong id="s-trades" class="dim">&#8212;</strong></span>
+      <span>W / L / Void: <strong id="s-wlv" class="dim">&#8212;</strong></span>
+    </div>
+    <!-- ── Portfolio Analytics ── -->
+    <div style="margin-top:16px">
+      <div class="analytics-grid" id="analytics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Total Return</div>
+          <div class="metric-value dim" id="m-return">&#8212;</div>
+          <div class="metric-sub" id="m-return-sub">on bankroll</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Sharpe Ratio</div>
+          <div class="metric-value dim" id="m-sharpe">&#8212;</div>
+          <div class="metric-sub">annualized</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Max Drawdown</div>
+          <div class="metric-value dim" id="m-drawdown">&#8212;</div>
+          <div class="metric-sub" id="m-dd-sub">peak to trough</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Profit Factor</div>
+          <div class="metric-value dim" id="m-pf">&#8212;</div>
+          <div class="metric-sub">gross wins / gross losses</div>
+        </div>
+      </div>
+      <div class="panels">
+        <div class="card">
+          <div class="card-title">Returns Analysis</div>
+          <div class="stat"><span class="lbl">Avg Win</span><span class="val pos" id="m-avg-win">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Avg Loss</span><span class="val neg" id="m-avg-loss">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Win / Loss Ratio</span><span class="val" id="m-wl-ratio">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Expectancy</span><span class="val" id="m-expect">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Largest Win</span><span class="val pos" id="m-best">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Largest Loss</span><span class="val neg" id="m-worst">&#8212;</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Risk Metrics</div>
+          <div class="stat"><span class="lbl">Total Wagered</span><span class="val" id="m-wagered">&#8212;</span></div>
+          <div class="stat"><span class="lbl">ROI</span><span class="val" id="m-roi">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Kelly Edge</span><span class="val" id="m-kelly">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Avg Position Size</span><span class="val" id="m-avg-size">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Current Streak</span><span class="val" id="m-streak">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Longest Win Streak</span><span class="val pos" id="m-best-streak">&#8212;</span></div>
+        </div>
+      </div>
+      <div class="equity-chart">
+        <div class="analytics-section-title">Equity Curve</div>
+        <canvas id="equity-canvas" height="120"></canvas>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">Placed Trades&nbsp;<span class="card-sub" id="trades-count"></span></div>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Status</th><th>Placed</th><th>Game</th><th>Pod</th><th>Venue</th><th>Event</th><th>Market</th>
+          <th>Side</th><th>Mkt / Fair</th><th>Size</th><th>Edge</th><th>Spread</th>
+        </tr></thead>
+        <tbody id="trades-rows"><tr><td colspan="12" class="empty">Waiting for first scan cycle&hellip;</td></tr></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ PER-POD VIEWS (built dynamically) ══════════════════ -->
+  <div id="pod-views"></div>
+</main>
+
+<script>
+(function(){
+const PM=__POLL_MS__;
+let _lastPodIds=[];
+
+/* ── Formatting helpers ── */
+function abs2(v){return Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtPnl(v){return (v>=0?'+':'-')+'$'+abs2(v);}
+function fmtPct(v){return (v>=0?'+':'')+v.toFixed(2)+'%';}
+function pc(v){return v>0?'pos':v<0?'neg':'dim';}
+function set(id,txt,cls){
+  const e=document.getElementById(id);if(!e)return;
+  e.textContent=txt;
+  if(cls!==undefined)e.className='val '+(cls||'');
+}
+
+/* ── Odds display ── */
+function fmtOdds(t){
+  let vp=t.venue_prob||t.kalshi_prob;
+  let fp=t.fair_prob;
+  if(typeof vp!=='number'&&typeof fp!=='number') return '<span class="dim">&#8212;</span>';
+  // venue_prob and fair_prob are stored side-adjusted (already reflect the
+  // actual side being bet — NO trades store the NO-side probability).
+  // No flip needed.
+  const vpStr=typeof vp==='number'?'<span style="color:#58a6ff">'+(vp*100).toFixed(0)+'¢</span>':'&#8212;';
+  const fpStr=typeof fp==='number'?'<span style="color:#3fb950">'+(fp*100).toFixed(0)+'¢</span>':'&#8212;';
+  return vpStr+' <span style="color:#484f58">/</span> '+fpStr;
+}
+
+/* ── Tab routing ── */
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  const v=document.getElementById('view-'+name);
+  if(v)v.classList.add('active');
+  const b=document.querySelector('[data-view="'+name+'"]');
+  if(b)b.classList.add('active');
+}
+document.getElementById('tab-nav').addEventListener('click',e=>{
+  const btn=e.target.closest('.tab-btn');
+  if(btn)showView(btn.dataset.view);
+});
+
+/* ── Win-rate ring ── */
+function makeRing(pct,color){
+  const r=34,circ=2*Math.PI*r;
+  const offset=circ*(1-pct/100);
+  const col=pct>=55?'#3fb950':pct>=45?'#d29922':'#f85149';
+  return `<div class="ring">
+    <svg viewBox="0 0 80 80" width="80" height="80">
+      <circle class="ring-bg" cx="40" cy="40" r="${r}"/>
+      <circle class="ring-fg" cx="40" cy="40" r="${r}"
+        stroke="${col}" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"/>
+    </svg>
+    <div class="ring-txt" style="color:${col}">${pct.toFixed(0)}%</div>
+  </div>`;
+}
+
+/* ── Build or refresh pod tabs ── */
+function ensurePodTabs(pods){
+  const ids=Object.keys(pods).sort();
+  const same=ids.length===_lastPodIds.length&&ids.every((v,i)=>v===_lastPodIds[i]);
+  if(same)return;
+  _lastPodIds=ids;
+
+  const nav=document.getElementById('tab-nav');
+  // Remove old pod tabs
+  nav.querySelectorAll('[data-pod]').forEach(b=>b.remove());
+  // Add new pod tabs
+  for(const id of ids){
+    const p=pods[id];
+    const btn=document.createElement('button');
+    btn.className='tab-btn';
+    btn.dataset.view='pod-'+id;
+    btn.dataset.pod=id;
+    btn.innerHTML=`${p.name||id}<span class="tab-id">${id}</span>`;
+    nav.appendChild(btn);
+  }
+
+  // Build pod view containers
+  const container=document.getElementById('pod-views');
+  container.innerHTML='';
+  for(const id of ids){
+    const div=document.createElement('div');
+    div.className='view';
+    div.id='view-pod-'+id;
+    div.innerHTML=`
+      <div class="pod-header">
+        <div><span class="pod-hdr-name" id="ph-name-${id}">&#8212;</span><span class="pod-hdr-id">${id}</span></div>
+        <div class="pod-hdr-meta">
+          <span>Allocation: <strong id="ph-alloc-${id}" class="pos">&#8212;</strong></span>
+          <span>Max Position: <strong id="ph-max-${id}" class="dim">&#8212;</strong></span>
+        </div>
+      </div>
+      <div class="pod-hero">
+        <div class="hero-card">
+          <div class="hero-label">Total P&amp;L</div>
+          <div class="hero-value dim" id="ph-pnl-${id}">&#8212;</div>
+          <div class="hero-sub">lifetime</div>
+        </div>
+        <div class="hero-card ring-wrap">
+          <div class="hero-label">Win Rate</div>
+          <div id="ph-ring-${id}">${makeRing(0,'#484f58')}</div>
+          <div class="hero-sub" id="ph-resolved-${id}">no resolved bets</div>
+        </div>
+        <div class="hero-card">
+          <div class="hero-label">Bets Placed</div>
+          <div class="hero-value dim" id="ph-placed-${id}">&#8212;</div>
+          <div class="hero-sub" id="ph-wl-${id}">&#8212; W / &#8212; L</div>
+        </div>
+      </div>
+      <div class="arb-summary-grid" id="arb-summary-${id}" style="display:none">
+        <div class="arb-stat"><div class="arb-stat-label">Total Arbs</div><div class="arb-stat-value dim" id="arb-total-${id}">0</div></div>
+        <div class="arb-stat"><div class="arb-stat-label">Avg Net Spread</div><div class="arb-stat-value dim" id="arb-avg-spread-${id}">&mdash;</div></div>
+        <div class="arb-stat"><div class="arb-stat-label">Kalshi Legs</div><div class="arb-stat-value" id="arb-kalshi-${id}" style="color:#a78bfa">0</div></div>
+        <div class="arb-stat"><div class="arb-stat-label">Polymarket Legs</div><div class="arb-stat-value" id="arb-poly-${id}" style="color:#38bdf8">0</div></div>
+      </div>
+      <div class="panels">
+        <div class="card">
+          <div class="card-title">Performance</div>
+          <div class="stat"><span class="lbl">Total Wins</span><span class="val pos" id="pd-wins-${id}">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Total Losses</span><span class="val neg" id="pd-losses-${id}">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Win Rate</span><span class="val" id="pd-winpct-${id}">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Net P&amp;L</span><span class="val" id="pd-pnl-${id}">&#8212;</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Allocation</div>
+          <div class="stat"><span class="lbl">Portfolio Share</span><span class="val" id="pd-alloc-${id}">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Max Single Bet</span><span class="val" id="pd-max-${id}">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Capital Deployed</span><span class="val" id="pd-cap-${id}">&#8212;</span></div>
+          <div class="stat"><span class="lbl">Return on Capital</span><span class="val" id="pd-roc-${id}">&#8212;</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Placed Trades&nbsp;<span class="card-sub" id="pd-trades-count-${id}"></span></div>
+        <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Status</th><th>Placed</th><th>Game</th><th>Venue</th><th>Event</th><th>Market</th>
+            <th>Side</th><th>Mkt / Fair</th><th>Size</th><th>Edge</th><th>Spread</th>
+          </tr></thead>
+          <tbody id="pd-trades-rows-${id}"><tr><td colspan="11" class="empty">Waiting for first scan cycle&hellip;</td></tr></tbody>
+        </table>
+        </div>
+      </div>`;
+    container.appendChild(div);
+  }
+  // Re-attach click listeners (new buttons)
+  nav.querySelectorAll('[data-pod]').forEach(btn=>{
+    btn.addEventListener('click',()=>showView('pod-'+btn.dataset.pod));
+  });
+}
+
+/* ── Update portfolio view ── */
+function updatePortfolio(d){
+  const st=d.engine_status||'starting';
+  document.getElementById('eng-badge').textContent=st.toUpperCase();
+  document.getElementById('eng-badge').className='badge badge-'+st;
+  document.getElementById('pulse').className='pulse'+(st==='running'?'':' pulse-off');
+
+  if(d.risk){
+    const r=d.risk;
+    set('exposure','$'+abs2(r.total_exposure_usd)+'  ('+r.total_exposure_pct.toFixed(1)+'%)');
+    set('daily-pnl',fmtPnl(r.daily_pnl)+'  ('+fmtPct(r.daily_pnl_pct)+')',pc(r.daily_pnl));
+    set('open-pos',r.open_positions+' open');
+    set('status-txt',r.halted?('HALTED'+(r.halt_reason?' \u2014 '+r.halt_reason:'')):'ACTIVE',r.halted?'neg':'pos');
+  }
+  if(d.cycle){
+    const c=d.cycle;
+    document.getElementById('cycle-num').textContent='#'+c.cycle_number;
+    set('duration',c.duration_seconds.toFixed(2)+'s');
+    set('pods-sc',c.pods_scanned);
+    set('placed',c.placed_count,c.placed_count>0?'pos':null);
+    set('skipped',c.skipped_count);
+    set('errors',c.error_count,c.error_count>0?'neg':null);
+    const sr=c.success_rate;
+    set('success',sr.toFixed(0)+'%',sr===100?'pos':sr>=80?'warn':'neg');
+  }
+  if(d.pods){
+    const ids=Object.keys(d.pods).sort();
+    let tp=0,tw=0,tl=0,tpnl=0,rows='';
+    for(const id of ids){
+      const p=d.pods[id];
+      tp+=p.placed;tw+=p.wins;tl+=p.losses;tpnl+=p.pnl;
+      const name=p.name&&p.name!==id?p.name:'';
+      rows+=`<tr>
+        <td>${id}</td>
+        <td style="text-align:left;color:#8b949e;font-size:12px;font-family:inherit;font-weight:400">${name}</td>
+        <td>${p.placed}</td><td class="pos">${p.wins}</td><td class="neg">${p.losses}</td>
+        <td class="${p.win_pct>=55?'pos':p.win_pct>=45?'warn':'dim'}">${p.win_pct.toFixed(1)}%</td>
+        <td class="${pc(p.pnl)}">${fmtPnl(p.pnl)}</td>
+        <td>${p.alloc_pct.toFixed(1)}%</td>
+        <td>$${p.max_position_usd.toLocaleString()}</td>
+      </tr>`;
+    }
+    const res=tw+tl;
+    const twp=res>0?(tw/res*100).toFixed(1):'0.0';
+    rows+=`<tr>
+      <td>TOTAL</td><td style="text-align:left"></td>
+      <td>${tp}</td><td class="pos">${tw}</td><td class="neg">${tl}</td>
+      <td class="${parseFloat(twp)>=55?'pos':parseFloat(twp)>=45?'warn':'dim'}">${twp}%</td>
+      <td class="${pc(tpnl)}">${fmtPnl(tpnl)}</td>
+      <td colspan="2">\u2013</td>
+    </tr>`;
+    document.getElementById('pod-rows').innerHTML=rows;
+  }
+  if(d.settlement){
+    const s=d.settlement;
+    const pe=document.getElementById('s-pnl');
+    pe.textContent=fmtPnl(s.total_pnl);pe.className=pc(s.total_pnl);
+    const we=document.getElementById('s-wr');
+    we.textContent=s.win_rate.toFixed(1)+'%';
+    we.className=s.win_rate>=55?'pos':s.win_rate>=45?'warn':'neg';
+    document.getElementById('s-trades').textContent=s.total_settled;
+    document.getElementById('s-wlv').textContent=s.wins+' / '+s.losses+' / '+s.voids;
+  }
+  document.getElementById('last-upd').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+/* ── Update individual pod views ── */
+function updatePodViews(pods){
+  for(const [id,p] of Object.entries(pods)){
+    const g=id=>{const e=document.getElementById(id);return e;};
+    const sn=(id,txt)=>{const e=g(id);if(e)e.textContent=txt;};
+    const sc=(id,txt,cls)=>{const e=g(id);if(e){e.textContent=txt;e.className=cls||'';}};
+
+    sn('ph-name-'+id, p.name&&p.name!==id?p.name:id);
+    sc('ph-alloc-'+id, p.alloc_pct.toFixed(1)+'%', 'pos');
+    sc('ph-max-'+id, '$'+p.max_position_usd.toLocaleString(), 'dim');
+
+    // Hero: P&L
+    const pnlEl=g('ph-pnl-'+id);
+    if(pnlEl){pnlEl.textContent=fmtPnl(p.pnl);pnlEl.className='hero-value '+(p.pnl>0?'pos':p.pnl<0?'neg':'dim');}
+
+    // Hero: ring
+    const ringEl=g('ph-ring-'+id);
+    if(ringEl)ringEl.innerHTML=makeRing(p.win_pct,'');
+    sn('ph-resolved-'+id, (p.wins+p.losses)+' resolved bet'+(p.wins+p.losses!==1?'s':''));
+
+    // Hero: placed
+    const plEl=g('ph-placed-'+id);
+    if(plEl){plEl.textContent=p.placed;plEl.className='hero-value '+(p.placed>0?'pos':'dim');}
+    sn('ph-wl-'+id, p.wins+' W / '+p.losses+' L');
+
+    // Detail: performance
+    sn('pd-wins-'+id, p.wins);
+    sn('pd-losses-'+id, p.losses);
+    sc('pd-winpct-'+id, p.win_pct.toFixed(1)+'%', 'val '+(p.win_pct>=55?'pos':p.win_pct>=45?'warn':'neg'));
+    sc('pd-pnl-'+id, fmtPnl(p.pnl), 'val '+pc(p.pnl));
+
+    // Detail: allocation
+    sc('pd-alloc-'+id, p.alloc_pct.toFixed(1)+'% of portfolio', 'val dim');
+    sc('pd-max-'+id, '$'+p.max_position_usd.toLocaleString()+' per bet', 'val dim');
+    const cap=p.capital_usd||0;
+    sc('pd-cap-'+id, cap>0?'$'+abs2(cap):'N/A', 'val dim');
+    const roc=cap>0?((p.pnl/cap)*100):0;
+    sc('pd-roc-'+id, cap>0?fmtPct(roc):'N/A', 'val '+(roc>0?'pos':roc<0?'neg':'dim'));
+  }
+}
+
+/* ── Trade table helpers ── */
+function fmtTime(ts){
+  if(!ts)return'&#8212;';
+  try{
+    return new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+  }catch(e){return ts;}
+}
+
+function fmtGameTime(iso){
+  if(!iso)return '&#8212;';
+  try{
+    const d=new Date(iso);
+    if(isNaN(d))return '&#8212;';
+    const now=new Date();
+    const diff=d-now;
+    // Show relative if in the future
+    const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dateStr=mo[d.getMonth()]+' '+d.getDate();
+    const h=d.getHours(),m=d.getMinutes();
+    const ampm=h>=12?'PM':'AM';
+    const h12=h%12||12;
+    const timeStr=h12+':'+(m<10?'0':'')+m+ampm;
+    if(diff>0&&diff<86400000){
+      const hrs=Math.floor(diff/3600000);
+      const mins=Math.floor((diff%3600000)/60000);
+      return `<span style="color:#f0883e">${dateStr} ${timeStr}</span> <span style="font-size:10px;opacity:0.7">(in ${hrs}h${mins}m)</span>`;
+    }
+    if(diff<0)return `<span style="color:#8b949e">${dateStr} ${timeStr}</span>`;
+    return `${dateStr} ${timeStr}`;
+  }catch(e){return '&#8212;';}
+}
+
+function tradeRow(t,showPod){
+  const side=t.side||'&#8212;';
+  const betTeam=t.bet_team||side;
+  const sideCls=side==='YES'?'pos':side==='NO'?'neg':'dim';
+  const edge=typeof t.edge_pct==='number'?(t.edge_pct*100).toFixed(1)+'%':'&#8212;';
+  const sz  =typeof t.position_size_usd==='number'?'$'+(t.position_size_usd).toFixed(2):'&#8212;';
+  const tm  =fmtTime(t.timestamp_utc);
+  const gt  =fmtGameTime(t.game_time);
+  const ev  =(t.event||'&#8212;').substring(0,32);
+  const mk  =(t.market_ticker||t.market_id||'&#8212;').substring(0,26);
+  const podCell=showPod?`<td style="text-align:left;font-size:11px;color:#8b949e;white-space:nowrap">${t.pod_id||'&#8212;'}</td>`:'';
+  const edgeCls=(t.edge_pct||0)>=0?'pos':'neg';
+  const st=(t.status||'OPEN').toUpperCase();
+  const stCls=st==='OPEN'?'status-open':st==='WIN'?'status-win':st==='LOSS'?'status-loss':'status-void';
+  // Show team name with YES/NO indicator if different
+  const sideDisplay=betTeam!==side&&betTeam?betTeam+' <span style="font-size:10px;opacity:0.6">('+side+')</span>':side;
+  // Venue badge
+  const venue=(t.venue||'').toLowerCase();
+  const venueBadge=venue==='kalshi'?'<span class="venue-badge venue-kalshi">Kalshi</span>':
+                   venue==='polymarket'?'<span class="venue-badge venue-polymarket">Poly</span>':
+                   '<span style="color:#8b949e;font-size:11px">'+(t.venue||'&#8212;')+'</span>';
+  // Arb spread (for dual-leg trades)
+  const ex=t.extra||{};
+  const isArb=ex.arb_type==='dual_leg';
+  let spreadCell='<td class="dim">&#8212;</td>';
+  if(isArb&&typeof ex.net_spread==='number'){
+    const net=(ex.net_spread*100).toFixed(1);
+    const gross=typeof ex.gross_spread==='number'?(ex.gross_spread*100).toFixed(1):null;
+    spreadCell=`<td><span class="arb-spread">${net}% net</span>${gross?'<br><span style="font-size:9px;color:#484f58">'+gross+'% gross</span>':''}</td>`;
+  }
+  // Arb link indicator
+  const arbTag=isArb?'<span class="arb-tag">ARB</span>':'';
+  return `<tr>
+    <td style="text-align:left"><span class="${stCls}">${st}</span>${arbTag}</td>
+    <td style="text-align:left;font-size:11px;white-space:nowrap;color:#8b949e">${tm}</td>
+    <td style="text-align:left;font-size:11px;white-space:nowrap">${gt}</td>
+    ${podCell}
+    <td style="text-align:center">${venueBadge}</td>
+    <td style="text-align:left;font-size:12px;color:#c9d1d9;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev}</td>
+    <td style="text-align:left;font-family:'Consolas','Courier New',monospace;font-size:11px;white-space:nowrap">${mk}</td>
+    <td class="${sideCls}" style="font-weight:700;white-space:nowrap">${sideDisplay}</td>
+    <td style="font-size:11px;white-space:nowrap">${fmtOdds(t)}</td>
+    <td>${sz}</td>
+    <td class="${edgeCls}">${edge}</td>
+    ${spreadCell}
+  </tr>`;
+}
+
+function updateTrades(trades){
+  // Portfolio: all trades
+  const ptb=document.getElementById('trades-rows');
+  const pcnt=document.getElementById('trades-count');
+  if(ptb){
+    if(!trades||!trades.length){
+      ptb.innerHTML='<tr><td colspan="12" class="empty">No placed trades yet&hellip;</td></tr>';
+      if(pcnt)pcnt.textContent='';
+    }else{
+      ptb.innerHTML=trades.map(t=>tradeRow(t,true)).join('');
+      if(pcnt)pcnt.textContent=trades.length+' trade'+(trades.length!==1?'s':'');
+    }
+  }
+  // Per-pod: filtered
+  const byPod={};
+  for(const t of (trades||[])){const pid=t.pod_id||'P-001';if(!byPod[pid])byPod[pid]=[];byPod[pid].push(t);}
+  // Clear all known pod trade tables first
+  document.querySelectorAll('[id^="pd-trades-rows-"]').forEach(el=>{
+    const pid=el.id.replace('pd-trades-rows-','');
+    const pts=byPod[pid]||[];
+    if(!pts.length){
+      el.innerHTML='<tr><td colspan="11" class="empty">No placed trades for this pod yet&hellip;</td></tr>';
+      const pcnt2=document.getElementById('pd-trades-count-'+pid);
+      if(pcnt2)pcnt2.textContent='';
+    }else{
+      el.innerHTML=pts.map(t=>tradeRow(t,false)).join('');
+      const pcnt2=document.getElementById('pd-trades-count-'+pid);
+      if(pcnt2)pcnt2.textContent=pts.length+' trade'+(pts.length!==1?'s':'');
+    }
+    // Update arb summary for this pod
+    updateArbSummary(pid,pts);
+  });
+}
+
+/* ── Arb summary for dual-leg pods ── */
+function updateArbSummary(pid,trades){
+  const summaryEl=document.getElementById('arb-summary-'+pid);
+  if(!summaryEl)return;
+  const arbTrades=trades.filter(t=>t.extra&&t.extra.arb_type==='dual_leg');
+  if(!arbTrades.length){summaryEl.style.display='none';return;}
+  summaryEl.style.display='';
+  // Count arbs (each arb = 2 legs, so total arbs = legs / 2)
+  const totalArbs=Math.floor(arbTrades.length/2);
+  const kalshiLegs=arbTrades.filter(t=>(t.venue||'').toLowerCase()==='kalshi').length;
+  const polyLegs=arbTrades.filter(t=>(t.venue||'').toLowerCase()==='polymarket').length;
+  const spreads=arbTrades.filter(t=>typeof t.extra.net_spread==='number').map(t=>t.extra.net_spread);
+  // Average spread (deduplicate by taking one per pair)
+  const avgSpread=spreads.length?(spreads.reduce((a,b)=>a+b,0)/spreads.length*100).toFixed(2)+'%':'\u2014';
+  const se=(id,txt)=>{const e=document.getElementById(id);if(e)e.textContent=txt;};
+  se('arb-total-'+pid,totalArbs);
+  se('arb-avg-spread-'+pid,avgSpread);
+  se('arb-kalshi-'+pid,kalshiLegs);
+  se('arb-poly-'+pid,polyLegs);
+}
+
+/* ── Portfolio analytics computation ── */
+function computeAnalytics(trades, settlement, bankroll){
+  // Filter to settled trades only
+  const settled=trades.filter(t=>t.status==='WIN'||t.status==='LOSS');
+  if(!settled.length)return null;
+
+  const wins=settled.filter(t=>t.status==='WIN');
+  const losses=settled.filter(t=>t.status==='LOSS');
+
+  // P&L arrays
+  const pnls=settled.map(t=>typeof t.pnl_usd==='number'?t.pnl_usd:0);
+  const winPnls=wins.map(t=>typeof t.pnl_usd==='number'?t.pnl_usd:0);
+  const lossPnls=losses.map(t=>typeof t.pnl_usd==='number'?Math.abs(t.pnl_usd):0);
+
+  const totalPnl=pnls.reduce((a,b)=>a+b,0);
+  const grossWins=winPnls.reduce((a,b)=>a+b,0);
+  const grossLosses=lossPnls.reduce((a,b)=>a+b,0);
+
+  // Total wagered (sum of all position sizes for settled trades)
+  const totalWagered=settled.reduce((a,t)=>a+(typeof t.position_size_usd==='number'?t.position_size_usd:0),0);
+
+  // Basic stats
+  const winRate=wins.length/(wins.length+losses.length);
+  const avgWin=winPnls.length?grossWins/winPnls.length:0;
+  const avgLoss=lossPnls.length?grossLosses/lossPnls.length:0;
+  const profitFactor=grossLosses>0?grossWins/grossLosses:grossWins>0?Infinity:0;
+  const wlRatio=avgLoss>0?avgWin/avgLoss:avgWin>0?Infinity:0;
+  const expectancy=winRate*avgWin-(1-winRate)*avgLoss;
+  const roi=totalWagered>0?(totalPnl/totalWagered)*100:0;
+
+  // Kelly criterion: f* = (bp - q) / b where b=avg_win/avg_loss, p=win_rate, q=1-p
+  const b=avgLoss>0?avgWin/avgLoss:0;
+  const kelly=b>0?((b*winRate-(1-winRate))/b)*100:0;
+
+  // Best/worst
+  const bestTrade=pnls.length?Math.max(...pnls):0;
+  const worstTrade=pnls.length?Math.min(...pnls):0;
+
+  // Equity curve: cumulative P&L over time (sorted by settlement date)
+  const sortedSettled=[...settled].sort((a,b)=>{
+    const da=a.settled_at_utc||a.timestamp_utc||'';
+    const db=b.settled_at_utc||b.timestamp_utc||'';
+    return da.localeCompare(db);
+  });
+  const equityCurve=[];
+  let cumPnl=0;
+  for(const t of sortedSettled){
+    cumPnl+=typeof t.pnl_usd==='number'?t.pnl_usd:0;
+    equityCurve.push({x:t.settled_at_utc||t.timestamp_utc||'',y:cumPnl});
+  }
+
+  // Max drawdown from equity curve
+  let peak=-Infinity,maxDD=0,maxDDpct=0;
+  for(const pt of equityCurve){
+    if(pt.y>peak)peak=pt.y;
+    const dd=peak-pt.y;
+    if(dd>maxDD){maxDD=dd;maxDDpct=peak>0?(dd/peak)*100:0;}
+  }
+
+  // Sharpe ratio (annualized): mean(daily_returns)/std(daily_returns)*sqrt(365)
+  // Group P&L by date for daily returns
+  const dailyPnl={};
+  for(const t of sortedSettled){
+    const ds=(t.settled_at_utc||t.timestamp_utc||'').substring(0,10);
+    if(ds)dailyPnl[ds]=(dailyPnl[ds]||0)+(typeof t.pnl_usd==='number'?t.pnl_usd:0);
+  }
+  const dailyReturns=Object.values(dailyPnl);
+  let sharpe=0;
+  if(dailyReturns.length>=2){
+    const mean=dailyReturns.reduce((a,b)=>a+b,0)/dailyReturns.length;
+    const variance=dailyReturns.reduce((a,v)=>a+(v-mean)*(v-mean),0)/(dailyReturns.length-1);
+    const std=Math.sqrt(variance);
+    sharpe=std>0?(mean/std)*Math.sqrt(365):0;
+  }
+
+  // Streaks
+  let curStreak=0,curStreakType='',bestWinStreak=0,curWinStreak=0;
+  for(const t of sortedSettled){
+    if(t.status==='WIN'){
+      curWinStreak++;
+      if(curWinStreak>bestWinStreak)bestWinStreak=curWinStreak;
+      if(curStreakType==='WIN')curStreak++;
+      else{curStreak=1;curStreakType='WIN';}
+    }else{
+      curWinStreak=0;
+      if(curStreakType==='LOSS')curStreak++;
+      else{curStreak=1;curStreakType='LOSS';}
+    }
+  }
+
+  return {
+    totalPnl,totalReturn:bankroll>0?(totalPnl/bankroll)*100:0,
+    winRate,avgWin,avgLoss,profitFactor,wlRatio,expectancy,
+    roi,kelly,bestTrade,worstTrade,sharpe,maxDD,maxDDpct,
+    totalWagered,avgSize:totalWagered/settled.length,
+    curStreak,curStreakType,bestWinStreak,
+    equityCurve,settled:settled.length,wins:wins.length,losses:losses.length
+  };
+}
+
+/* ── Render portfolio analytics ── */
+function renderAnalytics(a){
+  if(!a){return;}
+
+  const se=(id,txt,cls)=>{const e=document.getElementById(id);if(e){e.textContent=txt;if(cls)e.className=cls;}};
+
+  // Hero metrics
+  se('m-return',(a.totalReturn>=0?'+':'')+a.totalReturn.toFixed(2)+'%','metric-value '+(a.totalReturn>=0?'pos':'neg'));
+  se('m-return-sub',fmtPnl(a.totalPnl)+' on bankroll');
+  se('m-sharpe',a.sharpe.toFixed(2),'metric-value '+(a.sharpe>=1?'pos':a.sharpe>=0?'warn':'neg'));
+  se('m-drawdown',a.maxDD>0?'-$'+abs2(a.maxDD):'$0.00','metric-value '+(a.maxDD>0?'neg':'pos'));
+  se('m-dd-sub',a.maxDDpct>0?a.maxDDpct.toFixed(1)+'% from peak':'no drawdown');
+  const pfTxt=a.profitFactor===Infinity?'\\u221e':a.profitFactor.toFixed(2);
+  se('m-pf',pfTxt,'metric-value '+(a.profitFactor>=2?'pos':a.profitFactor>=1?'warn':'neg'));
+
+  // Returns analysis
+  se('m-avg-win','+$'+abs2(a.avgWin),'val pos');
+  se('m-avg-loss','-$'+abs2(a.avgLoss),'val neg');
+  const wlTxt=a.wlRatio===Infinity?'\\u221e':a.wlRatio.toFixed(2)+'x';
+  se('m-wl-ratio',wlTxt,'val '+(a.wlRatio>=1.5?'pos':a.wlRatio>=1?'warn':'neg'));
+  se('m-expect',(a.expectancy>=0?'+':'')+fmtPnl(a.expectancy)+' / trade','val '+pc(a.expectancy));
+  se('m-best','+$'+abs2(a.bestTrade),'val pos');
+  se('m-worst',fmtPnl(a.worstTrade),'val neg');
+
+  // Risk metrics
+  se('m-wagered','$'+abs2(a.totalWagered),'val dim');
+  se('m-roi',(a.roi>=0?'+':'')+a.roi.toFixed(2)+'%','val '+pc(a.roi));
+  se('m-kelly',a.kelly.toFixed(1)+'%','val '+(a.kelly>0?'pos':a.kelly===0?'dim':'neg'));
+  se('m-avg-size','$'+abs2(a.avgSize),'val dim');
+  const streakIcon=a.curStreakType==='WIN'?'\u25B2':'\u25BC';
+  const streakCls=a.curStreakType==='WIN'?'pos':'neg';
+  se('m-streak',streakIcon+' '+a.curStreak+' '+(a.curStreakType==='WIN'?'wins':'losses'),'val '+streakCls);
+  se('m-best-streak',a.bestWinStreak+' wins','val pos');
+
+  // Equity curve
+  drawEquityCurve(a.equityCurve);
+}
+
+/* ── Draw equity curve on canvas ── */
+function drawEquityCurve(curve){
+  const canvas=document.getElementById('equity-canvas');
+  if(!canvas||!curve||curve.length<2)return;
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*dpr;
+  canvas.height=120*dpr;
+  ctx.scale(dpr,dpr);
+  const W=rect.width,H=120;
+  const pad={t:10,r:60,b:25,l:10};
+  const cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;
+
+  const vals=curve.map(p=>p.y);
+  const minV=Math.min(0,...vals);
+  const maxV=Math.max(0,...vals);
+  const range=maxV-minV||1;
+
+  // Clear
+  ctx.clearRect(0,0,W,H);
+
+  // Zero line
+  const zeroY=pad.t+cH*(1-(0-minV)/range);
+  ctx.strokeStyle='#30363d';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(pad.l,zeroY);ctx.lineTo(W-pad.r,zeroY);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Fill gradient
+  const gradient=ctx.createLinearGradient(0,pad.t,0,H-pad.b);
+  const lastVal=vals[vals.length-1];
+  if(lastVal>=0){gradient.addColorStop(0,'rgba(63,185,80,0.15)');gradient.addColorStop(1,'rgba(63,185,80,0)');}
+  else{gradient.addColorStop(0,'rgba(248,81,73,0)');gradient.addColorStop(1,'rgba(248,81,73,0.15)');}
+
+  ctx.beginPath();
+  for(let i=0;i<curve.length;i++){
+    const x=pad.l+(i/(curve.length-1))*cW;
+    const y=pad.t+cH*(1-(vals[i]-minV)/range);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  const fillPath=new Path2D();
+  for(let i=0;i<curve.length;i++){
+    const x=pad.l+(i/(curve.length-1))*cW;
+    const y=pad.t+cH*(1-(vals[i]-minV)/range);
+    if(i===0)fillPath.moveTo(x,y);else fillPath.lineTo(x,y);
+  }
+  fillPath.lineTo(pad.l+cW,H-pad.b);fillPath.lineTo(pad.l,H-pad.b);fillPath.closePath();
+  ctx.fillStyle=gradient;ctx.fill(fillPath);
+
+  // Line
+  ctx.strokeStyle=lastVal>=0?'#3fb950':'#f85149';ctx.lineWidth=2;
+  ctx.beginPath();
+  for(let i=0;i<curve.length;i++){
+    const x=pad.l+(i/(curve.length-1))*cW;
+    const y=pad.t+cH*(1-(vals[i]-minV)/range);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // End dot
+  const lastX=pad.l+cW;
+  const lastY=pad.t+cH*(1-(lastVal-minV)/range);
+  ctx.beginPath();ctx.arc(lastX,lastY,4,0,Math.PI*2);
+  ctx.fillStyle=lastVal>=0?'#3fb950':'#f85149';ctx.fill();
+
+  // Y-axis labels
+  ctx.fillStyle='#8b949e';ctx.font='10px system-ui,sans-serif';ctx.textAlign='left';
+  ctx.fillText(fmtPnl(maxV),W-pad.r+6,pad.t+4);
+  ctx.fillText(fmtPnl(minV),W-pad.r+6,H-pad.b+4);
+  if(Math.abs(zeroY-pad.t)>15&&Math.abs(zeroY-(H-pad.b))>15){
+    ctx.fillText('$0',W-pad.r+6,zeroY+3);
+  }
+
+  // X-axis: first and last date
+  ctx.textAlign='center';
+  const firstDate=(curve[0].x||'').substring(5,10).replace('-','/');
+  const lastDate=(curve[curve.length-1].x||'').substring(5,10).replace('-','/');
+  if(firstDate)ctx.fillText(firstDate,pad.l,H-pad.b+14);
+  if(lastDate)ctx.fillText(lastDate,W-pad.r,H-pad.b+14);
+}
+
+let _lastPollOk=0;
+
+/* ── Stale-data warning ── */
+setInterval(()=>{
+  const el=document.getElementById('last-upd');
+  if(!el)return;
+  const age=(Date.now()-_lastPollOk)/1000;
+  el.style.color=age>30?'#f85149':age>15?'#d29922':'#8b949e';
+},5000);
+
+/* ── Re-poll immediately when tab regains focus ── */
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
+window.addEventListener('focus',poll);
+
+/* ── Main poll loop ── */
+async function poll(){
+  try{
+    const r=await fetch('/api/status');
+    if(!r.ok)return;
+    const d=await r.json();
+    _lastPollOk=Date.now();
+    document.getElementById('last-upd').style.color='#8b949e';
+    updatePortfolio(d);
+    if(d.pods){
+      ensurePodTabs(d.pods);
+      updatePodViews(d.pods);
+    }
+    updateTrades(d.trades||[]);
+    // Portfolio analytics
+    const bankroll=(d.risk&&d.risk.bankroll)?d.risk.bankroll:10000;
+    const analytics=computeAnalytics(d.trades||[],d.settlement,bankroll);
+    if(analytics)renderAnalytics(analytics);
+  }catch(e){}
+}
+poll();setInterval(poll,PM);
+})();
+</script>
+</body>
+</html>

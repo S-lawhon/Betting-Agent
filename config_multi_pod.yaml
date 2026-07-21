@@ -1,0 +1,468 @@
+# config_multi_pod.yaml
+# ─────────────────────
+# Extended config for multi-pod operation.
+# Merges with existing config.yaml (which remains unchanged).
+# Load both: config = {**base_config, **multi_pod_config}
+
+# ── Existing sections (unchanged, shown for reference) ──────────────
+# kalshi:
+#   environment: demo
+#   base_url: https://demo-api.kalshi.co/trade-api/v2
+#
+# odds_api:
+#   sports: ["americanfootball_nfl", "basketball_nba"]
+#
+# edge:
+#   fee_pct: 0.07
+#
+# risk:
+#   kelly_fraction: 0.25
+#   max_bet_pct: 0.03
+
+# ── Risk management (was commented out, now active) ─────────────────
+risk:
+  max_positions: 50             # open positions at any one time (multi-pod needs headroom)
+  max_exposure_pct: 0.50        # 50% of bankroll (raised: P-002 arb legs are hedged but counted)
+  max_daily_loss_pct: 0.05      # 5% daily loss triggers cooldown
+  cooldown_minutes: 60          # pause after max_daily_loss breach
+  kelly_fraction: 0.25          # fractional Kelly (quarter Kelly)
+  base_bet_pct: 0.03            # bet cap at normal edge levels
+  max_bet_pct: 0.06             # bet cap ceiling for very-high-edge opportunities
+  high_edge_threshold: 0.10     # edge at which cap begins scaling above base_bet_pct
+  max_edge_threshold: 0.25      # edge at which cap reaches max_bet_pct ceiling
+  min_confidence: 0.55          # minimum model confidence to trade
+  initial_bankroll: 1000.0      # starting paper bankroll
+
+# ── New sections ────────────────────────────────────────────────────
+
+polymarket:
+  environment: paper          # paper until US access opens
+  host: https://clob.polymarket.com
+  chain_id: 137
+  # private_key: (from POLYMARKET_PRIVATE_KEY env var)
+  matcher:
+    fuzzy_threshold: 55.0
+    time_window_minutes: 60.0
+
+deribit:
+  environment: live              # "live" or "testnet"
+  timeout: 15.0                  # HTTP timeout for API calls
+
+interactive_brokers:
+  environment: paper
+  host: 127.0.0.1
+  port: 7497                  # TWS paper trading port
+  client_id: 10
+
+cross_venue_matcher:
+  fuzzy_threshold: 80.0
+  settlement_check: true
+  require_both_teams: true     # Prevents single-team partial matches (P-006 lesson)
+  sports_only: true            # Filter Kalshi markets to sport ticker prefixes only
+
+# ── Aggregate risk ─────────────────────────────────────────────────
+aggregate_risk:
+  max_total_exposure_pct: 0.50   # 50% of bankroll across all pods
+  max_venue_exposure_pct: 0.30   # 30% of bankroll per venue
+  max_pod_exposure_pct:   0.25   # 25% of bankroll per pod
+  max_open_positions:     200
+  cooldown_minutes:       60.0
+  exempt_pods:                   # Pods that bypass aggregate exposure cap
+    - P-014                      # Live Game Agent — trades even when portfolio is over 50%
+
+# ── Pod configuration ───────────────────────────────────────────────
+
+pods:
+  active:
+    - P-001                   # Kalshi Moneyline Value (legacy scanner)
+    - P-002                   # Kalshi-Polymarket Cross-Venue Arb (dual-leg)
+    - P-006                   # Sportsbook-Polymarket Consensus (re-enabled w/ CID verification)
+#    - P-009                   # Sign-Up Bonus Blitz (promo hedging)   # disabled 2026-07-18 pivot
+#    - P-010                   # Daily Odds Boost Grind (boost EV)   # disabled 2026-07-18 pivot
+#    - P-013                   # Kalshi-Deribit Crypto Options Arb   # disabled 2026-07-18 pivot
+    - P-014                   # Live Game Agent (in-play consensus edge)
+    - P-015                   # Tennis Qualifier Favorite (paper validation, added 2026-07-20)
+    - P-017                   # Golf Top-N pre-tournament value (paper, restored 2026-07-21)
+#   - P-016 / P-017M are STANDALONE maker engines with their own fast loops
+#     (scripts/run_*.py). Do NOT add them here — the 5-min engine is not their runner.
+
+  P-001:
+    # Uses existing scanner config (no changes)
+    pass: true
+    # CLV gate (2026-07-18): validated MLB edge is in UNDERDOGS vs the de-vigged
+    # Pinnacle close, net-positive only as a maker. Reversible: enabled: false.
+    clv_gate:
+      enabled: true
+      max_entry_price: 0.50      # underdogs only (Kalshi price < 50c)
+      maker: true                # net edge uses the maker fee (0.0175)
+      min_net_edge: 0.0          # require fair - price - maker_fee > 0
+
+  P-006:
+    # sports: inherits from odds_api.sports (global list — nfl, nba, ncaab, ncaaw, mlb, nhl + tennis)
+    min_edge_pct: 0.008       # Lowered from 2% → 0.8% (0% Polymarket fees — even small edges are +EV)
+    min_ev: 0.005             # Lowered from 1% → 0.5% (0% fees means small edges still have positive EV)
+    fee_pct: 0.0
+    min_kelly_fraction: 0.005 # Override global 2% floor (calibrated for 7% Kalshi fees, too aggressive here)
+    require_series_id: true   # Reject sport if no Polymarket series_id found (no fuzzy fallback)
+    environment: paper
+
+    # ── Sport-specific threshold overrides ──────────────────────────────
+    # Override min_edge_pct per sport.  Sports not listed use the global
+    # P-006 min_edge_pct above.  Based on TRADE_ANALYSIS.md performance data.
+    sport_overrides:
+      # WTA: -15.5% ROI historically. Raise threshold to only take large edges.
+      tennis_wta:
+        min_edge_pct: 0.05       # 5% — only high-conviction WTA trades
+        min_ev: 0.02             # 2% EV floor
+
+      # ATP: 0.4% ROI — barely break-even. Modest tightening.
+      tennis_atp:
+        min_edge_pct: 0.02       # 2% — filter out noise, keep real edges
+        min_ev: 0.01             # 1% EV floor
+
+      # MLB: disabled until regular season aligns across venues.
+      baseball_mlb:
+        enabled: false           # Re-enable when Polymarket has regular-season markets
+
+      # NBA: 94% ROI — best performer. Keep aggressive thresholds.
+      basketball_nba:
+        min_edge_pct: 0.005      # 0.5% — capture maximum volume
+        min_ev: 0.003
+
+      # NHL: 119% ROI — strong. Keep aggressive.
+      icehockey_nhl:
+        min_edge_pct: 0.005      # 0.5% — capture maximum volume
+        min_ev: 0.003
+
+    # ── Fair value estimation method ────────────────────────────────────
+    # Controls how P-006 computes the "true" probability used for edge calc.
+    # Methods: "consensus" (legacy weighted-sharp), "pinnacle_only",
+    #          "ensemble" (blend of Pinnacle + Elo model)
+    fair_value:
+      method: ensemble           # "consensus", "pinnacle_only", or "ensemble"
+      pinnacle_weight: 0.60      # Weight for Pinnacle-only fair value in ensemble
+      elo_weight: 0.20           # Weight for Elo model prediction in ensemble
+      consensus_weight: 0.20     # Weight for multi-book consensus in ensemble
+      # Elo model parameters
+      elo:
+        k_factor: 20             # Standard Elo K-factor (higher = more reactive)
+        home_advantage: 60       # Home-court/ice Elo points (NBA ~100, NHL ~30, avg ~60)
+        default_rating: 1500     # Starting Elo for new teams
+        ratings_file: data/elo_ratings.json  # Persist ratings across restarts
+
+  P-009:
+    # Sign-Up Bonus Blitz — free-bet and risk-free hedge converter
+    enabled: false   # disabled 2026-07-18 (pivot: P-013 negative-edge; P-009/P-010 inactive promo shells)
+    environment: paper
+    min_conversion_rate: 0.60   # Require at least 60% free-bet conversion
+    promos:
+      # Add new sign-up bonuses here as you open accounts.
+      # Example entry (fill in real values before enabling):
+      # - promo_id: FD-FB-2026-01
+      #   sportsbook: fanduel
+      #   promo_type: free_bet
+      #   amount: 200
+      #   boosted_odds: 200        # American: +200
+      #   fair_yes_prob: 0.40      # From scanner or odds_client consensus
+      #   hedge_venue: kalshi
+      #   hedge_market_id: CHIEFS-2026-01
+      #   hedge_no_price: 0.62     # Current NO price at Kalshi
+      #   expiry: "2026-02-01"
+      #   status: pending
+
+  P-010:
+    # Daily Odds Boost Grind — +EV odds boosts from sportsbooks
+    enabled: false   # disabled 2026-07-18 (pivot: P-013 negative-edge; P-009/P-010 inactive promo shells)
+    environment: paper
+    boost_mode: ev              # "ev" (accept variance) or "locked" (hedge to guarantee)
+    min_ev_pct: 0.05            # Require at least 5% EV per dollar wagered
+    boosts:
+      # Add available daily boosts here.
+      # Example entry:
+      # - promo_id: FD-BOOST-2026-01-15
+      #   sportsbook: fanduel
+      #   promo_type: odds_boost
+      #   amount: 25              # Max stake
+      #   original_odds: 150      # Pre-boost American odds (+150)
+      #   boosted_odds: 350       # Boosted American odds (+350)
+      #   fair_yes_prob: 0.38     # Fair probability from scanner
+      #   max_stake: 25
+      #   hedge_venue: kalshi
+      #   hedge_market_id: CHIEFS-2026-01
+      #   hedge_no_price: 0.64
+      #   expiry: "2026-01-15"
+      #   status: pending
+
+  P-002:
+    # Kalshi-Polymarket Cross-Venue Arb (dual-leg)
+    # Buys opposite sides on each venue to lock in risk-free profit.
+    # Fee-adjusted: accounts for Kalshi's 7% profit fee, Polymarket 0%.
+    # Requires: kalshi_client, polymarket_client, cross_venue_matcher
+    enabled: true
+    environment: paper
+    min_arb_pct: 0.02          # Minimum fee-adjusted spread to trade (2%)
+    min_edge_pct: 0.01         # Minimum raw edge per leg
+    min_kelly_fraction: 0.005  # Low floor since arb is risk-free
+    # sports: inherits from odds_api.sports (global list)
+
+  P-013:
+    # Kalshi-Deribit Crypto Options Arb (Phase 1: directional)
+    # Uses Deribit BTC options chain as pricing oracle.
+    # Compares implied probability to Kalshi crypto binary contracts.
+    # Phase 1: directional bets on Kalshi when mispriced vs Deribit.
+    #
+    # REHABILITATION MODE (2026-03-30): Pod was -$1,943 / 35% win rate.
+    # Root causes: IV interpolation noise, daily contract expiry mismatch,
+    # edge thresholds too low for model precision.  Changes:
+    #   - Dropped daily contracts (no matching Deribit expiries)
+    #   - Raised min_edge 7%→12%, min_net_edge 5%→8%
+    #   - Lowered max_plausible_edge 35%→20%
+    #   - Reduced max_contracts_per_cycle 5→3
+    #   - Reduced kelly_multiplier 0.25→0.15 (extra conservative)
+    #   - Pricer: cubic spline IV, put-call parity cross-check, bid/ask mid
+    #   - Paper mode until calibration proves positive expectancy
+    enabled: false   # disabled 2026-07-18 (pivot: P-013 negative-edge; P-009/P-010 inactive promo shells)
+    environment: paper             # PAPER ONLY until recalibrated
+    min_edge_pct: 0.12             # 12% raw edge minimum (was 7% — too noisy)
+    min_net_edge_pct: 0.08         # 8% edge after Kalshi maker fees (was 5%)
+    max_plausible_edge: 0.20       # 20% cap (was 35% — anything above is data noise)
+    max_contracts_per_cycle: 3     # Reduced from 5 — fewer, higher-quality trades
+    kelly_multiplier: 0.15         # Reduced from 0.25 — model still unproven
+    use_maker_orders: true         # Maker orders (1/4 taker fee)
+    min_kelly_fraction: 0.005      # Low floor — edge filtering already aggressive
+    target_categories:             # Dropped daily — no matching Deribit expiries
+      - weekly
+      - monthly
+      - yearly
+
+    # Pricing model config
+    pricer:
+      method: ensemble             # "spread", "bsm", "delta", or "ensemble"
+      spread_weight: 0.65          # Weight for vertical spread replication
+      bsm_weight: 0.35             # Weight for Black-Scholes N(d2)
+      max_spread_width: 3000       # Tightened from 5000 — narrower spreads = better precision
+      risk_free_rate: 0.045        # Annualised risk-free rate for BSM
+
+  P-004:
+    # ForecastEx-Kalshi Econ Arb
+    # Both venues live-capable (Kalshi active, IB active)
+    enabled: false
+    min_arb_pct: 0.02
+    min_edge_pct: 0.02
+    symbols:
+      - forecastex_symbol: "FED.RATE.25JUN"
+        kalshi_ticker: "FED-25JUN-T4.75"
+        description: "Fed Rate June 2025"
+        category: "fed_rate"
+      - forecastex_symbol: "CPI.25JUN"
+        kalshi_ticker: "CPI-25JUN-T3.5"
+        description: "CPI June 2025"
+        category: "cpi"
+      - forecastex_symbol: "GDP.25Q2"
+        kalshi_ticker: "GDP-25Q2-T2.0"
+        description: "GDP Q2 2025"
+        category: "gdp"
+
+  P-012:
+    # Macro Economic Nowcast
+    # Uses free public data: Cleveland Fed CPI, Atlanta Fed GDP, FRED
+    enabled: false
+    data_sources:
+      - "cleveland_fed_cpi"
+      - "atlanta_fed_gdp"
+      - "fred_payrolls"
+    econ_markets:
+      - source: "cleveland_fed_cpi"
+        indicator: "cpi_yoy"
+        kalshi_tickers:
+          - ticker: "CPI-25JUN-T3.0"
+            threshold: 3.0
+            direction: "above"
+          - ticker: "CPI-25JUN-T3.5"
+            threshold: 3.5
+            direction: "above"
+      - source: "atlanta_fed_gdp"
+        indicator: "gdp_quarterly"
+        kalshi_tickers:
+          - ticker: "GDP-25Q2-T2.0"
+            threshold: 2.0
+            direction: "above"
+      - source: "fred_payrolls"
+        indicator: "payrolls"
+        kalshi_tickers:
+          - ticker: "JOBS-25JUN-T150"
+            threshold: 150.0
+            direction: "above"
+
+  P-014:
+    # Live Game Agent — in-play consensus edge on Kalshi
+    # Scans live NBA/MLB markets for mispricings vs sharp sportsbook consensus
+    enabled: true
+    environment: demo          # paper mode
+    sports:
+      - basketball_nba
+      - baseball_mlb
+    scan:
+      poll_interval_seconds: 15      # How often to poll live odds
+      score_poll_interval_seconds: 30 # How often to poll scores
+      max_concurrent_games: 5        # Max games traded simultaneously
+    fair_value:
+      min_books_for_consensus: 3     # Require at least 3 books reporting
+      confidence_floor: 0.6          # Minimum confidence to trade
+    signals:
+      min_edge_pct: 0.02             # 2% minimum edge to trigger trade
+    execution:
+      order_type: limit              # Limit orders only (no market buys)
+      stale_order_timeout_seconds: 30
+    risk:
+      max_exposure_per_game_usd: 500  # Per-game cap
+      max_total_live_exposure_usd: 2500
+      kelly_cap: 0.05                # Max 5% of bankroll per trade
+    odds_api:
+      regions: ["us", "eu"]
+      markets: ["h2h"]               # Start with moneyline only
+
+  P-015:
+    # Tennis Qualifier Favorite — buy heavy favorites in ATP/WTA
+    # qualifying matches on Kalshi.  Basis: tennis_research/REPORT.md §8b
+    # (13-month backtest: +4.1c/contract net at ask>=0.85, 95.8% hit,
+    # n=238, CI [+1.4,+6.3]; ATP stronger than WTA; 2026 data only).
+    # PAPER VALIDATION: ~20 trades/month expected. Kill if realized hit
+    # rate < ask-implied; promote only if forward EV matches +3-4c.
+    enabled: true
+    environment: demo            # paper mode
+    strategy:
+      ask_floor: 0.85            # buy favorite when ask >= this
+      ask_cap: 0.975             # skip near-certainties (no room after fees)
+      edge_bump: 0.025           # fair = ask + bump (conservative: CI lower half,
+                                 # not the +0.041 point estimate)
+      min_net_edge: 0.005        # after quadratic taker fee
+      max_spread: 0.05           # skip defensive/junk books
+      include_wta: true          # WTA effect weaker (+2.3c, CI includes 0)
+      wta_size_mult: 0.5         # ...so half size
+      min_lead_minutes: 10       # pre-match only; no in-play entries
+    risk:
+      max_open_positions: 6      # loss profile is -94c tail; don't stack a session
+      depth_haircut: 0.5         # assume we get at most half the displayed ask size
+    api:
+      timeout: 15.0
+
+  P-016:
+    # Live Maker — paper market-making on Kalshi MLB in-game moneylines.
+    # Basis: live_agent_research/REPORT_Live_InPlay_Agent_2026-07-19.md
+    # (taker sniping refuted by arXiv 2606.07811 — spread absorbs drift;
+    # documented positive returns are maker-side).  NOT in pods.active:
+    # runs standalone via scripts/run_live_maker.py (betting-live-maker
+    # service) because the 5-min engine cycle can't maintain resting
+    # quotes.  Paper fills are pessimistic: only prints strictly THROUGH
+    # the quote fill, and quotes stay live until the state change is
+    # OBSERVED (we eat realistic pick-off latency).  Kill switch:
+    # touch data/KILL_MAKER.
+    # GATE (pre-registered): ≥500 fills with positive fee-adjusted +5m
+    # markout P&L, robust to excluding the best day → else kill.
+    enabled: true
+    environment: demo            # paper only — no order placement code path
+    quoting:
+      base_half_width: 0.025     # quote fair ± 2.5c baseline
+      sens_mult: 0.15            # widen by 0.15 × |dWP/drun| (leverage)
+      max_half_width: 0.06
+      flb_skew_coef: 0.04        # favorite-longshot-bias shade (±2c max)
+      inv_skew_coef: 0.5         # lean quotes against inventory
+      quote_size: 20             # contracts per side
+      quote_max_inning: 8        # innings 1-8 only: WP model is weakest in
+                                 # walk-off states; clutch = max pick-off risk
+      min_quote_px: 0.05
+      max_quote_px: 0.95
+    risk:
+      max_net_contracts: 100     # per game; stop quoting the growing side
+
+  P-017:
+    # Golf Top-N pre-tournament value (TAKER leg) — restored 2026-07-21 from
+    # golf_research/p017_config_block.yaml after a config reconcile dropped it
+    # while the pod code stayed in the tree (orphaned pod).
+    # Validation: +6.8c/ct net, 9/10 tournaments (golf_research/backtest/).
+    # Gate: go/no-go after ~8 tournaments; each tournament = ONE observation.
+    enabled: true
+    environment: demo            # paper mode
+    strategy:
+      series:
+        - KXPGATOP10
+        - KXPGATOP20
+      ask_floor: 0.08
+      ask_cap: 0.45
+      edge_bump: 0.04
+      min_net_edge: 0.02
+      min_net_edge_model: 0.03   # higher bar when the DataGolf feed is live
+      model_weight: 0.5
+      max_spread: 0.06
+      min_days_to_close: 4.0
+      max_days_to_close: 10.0
+      fair_prob_cap: 0.75
+      skip_events:
+        - TRAV26
+    risk:
+      max_open_positions: 40
+      depth_haircut: 0.5
+
+  P-017M:
+    # Golf fade-maker — STANDALONE engine (scripts/run_golf_maker.py).
+    # Deliberately NOT in pods.active: it runs its own fast loop, not the
+    # 5-minute engine. Config lives here so both share one source of truth.
+    quoting:
+      series:
+        - KXPGATOP10
+        - KXPGATOP20
+      mid_band: [0.08, 0.40]
+      quote_offset: 0.03
+      quote_size: 25
+      fade_start_h: 36.0
+      fade_end_h: 6.0
+    risk:
+      max_net_contracts: 200
+
+# ── DataGolf model feed (optional, used by P-017) ───────────────────
+# Off until DATAGOLF_API_KEY is in .env AND enabled: true. When disabled
+# or keyless, P-017 falls back to the validated structural edge_bump.
+datagolf:
+  enabled: false
+  tour: pga
+  cache_ttl: 900
+  match_threshold: 80.0
+
+nowcast:
+  fred_api_key: null           # Overridden by FRED_API_KEY env var if set
+
+# ── The Odds API (used by P-006 Polymarket Consensus) ───────────────
+# API key is read from ODDS_API_KEY env var (set in .env).
+# List which sports to pull lines for:
+odds_api:
+  regions: ["us", "eu"]   # eu region adds Pinnacle (sharp anchor for CLV; get_consensus_probs weights it 2x)
+  sports:
+    - americanfootball_nfl
+    - basketball_nba
+    - basketball_ncaab          # NCAA Men's — March Madness is peak volume
+    - basketball_ncaaw          # NCAA Women's — shares school abbreviation map with NCAAB
+    - baseball_mlb
+    - icehockey_nhl
+    # Tennis keys are NOT listed here — they are auto-discovered at startup
+    # by querying /v4/sports and merging any active "Tennis" group keys.
+    # This covers Grand Slams, ATP/WTA 1000s, and weekly 250/500 events
+    # without needing to maintain a hand-curated list.
+
+# ── Paths ───────────────────────────────────────────────────────────
+
+paths:
+  trade_log: data/trade_logs/trade_log.jsonl
+  pod_logs: data/pods/             # Per-pod: data/pods/P-006.jsonl
+  polymarket_unmatched_log: data/trade_logs/polymarket_unmatched.jsonl
+  cross_venue_log: data/trade_logs/cross_venue_matches.jsonl
+
+# ── TradeStore (startup memory safety) ──────────────────────────────
+# The engine loads the trade log into an in-memory indexed store at boot.
+# max_load_entries caps how many of the MOST RECENT entries are held as full
+# records, so an oversized log can't OOM the process (root cause of the
+# May–Jun 2026 crash loop). Still-open positions and the COMPLETE dedup
+# fingerprint set are always preserved regardless of this cap.
+# Set to 0 to disable the cap (load everything — original behaviour).
+trade_store:
+  max_load_entries: 50000

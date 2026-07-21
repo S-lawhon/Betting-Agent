@@ -1,0 +1,47 @@
+[Unit]
+Description=Betting Pod Shop — Multi-Pod Scan Engine
+Documentation=https://github.com/samlawhon/betting-pod-shop
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Run as dedicated service account (see server_setup.sh for user creation)
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+
+# Legacy scanner src/ on PYTHONPATH so `from scanner import Scanner` etc. resolve.
+# engine.py also does sys.path.insert() at module level, but belt-and-suspenders.
+Environment="PYTHONPATH=/opt/betting-pod-shop/Legacy/Kalshi Arb Project/src"
+
+# __PYTHON__ is replaced by server_setup.sh with the real venv Python path
+ExecStart=__PYTHON__ -m src.main --loop --interval 300 --web --no-browser
+
+# Restart automatically if the engine crashes, with a 30-second cooldown
+Restart=on-failure
+RestartSec=30
+
+# Give the network 10 seconds to settle before first scan
+ExecStartPre=/bin/sleep 10
+
+# ── Logging ─────────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=betting-pod-shop
+
+# ── Security hardening ──────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data /opt/betting-pod-shop/output.log
+
+# Allow network access (needed for API calls) but nothing else
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

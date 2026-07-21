@@ -1,0 +1,122 @@
+# Fund Manager
+
+Cross-project manager for the betting fund. Answers three questions every day:
+
+1. **Is live production healthy?**
+2. **What is waiting on me?**
+3. **How close is each strategy to its decision point?**
+
+## Why it is built this way
+
+**The registry is the point.** Before this existed, project state lived in nine
+memory files, six research directories, a `PROJECT_STATUS.md` that had been stale
+since March, a config, and two crontabs on two machines that did not know about
+each other. `registry.yaml` is the one place that says what every workstream is,
+what its pre-registered gate is, and what it is blocked on. Everything else here
+is machinery around that file.
+
+**Alerting never touches an LLM.** Threshold checks are plain Python. A model in
+the alert path costs tokens, can fail in ways that look like silence, and is
+unnecessary for "is the service up". The model is for judgment, on top of facts
+already collected.
+
+**Report by exception.** Workstreams blocked on calendar time (P-015 needs ~6
+months to reach n=120) are summarised in one line and otherwise stay silent until
+their gate fires. A daily report that repeats unchanged gets skimmed, and then it
+protects nothing.
+
+**A cron exiting 0 is not evidence it worked.** `clv_settlement` ran daily and
+wrote zero rows for 31 hours while looking perfectly healthy. Every scheduled job
+is judged on output freshness, never on exit code.
+
+## Layout
+
+| File | Runs on | What it does |
+|---|---|---|
+| `registry.yaml` | — | Source of truth: workstreams, gates, blocked-on, noise suppression |
+| `collect.py` | droplet | Measures the real system → `state/status.json`. No LLM, no judgment |
+| `checks.py` | both | Facts → findings with severity. Deterministic |
+| `alert.py` | droplet | Dispatches critical/warn findings with cooldown + dedupe |
+| `notify.py` | both | Email (SMTP) and push (ntfy) adapters |
+| `brief.py` | Mac | Renders the daily brief as markdown / HTML |
+| `refresh.py` | Mac | Runs the remote collector over SSH and pulls the snapshot back |
+
+Plus `/manager` and `/api/manager` routes on the existing dashboard, and the
+`fund-manager` agent in `.claude/agents/`.
+
+## Daily use
+
+```bash
+cd "~/Desktop/Betting Fund Project"
+python3 manager/refresh.py && python3 manager/brief.py
+```
+
+Or ask Claude: **"what's my status"** / **"daily brief"** → the `fund-manager`
+agent runs the above and adds ranking, deltas, and judgment.
+
+Live view: <https://dashboard.htxtrades.org/manager> (behind existing basic auth).
+
+## Setup
+
+### 1. Delivery credentials
+
+Create `manager/manager.env` (chmod 600, gitignored — never commit it):
+
+```sh
+# email
+MANAGER_SMTP_HOST=smtp.gmail.com
+MANAGER_SMTP_PORT=587
+MANAGER_SMTP_USER=samsonlawhon@gmail.com
+MANAGER_SMTP_PASS=<Gmail App Password, not your account password>
+MANAGER_EMAIL_TO=samsonlawhon@gmail.com
+
+# push — pick a long unguessable topic; anyone who knows it can read your alerts
+MANAGER_NTFY_TOPIC=btf-<random-string>
+MANAGER_NTFY_SERVER=https://ntfy.sh
+```
+
+Gmail needs an **App Password** (Google Account → Security → 2-Step Verification
+→ App passwords). Your normal password will not work over SMTP.
+
+For push, install the **ntfy** app (iOS/Android) and subscribe to the same topic.
+The topic is the only secret — treat it like a password. Self-host or use
+`MANAGER_NTFY_TOKEN` if you want real auth.
+
+Then verify — an untested alert path is an assumption, not a safety net:
+
+```bash
+python3 manager/notify.py --selftest
+```
+
+### 2. Droplet cron
+
+```cron
+*/15 * * * * cd /opt/betting-pod-shop && venv/bin/python manager/collect.py --root /opt/betting-pod-shop >> /var/log/manager_collect.log 2>&1
+*/15 * * * * cd /opt/betting-pod-shop && sleep 30 && venv/bin/python manager/alert.py >> /var/log/manager_alert.log 2>&1
+30  12 * * * cd /opt/betting-pod-shop && venv/bin/python manager/brief.py --email >> /var/log/manager_brief.log 2>&1
+```
+
+`12:30 UTC` = 8:30am ET. The `sleep 30` lets the collector finish first.
+
+## Maintaining the registry
+
+**Edit `registry.yaml` when reality changes.** The machinery is only as good as
+that file. In particular:
+
+- Finished something? Change `blocked_on: human` → `time` / `nothing`, or the
+  item nags you forever.
+- New workstream? Add it with its gate written down *before* you start — that is
+  the whole lesson of P-013 (lost $2,094 while its criteria were still being
+  decided after the fact) and why P-015's rule is locked.
+- New recurring noise? Add it to `suppress:` with a reason and an expiry.
+
+## Design rules for anything added here
+
+1. **Never write to the trading system.** Read-only against `data/`, configs, and
+   journald. The collector must not be able to cause an incident.
+2. **A failed probe is a finding, not a crash.** Unmeasured must never render as
+   healthy.
+3. **Severity discipline.** `critical` = live production broken or a locked kill
+   rule fired. If something fires daily without being actionable, demote it.
+4. **Locked gates are read, not interpreted.** If the rule says NO DECISION at
+   n<120, that is the answer regardless of how the numbers look.

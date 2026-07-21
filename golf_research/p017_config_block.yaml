@@ -1,0 +1,60 @@
+# P-017 Golf Top-N — paste-ready config overlay
+#
+# Extracted 2026-07-21 from the local config_multi_pod.yaml before that file was
+# reconciled against the droplet. It is NOT active anywhere: the live config on
+# the droplet has no P-017 section, and the local copy now matches the droplet.
+#
+# This version supersedes the earlier block: it carries the DataGolf integration
+# params (strategy.min_net_edge_model, strategy.model_weight, and the top-level
+# datagolf section) that the 2026-07-20 09:12 version did not have.
+#
+# TO ACTIVATE (per golf_research/P-017_Golf_Pod_Spec.md):
+#   1. Merge the `pods.P-017` / `pods.P-017M` sections and the `datagolf` key
+#      into config_multi_pod.yaml.
+#   2. Add `- P-017` to `pods.active`.
+#   3. Deploy code first -- the droplet has no golf pod code yet, and activating
+#      a pod whose module is missing will fail the engine's pod load.
+#   4. Gate: go/no-go after ~8 tournaments, each tournament = ONE observation.
+#
+pods:
+  P-017:
+    enabled: true
+    environment: demo
+    strategy:
+      series:
+      - KXPGATOP10
+      - KXPGATOP20
+      ask_floor: 0.08
+      ask_cap: 0.45
+      edge_bump: 0.04
+      min_net_edge: 0.02
+      min_net_edge_model: 0.03
+      model_weight: 0.5
+      max_spread: 0.06
+      min_days_to_close: 4.0
+      max_days_to_close: 10.0
+      fair_prob_cap: 0.75
+      skip_events:
+      - TRAV26
+    risk:
+      max_open_positions: 40
+      depth_haircut: 0.5
+  P-017M:
+    quoting:
+      series:
+      - KXPGATOP10
+      - KXPGATOP20
+      mid_band:
+      - 0.08
+      - 0.4
+      quote_offset: 0.03
+      quote_size: 25
+      fade_start_h: 36.0
+      fade_end_h: 6.0
+    risk:
+      max_net_contracts: 200
+datagolf:
+  enabled: false
+  tour: pga
+  cache_ttl: 900
+  match_threshold: 80.0

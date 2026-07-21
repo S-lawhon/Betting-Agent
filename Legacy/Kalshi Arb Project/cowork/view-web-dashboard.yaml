@@ -1,0 +1,63 @@
+---
+# cowork/view-web-dashboard.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+# Automation: Launch the web dashboard and open it in the default browser.
+#
+# What it does
+# ────────────
+#   Starts a lightweight local web server on http://localhost:8765 and opens
+#   the dashboard automatically in your default browser.  The page shows:
+#     • Bankroll, daily P&L, exposure, drawdown, cooldown status
+#     • Open positions table
+#     • Last 20 trades
+#     • All-time edge history summary
+#     • Learner / calibration stats
+#   The dashboard auto-refreshes every 10 seconds while the server is running.
+#
+# Stopping the server
+# ───────────────────
+#   Press Ctrl+C in the terminal where the server is running, or close the
+#   terminal window.
+#
+# Scheduling
+# ──────────
+#   Manual (on demand).
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: view-web-dashboard
+display_name: "Open Web Dashboard"
+description: >
+  Start a local web server and open the betting agent dashboard in your
+  browser.  The page shows bankroll, P&L, drawdown, open positions, recent
+  trades, edge history, and learner stats — auto-refreshing every 10 seconds.
+version: "1.0"
+category: monitoring
+
+trigger:
+  type: manual
+
+environment:
+  working_directory: "."
+  python_executable: python3
+  required_files:
+    - config.yaml
+    - scripts/serve_dashboard.py
+
+steps:
+  - id: launch_server
+    name: "Start dashboard server and open browser"
+    description: >
+      Launch the local HTTP server on port 8765 and open
+      http://localhost:8765 in the default browser automatically.
+      The server runs until you press Ctrl+C.
+    command: python3
+    args:
+      - "scripts/serve_dashboard.py"
+    on_failure: notify
+
+notifications:
+  on_success: false
+  on_failure: true
+  failure_message: >
+    Could not start the dashboard server.  Make sure port 8765 is free
+    (try --port 8080 as an alternative) and that pyyaml is installed.

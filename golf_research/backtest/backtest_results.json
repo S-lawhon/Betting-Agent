@@ -1,0 +1,158 @@
+{
+  "generated": "backtest_golf.py",
+  "n_candle_markets": 12796,
+  "n_trade_markets": 1016,
+  "legs": [
+    {
+      "leg": "A_pre_tourn_yes",
+      "n_bets": 926,
+      "n_events": 10,
+      "mean_pnl_per_contract": 0.0681,
+      "ci95_lo": 0.0306,
+      "ci95_hi": 0.1018,
+      "total_pnl_per_contract_units": 63.06,
+      "events": [
+        "CHSC26",
+        "GESO26",
+        "ISC26",
+        "JODC26",
+        "PGC26",
+        "RBBCAN26",
+        "THCCBN26",
+        "THMTPBW26",
+        "TRAV26",
+        "USO26"
+      ],
+      "hit_rate": 0.2689,
+      "gross_mean": 0.0784,
+      "band": [
+        0.08,
+        0.4
+      ],
+      "days_window": [
+        4.0,
+        10.0
+      ],
+      "series": [
+        "KXPGATOP10",
+        "KXPGATOP20"
+      ]
+    },
+    {
+      "leg": "A_pre_tourn_yes",
+      "n_bets": 23,
+      "n_events": 1,
+      "mean_pnl_per_contract": 0.319,
+      "ci95_lo": null,
+      "ci95_hi": null,
+      "total_pnl_per_contract_units": 7.34,
+      "events": [
+        "USO26"
+      ],
+      "hit_rate": 0.6087,
+      "gross_mean": 0.3322,
+      "band": [
+        0.1,
+        0.45
+      ],
+      "days_window": [
+        4.0,
+        10.0
+      ],
+      "series": [
+        "KXPGATOP40"
+      ]
+    },
+    {
+      "leg": "A_pre_tourn_yes",
+      "n_bets": 330,
+      "n_events": 10,
+      "mean_pnl_per_contract": 0.0051,
+      "ci95_lo": -0.007,
+      "ci95_hi": 0.0183,
+      "total_pnl_per_contract_units": 1.67,
+      "events": [
+        "CHSC26",
+        "GESO26",
+        "ISC26",
+        "JODC26",
+        "PGC26",
+        "RBBCAN26",
+        "THCCBN26",
+        "THMTPBW26",
+        "TRAV26",
+        "USO26"
+      ],
+      "hit_rate": 0.1091,
+      "gross_mean": 0.0111,
+      "band": [
+        0.05,
+        0.3
+      ],
+      "days_window": [
+        4.0,
+        10.0
+      ],
+      "series": [
+        "KXPGATOP5"
+      ]
+    },
+    {
+      "leg": "C_makecut_yes",
+      "n_bets": 7,
+      "n_events": 1,
+      "mean_pnl_per_contract": 0.2319,
+      "ci95_lo": null,
+      "ci95_hi": null,
+      "total_pnl_per_contract_units": 1.62,
+      "events": [
+        "USO26"
+      ],
+      "hit_rate": 0.5714,
+      "gross_mean": 0.2471,
+      "band": [
+        0.05,
+        0.4
+      ],
+      "days_window": [
+        4.0,
+        10.0
+      ],
+      "series": [
+        "KXPGAMAKECUT"
+      ]
+    },
+    {
+      "leg": "B_fade_maker",
+      "n_quotes": 449,
+      "n_filled_quotes": 303,
+      "fill_rate": 0.6748,
+      "total_contracts_filled": 6988.7,
+      "mean_pnl_per_contract": 0.0915,
+      "n_events": 4,
+      "events": [
+        "GESO26",
+        "PGC26",
+        "TRAV26",
+        "USO26"
+      ],
+      "band": [
+        0.08,
+        0.4
+      ],
+      "quote_offset": 0.03,
+      "fade_window_h": [
+        36.0,
+        6.0
+      ],
+      "series": [
+        "KXPGATOP10",
+        "KXPGATOP20"
+      ],
+      "note": "per-contract PnL; maker fee = 0 (quadratic series); pessimistic through-fill only.",
+      "ci95_lo": 0.0452,
+      "ci95_hi": 0.1349,
+      "n_bets": 659
+    }
+  ]
+}

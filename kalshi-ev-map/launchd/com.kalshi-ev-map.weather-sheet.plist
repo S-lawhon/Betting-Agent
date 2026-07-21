@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.kalshi-ev-map.weather-sheet</string>
+<key>WorkingDirectory</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map</string>
+<key>StandardOutPath</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/data/cron_weather.log</string>
+<key>StandardErrorPath</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/data/cron_weather.log</string>
+<key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/src/weather_pipeline.py</string></array>
+<key>StartCalendarInterval</key><dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>53</integer></dict>
+</dict></plist>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.kalshi-ev-map.weather-eval</string>
+<key>WorkingDirectory</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map</string>
+<key>StandardOutPath</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/data/cron_paper.log</string>
+<key>StandardErrorPath</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/data/cron_paper.log</string>
+<key>ProgramArguments</key><array><string>/bin/zsh</string><string>-c</string><string>/usr/bin/python3 "/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/src/weather_paper_eval.py" --day=$(date -v-1d +%Y-%m-%d)</string></array>
+<key>StartCalendarInterval</key><dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>37</integer></dict>
+</dict></plist>

@@ -1,0 +1,504 @@
+# =============================================================================
+# FUND MANAGER REGISTRY — single source of truth for every workstream
+# =============================================================================
+#
+# This file is the thing that did not exist before: the project's state was
+# scattered across 9 memory files, 6 research directories, PROJECT_STATUS.md
+# (stale since March), config_multi_pod.yaml, and two crontabs on two hosts.
+#
+# EDIT THIS FILE when a workstream changes stage, a gate is reached, or you
+# unblock something. The collector reads it; it never writes it. Everything
+# the manager reports is derived from here plus measured facts.
+#
+# ---------------------------------------------------------------------------
+# blocked_on semantics — this is what drives "what do I need to jump back into"
+# ---------------------------------------------------------------------------
+#   human    -> WAITING ON YOU. Surfaces in the brief every day until cleared.
+#   time     -> Accumulating sample. Silent until `gate` thresholds are met.
+#               (P-015 needs ~6 months of trades; nagging daily is noise.)
+#   data     -> Waiting on a data pull/backfill that is already running.
+#   external -> Waiting on a third party (API access, fee schedule, venue).
+#   nothing  -> Running normally; report by exception only.
+#
+# A workstream with blocked_on: time NEVER appears in the action list until its
+# gate fires. That is deliberate — report by exception, or you stop reading.
+#
+# stage: live | paper | build | research | parked | killed
+# =============================================================================
+
+meta:
+  version: 1
+  updated: 2026-07-20
+  # Paths are resolved relative to project_root unless absolute.
+  project_root: /opt/betting-pod-shop
+  local_root: /Users/samlawhon/Desktop/Betting Fund Project
+
+# -----------------------------------------------------------------------------
+# Global invariants — violations are always alertable regardless of workstream
+# -----------------------------------------------------------------------------
+invariants:
+  all_trading_is_paper:
+    description: >
+      Every pod must be in paper/demo mode. Real money has never been deployed.
+      If any pod reports mode != paper, that is a P1 alert — it means either a
+      config mistake or an unreviewed promotion.
+    severity: critical
+  kill_switch_absent:
+    description: Presence of data/KILL_MAKER means P-016 was killed; surface it.
+    severity: warn
+
+# -----------------------------------------------------------------------------
+# SERVICES — process-level liveness
+# -----------------------------------------------------------------------------
+services:
+  - id: betting-pod-shop
+    kind: systemd
+    description: Main 5-minute multi-pod engine (P-001/002/006/014/015) + dashboard
+    cycle_seconds: 300
+    heartbeat:
+      file: data/trade_logs/trade_log.jsonl
+      # Engine writes constantly (~99% SKIPPED_EDGE rows). 20 min of silence
+      # means the loop is wedged even if systemd still calls it "active".
+      max_stale_minutes: 20
+    severity: critical
+
+  - id: betting-live-maker
+    kind: systemd
+    description: P-016 Live Maker, 12s fast loop, separate unit (can't live in 5-min engine)
+    cycle_seconds: 12
+    heartbeat:
+      file: data/trade_logs/maker_quotes.jsonl
+      # Only quotes during live MLB games — long quiet stretches are NORMAL
+      # overnight. Staleness is only meaningful inside the games window, so the
+      # check is suppressed outside it (see checks.py: games_window).
+      max_stale_minutes: 45
+      only_during: mlb_games_window
+    severity: critical
+
+# -----------------------------------------------------------------------------
+# SCHEDULED JOBS — the silent-failure surface. clv_settlement proved this:
+# the cron RAN, exited clean, and wrote zero rows for 31 hours. Exit code is
+# not evidence of success; only fresh output is.
+# -----------------------------------------------------------------------------
+jobs:
+  - id: clv_settlement
+    host: droplet
+    schedule: "30 7 * * *"
+    description: Captures Pinnacle closing lines for the P-001 CLV forward test
+    output:
+      file: data/trade_logs/clv_log.jsonl
+      max_stale_hours: 48   # daily job, 2-day grace for genuinely empty days
+    severity: warn
+    note: >
+      FIXED 2026-07-21. Root cause: P-001 settles 01:00-02:00 UTC, the trade log
+      rotates at 06:00, and this job ran at 07:30 reading ONLY the active log —
+      whose window began after the rotation. On every day rotation fired, the
+      job was structurally guaranteed to find zero settlements. Rotation is
+      size-triggered and therefore irregular (Jul 8, 11, 17, 20), so it appeared
+      to work intermittently rather than failing outright.
+      Fix: scripts/clv_settlement.py now scans the active log PLUS the last
+      CLV_ARCHIVE_LOOKBACK (default 3) archives. Safe by construction — the job
+      already deduped by fingerprint, so re-reading captured rows is a no-op.
+      Recovered 4 records immediately (25 -> 29 rows).
+      OPEN: of 14 newly-found settled bets, only 4 produced records — close_fair()
+      returned nothing for 10 games. Cause unknown (Odds API historical depth,
+      quota, or team-name normalisation). Worth a look; it caps capture rate.
+
+  - id: rotate_active_log
+    host: droplet
+    schedule: "0 6 * * *"
+    description: Size-rotates trade_log.jsonl into gzipped archives
+    output:
+      glob: data/trade_logs/trade_log.archive_*.jsonl.gz
+      max_stale_hours: 48
+    severity: info
+
+  - id: shadow_maker
+    host: droplet
+    schedule: "*/30 * * * *"
+    description: Shadow maker quote collection (guardrail-cost measurement)
+    output:
+      file: data/shadow_maker/quotes.jsonl
+      max_stale_hours: 3
+    severity: info
+
+  - id: maker_diagnostics
+    host: droplet
+    schedule: "47 13 * * *"
+    description: P-016 Tier-1 recursive review — daily backstop for fill-triggered runs
+    output:
+      file: /var/log/maker_diagnostics.log
+      max_stale_hours: 48
+    severity: info
+    note: Added 2026-07-20; had not fired yet as of first inventory.
+
+  # --- Mac-hosted (kalshi-ev-map weather pipeline) -------------------------
+  # These run under the LOCAL crontab and silently skip whenever the Mac is
+  # asleep. The roadmap says "every week you don't archive is calibration data
+  # lost forever", so gaps here are real data loss, not just a late report.
+  - id: weather_paper_maker
+    host: mac
+    schedule: "13,43 7-19 * * *"
+    description: Weather paper maker quotes (Build 2 evidence accumulation)
+    output:
+      file: kalshi-ev-map/data/paper_quotes.parquet
+      max_stale_hours: 4
+      root: local
+    severity: warn
+    note: Sleep-gap prone. launchd blocked by root-owned ~/Library/LaunchAgents.
+
+  - id: weather_archiver
+    host: mac
+    schedule: "17 3 * * 0"
+    description: Weekly settled-market archiver — 90-day API horizon means gaps are permanent
+    output:
+      file: kalshi-ev-map/data/
+      max_stale_hours: 240   # weekly + generous grace
+      root: local
+    severity: warn
+
+# =============================================================================
+# WORKSTREAMS
+# =============================================================================
+workstreams:
+
+  # ---------------------------------------------------------------------------
+  # LIVE (paper) PODS
+  # ---------------------------------------------------------------------------
+  - id: P-001
+    name: Kalshi Moneyline Value
+    stage: paper
+    owner_dir: src/pods/kalshi_moneyline.py
+    blocked_on: time
+    summary: >
+      Core moneyline pod. Lifetime verdict was KEEP-but-RECALIBRATE (model
+      overconfident ~5pp). CLV gate active since 2026-07-19 restricting to
+      underdogs <50c with positive net-edge-maker.
+    gate:
+      question: Does realized underdog ROI follow the measured +1.4pp net-maker CLV?
+      metric: clv_forward_rows
+      source: clv_log
+      threshold: 200
+      current_key: clv.rows_since_gate
+      decision: >
+        The open tension: dogs are CLV-positive but were ROI-negative
+        retrospectively. Forward test must confirm ROI follows CLV. Until then
+        do not scale P-001.
+    watch:
+      - clv_log freshness (currently BROKEN — see jobs.clv_settlement)
+
+  - id: P-002
+    name: Kalshi-Polymarket Cross-Venue Arb
+    stage: paper
+    blocked_on: human
+    action_required: >
+      Needs realistic-fill validation. Best raw P&L (+$1,268) but day-level
+      insignificant (p=0.17), ~2/3 of profit from a single $816 bet, and a 74%
+      void rate. Arb-in-paper systematically overstates edge because it assumes
+      both legs fill. Decide: build a fill-realism simulator, or stop counting
+      P-002 P&L as evidence of anything.
+    summary: KEEP but VALIDATE.
+
+  - id: P-006
+    name: Sportsbook-Polymarket Consensus
+    stage: paper
+    blocked_on: nothing
+    summary: >
+      Most trustworthy edge in the lifetime analysis — per-bet CI [+5.4%,+21.2%]
+      above zero, well calibrated, no outlier dependence. KEEP + INVEST.
+    watch:
+      - SANITY_SKIP rate (5-11/cycle, pod's own message says "probable mapping error")
+    note: baseball_mlb sport_override disabled pending Polymarket regular-season markets.
+
+  - id: P-014
+    name: Live Game Agent
+    stage: paper
+    blocked_on: time
+    summary: INCONCLUSIVE — not significant but excellently calibrated. Hold, do not scale.
+    gate:
+      question: Does the calibration edge become statistically significant with more n?
+      metric: settled_trades
+      source: trade_log
+      threshold: 500
+      current_key: pods.P-014.settled
+
+  - id: P-015
+    name: Tennis Qualifier Favorite
+    stage: paper
+    blocked_on: time
+    summary: >
+      Buy heavy favorites (0.85-0.975 ask) in ATP/WTA QUALIFYING matches.
+      Backtest +4.1c/contract net, 95.8% hit, n=238.
+    # ---- PRE-REGISTERED AND LOCKED 2026-07-20. DO NOT RENEGOTIATE. ----
+    # This exists because P-013 lost $2,094 while its criteria were still being
+    # decided after the fact. The manager enforces the rule as written; it does
+    # not get to reinterpret it, and neither do you at 2am after a bad week.
+    gate:
+      locked: true
+      locked_date: 2026-07-20
+      doc: tennis_research/P015_DECISION_RULE.md
+      reader: scripts/p015_checkpoint.py   # the ONLY sanctioned way to read results
+      metric: settled_trades
+      source: p015_checkpoint
+      current_key: pods.P-015.settled
+      rules:
+        - if: "z <= -2.0"
+          at_any_n: true
+          verdict: HARD_KILL
+          severity: critical
+        - if: "n < 120"
+          verdict: NO_DECISION
+          note: Underpowered. Do not act. Silence is not confirmation.
+        - if: "n >= 120 and edge <= 0"
+          verdict: KILL
+          severity: warn
+        - if: "n >= 240 and edge > 0 and z >= 2.0"
+          verdict: PROMOTE_CANDIDATE
+          severity: warn
+      expected_pace: ~20 trades/month
+      milestones:
+        - date: 2026-08-17
+          label: US Open qualifying begins — first volume spike (Aug 17-21)
+        - date: 2027-01-01
+          label: ~120-trade checkpoint lands around here
+        - date: 2027-07-01
+          label: ~240-trade checkpoint lands around here
+      no_promotion_by_default: >
+        If volume never reaches 120, the verdict stays NO DECISION and the pod
+        stays in paper forever. An unfalsifiable strategy is not promoted by
+        default.
+    note: >
+      P-015b (lower-tour Challenger/ITF) is a SEPARATE strategy version with its
+      own n counter. It must be re-registered before enabling — not folded in.
+
+  - id: P-016
+    name: Live In-Play Maker
+    stage: paper
+    service: betting-live-maker
+    blocked_on: time
+    summary: >
+      Kalshi MLB in-game home-YES market making, innings 1-8, settle-don't-trade-out.
+      Market-anchored quoting with +/-0.03 max tilt after first-night fixes.
+    gate:
+      question: Positive fee-adjusted +5m markout across a real sample?
+      metric: fills
+      source: maker_fills
+      threshold: 500
+      current_key: pods.P-016.fills_clean
+      decision: >
+        PRE-REGISTERED: >=500 fills AND positive fee-adjusted +5m markout AND
+        robust to excluding the best single day -> else kill.
+      exclude_before: "2026-07-20T01:26:00Z"
+      exclude_reason: >
+        First-night data is anchor-contaminated (restart re-anchored live books
+        to current mid, double-counting score -> 484 one-way fills in 45 min).
+        Archived to data/trade_logs/contaminated_2026-07-20/ and EXCLUDED from
+        the gate. Any fill counter must start after this timestamp or it will
+        report a phantom 484-fill head start.
+    open_questions:
+      - id: markout-vs-settlement
+        blocked_on: human
+        text: >
+          Is +5m markout the right adaptation target at all? It is the gate
+          metric, but for a maker holding to SETTLEMENT, realized settlement P&L
+          is ground truth and markout is a proxy assuming we could exit at mid.
+          If the two diverge materially once settlements accumulate, the GATE
+          METRIC itself needs revisiting — that is explicitly a human decision.
+        trigger: Surface once >=100 settled maker positions exist to compare.
+    watch:
+      - divergence-guard pulls (|fair - mid| > 0.15)
+      - one-sided fill ratio (the anchor-contamination signature)
+
+  - id: P-017
+    name: Golf Top-N Prop Pod
+    stage: parked
+    owner_dir: golf_research
+    blocked_on: human
+    action_required: >
+      FULLY BUILT AND BACKTESTED, NOT DEPLOYED. Config overlay is preserved at
+      golf_research/p017_config_block.yaml (refreshed 2026-07-21 with the
+      DataGolf params — strategy.min_net_edge_model, strategy.model_weight, and
+      the datagolf section — that were rescued from the stale local config
+      before it was reconciled to the droplet). P-017 is absent from both the
+      local and live configs by design.
+      NOTE: the golf pod CODE is not on the droplet either. Deploy code before
+      adding P-017 to pods.active, or the engine will fail its pod load.
+      Decide: deploy and start paper collection through the next event (3M Open
+      week), or explicitly shelve it so it stops appearing here.
+    gate:
+      question: Does forward net CLV hold above half the backtest baseline?
+      metric: tournaments
+      threshold: 8
+      decision: >
+        Go/no-go after ~8 tournaments, treating EACH TOURNAMENT as one
+        observation (not each bet — bets within a tournament are correlated).
+        P-017M validates separately on fill quality (>=30% of quoted names fill)
+        AND positive markout-implied net.
+    note: THOC26/COPC26 excluded from backtest — settlement not populated at pull date.
+
+  # ---------------------------------------------------------------------------
+  # DISABLED / KILLED
+  # ---------------------------------------------------------------------------
+  - id: P-013
+    name: Kalshi-Deribit Crypto Options
+    stage: killed
+    blocked_on: nothing
+    summary: >
+      KILLED. Significant NEGATIVE edge (-$2,094; per-bet CI [-51%,-11%]),
+      backwards calibration. Kelly denominator bug (edge/buy_price instead of
+      edge/(1-buy_price)) was oversizing cheap options 4-9x and amplified losses.
+      This pod is why P-015's decision rule is locked in advance.
+    monitor_only: Assert it stays disabled.
+
+  - id: P-009-P-010
+    name: Promo pods (Sign-Up Bonus / Odds Boost)
+    stage: parked
+    blocked_on: nothing
+    summary: Loaded but zero settled history, disabled at the 2026-07-18 pivot. Not analyzed.
+
+  # ---------------------------------------------------------------------------
+  # RESEARCH WORKSTREAMS
+  # ---------------------------------------------------------------------------
+  - id: R-MLB-PROPS
+    name: MLB Props Research (Phase 3)
+    stage: build
+    owner_dir: mlb_props_research
+    blocked_on: human
+    action_required: >
+      PHASE 3 COMPLETE 2026-07-20 with two NEGATIVE results (PHASE3_REPORT.md).
+      Next step is a live paper EXECUTION test, NOT more modelling: every edge so
+      far was measured against trade prints, never against a live book. Must
+      measure whether fills are actually available at the ask near first pitch,
+      using the collector orderbook snapshots in mlb_props_research/data/live/.
+      Decide whether ~$10-35/day justifies building that execution test.
+    summary: >
+      Phase 3 killed two things. (1) The batter-hits model FAILS: well calibrated
+      in isolation but loses to market on Brier (0.2236 vs 0.2210) at every
+      strike, with NEGATIVE selection value — bets it liked returned +7.73c,
+      bets it said to AVOID returned +9.04c. Public box-score aggregates carry no
+      information Kalshi prices lack. Model shelved. (2) Phase 2's +8.5c was
+      STALE-PRICE INFLATED — entry priced at last pregame trade, which in thin
+      prop books is hours old. Edge grows with staleness (>8h: +19.7c) but drift
+      is ~zero, so it was measuring uncontested books, not mispricing. Honest
+      tradeable number on fresh entries (<=30m): +5.55c IS / +3.66c OOS at 1.5c
+      cost — positive in both windows but DECLINING.
+    gate:
+      question: Are fills actually available at the ask near first pitch?
+      decision: >
+        CAPACITY IS THE BINDING CONSTRAINT, not edge. Median qualifying market
+        trades only 86 contracts in the final 30 min (~$4.30 theoretical edge at
+        5c). Realistic capture 5-15% of ~447k contracts/90d = ~$10-35/day — far
+        below Phase 1's "low hundreds/day" projection. Gate before real capital
+        is a live paper execution test against real book depth.
+    open_questions:
+      - id: websocket-capture
+        blocked_on: human
+        text: >
+          Sizing the repricing-lag edge needs 1-minute or websocket book capture
+          for a two-week window. Currently sampled at 5 min, which is
+          underpowered. Nothing is scheduled to collect this.
+    note: >
+      NEVER use last_price for calibration — it is settlement-contaminated.
+      Use pregame trade prices.
+
+  - id: R-LIVE-AGENT
+    name: Live In-Play Agent Research / Recursive Review
+    stage: build
+    owner_dir: live_agent_research
+    blocked_on: human
+    action_required: >
+      Tier 1 (measurement + deterministic proposals) is built. Tiers 2 and 3 are
+      DESIGNED BUT NOT BUILT. Next step per the design doc: size challenger arm
+      count to the measured fill rate, build Tier 2 within pre-registered bounds,
+      keep champion frozen for the gate.
+    governing_rule: >
+      The system may become MORE CONSERVATIVE on its own authority; MORE
+      AGGRESSIVE only within pre-registered bounds. LLM review is hypothesis
+      generation only — never auto-commit.
+    open_questions:
+      - id: mlb-maker-fee
+        blocked_on: external
+        text: >
+          Confirm whether the 2026-07-07 Kalshi fee schedule puts MLB series on
+          the maker-fee list. Changes P-016 economics by 0.44c/contract. Currently
+          assuming the conservative 0.0175 coefficient.
+      - id: polymarket-us-api
+        blocked_on: external
+        text: Determine Polymarket US API availability (relaunched Dec 2025, 49 states).
+      - id: inplay-basis
+        blocked_on: data
+        text: Log in-play Kalshi-vs-Polymarket basis for a few weeks.
+
+  - id: R-TENNIS
+    name: Tennis Research / P-015b lower tour
+    stage: research
+    owner_dir: tennis_research
+    blocked_on: human
+    action_required: >
+      analyze_lower_tour.py (the P-015b Challenger/ITF mechanism test) was
+      written 2026-07-20 20:27 and is in flight. Per the locked decision rule
+      clause 5, enabling lower-tour series is a NEW strategy version requiring
+      separate registration and its own n counter — it cannot be folded into
+      P-015. Finish the analysis, then register P-015b properly or drop it.
+
+  - id: R-EV-MAP
+    name: Kalshi EV Opportunity Map
+    stage: build
+    owner_dir: kalshi-ev-map
+    blocked_on: human
+    action_required: >
+      DOCUMENT CONTRADICTION — 05_build_roadmap.md still opens with "Build 1 —
+      MLB props engine (totals first) — start now", but the newer 03_validation.md
+      records that Build 1's kill-test FAILED: the +60%/trade MLB totals fade was
+      a close-anchoring selection artifact. The main deliverable now contradicts
+      its own validation doc. Anyone (including a future you, or an agent) reading
+      the roadmap first will build a dead strategy. Fix the roadmap.
+    contamination_warning: >
+      EVERY close-anchored T-1h sports result in 03_validation.md carries the same
+      methodology risk (UFC MOV, WC props cheap-side, pooled props tables) and is
+      UNVERIFIED until re-run with event-start anchoring. Always anchor to
+      scheduled event start, never to close.
+    gate:
+      # Build 2 (weather) is the live one — the 5 Mac cron jobs feed it.
+      question: Build 2 weather maker — is it capturing real edge?
+      decision: >
+        30 days live across >=10 cities, realized maker ROI > +5%/week on
+        deployed collateral, and adverse selection (post-fill drift) measured at
+        less than half of captured edge.
+      metric: days_live
+      threshold: 30
+    open_questions:
+      - id: build3-gate
+        blocked_on: data
+        text: >
+          Build 3 needs 2 weeks of websocket quote capture measuring fill rates
+          at +/-1c around Poly mid, post-fill adverse selection, and effective
+          spread capture. If capture < 1c/contract after adverse selection, stop
+          at Build 1+2.
+    standing_debt: >
+      90-day API history horizon: every week not archived is calibration data
+      lost forever. The weekly archiver runs on Mac cron and silently skips
+      whenever the machine is asleep.
+
+# =============================================================================
+# KNOWN BENIGN NOISE — suppress these so real signal stays visible.
+# An alerting system that cries wolf every 5 minutes gets muted, and then it
+# protects nothing. Each entry needs a reason and ideally an expiry.
+# =============================================================================
+suppress:
+  - pattern: "HTTP 404: Unknown sport"
+    match: "basketball_ncaaw"
+    reason: >
+      NCAA women's basketball is out of season but still in the configured scan
+      list. Logged at ERROR level once per 5-min cycle, deterministically. Left
+      unsuppressed it fires ~288 times/day and poisons every error count.
+    fix: Remove basketball_ncaaw from the scan list, or gate it on season dates.
+    expires: 2026-11-01   # re-evaluate when NCAAW season starts
+
+  - pattern: "SANITY_SKIP"
+    reason: >
+      P-006 skips 5-11 markets/cycle where Polymarket mid diverges 0.25-0.41
+      from fair. The pod's own message calls it a probable mapping error. This
+      is the guard WORKING, not failing — but the underlying mapping bug is real
+      and tracked under P-006.watch. Alert on RATE CHANGE, not presence.
+    alert_on: rate_change

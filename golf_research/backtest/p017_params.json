@@ -1,0 +1,43 @@
+{
+  "_comment": "Validated P-017 golf pod parameters from backtest_golf.py + refine_golf.py, H1-2026 Kalshi data (10 tournaments; Leg B 4 tournaments of tick data). THOC26/COPC26 excluded (settlement lag on pull date). edge_bump values are the CONSERVATIVE lower-CI convention (matching qualifier_favorite_pod P-015), NOT point estimates. Regenerate after each new event via re-pull + backtest.",
+  "leg_A_pre_tourn_taker": {
+    "status": "VALIDATED",
+    "series": ["KXPGATOP10", "KXPGATOP20"],
+    "ask_band": [0.08, 0.45],
+    "max_spread": 0.06,
+    "anchor_days_to_close": [4.0, 10.0],
+    "measured_net_per_contract": 0.068,
+    "ci95": [0.031, 0.102],
+    "gross_per_contract": 0.078,
+    "n_bets": 926,
+    "n_events": 10,
+    "positive_events": "9/10 (TRAV26 the lone negative at -4.9c)",
+    "edge_bump": 0.04,
+    "min_net_edge": 0.02,
+    "depth_haircut": 0.5,
+    "notes": "top-20 (+8.3c) stronger than top-10 (+4.9c); band-robust +6.6..+7.4c. Exclude signature-event weeks initially (TRAV26 exception). fair_prob = min(ask + edge_bump, cap); with DataGolf later, replace edge_bump with model prob."
+  },
+  "leg_B_fade_maker": {
+    "status": "PROMISING_UNDERPOWERED",
+    "series": ["KXPGATOP10", "KXPGATOP20"],
+    "mid_band": [0.08, 0.40],
+    "fade_window_hours_before_close": [36.0, 6.0],
+    "quote_offset_above_mid": 0.03,
+    "quote_size": 25.0,
+    "maker_fee": 0.0,
+    "measured_net_per_contract": 0.091,
+    "ci95": [0.045, 0.135],
+    "fill_rate": 0.675,
+    "n_events": 4,
+    "notes": "REAL edge but only 4 tournaments of tick data. CRITICAL: window must start at 36h, NOT 48h. The 48-24h slice is NEGATIVE (-3.1c) - fading Friday loses because YES is still climbing; edge is Sat->Sun-AM. offset 0.03 minimizes adverse selection. Deploy paper-only to confirm before any real money."
+  },
+  "leg_C_makecut": {
+    "status": "SHELVED_INSUFFICIENT_DATA",
+    "notes": "Only 12 two-sided pre-tournament make-cut quotes in sample (median ask 0.36, clustered 0.3-0.7). Cannot validate. Revisit after live paper collection."
+  },
+  "rejected": {
+    "top5": "net +0.5c, CI [-0.7,+1.8] straddles zero - matches literature (top-5 not soft). Do not trade.",
+    "top40": "only 1 event with data - insufficient.",
+    "outright_winner": "efficient + maker fees + institutional MM (0.2c spreads). Benchmark only, per GOLF_KALSHI_RESEARCH.md."
+  }
+}

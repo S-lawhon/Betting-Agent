@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Betting Pod Shop — Trade Analysis Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --card: #1a1d27;
+            --card-hover: #22263a;
+            --border: #2a2e3d;
+            --text: #e2e4ea;
+            --text-muted: #8b8fa3;
+            --accent: #6c63ff;
+            --accent-light: #8b84ff;
+            --green: #22c55e;
+            --green-bg: rgba(34,197,94,0.12);
+            --red: #ef4444;
+            --red-bg: rgba(239,68,68,0.12);
+            --yellow: #eab308;
+            --yellow-bg: rgba(234,179,8,0.12);
+            --blue: #3b82f6;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+
+        .dashboard { max-width:1400px; margin:0 auto; padding:24px; }
+
+        header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
+        header h1 { font-size:1.6rem; font-weight:700; }
+        header h1 span { color:var(--accent); }
+        .header-meta { color:var(--text-muted); font-size:0.85rem; }
+        .filter-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+        .filter-row label { font-size:0.8rem; color:var(--text-muted); }
+        .filter-row select { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:0.85rem; cursor:pointer; }
+
+        .kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:24px; }
+        .kpi { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px; }
+        .kpi-label { font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+        .kpi-value { font-size:1.6rem; font-weight:700; }
+        .kpi-sub { font-size:0.78rem; color:var(--text-muted); margin-top:4px; }
+        .kpi-value.positive { color:var(--green); }
+        .kpi-value.negative { color:var(--red); }
+
+        .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+        .chart-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px; }
+        .chart-card h3 { font-size:0.9rem; font-weight:600; margin-bottom:14px; color:var(--text-muted); }
+        .chart-card.full { grid-column:1/-1; }
+
+        .recommendations { background:var(--card); border:1px solid var(--accent); border-radius:10px; padding:22px; margin-bottom:24px; }
+        .recommendations h2 { font-size:1.1rem; font-weight:700; color:var(--accent); margin-bottom:14px; }
+        .rec-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:14px; }
+        .rec-item { background:var(--bg); border-radius:8px; padding:14px; border-left:3px solid var(--accent); }
+        .rec-item h4 { font-size:0.88rem; font-weight:600; margin-bottom:6px; }
+        .rec-item p { font-size:0.82rem; color:var(--text-muted); }
+        .rec-tag { display:inline-block; font-size:0.7rem; padding:2px 8px; border-radius:4px; font-weight:600; margin-bottom:6px; }
+        .rec-tag.high { background:var(--green-bg); color:var(--green); }
+        .rec-tag.medium { background:var(--yellow-bg); color:var(--yellow); }
+
+        .table-section { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px; margin-bottom:24px; overflow-x:auto; }
+        .table-section h3 { font-size:0.95rem; font-weight:600; margin-bottom:14px; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+        th { text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); color:var(--text-muted); font-weight:600; cursor:pointer; user-select:none; white-space:nowrap; }
+        th:hover { color:var(--accent); }
+        th .sort-arrow { font-size:0.7rem; margin-left:3px; }
+        td { padding:7px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+        tr:hover td { background:var(--card-hover); }
+        .win { color:var(--green); }
+        .loss { color:var(--red); }
+
+        .tabs { display:flex; gap:6px; margin-bottom:20px; }
+        .tab { padding:8px 16px; border-radius:6px; font-size:0.85rem; cursor:pointer; background:var(--card); border:1px solid var(--border); color:var(--text-muted); transition:all 0.2s; }
+        .tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+        .section { display:none; }
+        .section.active { display:block; }
+
+        @media (max-width:900px) {
+            .charts-grid { grid-template-columns:1fr; }
+            .rec-grid { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <header>
+        <div>
+            <h1><span>Betting Pod Shop</span> — Trade Analysis</h1>
+            <div class="header-meta">Data: March 4–14, 2026 · 62,226 log entries · 247 placed trades · 41 resolved</div>
+        </div>
+        <div class="filter-row">
+            <div>
+                <label>Pod</label><br>
+                <select id="filterPod" onchange="applyFilters()">
+                    <option value="all">All Pods</option>
+                    <option value="P-001">P-001 (Kalshi)</option>
+                    <option value="P-006">P-006 (Polymarket)</option>
+                </select>
+            </div>
+            <div>
+                <label>Sport</label><br>
+                <select id="filterSport" onchange="applyFilters()"></select>
+            </div>
+        </div>
+    </header>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('overview')">Overview</div>
+        <div class="tab" onclick="switchTab('edge')">Edge & Kelly</div>
+        <div class="tab" onclick="switchTab('sports')">By Sport</div>
+        <div class="tab" onclick="switchTab('recommendations')">Recommendations</div>
+        <div class="tab" onclick="switchTab('trades')">All Trades</div>
+    </div>
+
+    <!-- ============ OVERVIEW TAB ============ -->
+    <div id="tab-overview" class="section active">
+        <div class="kpis" id="kpi-row"></div>
+        <div class="charts-grid">
+            <div class="chart-card full">
+                <h3>Equity Curve (Cumulative P&L)</h3>
+                <canvas id="equityChart" height="80"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>P&L by Sport</h3>
+                <canvas id="sportPnlChart" height="160"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Win/Loss by Side (YES vs NO)</h3>
+                <canvas id="sideChart" height="160"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ EDGE & KELLY TAB ============ -->
+    <div id="tab-edge" class="section">
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h3>Win Rate by Edge Band</h3>
+                <canvas id="edgeBandChart" height="180"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>P&L by Edge Band</h3>
+                <canvas id="edgePnlChart" height="180"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Win Rate by Kelly Fraction Band</h3>
+                <canvas id="kellyWinChart" height="180"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>P&L by Position Size Band</h3>
+                <canvas id="sizePnlChart" height="180"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Win Rate by Fair Probability Band</h3>
+                <canvas id="probBandChart" height="180"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>P&L by Hour (UTC)</h3>
+                <canvas id="hourChart" height="180"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ BY SPORT TAB ============ -->
+    <div id="tab-sports" class="section">
+        <div class="charts-grid">
+            <div class="chart-card full">
+                <h3>Win Rate & Trade Count by Sport</h3>
+                <canvas id="sportDetailChart" height="100"></canvas>
+            </div>
+            <div class="chart-card full">
+                <h3>Open Positions by Sport (Capital Deployed)</h3>
+                <canvas id="openPosChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ RECOMMENDATIONS TAB ============ -->
+    <div id="tab-recommendations" class="section">
+        <div class="recommendations">
+            <h2>Optimization Recommendations</h2>
+            <div class="rec-grid">
+                <div class="rec-item">
+                    <span class="rec-tag high">HIGH IMPACT</span>
+                    <h4>1. Raise Minimum Kelly Threshold to 2%</h4>
+                    <p>Trades with Kelly &lt;2% are 3W/7L (30% win rate, −$110.58). Trades at 2–5% Kelly are 18W/7L (72%, +$784.90). Filtering out sub-2% Kelly trades would have saved $110 and eliminated the worst-performing cohort.</p>
+                </div>
+                <div class="rec-item">
+                    <span class="rec-tag high">HIGH IMPACT</span>
+                    <h4>2. Set Minimum Position Size to $60</h4>
+                    <p>Trades under $30: 33% win rate (−$42.98). Trades $30–60: 25% win rate (−$219.18). Trades $60–80: 72.7% win rate (+$431.01). Small positions lose money — they correspond to low-conviction bets.</p>
+                </div>
+                <div class="rec-item">
+                    <span class="rec-tag high">HIGH IMPACT</span>
+                    <h4>3. Disable or Re-calibrate MLB Betting</h4>
+                    <p>MLB is 0W/2L (−$92.04) with 19 more open positions ($869 deployed). Spring training/early season MLB has notoriously unpredictable outcomes. Consider disabling until regular season.</p>
+                </div>
+                <div class="rec-item">
+                    <span class="rec-tag medium">MEDIUM IMPACT</span>
+                    <h4>4. Favor NO Side on Kalshi (P-001)</h4>
+                    <p>NO side overall: 12W/7L (63.2%, +$1,482.01) vs YES: 13W/9L (59.1%, +$225.04). P-001 NO side specifically is enormously profitable. The asymmetry suggests Kalshi YES prices are more efficiently priced.</p>
+                </div>
+                <div class="rec-item">
+                    <span class="rec-tag medium">MEDIUM IMPACT</span>
+                    <h4>5. Concentrate on 8–12% Edge Band</h4>
+                    <p>The 8–12% edge band has 80% win rate (+$272.21). Both below (&lt;4%: 33%) and very high (20%+: 66.7%) bands underperform on win rate. The sweet spot combines signal quality with sufficient sample.</p>
+                </div>
+                <div class="rec-item">
+                    <span class="rec-tag medium">MEDIUM IMPACT</span>
+                    <h4>6. Prefer High Fair-Prob Markets (70%+)</h4>
+                    <p>Fair prob 70–100%: 10W/4L (71.4%, +$923.43). These are heavy favorites where the consensus is strong and the model's edge is most reliable. The &lt;30% fair prob band is 60% win rate but net negative.</p>
+                </div>
+                <div class="rec-item">
+                    <span class="rec-tag medium">MEDIUM IMPACT</span>
+                    <h4>7. Review Aggregate Risk Limits</h4>
+                    <p>3,475 trades were SKIPPED_RISK — blocked by aggregate exposure limits. With the strong performance of resolved trades, selectively raising per-sport or per-venue caps could unlock more edge.</p>
+                </div>
+                <div class="rec-item">
+                    <span class="rec-tag medium">MEDIUM IMPACT</span>
+                    <h4>8. Monitor NHL Exposure</h4>
+                    <p>NHL is 2W/0L (+$178.75) but has 123 open positions ($6,678 deployed) — by far the largest exposure. One bad streak could wipe gains. Consider tighter per-sport position limits for NHL.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ ALL TRADES TAB ============ -->
+    <div id="tab-trades" class="section">
+        <div class="table-section">
+            <h3>All Resolved Trades (Sorted by P&L)</h3>
+            <table id="tradesTable">
+                <thead>
+                    <tr>
+                        <th data-col="pod">Pod <span class="sort-arrow"></span></th>
+                        <th data-col="event">Event <span class="sort-arrow"></span></th>
+                        <th data-col="sport">Sport <span class="sort-arrow"></span></th>
+                        <th data-col="side">Side <span class="sort-arrow"></span></th>
+                        <th data-col="edge">Edge% <span class="sort-arrow"></span></th>
+                        <th data-col="kelly">Kelly% <span class="sort-arrow"></span></th>
+                        <th data-col="size">Size$ <span class="sort-arrow"></span></th>
+                        <th data-col="fair_prob">Fair% <span class="sort-arrow"></span></th>
+                        <th data-col="pnl">P&L$ <span class="sort-arrow"></span></th>
+                        <th data-col="outcome">Result <span class="sort-arrow"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="tradesBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// ======== DATA ========
+const ALL_TRADES = [{"pod":"P-001","event":"Los Angeles Clippers vs Indiana Pacers","sport":"basketball_nba","side":"NO","edge":68.2,"kelly":6.0,"size":150.0,"fill_price":0.845,"fair_prob":83.7,"pnl":817.74,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-05T20:40"},{"pod":"P-001","event":"Flavio Cobolli vs Miomir Kecmanovic","sport":"tennis_atp","side":"NO","edge":16.98,"kelly":4.4,"size":109.92,"fill_price":0.745,"fair_prob":42.5,"pnl":321.14,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-06T22:15"},{"pod":"P-006","event":"Milwaukee Bucks vs Atlanta Hawks","sport":"basketball_nba","side":"YES","edge":11.06,"kelly":3.17,"size":75.0,"fill_price":0.215,"fair_prob":32.6,"pnl":273.84,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-05T07:27"},{"pod":"P-001","event":"New York Knicks vs Oklahoma City Thunder","sport":"basketball_nba","side":"NO","edge":24.92,"kelly":5.98,"size":149.62,"fill_price":0.64,"fair_prob":60.9,"pnl":265.99,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-05T20:40"},{"pod":"P-006","event":"Anaheim Ducks vs New York Islanders","sport":"icehockey_nhl","side":"NO","edge":12.58,"kelly":3.52,"size":75.0,"fill_price":0.63,"fair_prob":50.4,"pnl":127.7,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-05T07:47"},{"pod":"P-001","event":"Murray St Racers vs UIC Flames","sport":"basketball_ncaab","side":"YES","edge":14.29,"kelly":3.86,"size":96.43,"fill_price":0.495,"fair_prob":63.8,"pnl":98.38,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-06T23:00"},{"pod":"P-006","event":"Jenson Brooksby vs Frances Tiafoe","sport":"tennis_atp","side":"NO","edge":7.61,"kelly":2.61,"size":65.34,"fill_price":0.575,"fair_prob":49.9,"pnl":88.4,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-07T04:05"},{"pod":"P-006","event":"Alejandro Davidovich Fokina vs Zachary Svajda","sport":"tennis_atp","side":"YES","edge":7.13,"kelly":3.0,"size":75.0,"fill_price":0.58,"fair_prob":65.1,"pnl":54.31,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-07T05:10"},{"pod":"P-006","event":"Kamil Majchrzak vs Giovanni Mpetshi Perricard","sport":"tennis_atp","side":"YES","edge":5.56,"kelly":1.85,"size":46.23,"fill_price":0.475,"fair_prob":53.1,"pnl":51.09,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-05T23:45"},{"pod":"P-006","event":"Vancouver Canucks vs Carolina Hurricanes","sport":"icehockey_nhl","side":"YES","edge":24.25,"kelly":5.85,"size":75.0,"fill_price":0.595,"fair_prob":83.8,"pnl":51.05,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-05T08:22"},{"pod":"P-006","event":"Victoria Mboko vs Kimberly Birrell","sport":"tennis_wta","side":"YES","edge":21.45,"kelly":5.29,"size":75.0,"fill_price":0.61,"fair_prob":82.4,"pnl":47.95,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-06T23:10"},{"pod":"P-006","event":"Anastasia Potapova vs Jasmine Paolini","sport":"tennis_wta","side":"NO","edge":8.72,"kelly":3.0,"size":75.0,"fill_price":0.365,"fair_prob":27.8,"pnl":43.11,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-07T04:05"},{"pod":"P-006","event":"Yulia Putintseva vs Clara Tauson","sport":"tennis_wta","side":"NO","edge":5.52,"kelly":3.0,"size":75.0,"fill_price":0.335,"fair_prob":28.0,"pnl":37.78,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-07T00:35"},{"pod":"P-006","event":"Adam Walton vs Learner Tien","sport":"tennis_atp","side":"NO","edge":13.44,"kelly":3.69,"size":75.0,"fill_price":0.33,"fair_prob":19.6,"pnl":36.94,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-06T23:20"},{"pod":"P-001","event":"Florida Gulf Coast Eagles vs North Alabama Lions","sport":"basketball_ncaab","side":"YES","edge":13.43,"kelly":3.69,"size":92.15,"fill_price":0.725,"fair_prob":85.9,"pnl":34.95,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-05T20:40"},{"pod":"P-006","event":"Brandon Nakashima vs Camilo Ugo Carabelli","sport":"tennis_atp","side":"YES","edge":15.67,"kelly":4.13,"size":75.0,"fill_price":0.69,"fair_prob":84.7,"pnl":33.7,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-07T03:30"},{"pod":"P-006","event":"Terence Atmane vs Grigor Dimitrov","sport":"tennis_atp","side":"NO","edge":4.88,"kelly":3.0,"size":75.0,"fill_price":0.235,"fair_prob":18.6,"pnl":23.04,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-06T00:10"},{"pod":"P-006","event":"Emma Raducanu vs Anastasia Zakharova","sport":"tennis_wta","side":"YES","edge":3.61,"kelly":1.42,"size":35.6,"fill_price":0.64,"fair_prob":67.6,"pnl":20.02,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-06T23:00"},{"pod":"P-001","event":"Matteo Berrettini vs Alexander Zverev","sport":"tennis_atp","side":"YES","edge":9.28,"kelly":3.0,"size":75.0,"fill_price":0.815,"fair_prob":90.8,"pnl":17.02,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-06T22:15"},{"pod":"P-001","event":"Memphis Grizzlies vs Portland Trail Blazers","sport":"basketball_nba","side":"YES","edge":3.02,"kelly":1.14,"size":28.49,"fill_price":0.67,"fair_prob":70.0,"pnl":14.03,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-05T20:40"},{"pod":"P-001","event":"Lorenzo Musetti vs Marton Fucsovics","sport":"tennis_atp","side":"NO","edge":7.01,"kelly":3.0,"size":75.0,"fill_price":0.15,"fair_prob":92.0,"pnl":13.24,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-06T23:50"},{"pod":"P-006","event":"Dalibor Svrcina vs Jannik Sinner","sport":"tennis_atp","side":"NO","edge":9.33,"kelly":3.0,"size":75.0,"fill_price":0.15,"fair_prob":5.7,"pnl":13.24,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-07T06:10"},{"pod":"P-006","event":"Los Angeles Clippers vs Indiana Pacers","sport":"basketball_nba","side":"NO","edge":4.49,"kelly":3.0,"size":75.0,"fill_price":0.145,"fair_prob":10.0,"pnl":12.72,"outcome":"WIN","venue":"polymarket","timestamp":"2026-03-05T08:32"},{"pod":"P-001","event":"Ben Shelton vs Reilly Opelka","sport":"tennis_atp","side":"YES","edge":4.12,"kelly":2.06,"size":25.74,"fill_price":0.675,"fair_prob":71.6,"pnl":12.39,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-06T23:50"},{"pod":"P-001","event":"North Carolina A&T Aggies vs Northeastern Huskies","sport":"basketball_ncaab","side":"YES","edge":4.29,"kelly":3.0,"size":75.0,"fill_price":0.915,"fair_prob":95.8,"pnl":6.97,"outcome":"WIN","venue":"kalshi","timestamp":"2026-03-06T21:15"},{"pod":"P-006","event":"Ben Shelton vs Reilly Opelka","sport":"tennis_atp","side":"NO","edge":3.07,"kelly":0.57,"size":14.28,"fill_price":0.745,"fair_prob":71.4,"pnl":-14.28,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-07T02:55"},{"pod":"P-006","event":"Sebastian Korda vs Francisco Comesana","sport":"tennis_atp","side":"NO","edge":3.02,"kelly":0.61,"size":15.14,"fill_price":0.835,"fair_prob":80.5,"pnl":-15.14,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-06T06:50"},{"pod":"P-001","event":"Victoria Mboko vs Kimberly Birrell","sport":"tennis_wta","side":"YES","edge":3.34,"kelly":0.75,"size":18.79,"fill_price":0.095,"fair_prob":12.8,"pnl":-18.79,"outcome":"LOSS","venue":"kalshi","timestamp":"2026-03-06T22:15"},{"pod":"P-006","event":"Diane Parry vs Venus Williams","sport":"tennis_wta","side":"NO","edge":3.87,"kelly":0.85,"size":21.19,"fill_price":0.785,"fair_prob":74.6,"pnl":-21.19,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-06T03:15"},{"pod":"P-006","event":"San Francisco Giants vs New York Yankees","sport":"baseball_mlb","side":"YES","edge":5.33,"kelly":1.59,"size":39.75,"fill_price":0.425,"fair_prob":47.8,"pnl":-39.75,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-07T02:25"},{"pod":"P-001","event":"Philadelphia 76ers vs Utah Jazz","sport":"basketball_nba","side":"YES","edge":6.66,"kelly":1.73,"size":43.15,"fill_price":0.19,"fair_prob":25.7,"pnl":-43.15,"outcome":"LOSS","venue":"kalshi","timestamp":"2026-03-05T20:40"},{"pod":"P-006","event":"Alexander Shevchenko vs Sho Shimabukuro","sport":"tennis_atp","side":"NO","edge":5.8,"kelly":1.74,"size":43.42,"fill_price":0.6,"fair_prob":54.2,"pnl":-43.42,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-05T23:30"},{"pod":"P-006","event":"San Francisco Giants vs New York Yankees","sport":"baseball_mlb","side":"YES","edge":6.17,"kelly":2.09,"size":52.29,"fill_price":0.46,"fair_prob":52.2,"pnl":-52.29,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-07T04:40"},{"pod":"P-006","event":"Bianca Andreescu vs Kamilla Rakhimova","sport":"tennis_wta","side":"YES","edge":6.49,"kelly":2.11,"size":52.78,"fill_price":0.425,"fair_prob":49.0,"pnl":-52.78,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-05T07:17"},{"pod":"P-001","event":"Winthrop Eagles vs Charleston Southern Buccaneers","sport":"basketball_ncaab","side":"YES","edge":7.44,"kelly":2.36,"size":58.9,"fill_price":0.375,"fair_prob":44.9,"pnl":-58.9,"outcome":"LOSS","venue":"kalshi","timestamp":"2026-03-06T21:55"},{"pod":"P-006","event":"Zachary Svajda vs Marin Cilic","sport":"tennis_atp","side":"NO","edge":9.47,"kelly":3.0,"size":75.0,"fill_price":0.56,"fair_prob":46.5,"pnl":-75.0,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-05T07:12"},{"pod":"P-006","event":"Ekaterina Alexandrova vs Talia Gibson","sport":"tennis_wta","side":"YES","edge":22.31,"kelly":5.46,"size":75.0,"fill_price":0.48,"fair_prob":70.3,"pnl":-75.0,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-06T23:00"},{"pod":"P-006","event":"Zeynep Sonmez vs Anna Kalinskaya","sport":"tennis_wta","side":"NO","edge":17.44,"kelly":4.49,"size":75.0,"fill_price":0.5,"fair_prob":32.6,"pnl":-75.0,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-07T01:30"},{"pod":"P-006","event":"Lorenzo Musetti vs Marton Fucsovics","sport":"tennis_atp","side":"YES","edge":17.13,"kelly":4.43,"size":75.0,"fill_price":0.49,"fair_prob":66.1,"pnl":-75.0,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-07T02:15"},{"pod":"P-006","event":"Gael Monfils vs Felix Auger-Aliassime","sport":"tennis_atp","side":"NO","edge":21.47,"kelly":5.29,"size":75.0,"fill_price":0.38,"fair_prob":16.5,"pnl":-75.0,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-07T04:10"},{"pod":"P-006","event":"Orlando Magic vs Dallas Mavericks","sport":"basketball_nba","side":"YES","edge":14.09,"kelly":3.8,"size":75.0,"fill_price":0.115,"fair_prob":25.6,"pnl":-75.0,"outcome":"LOSS","venue":"polymarket","timestamp":"2026-03-07T04:50"}];
+
+const EQUITY_CURVE = [{"date":"2026-03-05","cum_pnl":-75.0,"pnl":-75.0},{"date":"2026-03-05","cum_pnl":-127.78,"pnl":-52.78},{"date":"2026-03-05","cum_pnl":146.06,"pnl":273.84},{"date":"2026-03-05","cum_pnl":273.76,"pnl":127.7},{"date":"2026-03-05","cum_pnl":324.81,"pnl":51.05},{"date":"2026-03-05","cum_pnl":337.53,"pnl":12.72},{"date":"2026-03-05","cum_pnl":294.38,"pnl":-43.15},{"date":"2026-03-05","cum_pnl":560.37,"pnl":265.99},{"date":"2026-03-05","cum_pnl":1378.11,"pnl":817.74},{"date":"2026-03-05","cum_pnl":1392.14,"pnl":14.03},{"date":"2026-03-05","cum_pnl":1427.09,"pnl":34.95},{"date":"2026-03-05","cum_pnl":1383.67,"pnl":-43.42},{"date":"2026-03-05","cum_pnl":1434.76,"pnl":51.09},{"date":"2026-03-06","cum_pnl":1457.8,"pnl":23.04},{"date":"2026-03-06","cum_pnl":1436.61,"pnl":-21.19},{"date":"2026-03-06","cum_pnl":1421.47,"pnl":-15.14},{"date":"2026-03-06","cum_pnl":1428.44,"pnl":6.97},{"date":"2026-03-06","cum_pnl":1369.54,"pnl":-58.9},{"date":"2026-03-06","cum_pnl":1386.56,"pnl":17.02},{"date":"2026-03-06","cum_pnl":1707.7,"pnl":321.14},{"date":"2026-03-06","cum_pnl":1688.91,"pnl":-18.79},{"date":"2026-03-06","cum_pnl":1787.29,"pnl":98.38},{"date":"2026-03-06","cum_pnl":1712.29,"pnl":-75.0},{"date":"2026-03-06","cum_pnl":1732.31,"pnl":20.02},{"date":"2026-03-06","cum_pnl":1780.26,"pnl":47.95},{"date":"2026-03-06","cum_pnl":1817.2,"pnl":36.94},{"date":"2026-03-06","cum_pnl":1830.44,"pnl":13.24},{"date":"2026-03-06","cum_pnl":1842.83,"pnl":12.39},{"date":"2026-03-07","cum_pnl":1880.61,"pnl":37.78},{"date":"2026-03-07","cum_pnl":1805.61,"pnl":-75.0},{"date":"2026-03-07","cum_pnl":1730.61,"pnl":-75.0},{"date":"2026-03-07","cum_pnl":1690.86,"pnl":-39.75},{"date":"2026-03-07","cum_pnl":1676.58,"pnl":-14.28},{"date":"2026-03-07","cum_pnl":1710.28,"pnl":33.7},{"date":"2026-03-07","cum_pnl":1798.68,"pnl":88.4},{"date":"2026-03-07","cum_pnl":1841.79,"pnl":43.11},{"date":"2026-03-07","cum_pnl":1766.79,"pnl":-75.0},{"date":"2026-03-07","cum_pnl":1714.5,"pnl":-52.29},{"date":"2026-03-07","cum_pnl":1639.5,"pnl":-75.0},{"date":"2026-03-07","cum_pnl":1693.81,"pnl":54.31},{"date":"2026-03-07","cum_pnl":1707.05,"pnl":13.24}];
+
+const OPEN_POSITIONS = [
+    {sport:"NHL", count:123, capital:6678.43},
+    {sport:"WTA Tennis", count:52, capital:3045.22},
+    {sport:"ATP Tennis", count:33, capital:1950.51},
+    {sport:"MLB", count:19, capital:869.24},
+    {sport:"NBA (P-006)", count:6, capital:438.75},
+    {sport:"NCAAB (P-001)", count:5, capital:405.92},
+    {sport:"NBA (P-001)", count:4, capital:371.26},
+    {sport:"ATP (P-001)", count:4, capital:285.66},
+];
+
+// ======== HELPERS ========
+// Fix pod_id: entries with pod_id "?" are P-001 (Kalshi)
+ALL_TRADES.forEach(t => { if (t.pod === '?') t.pod = 'P-001'; });
+
+let filtered = [...ALL_TRADES];
+let sortCol = 'pnl', sortDir = -1;
+const charts = {};
+
+function fmt$(v) { return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2); }
+function fmtPct(v) { return v.toFixed(1) + '%'; }
+
+function cleanSport(s) {
+    return s.replace(/^sports_/, '').replace(/_/g, ' ').replace(/indian wells/i, 'IW').replace(/basketball /,'').replace(/icehockey /,'').replace(/baseball /,'').replace(/tennis /,'');
+}
+
+// ======== FILTERS ========
+function populateSportFilter() {
+    const sports = [...new Set(ALL_TRADES.map(t => t.sport))].sort();
+    const sel = document.getElementById('filterSport');
+    sel.innerHTML = '<option value="all">All Sports</option>';
+    sports.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s; opt.textContent = cleanSport(s);
+        sel.appendChild(opt);
+    });
+}
+
+function applyFilters() {
+    const pod = document.getElementById('filterPod').value;
+    const sport = document.getElementById('filterSport').value;
+    filtered = ALL_TRADES.filter(t => {
+        if (pod !== 'all' && t.pod !== pod) return false;
+        if (sport !== 'all' && t.sport !== sport) return false;
+        return true;
+    });
+    renderAll();
+}
+
+// ======== RENDER ========
+function renderKPIs() {
+    const wins = filtered.filter(t => t.outcome === 'WIN');
+    const losses = filtered.filter(t => t.outcome === 'LOSS');
+    const total = wins.length + losses.length;
+    const winRate = total > 0 ? (wins.length / total * 100) : 0;
+    const totalPnl = filtered.reduce((s,t) => s + t.pnl, 0);
+    const avgWin = wins.length > 0 ? wins.reduce((s,t) => s + t.pnl, 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? losses.reduce((s,t) => s + t.pnl, 0) / losses.length : 0;
+    const profitFactor = Math.abs(avgLoss) > 0 ? (avgWin / Math.abs(avgLoss)) : Infinity;
+    const totalWagered = filtered.reduce((s,t) => s + t.size, 0);
+    const roi = totalWagered > 0 ? (totalPnl / totalWagered * 100) : 0;
+    const maxDrawdown = calcMaxDrawdown();
+
+    const kpis = [
+        {label:'Net P&L', value:fmt$(totalPnl), cls:totalPnl>=0?'positive':'negative'},
+        {label:'Win Rate', value:fmtPct(winRate), sub:`${wins.length}W / ${losses.length}L`, cls:winRate>=55?'positive':'negative'},
+        {label:'ROI', value:fmtPct(roi), cls:roi>=0?'positive':'negative'},
+        {label:'Avg Win', value:fmt$(avgWin), cls:'positive'},
+        {label:'Avg Loss', value:fmt$(avgLoss), cls:'negative'},
+        {label:'Profit Factor', value:profitFactor === Infinity ? '∞' : profitFactor.toFixed(2), cls:profitFactor>1.5?'positive':''},
+        {label:'Max Drawdown', value:fmt$(maxDrawdown), cls:'negative'},
+        {label:'Total Wagered', value:'$'+totalWagered.toFixed(0)},
+    ];
+
+    document.getElementById('kpi-row').innerHTML = kpis.map(k =>
+        `<div class="kpi"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls||''}">${k.value}</div>${k.sub?`<div class="kpi-sub">${k.sub}</div>`:''}</div>`
+    ).join('');
+}
+
+function calcMaxDrawdown() {
+    let peak = 0, dd = 0, cum = 0;
+    const sorted = [...filtered].sort((a,b) => a.timestamp.localeCompare(b.timestamp));
+    sorted.forEach(t => {
+        cum += t.pnl;
+        if (cum > peak) peak = cum;
+        if (cum - peak < dd) dd = cum - peak;
+    });
+    return dd;
+}
+
+function renderEquityChart() {
+    const ctx = document.getElementById('equityChart').getContext('2d');
+    if (charts.equity) charts.equity.destroy();
+    const labels = EQUITY_CURVE.map((_, i) => i + 1);
+    const data = EQUITY_CURVE.map(d => d.cum_pnl);
+    const colors = EQUITY_CURVE.map(d => d.cum_pnl >= 0 ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)');
+
+    charts.equity = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                borderColor: '#6c63ff',
+                backgroundColor: 'rgba(108,99,255,0.1)',
+                fill: true, tension: 0.3, pointRadius: 3,
+                pointBackgroundColor: EQUITY_CURVE.map(d => d.pnl >= 0 ? '#22c55e' : '#ef4444'),
+            }]
+        },
+        options: {
+            responsive: true, plugins: {
+                legend: {display:false},
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `$${ctx.parsed.y.toFixed(2)}`,
+                        title: ctx => `Trade #${ctx[0].label} (${EQUITY_CURVE[ctx[0].dataIndex].date})`
+                    }
+                }
+            },
+            scales: {
+                x: {display:true, title:{display:true, text:'Trade #', color:'#8b8fa3'}, ticks:{color:'#8b8fa3'}, grid:{color:'#2a2e3d'}},
+                y: {title:{display:true, text:'Cumulative P&L ($)', color:'#8b8fa3'}, ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{color:'#2a2e3d'}}
+            }
+        }
+    });
+}
+
+function renderSportPnlChart() {
+    const ctx = document.getElementById('sportPnlChart').getContext('2d');
+    if (charts.sportPnl) charts.sportPnl.destroy();
+    const sportMap = {};
+    filtered.forEach(t => {
+        const s = cleanSport(t.sport);
+        if (!sportMap[s]) sportMap[s] = 0;
+        sportMap[s] += t.pnl;
+    });
+    const sorted = Object.entries(sportMap).sort((a,b) => b[1] - a[1]);
+
+    charts.sportPnl = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sorted.map(s => s[0]),
+            datasets: [{
+                data: sorted.map(s => s[1]),
+                backgroundColor: sorted.map(s => s[1] >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)'),
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true,
+            plugins: {legend:{display:false}, tooltip:{callbacks:{label:ctx=>'$'+ctx.parsed.x.toFixed(2)}}},
+            scales: {
+                x: {ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{color:'#2a2e3d'}},
+                y: {ticks:{color:'#e2e4ea'}, grid:{display:false}}
+            }
+        }
+    });
+}
+
+function renderSideChart() {
+    const ctx = document.getElementById('sideChart').getContext('2d');
+    if (charts.side) charts.side.destroy();
+    const sideData = {YES:{w:0,l:0}, NO:{w:0,l:0}};
+    filtered.forEach(t => {
+        if (t.outcome === 'WIN') sideData[t.side].w++;
+        else sideData[t.side].l++;
+    });
+
+    charts.side = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['YES', 'NO'],
+            datasets: [
+                {label:'Wins', data:[sideData.YES.w, sideData.NO.w], backgroundColor:'rgba(34,197,94,0.7)', borderRadius:4},
+                {label:'Losses', data:[sideData.YES.l, sideData.NO.l], backgroundColor:'rgba(239,68,68,0.7)', borderRadius:4},
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {legend:{labels:{color:'#8b8fa3'}}},
+            scales: {
+                x: {ticks:{color:'#e2e4ea'}, grid:{display:false}},
+                y: {ticks:{color:'#8b8fa3'}, grid:{color:'#2a2e3d'}, title:{display:true, text:'Count', color:'#8b8fa3'}}
+            }
+        }
+    });
+}
+
+function renderEdgeBandChart() {
+    const ctx = document.getElementById('edgeBandChart').getContext('2d');
+    if (charts.edgeBand) charts.edgeBand.destroy();
+    const bands = [{lo:0,hi:4,label:'<4%'},{lo:4,hi:8,label:'4-8%'},{lo:8,hi:12,label:'8-12%'},{lo:12,hi:20,label:'12-20%'},{lo:20,hi:100,label:'20%+'}];
+    const winRates = bands.map(b => {
+        const bt = filtered.filter(t => t.edge >= b.lo && t.edge < b.hi);
+        const w = bt.filter(t=>t.outcome==='WIN').length;
+        return bt.length > 0 ? (w/bt.length*100) : 0;
+    });
+    const counts = bands.map(b => filtered.filter(t => t.edge >= b.lo && t.edge < b.hi).length);
+
+    charts.edgeBand = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: bands.map(b => b.label),
+            datasets: [
+                {label:'Win Rate %', data:winRates, backgroundColor:'rgba(108,99,255,0.7)', borderRadius:4, yAxisID:'y'},
+                {label:'Trade Count', data:counts, backgroundColor:'rgba(59,130,246,0.4)', borderRadius:4, yAxisID:'y1'},
+            ]
+        },
+        options: {
+            responsive:true, plugins:{legend:{labels:{color:'#8b8fa3'}}},
+            scales: {
+                x:{ticks:{color:'#e2e4ea'}, grid:{display:false}},
+                y:{position:'left', ticks:{color:'#8b8fa3', callback:v=>v+'%'}, grid:{color:'#2a2e3d'}, max:100},
+                y1:{position:'right', ticks:{color:'#8b8fa3'}, grid:{display:false}}
+            }
+        }
+    });
+}
+
+function renderEdgePnlChart() {
+    const ctx = document.getElementById('edgePnlChart').getContext('2d');
+    if (charts.edgePnl) charts.edgePnl.destroy();
+    const bands = [{lo:0,hi:4,label:'<4%'},{lo:4,hi:8,label:'4-8%'},{lo:8,hi:12,label:'8-12%'},{lo:12,hi:20,label:'12-20%'},{lo:20,hi:100,label:'20%+'}];
+    const pnls = bands.map(b => {
+        return filtered.filter(t => t.edge >= b.lo && t.edge < b.hi).reduce((s,t) => s + t.pnl, 0);
+    });
+
+    charts.edgePnl = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: bands.map(b => b.label),
+            datasets: [{data:pnls, backgroundColor:pnls.map(p => p>=0?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.7)'), borderRadius:4}]
+        },
+        options: {
+            responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>'$'+ctx.parsed.y.toFixed(2)}}},
+            scales: {x:{ticks:{color:'#e2e4ea'}, grid:{display:false}}, y:{ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{color:'#2a2e3d'}}}
+        }
+    });
+}
+
+function renderKellyChart() {
+    const ctx = document.getElementById('kellyWinChart').getContext('2d');
+    if (charts.kelly) charts.kelly.destroy();
+    const bands = [{lo:0,hi:2,label:'<2%'},{lo:2,hi:5,label:'2-5%'},{lo:5,hi:10,label:'5-10%'},{lo:10,hi:100,label:'10%+'}];
+    const winRates = bands.map(b => {
+        const bt = filtered.filter(t => t.kelly >= b.lo && t.kelly < b.hi);
+        const w = bt.filter(t=>t.outcome==='WIN').length;
+        return bt.length > 0 ? (w/bt.length*100) : 0;
+    });
+    const pnls = bands.map(b => filtered.filter(t => t.kelly >= b.lo && t.kelly < b.hi).reduce((s,t) => s + t.pnl, 0));
+
+    charts.kelly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: bands.map(b => b.label),
+            datasets: [
+                {label:'Win Rate %', data:winRates, backgroundColor:'rgba(108,99,255,0.7)', borderRadius:4, yAxisID:'y'},
+                {label:'P&L', data:pnls, backgroundColor:pnls.map(p=>p>=0?'rgba(34,197,94,0.4)':'rgba(239,68,68,0.4)'), borderRadius:4, yAxisID:'y1'},
+            ]
+        },
+        options: {
+            responsive:true, plugins:{legend:{labels:{color:'#8b8fa3'}}},
+            scales: {
+                x:{ticks:{color:'#e2e4ea'}, grid:{display:false}},
+                y:{position:'left', ticks:{color:'#8b8fa3', callback:v=>v+'%'}, grid:{color:'#2a2e3d'}, max:100},
+                y1:{position:'right', ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{display:false}}
+            }
+        }
+    });
+}
+
+function renderSizePnlChart() {
+    const ctx = document.getElementById('sizePnlChart').getContext('2d');
+    if (charts.sizePnl) charts.sizePnl.destroy();
+    const bands = [{lo:0,hi:30,label:'<$30'},{lo:30,hi:60,label:'$30-60'},{lo:60,hi:80,label:'$60-80'},{lo:80,hi:150,label:'$80-150'},{lo:150,hi:9999,label:'$150+'}];
+    const pnls = bands.map(b => filtered.filter(t=>t.size>=b.lo&&t.size<b.hi).reduce((s,t)=>s+t.pnl,0));
+    const wr = bands.map(b => {
+        const bt = filtered.filter(t=>t.size>=b.lo&&t.size<b.hi);
+        const w = bt.filter(t=>t.outcome==='WIN').length;
+        return bt.length>0?(w/bt.length*100):0;
+    });
+
+    charts.sizePnl = new Chart(ctx, {
+        type:'bar',
+        data: {
+            labels: bands.map(b=>b.label),
+            datasets: [
+                {label:'P&L', data:pnls, backgroundColor:pnls.map(p=>p>=0?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.7)'), borderRadius:4, yAxisID:'y'},
+                {label:'Win Rate %', data:wr, type:'line', borderColor:'#6c63ff', pointBackgroundColor:'#6c63ff', yAxisID:'y1', tension:0.3},
+            ]
+        },
+        options: {
+            responsive:true, plugins:{legend:{labels:{color:'#8b8fa3'}}},
+            scales: {
+                x:{ticks:{color:'#e2e4ea'}, grid:{display:false}},
+                y:{position:'left', ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{color:'#2a2e3d'}},
+                y1:{position:'right', ticks:{color:'#8b8fa3', callback:v=>v+'%'}, grid:{display:false}, max:100}
+            }
+        }
+    });
+}
+
+function renderProbBandChart() {
+    const ctx = document.getElementById('probBandChart').getContext('2d');
+    if (charts.prob) charts.prob.destroy();
+    const bands = [{lo:0,hi:30,label:'<30%'},{lo:30,hi:50,label:'30-50%'},{lo:50,hi:70,label:'50-70%'},{lo:70,hi:101,label:'70-100%'}];
+    const wr = bands.map(b => {
+        const bt = filtered.filter(t=>t.fair_prob>=b.lo&&t.fair_prob<b.hi);
+        const w = bt.filter(t=>t.outcome==='WIN').length;
+        return bt.length>0?(w/bt.length*100):0;
+    });
+    const pnls = bands.map(b => filtered.filter(t=>t.fair_prob>=b.lo&&t.fair_prob<b.hi).reduce((s,t)=>s+t.pnl,0));
+
+    charts.prob = new Chart(ctx, {
+        type:'bar',
+        data: {
+            labels: bands.map(b=>b.label),
+            datasets: [
+                {label:'Win Rate %', data:wr, backgroundColor:'rgba(108,99,255,0.7)', borderRadius:4, yAxisID:'y'},
+                {label:'P&L', data:pnls, type:'line', borderColor:pnls.map(p=>p>=0?'#22c55e':'#ef4444'), pointBackgroundColor:pnls.map(p=>p>=0?'#22c55e':'#ef4444'), yAxisID:'y1', tension:0.3},
+            ]
+        },
+        options: {
+            responsive:true, plugins:{legend:{labels:{color:'#8b8fa3'}}},
+            scales: {
+                x:{ticks:{color:'#e2e4ea'}, grid:{display:false}},
+                y:{position:'left', ticks:{color:'#8b8fa3', callback:v=>v+'%'}, grid:{color:'#2a2e3d'}, max:100},
+                y1:{position:'right', ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{display:false}}
+            }
+        }
+    });
+}
+
+function renderHourChart() {
+    const ctx = document.getElementById('hourChart').getContext('2d');
+    if (charts.hour) charts.hour.destroy();
+    const hourMap = {};
+    filtered.forEach(t => {
+        const h = parseInt(t.timestamp.substring(11,13));
+        if (!hourMap[h]) hourMap[h] = {w:0,l:0,pnl:0};
+        if (t.outcome==='WIN') hourMap[h].w++;
+        else hourMap[h].l++;
+        hourMap[h].pnl += t.pnl;
+    });
+    const hours = Object.keys(hourMap).map(Number).sort((a,b)=>a-b);
+    const pnls = hours.map(h => hourMap[h].pnl);
+
+    charts.hour = new Chart(ctx, {
+        type:'bar',
+        data: {
+            labels: hours.map(h=>h+':00'),
+            datasets: [{data:pnls, backgroundColor:pnls.map(p=>p>=0?'rgba(34,197,94,0.7)':'rgba(239,68,68,0.7)'), borderRadius:4}]
+        },
+        options: {
+            responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>'$'+ctx.parsed.y.toFixed(2)}}},
+            scales: {x:{ticks:{color:'#e2e4ea'}, grid:{display:false}}, y:{ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{color:'#2a2e3d'}}}
+        }
+    });
+}
+
+function renderSportDetailChart() {
+    const ctx = document.getElementById('sportDetailChart').getContext('2d');
+    if (charts.sportDetail) charts.sportDetail.destroy();
+    const sportMap = {};
+    filtered.forEach(t => {
+        const s = cleanSport(t.sport);
+        if (!sportMap[s]) sportMap[s] = {w:0,l:0,pnl:0};
+        if (t.outcome==='WIN') sportMap[s].w++;
+        else sportMap[s].l++;
+        sportMap[s].pnl += t.pnl;
+    });
+    const sports = Object.keys(sportMap).sort((a,b) => sportMap[b].pnl - sportMap[a].pnl);
+    const wr = sports.map(s => {const d=sportMap[s]; return d.w+d.l>0?(d.w/(d.w+d.l)*100):0;});
+    const counts = sports.map(s => sportMap[s].w + sportMap[s].l);
+    const pnls = sports.map(s => sportMap[s].pnl);
+
+    charts.sportDetail = new Chart(ctx, {
+        type:'bar',
+        data: {
+            labels: sports,
+            datasets: [
+                {label:'Win Rate %', data:wr, backgroundColor:'rgba(108,99,255,0.7)', borderRadius:4, yAxisID:'y'},
+                {label:'P&L', data:pnls, type:'line', borderColor:'#22c55e', pointBackgroundColor:pnls.map(p=>p>=0?'#22c55e':'#ef4444'), yAxisID:'y1', tension:0.3, pointRadius:5},
+            ]
+        },
+        options: {
+            responsive:true, plugins:{legend:{labels:{color:'#8b8fa3'}}},
+            scales: {
+                x:{ticks:{color:'#e2e4ea', maxRotation:45}, grid:{display:false}},
+                y:{position:'left', ticks:{color:'#8b8fa3', callback:v=>v+'%'}, grid:{color:'#2a2e3d'}, max:110},
+                y1:{position:'right', ticks:{color:'#8b8fa3', callback:v=>'$'+v}, grid:{display:false}}
+            }
+        }
+    });
+}
+
+function renderOpenPosChart() {
+    const ctx = document.getElementById('openPosChart').getContext('2d');
+    if (charts.openPos) charts.openPos.destroy();
+    charts.openPos = new Chart(ctx, {
+        type:'bar',
+        data: {
+            labels: OPEN_POSITIONS.map(p => p.sport),
+            datasets: [
+                {label:'Capital Deployed ($)', data:OPEN_POSITIONS.map(p=>p.capital), backgroundColor:'rgba(59,130,246,0.6)', borderRadius:4, yAxisID:'y'},
+                {label:'Open Trades', data:OPEN_POSITIONS.map(p=>p.count), type:'line', borderColor:'#eab308', pointBackgroundColor:'#eab308', yAxisID:'y1', tension:0.3, pointRadius:5},
+            ]
+        },
+        options: {
+            responsive:true, plugins:{legend:{labels:{color:'#8b8fa3'}}},
+            scales: {
+                x:{ticks:{color:'#e2e4ea'}, grid:{display:false}},
+                y:{position:'left', ticks:{color:'#8b8fa3', callback:v=>'$'+v.toLocaleString()}, grid:{color:'#2a2e3d'}},
+                y1:{position:'right', ticks:{color:'#8b8fa3'}, grid:{display:false}}
+            }
+        }
+    });
+}
+
+function renderTable() {
+    const tbody = document.getElementById('tradesBody');
+    const sorted = [...filtered].sort((a,b) => {
+        let av = a[sortCol], bv = b[sortCol];
+        if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+        return sortDir * (av - bv);
+    });
+    tbody.innerHTML = sorted.map(t => `
+        <tr>
+            <td>${t.pod}</td>
+            <td>${t.event.length > 40 ? t.event.substring(0,37)+'...' : t.event}</td>
+            <td>${cleanSport(t.sport)}</td>
+            <td>${t.side}</td>
+            <td>${t.edge.toFixed(1)}%</td>
+            <td>${t.kelly.toFixed(1)}%</td>
+            <td>$${t.size.toFixed(0)}</td>
+            <td>${t.fair_prob.toFixed(0)}%</td>
+            <td class="${t.pnl>=0?'win':'loss'}">${fmt$(t.pnl)}</td>
+            <td class="${t.outcome==='WIN'?'win':'loss'}">${t.outcome}</td>
+        </tr>
+    `).join('');
+}
+
+// ======== TAB SWITCHING ========
+function switchTab(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-'+name).classList.add('active');
+    event.target.classList.add('active');
+    renderAll();
+}
+
+// ======== TABLE SORTING ========
+document.querySelectorAll('#tradesTable th').forEach(th => {
+    th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (sortCol === col) sortDir *= -1;
+        else { sortCol = col; sortDir = -1; }
+        renderTable();
+    });
+});
+
+// ======== RENDER ALL ========
+function renderAll() {
+    renderKPIs();
+    renderEquityChart();
+    renderSportPnlChart();
+    renderSideChart();
+    renderEdgeBandChart();
+    renderEdgePnlChart();
+    renderKellyChart();
+    renderSizePnlChart();
+    renderProbBandChart();
+    renderHourChart();
+    renderSportDetailChart();
+    renderOpenPosChart();
+    renderTable();
+}
+
+// ======== INIT ========
+populateSportFilter();
+renderAll();
+</script>
+</body>
+</html>

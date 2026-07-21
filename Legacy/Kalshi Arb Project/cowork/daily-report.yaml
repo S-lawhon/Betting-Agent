@@ -1,0 +1,299 @@
+---
+# cowork/daily-report.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+# Automation: Generate a daily P&L snapshot and export a trade-log summary.
+#
+# What it does
+# ────────────
+#   1. Reads the current trade_log.jsonl and unmatched_markets.jsonl.
+#   2. Prints a summary: trades today, P&L today, open positions, win rate
+#      (last 30 days), cooldown status, learner calibration stats.
+#   3. Exports trade_log.csv and unmatched_markets.csv to data/exports/
+#      so the user can open them in Excel or share them.
+#   4. Appends a one-line summary row to data/exports/daily_summary.csv
+#      for week-over-week trending.
+#
+# Scheduling
+# ──────────
+#   Daily at 9:00 am local time — a morning briefing before the trading day.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: daily-report
+display_name: "Daily P&L Report"
+description: >
+  Produce a morning briefing: today's trade count, running P&L, open-position
+  summary, 30-day win rate, and learner calibration stats.  Exports
+  trade_log.csv and unmatched_markets.csv to data/exports/ and appends a
+  one-line row to data/exports/daily_summary.csv for week-over-week trending.
+version: "1.0"
+category: reporting
+
+trigger:
+  type: scheduled
+  cron: "0 9 * * *"    # 9:00 am local time, every day
+  timezone: local
+
+environment:
+  working_directory: "."
+  python_executable: python3
+  required_files:
+    - config.yaml
+
+steps:
+  - id: trade_log_summary
+    name: "Summarise today's trade log"
+    description: >
+      Parse trade_log.jsonl, count resolved WIN/LOSS/VOID entries logged
+      today, sum P&L, and list any open (PENDING) positions.
+    command: python3
+    args:
+      - "-c"
+      - |
+        import json, sys
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        today_str = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d')
+        log_path  = Path('data/trade_logs/trade_log.jsonl')
+        if not log_path.exists():
+            print("[INFO] No trade log yet.")
+            sys.exit(0)
+
+        wins = losses = voids = pending = 0
+        pnl  = 0.0
+        for raw in log_path.read_text(encoding='utf-8').splitlines():
+            if not raw.strip():
+                continue
+            try:
+                rec = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            ts = rec.get('timestamp', rec.get('as_of', ''))
+            if not ts.startswith(today_str):
+                continue
+            outcome = (rec.get('outcome') or '').upper()
+            if outcome == 'WIN':
+                wins   += 1
+                pnl    += float(rec.get('pnl_usd', 0))
+            elif outcome == 'LOSS':
+                losses += 1
+                pnl    += float(rec.get('pnl_usd', 0))
+            elif outcome == 'VOID':
+                voids  += 1
+            elif outcome in ('PENDING', ''):
+                pending += 1
+
+        total = wins + losses
+        win_rate = wins / total if total > 0 else float('nan')
+        print(f"── Today ({today_str}) ─────────────────────────")
+        print(f"  Resolved  : {wins}W / {losses}L / {voids} void")
+        print(f"  Pending   : {pending}")
+        print(f"  P&L today : ${pnl:+,.2f}")
+        if total > 0:
+            print(f"  Win rate  : {win_rate:.1%}")
+    on_failure: continue
+
+  - id: learner_stats
+    name: "Print learner calibration stats"
+    description: >
+      Load the persisted model_state.json and display the current calibration
+      statistics: number of resolved trades, global bias, per-sport biases,
+      and whether the logistic model has been trained yet.
+    command: python3
+    args:
+      - "-c"
+      - |
+        import json, sys
+        from pathlib import Path
+        state_path = Path('data/model_state.json')
+        if not state_path.exists():
+            print("[INFO] No learner state file yet (data/model_state.json).")
+            sys.exit(0)
+        try:
+            state = json.loads(state_path.read_text(encoding='utf-8'))
+        except Exception as e:
+            print(f"[WARN] Could not read model_state.json: {e}")
+            sys.exit(0)
+
+        records = state.get('records', [])
+        n = len(records)
+        if n == 0:
+            print("[INFO] Learner: no resolved trades recorded yet.")
+            sys.exit(0)
+
+        outcomes   = [r['outcome']   for r in records]
+        fair_probs = [r['fair_prob'] for r in records]
+        bias = sum(outcomes) / n - sum(fair_probs) / n
+
+        trained    = state.get('logistic_weights') is not None
+        last_n     = state.get('last_trained_n', 0)
+        updated    = state.get('last_updated', 'unknown')
+
+        print(f"── Learner calibration ────────────────────────")
+        print(f"  Records   : {n}  (last trained at n={last_n})")
+        print(f"  Global bias: {bias:+.4f}  ({'model' if trained else 'bias-only'})")
+        print(f"  Updated   : {updated}")
+
+        # Per-sport bias
+        sports = {}
+        for r in records:
+            sp = r.get('sport', 'unknown')
+            sports.setdefault(sp, {'outcomes': [], 'fair_probs': []})
+            sports[sp]['outcomes'].append(r['outcome'])
+            sports[sp]['fair_probs'].append(r['fair_prob'])
+        for sp, d in sorted(sports.items()):
+            n_sp = len(d['outcomes'])
+            if n_sp >= 10:
+                sb = sum(d['outcomes'])/n_sp - sum(d['fair_probs'])/n_sp
+                print(f"  {sp:<20s}: bias={sb:+.4f}  (n={n_sp})")
+    on_failure: continue
+
+  - id: export_trade_csv
+    name: "Export trade log to CSV"
+    description: >
+      Convert trade_log.jsonl → data/exports/trade_log.csv so the user can
+      open it in Excel without needing to parse JSONL manually.
+    command: python3
+    args:
+      - "-c"
+      - |
+        import csv, json, sys
+        from pathlib import Path
+        src = Path('data/trade_logs/trade_log.jsonl')
+        dst = Path('data/exports/trade_log.csv')
+        if not src.exists():
+            print("[SKIP] trade_log.jsonl not found.")
+            sys.exit(0)
+        rows = []
+        for line in src.read_text(encoding='utf-8').splitlines():
+            if line.strip():
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        if not rows:
+            print("[SKIP] trade_log.jsonl is empty.")
+            sys.exit(0)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = list(dict.fromkeys(k for r in rows for k in r))
+        with dst.open('w', newline='', encoding='utf-8') as fh:
+            w = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction='ignore')
+            w.writeheader()
+            w.writerows(rows)
+        print(f"[OK] trade_log.csv: {len(rows)} row(s) → {dst}")
+    on_failure: continue
+
+  - id: export_unmatched_csv
+    name: "Export unmatched markets to CSV"
+    description: >
+      Convert unmatched_markets.jsonl → data/exports/unmatched_markets.csv
+      so the user can review which Kalshi markets could not be paired with
+      an Odds API price.
+    command: python3
+    args:
+      - "-c"
+      - |
+        import csv, json, sys
+        from pathlib import Path
+        src = Path('data/trade_logs/unmatched_markets.jsonl')
+        dst = Path('data/exports/unmatched_markets.csv')
+        if not src.exists():
+            print("[SKIP] unmatched_markets.jsonl not found.")
+            sys.exit(0)
+        rows = []
+        for line in src.read_text(encoding='utf-8').splitlines():
+            if line.strip():
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        if not rows:
+            print("[SKIP] unmatched_markets.jsonl is empty.")
+            sys.exit(0)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = list(dict.fromkeys(k for r in rows for k in r))
+        with dst.open('w', newline='', encoding='utf-8') as fh:
+            w = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction='ignore')
+            w.writeheader()
+            w.writerows(rows)
+        print(f"[OK] unmatched_markets.csv: {len(rows)} row(s) → {dst}")
+    on_failure: continue
+
+  - id: append_daily_summary
+    name: "Append row to daily_summary.csv"
+    description: >
+      Append a one-line summary (date, n_trades, pnl_usd, n_pending, n_unmatched)
+      to data/exports/daily_summary.csv so weekly trends can be tracked in Excel.
+    command: python3
+    args:
+      - "-c"
+      - |
+        import csv, json, sys
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        today = datetime.now(tz=timezone.utc).strftime('%Y-%m-%d')
+        summary_path = Path('data/exports/daily_summary.csv')
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Count trades
+        trades_path = Path('data/trade_logs/trade_log.jsonl')
+        wins = losses = voids = pending = 0
+        pnl  = 0.0
+        if trades_path.exists():
+            for raw in trades_path.read_text(encoding='utf-8').splitlines():
+                if not raw.strip():
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if not rec.get('timestamp', '').startswith(today):
+                    continue
+                outcome = (rec.get('outcome') or '').upper()
+                if outcome == 'WIN':
+                    wins += 1; pnl += float(rec.get('pnl_usd', 0))
+                elif outcome == 'LOSS':
+                    losses += 1; pnl += float(rec.get('pnl_usd', 0))
+                elif outcome == 'VOID':
+                    voids += 1
+                elif outcome in ('PENDING', ''):
+                    pending += 1
+
+        unmatched_path = Path('data/trade_logs/unmatched_markets.jsonl')
+        n_unmatched = 0
+        if unmatched_path.exists():
+            for raw in unmatched_path.read_text(encoding='utf-8').splitlines():
+                if raw.strip():
+                    try:
+                        rec = json.loads(raw)
+                        if rec.get('timestamp', '').startswith(today):
+                            n_unmatched += 1
+                    except json.JSONDecodeError:
+                        pass
+
+        fieldnames = ['date','n_wins','n_losses','n_void','n_pending',
+                      'pnl_usd','n_unmatched']
+        write_header = not summary_path.exists()
+        with summary_path.open('a', newline='', encoding='utf-8') as fh:
+            w = csv.DictWriter(fh, fieldnames=fieldnames)
+            if write_header:
+                w.writeheader()
+            w.writerow({
+                'date':         today,
+                'n_wins':       wins,
+                'n_losses':     losses,
+                'n_void':       voids,
+                'n_pending':    pending,
+                'pnl_usd':      round(pnl, 2),
+                'n_unmatched':  n_unmatched,
+            })
+        print(f"[OK] Appended summary row for {today} to {summary_path}")
+    on_failure: continue
+
+notifications:
+  on_success: true
+  on_failure: false
+  success_message: >
+    Daily report ready. Exports in data/exports/ (trade_log.csv,
+    unmatched_markets.csv, daily_summary.csv).

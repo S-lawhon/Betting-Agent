@@ -1,0 +1,90 @@
+{
+ "KXGOLFTOURN": {
+  "n": 90,
+  "vol": 119513.77000000002,
+  "medspread": 4.0,
+  "fade_n": 5,
+  "fade_edge": null,
+  "fade_se": null
+ },
+ "KXPGA3BALL": {
+  "n": 2144,
+  "vol": 833355.3400000002,
+  "medspread": 6.000000000000001,
+  "fade_n": 249,
+  "fade_edge": 3.945783132530123,
+  "fade_se": 2.725491434504103
+ },
+ "KXPGAH2H": {
+  "n": 812,
+  "vol": 964383.0299999994,
+  "medspread": 4.0000000000000036,
+  "fade_n": 18,
+  "fade_edge": null,
+  "fade_se": null
+ },
+ "KXPGAMAKECUT": {
+  "n": 1283,
+  "vol": 2508101.1599999974,
+  "medspread": 6.000000000000003,
+  "fade_n": 318,
+  "fade_edge": -4.070754716981129,
+  "fade_se": 2.6106573477744073
+ },
+ "KXPGAR1LEAD": {
+  "n": 1356,
+  "vol": 52618910.84000002,
+  "medspread": 0.8,
+  "fade_n": 6,
+  "fade_edge": null,
+  "fade_se": null
+ },
+ "KXPGAR2LEAD": {
+  "n": 1360,
+  "vol": 1445737.3900000004,
+  "medspread": 3.0,
+  "fade_n": 5,
+  "fade_edge": null,
+  "fade_se": null
+ },
+ "KXPGAR3LEAD": {
+  "n": 1360,
+  "vol": 2538680.3000000003,
+  "medspread": 3.0,
+  "fade_n": 17,
+  "fade_edge": null,
+  "fade_se": null
+ },
+ "KXPGATOP10": {
+  "n": 1359,
+  "vol": 10984858.469999982,
+  "medspread": 3.0,
+  "fade_n": 620,
+  "fade_edge": 4.393548387096774,
+  "fade_se": 1.1784737200371078
+ },
+ "KXPGATOP20": {
+  "n": 1359,
+  "vol": 16513358.080000017,
+  "medspread": 2.0000000000000018,
+  "fade_n": 822,
+  "fade_edge": 8.630170316301703,
+  "fade_se": 0.9921894677058722
+ },
+ "KXPGATOP40": {
+  "n": 313,
+  "vol": 709407.3199999995,
+  "medspread": 6.999999999999995,
+  "fade_n": 97,
+  "fade_edge": 14.577319587628864,
+  "fade_se": 2.94581174512516
+ },
+ "KXPGATOP5": {
+  "n": 1360,
+  "vol": 8643175.190000003,
+  "medspread": 2.0,
+  "fade_n": 323,
+  "fade_edge": 3.2755417956656347,
+  "fade_se": 1.7075939066396058
+ }
+}

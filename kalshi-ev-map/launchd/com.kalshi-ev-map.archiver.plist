@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.kalshi-ev-map.archiver</string>
+<key>WorkingDirectory</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map</string>
+<key>StandardOutPath</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/data/cron_archive.log</string>
+<key>StandardErrorPath</key><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/data/cron_archive.log</string>
+<key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>/Users/samlawhon/Desktop/Betting Fund Project/kalshi-ev-map/src/archive_settled.py</string></array>
+<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>3</integer><key>Minute</key><integer>17</integer></dict>
+</dict></plist>

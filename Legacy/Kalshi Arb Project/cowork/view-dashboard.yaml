@@ -1,0 +1,87 @@
+---
+# cowork/view-dashboard.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+# Automation: Print a live dashboard snapshot of the betting agent's state.
+#
+# What it does
+# ────────────
+#   Replays trade_log.jsonl to reconstruct the current Ledger state, then
+#   renders the full ANSI terminal dashboard:
+#     • Header  — timestamp, paper/live mode, scan count
+#     • Account — bankroll, daily P&L, exposure %, drawdown, cooldown status
+#     • Positions — open trades (ticker / side / size / fill price / opened)
+#     • Trades  — last 10 rows from trade_log.jsonl
+#
+#   Optionally exports trade_log.csv and unmatched_markets.csv to
+#   data/exports/ for review in Excel.
+#
+# Scheduling
+# ──────────
+#   Manual (on demand) — run any time you want a quick status check.
+#   To watch continuously from the terminal, use:
+#       python scripts/run_dashboard.py --watch --interval 5
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: view-dashboard
+display_name: "View Agent Dashboard"
+description: >
+  Render a full terminal dashboard snapshot: bankroll, daily P&L, drawdown,
+  open positions, cooldown status, and last 10 trade log entries.  Optionally
+  exports trade_log.csv and unmatched_markets.csv to data/exports/.
+version: "1.0"
+category: monitoring
+
+trigger:
+  type: manual
+
+environment:
+  working_directory: "."
+  python_executable: python3
+  required_files:
+    - config.yaml
+    - scripts/run_dashboard.py
+
+steps:
+  - id: render_dashboard
+    name: "Render dashboard snapshot"
+    description: >
+      Replay trade_log.jsonl to rebuild the Ledger state, then print the
+      full ANSI dashboard (bankroll, P&L, positions, recent trades).
+    command: python3
+    args:
+      - "scripts/run_dashboard.py"
+      - "--no-color"    # plain text works best in the Cowork output panel
+      - "--export"      # also export CSV files to data/exports/
+    on_failure: notify
+
+  - id: summarise_exports
+    name: "Confirm export file locations"
+    description: >
+      Print the paths and sizes of any CSV files written to data/exports/
+      so the user knows where to find them.
+    command: python3
+    args:
+      - "-c"
+      - |
+        from pathlib import Path
+        exports = Path('data/exports')
+        if not exports.exists():
+            print("[INFO] data/exports/ not created yet — no data to export.")
+            exit(0)
+        files = sorted(exports.glob('*.csv'))
+        if not files:
+            print("[INFO] No CSV files in data/exports/ yet.")
+            exit(0)
+        print("\nExported files:")
+        for f in files:
+            size_kb = f.stat().st_size / 1024
+            rows = len(f.read_text(encoding='utf-8').splitlines()) - 1
+            print(f"  {f.name:<35s} {rows:>5d} row(s)  ({size_kb:.1f} KB)")
+    on_failure: continue
+
+notifications:
+  on_success: false
+  on_failure: true
+  failure_message: >
+    Dashboard render failed.  Check that config.yaml is valid and that
+    numpy, pyyaml, and python-dotenv are installed.

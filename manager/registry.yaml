@@ -208,7 +208,21 @@ workstreams:
       above zero, well calibrated, no outlier dependence. KEEP + INVEST.
     watch:
       - SANITY_SKIP rate (5-11/cycle, pod's own message says "probable mapping error")
-    note: baseball_mlb sport_override disabled pending Polymarket regular-season markets.
+    note: >
+      baseball_mlb sport_override still disabled — but NOT for the original reason.
+      Verified 2026-07-21: Polymarket series_id=3 lists current regular-season
+      games (109 live events) and Kalshi KXMLBGAME is open (68 markets); title
+      matching scores 100.0. The real blockers, found on first end-to-end
+      exercise of the MLB path, are (A) "First 5 Innings Winner" and "Player
+      Props" events pass tag_id=100639 and the 55.0 fuzzy threshold and get
+      priced as the full-game moneyline — F5 sits 6-13c below the game line, a
+      one-directional phantom edge; and (B) MLB series produce 3 identically
+      titled Polymarket events on different dates, and matching is title-only
+      with skip_time_check=true — 32/58 cross_venue_matcher MLB matches pair
+      different game days. Fix key: markets[0].gameStartTime (exact) or the
+      slug date. Liquidity is fine on the true moneyline (1c spread, $88k-176k
+      depth); the thin books previously sampled were alt-lines/derivatives.
+      See PROJECT_STATUS.md "Pending / Known Gaps" item 3.
 
   - id: P-014
     name: Live Game Agent

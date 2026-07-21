@@ -340,6 +340,27 @@ class GolfTopNPod(BasePod):
             "net": fair_prob - ask - fee,
         }
 
+    def _open_position_count(self) -> int:
+        """Positions actually open for this pod, restart-safe.
+
+        _open_count alone is process-local: it resets to 0 on every
+        service restart while the real positions live on in the
+        TradeStore. Since this cap is the pod's binding intra-cycle
+        exposure control (see the class docstring), a process-local
+        counter means each deploy silently grants another full cap.
+        Observed in production: two restarts in one day took P-017 from
+        27 positions / $247 to 36 / $305, past the 25% per-pod policy.
+
+        Derive from the store when we have one; fall back otherwise.
+        """
+        store = self._trade_store
+        if store is not None:
+            try:
+                return len(store.get_open_trades(self.pod_id))
+            except Exception as exc:   # never let bookkeeping stop a scan
+                logger.warning("P-017: open-position lookup failed: %s", exc)
+        return self._open_count
+
     def _select_candidates(self, candidates: List[tuple]) -> List[tuple]:
         """Order candidates so the position cap truncates deliberately.
 
@@ -366,7 +387,7 @@ class GolfTopNPod(BasePod):
           * model mode (DataGolf live) — fair_prob genuinely varies by
             golfer, so net edge IS a quality signal and we rank by it.
         """
-        slots = self.max_open_positions - self._open_count
+        slots = self.max_open_positions - self._open_position_count()
         if slots <= 0 or len(candidates) <= slots:
             return candidates
 
@@ -426,7 +447,7 @@ class GolfTopNPod(BasePod):
         fp = self.make_fingerprint(ticker, "YES")
         if self.is_duplicate(fp) or self.has_open_position(ticker):
             return None
-        if self._open_count >= self.max_open_positions:
+        if self._open_position_count() >= self.max_open_positions:
             return self._skip(m, ask, fair_prob, "SKIPPED_RISK",
                               f"max_open_positions {self.max_open_positions}")
 

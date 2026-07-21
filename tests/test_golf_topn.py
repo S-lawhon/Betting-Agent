@@ -257,3 +257,70 @@ def test_close_utc_recorded_for_settler():
     placed = [r for r in _pod([m], now).scan_once() if r.action == "PLACED"]
     assert len(placed) == 1
     assert placed[0].extra["close_utc"].startswith("2026-07-21")
+
+
+# ── Cap must survive a restart ───────────────────────────────────────
+
+class _StubStore:
+    """Minimal TradeStore stand-in: knows which positions are open."""
+
+    def __init__(self, open_market_ids):
+        self._open = list(open_market_ids)
+
+    def get_open_trades(self, pod_id=None):
+        return [{"pod_id": pod_id or "P-017", "market_id": m}
+                for m in self._open]
+
+    # BasePod dedup/open-position hooks
+    def is_fingerprint_seen(self, fp):
+        return False
+
+    def is_position_open(self, market_id):
+        return market_id in self._open
+
+    @property
+    def seen_fingerprints(self):
+        return set()
+
+    def get_open_market_ids(self):
+        return set(self._open)
+
+    def append(self, entry):
+        pass
+
+
+def test_cap_counts_positions_from_store_not_process_counter():
+    """Regression: _open_count is process-local and resets on restart.
+
+    Observed in production — two deploys in one day took P-017 from 27
+    positions/$247 to 36/$305, past the 25% per-pod exposure policy,
+    because each restart handed the pod a fresh full cap while the real
+    positions lived on in the TradeStore.
+    """
+    now = _now()
+    close = now + timedelta(days=6)
+    # 30 positions already open from before the "restart"
+    store = _StubStore([f"KXPGATOP10-XYZ26-OLD{i:03d}" for i in range(30)])
+    pod = _pod(_band_markets(60, 60, close), now,
+               max_open_positions=40, trade_store=store)
+
+    placed = [r for r in pod.scan_once() if r.action == "PLACED"]
+    # only 10 slots left, not a fresh 40
+    assert len(placed) == 10, f"expected 10 remaining slots, got {len(placed)}"
+
+
+def test_cap_blocks_entirely_when_store_already_full():
+    now = _now()
+    close = now + timedelta(days=6)
+    store = _StubStore([f"KXPGATOP10-XYZ26-OLD{i:03d}" for i in range(40)])
+    pod = _pod(_band_markets(60, 60, close), now,
+               max_open_positions=40, trade_store=store)
+    assert [r for r in pod.scan_once() if r.action == "PLACED"] == []
+
+
+def test_cap_falls_back_to_counter_without_store():
+    """No store attached (standalone/backtest) — old behaviour holds."""
+    now = _now()
+    close = now + timedelta(days=6)
+    pod = _pod(_band_markets(60, 60, close), now, max_open_positions=12)
+    assert len([r for r in pod.scan_once() if r.action == "PLACED"]) == 12

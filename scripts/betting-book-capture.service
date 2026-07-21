@@ -13,14 +13,23 @@ WorkingDirectory=/opt/betting-pod-shop
 # Separate unit from betting-pod-shop / betting-live-maker so a capture bug
 # cannot take down trading, and a trading restart cannot gap the capture.
 #
-# --rate 2.5 is DELIBERATELY below the module default of 5.0.  Measured on
-# this host 2026-07-20: betting-pod-shop already takes 829 HTTP 429s/24h,
-# escalating to ~134/hr at 03:00 UTC (peak MLB).  betting-live-maker takes
-# zero, and P-016 is mid-gate (282/500 fills) — pushing it into 429s would
-# contaminate a running pre-registered sample.  Capture therefore runs at
-# ~1/3 of the ~7 req/s pain threshold and halves itself on any 429.
-# Raise this only after the main engine's rate-limit problem is fixed.
-ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_book_capture --rate 2.5
+# --rate 4.0 sized to COVERAGE, not to a round number.  The cap is
+# rate*cadence*safety/reqs_per_market = 4.0*60*0.6/2 = 72 markets, which covers
+# the 68 discovered on a full MLB slate with margin.  5.0 would give 90 — more
+# API budget than the job needs, and on this host budget is shared.
+#
+# History: this ran at 2.5 (45 markets, truncating ~23) from 2026-07-20 while
+# the 429 storm was being diagnosed.  Root cause turned out to be the legacy
+# shared KalshiClient defaulting to 5 req/s (kalshi.rate_limit now 2), NOT this
+# daemon — 98 of 98 429s came from [kalshi_client], zero from KalshiPublic.
+# With that fixed and the MLB props collector throttled to 2.0, the headroom
+# for full slate coverage exists.
+#
+# Kalshi throttles per-IP, so this competes with betting-pod-shop,
+# betting-live-maker and mlb-props-collector.  The daemon halves its own rate
+# on any 429 and recovers at 5%/cycle, so it yields first if that is wrong.
+# Watch: journalctl -u betting-book-capture | grep 'throttling down'
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_book_capture --rate 4.0
 
 Restart=always
 RestartSec=30

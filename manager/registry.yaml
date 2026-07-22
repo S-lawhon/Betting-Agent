@@ -613,6 +613,27 @@ workstreams:
       This pod is why P-015's decision rule is locked in advance.
     monitor_only: Assert it stays disabled.
 
+  - id: P-019
+    name: Cross-Family Longshot Maker
+    stage: killed
+    tier: none
+    blocked_on: nothing
+    owner_dir: longshot_research
+    summary: >
+      KILLED 2026-07-22 at the step-1 calibration gate, before any engine code.
+      The favorite-longshot bias does not replicate in our universe: on 5,192
+      event-clustered settled Kalshi contracts (politics + audited sports-
+      futures), both proposed bands are calibrated within CI (sell-target
+      0.03-0.10 realized 6.6% vs implied 5.8%; buy-target 0.80-0.90 realized
+      80.9% vs implied 84.8%, favorites if anything OVERpriced). Only the 0-3c
+      tail is mispriced — outside the bands, ~1.2c vs ~65:1 downside,
+      unharvestable. Long-horizon slice (px_open) disconfirms hardest, exactly
+      where the thesis claims the edge is strongest. Evidence:
+      longshot_research/REPORT_Longshot_2026-07.md; spec banner-marked NO-GO at
+      research/SPEC_P019_Longshot_Maker.md. Reusable idea if ever needed: the
+      AggregateRiskGuard cluster-correlation dimension (spec 4.2).
+    monitor_only: Assert nothing named P-019 is ever registered/deployed.
+
   - id: P-009-P-010
     name: Promo pods (Sign-Up Bonus / Odds Boost)
     stage: parked

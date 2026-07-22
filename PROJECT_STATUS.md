@@ -1,153 +1,211 @@
 # Betting Pod Shop — Project Status & Continuity Reference
 
-**Last Updated:** March 24, 2026 (Session 9)
+**Last Updated:** July 22, 2026
 **VPS:** 129.212.176.202 (DigitalOcean)
 **VPS Path:** `/opt/betting-pod-shop/`
-**Dashboard:** http://129.212.176.202:8080
+**Dashboard:** https://dashboard.htxtrades.org/ (TLS + basic auth via Caddy; public :8080 closed)
 **Deploy:** `cd ~/Desktop/"Betting Fund Project" && bash scripts/deploy.sh 129.212.176.202 restart`
+
+> **What this document is.** The two sections that follow (System Overview,
+> Active Pods) plus Deployment Rules are the **current-state reference** — kept
+> accurate. Everything under **Recent Changes** is a **reverse-chronological
+> changelog / archive**; older entries reflect the state at their date and are
+> not maintained. The single authoritative source of live state is
+> `manager/registry.yaml` + the daily brief (`python3 manager/brief.py`); this
+> file is orientation, the registry is truth.
 
 ---
 
 ## System Overview
 
-Multi-pod sports betting engine running on a DigitalOcean VPS. Currently in **paper/demo mode** — all trades are simulated. The system scans for mispriced moneyline markets across Kalshi (P-001) and Polymarket (P-006), using The Odds API multi-book consensus as fair value.
+Multi-pod sports betting engine on a DigitalOcean VPS, **paper/demo mode
+throughout** — no real money has ever been deployed. Since the July 2026 pivot
+the focus is **Kalshi-only, per-sport, CLV-gated** models (see
+`PROJECT_PLAN_Kalshi_Sports_v2.md`). Polymarket-executing pods are shelved
+because the project has no Polymarket execution access.
 
 ### Architecture
 
 ```
-Main Loop (src/main.py → src/engine.py)
-  ├── AggregateRiskGuard — portfolio-level exposure/drawdown limits
+5-minute engine  (betting-pod-shop.service; src/main.py → src/engine.py)
+  ├── AggregateRiskGuard — portfolio exposure/drawdown limits; intra-cycle
+  │                        reservations (caps bind within a scan, not just across)
   ├── CapitalAllocator   — pod-level bankroll allocation + performance tracking
-  ├── PodRunner          — orchestrates scan cycles across active pods
-  │     ├── P-001: KalshiMoneylinePod → Legacy Scanner → Kalshi Production API
-  │     ├── P-002: CrossVenueArbPod (disabled)
-  │     ├── P-004: ForecastExKalshiArbPod (disabled)
-  │     ├── P-006: PolymarketConsensusPod → Gamma API + Odds API → Polymarket
-  │     ├── P-009: SignupBonusPod (disabled)
-  │     ├── P-010: BoostScannerPod (disabled)
-  │     └── P-012: MacroNowcastPod (disabled)
-  ├── TradeStore         — centralized in-memory indexed JSONL store
-  ├── Settler (Kalshi)   — resolves P-001 trades via Odds API /scores
-  ├── PolymarketSettler  — resolves P-006 trades via Gamma API resolution
-  └── WebDashboardServer — serves live dashboard at :8080
+  ├── PodRunner          — scans active pods concurrently (execution.max_scan_workers: 2)
+  │     ├── P-001  Kalshi Moneyline Value  → Legacy Scanner → Kalshi
+  │     ├── P-014  Live Game Agent (in-play consensus)
+  │     ├── P-015  Tennis Qualifier Favorite (paper validation)
+  │     └── P-017  Golf Top-N pre-tournament value (paper validation)
+  ├── Settlers (run at settlement.interval_cycles: 6, i.e. every 30 min):
+  │     Kalshi (P-001), Polymarket, KalshiTennisSettler (P-015), KalshiGolfSettler (P-017)
+  ├── TradeStore         — central in-memory indexed JSONL store
+  └── WebDashboardServer — dashboard
+
+Standalone units (own fast loops, NOT in the 5-min engine):
+  ├── betting-live-maker      — P-016 Live Maker. RETIRED 2026-07-21 (failed
+  │                             gate); unit runs but idle, KILL_MAKER present.
+  ├── betting-book-capture    — 1-min Kalshi order-book capture (src/book_capture.py)
+  └── mlb-props-collector     — MLB order-book snapshots (timer; writes /opt/mlb-props/)
+
+Disabled/retired: P-002 (shelved), P-004, P-006 (shelved), P-009, P-010,
+P-012, P-013, P-016 (retired). P-017M golf fade maker shelved.
 ```
 
 ### VPS Details
 
-- **Path:** `/opt/betting-pod-shop/`
-- **Service:** systemd (`betting-pod-shop.service`) — auto-restart on failure, 30s cooldown
-- **User:** `bettingbot` (system user, no login shell, no home dir)
+- **Path:** `/opt/betting-pod-shop/` (service runs here; `data/` is the
+  authoritative live trade history — never overwrite it, see Deployment Rules)
+- **Services (4):** `betting-pod-shop` (5-min engine), `betting-live-maker`
+  (P-016, idle post-retirement), `betting-book-capture`, `mlb-props-collector`
+- **User:** `bettingbot` (system user, no login shell) — rsync-as-root must
+  `chown -R bettingbot:bettingbot` after; `deploy.sh` does this
 - **Python:** `/opt/betting-pod-shop/venv/bin/python` (3.12)
-- **Legacy sys.path:** Injected at module level in `src/engine.py` + PYTHONPATH in service file (belt-and-suspenders)
-- **Start/Stop:** `systemctl start|stop|restart betting-pod-shop`
-- **Logs:** `journalctl -u betting-pod-shop -f`
-- **Config:** `config.yaml` (base Kalshi) + `config_multi_pod.yaml` (multi-pod overlay)
-- **Trade Log:** `data/trade_logs/trade_log.jsonl`
-- **Environment:** `demo` (paper mode) — pointing at **production** Kalshi API (`trading-api.kalshi.co`) for full market inventory, but `environment: demo` keeps order placement gated
+- **Legacy sys.path:** injected in `src/engine.py` + PYTHONPATH in the service
+  file (the Scanner/Settler/KalshiClient live under `Legacy/Kalshi Arb Project/src/`)
+- **Logs:** `journalctl -u <service> -f`
+- **Config:** `config.yaml` (base) + `config_multi_pod.yaml` (multi-pod overlay,
+  merged over base). Key blocks added this era: `kalshi.rate_limit` (2 req/s —
+  shared client, per-IP throttle), `execution.max_scan_workers`,
+  `settlement.interval_cycles`, `book_capture`.
+- **Kalshi API:** **production** `https://api.elections.kalshi.com/trade-api/v2`
+  for full market inventory; `KALSHI_ENVIRONMENT=demo` + no
+  `I_UNDERSTAND_LIVE_TRADING` keeps order placement gated. **Demo credentials
+  only** — this is why the book-capture daemon uses REST, not the authenticated
+  websocket. Kalshi throttles **per-IP**, so all services share one budget.
+- **Timezone:** the droplet is UTC; Kalshi tickers encode ET. Use
+  `src/et_time.py` for any ET conversion — do not hardcode UTC offsets (they
+  break at DST). Known deferred bug: `aggregate_risk` daily-P&L resets at UTC
+  midnight (mid-slate ET); scheduled fix `fix-aggregate-risk-pnl-reset-tz`.
 
 ### Key Environment Variables
 
-- `ODDS_API_KEY` — The Odds API key (required for scanning + settlement)
-- `KALSHI_API_KEY_ID` — Kalshi production API key
-- `KALSHI_PRIVATE_KEY` — Kalshi private key (RSA PEM format)
-- `POLYMARKET_API_KEY` — Polymarket API key
-- `FRED_API_KEY` — FRED API key (for P-012 macro nowcasting)
+- `ODDS_API_KEY` — The Odds API (scanning + P-001/settlement)
+- `KALSHI_API_KEY_ID` / `KALSHI_PRIVATE_KEY` — Kalshi (RSA PEM); **demo** keys
+- `KALSHI_ENVIRONMENT=demo` — paper-mode gate
+- `POLYMARKET_API_KEY` — data only (no execution access)
+- `FRED_API_KEY` — FRED (legacy P-012, disabled)
 
 ---
 
 ## Active Pods
 
-> **⚠️ Roster as of 2026-07-22:** engine runs **P-001, P-014, P-015, P-017**.
-> **P-002 and P-006 are SHELVED** (no Polymarket execution access). **P-016 is
-> RETIRED** (failed gate). The per-pod detail below is partly pre-pivot — see
-> `manager/registry.yaml` for authoritative current state and the July 21–22
-> session notes below. P-006's section is retained for reference but it is not
-> running.
+Roster as of 2026-07-22. Full per-workstream state, gates, and history live in
+`manager/registry.yaml` (authoritative) — this is the orientation summary.
 
-### P-001: Kalshi vs Sharp's Strategy
+| Pod | Status | Tier | Gate |
+|---|---|---|---|
+| **P-001** Kalshi Moneyline Value | active | validating | 200 CLV rows (~81) |
+| **P-014** Live Game Agent | active | validating | 500 settled trades |
+| **P-015** Tennis Qualifier Favorite | active | validating | 120 trades (0; US Open quals Aug) |
+| **P-017** Golf Top-N (taker) | active | validating | 8 tournaments (1) |
+| P-002 Cross-Venue Arb | ⛔ shelved | none | no Poly execution access |
+| P-006 Poly Consensus | ⛔ shelved | none | no Poly execution access |
+| P-016 Live Maker | ☠ retired | none | failed gate (−1.29¢ markout) |
+| P-017M Golf Fade Maker | shelved | none | +9.1¢ was a weighting-bug artifact |
 
-- **File:** `src/pods/kalshi_moneyline.py` (wrapper) → `Legacy/Kalshi Arb Project/src/scanner.py`
-- **Strategy:** Finds mispriced moneyline markets on Kalshi using Odds API multi-book consensus (Pinnacle-weighted) as fair value
-- **Settlement:** `Legacy/Kalshi Arb Project/src/settler.py` — uses **Odds API `/v4/sports/{sport}/scores/?daysFrom=3`** as primary resolution source (NOT Kalshi API, which never settles sports markets in demo mode)
+**No pod is `tier: production` — nothing has cleared a gate.** All trading is
+paper. Kill switch for the maker unit: `touch data/KILL_MAKER`.
 
-### P-006: Sportsbook-Polymarket Consensus — ⛔ SHELVED 2026-07-22
+### P-001 — Kalshi Moneyline Value
 
-- **SHELVED:** executes on Polymarket only, which this project cannot access, so
-  it can never graduate regardless of edge quality. NOT a judgement on the edge
-  (was the most trustworthy in the lifetime analysis). Known unfixed defect if
-  ever revived: the SANITY_SKIP mapping error (likely the derivative-event /
-  date-collision matching bug found this session). See `manager/registry.yaml`.
-- **File:** `src/pods/polymarket_consensus.py` (986 lines)
-- **Strategy:** Same edge logic as P-001 but executes on Polymarket (0% fees vs Kalshi's ~7%). Lower edge threshold (0.8% vs 3%) and lower min_ev (0.5% vs 1%).
-- **Market Discovery:** Gamma API `/events?series_id=X&tag_id=100639` → filters to game-day moneyline bets
-- **Matching:** `src/polymarket_matcher.py` — fuzzy threshold 55 (vs 85 for Kalshi), time window 60 min
-- **Settlement:** `src/polymarket_settler.py` — polls Gamma API `/markets?slug=X` for resolution status
-- **Client:** `src/polymarket_client.py` — thin wrapper around py-clob-client with paper mode
+- `src/pods/kalshi_moneyline.py` (wrapper) → `Legacy/Kalshi Arb Project/src/scanner.py`.
+  Mispriced Kalshi moneylines vs Odds API multi-book (Pinnacle-weighted) consensus.
+- Settlement: `Legacy/.../settler.py` via **Odds API `/scores`** (Kalshi demo
+  never settles sports). Gate: forward CLV must follow the +1.4pp net-maker CLV
+  measured in backtest (`clv_log.jsonl`, ~81/200 rows). Do not scale until 200.
 
-### P-015: Tennis Qualifier Favorite (added 2026-07-20, paper validation)
+### P-014 — Live Game Agent
 
-- **Files:** `src/pods/qualifier_favorite_pod.py`, `src/kalshi_tennis_client.py` (public API, read-only), `src/kalshi_tennis_settler.py`
-- **Strategy:** Buy heavy favorites (ask 0.85–0.975) in ATP/WTA **qualifying** matches on Kalshi. Basis: `tennis_research/REPORT.md` §8b — 13-month backtest, +4.1¢/contract net of fees, 95.8% hit, n=238, CI [+1.4, +6.3]; ATP stronger than WTA (WTA runs half size). Sized with `fair = ask + 0.025` (conservative CI lower half), capped by displayed ask depth × 0.5 and max 6 concurrent positions.
-- **Settlement:** `KalshiTennisSettler` polls the Kalshi public API `result` field (production tennis markets settle normally); 14-day stale auto-void matches Kalshi's postponement rule. Wired into the engine loop alongside the P-001/P-006 settlers.
-- **Validation gate:** ~20 trades/month expected. Kill if realized hit rate < ask-implied; promote only if forward EV matches the retrospective +3–4¢. No CLV benchmark exists for quals (no sharp lines), so validation is realized-outcome calibration.
+- In-play consensus-edge agent. Verdict was INCONCLUSIVE-but-well-calibrated;
+  gate is 500 settled trades to resolve significance. Hold, do not scale.
 
-### P-009 / P-010 (Disabled)
+### P-015 — Tennis Qualifier Favorite (paper validation)
 
-- P-009: Sign-Up Bonus Blitz — promo/free-bet infrastructure present but not live
-- P-010: Daily Odds Boost Grind — boost infrastructure present but not live
+- `src/pods/qualifier_favorite_pod.py`, `src/kalshi_tennis_client.py` (read-only),
+  `src/kalshi_tennis_settler.py`. Buy heavy favorites (ask 0.85–0.975) in ATP/WTA
+  **qualifying** matches. Basis: `tennis_research/REPORT.md` — +4.1¢/ct net,
+  n=238, CI [+1.4,+6.3]. Sized `fair = ask + 0.025`, depth×0.5, max 6 concurrent.
+- Gate: 120 trades (currently 0; first volume is US Open quals Aug 17–21,
+  checkpoint ~Jan 2027). **P-015b** (extending to Challenger/ITF) was tested and
+  **dropped** — edge did not replicate (Challenger −1.98¢, ITF −2.33¢).
+
+### P-017 — Golf Top-N pre-tournament value (paper validation)
+
+- `src/pods/golf_topn_pod.py`, settler `src/kalshi_golf_settler.py`. Taker on
+  top-10/top-20 props. Backtest +6.92¢/ct net, 11/12 tournaments positive
+  (`golf_research/`). Gate: 8 live tournaments (currently 1, the 3M Open).
+- Cap derived from the TradeStore (not a process counter); `max_open_positions:
+  30` sized to the 25% per-pod exposure policy. **P-017M** (fade maker) shelved —
+  its +9.1¢ was a contract-weighting bug; corrected ~+3.3¢, below baseline.
+
+### Shelved / retired (kept in code, not running)
+
+- **P-016 Live Maker** — RETIRED 2026-07-21, failed its markout gate. Adverse
+  selection ate the spread; a v2 was tested and rejected (loss is diffuse). See
+  `research/POSTMORTEM_P016_2026-07-21.md`.
+- **P-002 / P-006** — shelved 2026-07-22, no Polymarket execution access. P-006's
+  edge was strong but unexecutable; do not read "shelved" as "refuted."
+- **P-004, P-009, P-010, P-012, P-013** — legacy/disabled since the July pivot.
 
 ---
 
 ## Optimization Plan Status
 
-All 4 phases complete. See `OPTIMIZATION_PLAN.md` for full details.
+The Phase I–IV optimization plan (`OPTIMIZATION_PLAN.md`) completed pre-pivot.
+Test suite is now **~1376 passing** (the "35 pre-existing failures" noted in old
+entries below was itself stale — the suite has been green). Historical detail:
 
-| Phase | Focus | Status | Test Count |
-|-------|-------|--------|------------|
-| Phase I | TradeStore, concurrent scanning, atomic writes | ✅ Complete | 642 pass / 35 fail |
-| Phase II | Exception audit, HTTP pooling, constants, VPS hardening, watchdog | ✅ Complete | 654 pass / 35 fail |
-| Phase III | Split main.py, log schema, BasePod helpers, deploy hardening, integration tests | ✅ Complete | 679 pass / 35 fail |
-| Phase IV | Pod auto-discovery, template extraction, type hints, P&L calculator, compat layer | ✅ Complete | 696 pass / 35 fail |
+| Phase | Focus | Status |
+|-------|-------|--------|
+| Phase I | TradeStore, concurrent scanning, atomic writes | ✅ Complete |
+| Phase II | Exception audit, HTTP pooling, constants, VPS hardening, watchdog | ✅ Complete |
+| Phase III | Split main.py, log schema, BasePod helpers, deploy hardening, integration tests | ✅ Complete |
+| Phase IV | Pod auto-discovery, template extraction, type hints, P&L calculator, compat layer | ✅ Complete |
 
 ---
 
 ## CRITICAL: Deployment Rules
 
-### ⚠️ NEVER rsync data/ to the live server
+### Use `scripts/deploy.sh` — it protects live data by construction
 
-The service runs from `/opt/betting-pod-shop/` (NOT `/root/Betting-Fund-Project/`). The live trade log at `/opt/betting-pod-shop/data/trade_logs/trade_log.jsonl` contains the authoritative trade history. The copy on your Mac is a stale snapshot.
-
-**Safe deploy (code only, preserves live data):**
 ```bash
-# Step 1: Mac → staging directory on server
-rsync -avz --exclude '.git' --exclude '__pycache__' ~/Desktop/Betting\ Fund\ Project/ root@129.212.176.202:~/Betting-Fund-Project/
-
-# Step 2: staging → live (EXCLUDE data/ to protect trade logs)
-ssh root@129.212.176.202 "rsync -av /root/Betting-Fund-Project/ /opt/betting-pod-shop/ --exclude '.git' --exclude '__pycache__' --exclude 'data/' && systemctl restart betting-pod-shop"
+bash scripts/deploy.sh 129.212.176.202          # sync code only, no restart
+bash scripts/deploy.sh 129.212.176.202 restart  # sync + restart betting-pod-shop + health check
 ```
 
-**NEVER run this** (overwrites live trade history with stale Mac copy):
-```bash
-# DANGEROUS — this destroyed trade history on March 21, 2026
-ssh root@129.212.176.202 "rsync -av /root/Betting-Fund-Project/ /opt/betting-pod-shop/ --exclude '.git' --exclude '__pycache__'"
-# Missing --exclude 'data/' caused loss of March 7-19 trade records
-```
+`deploy.sh` rsyncs the repo **directly** to `/opt/betting-pod-shop/` with
+`--exclude 'data/'` and `--exclude '*.jsonl'`, then `chown -R
+bettingbot:bettingbot`, then (with `restart`) restarts **only**
+`betting-pod-shop` and runs a health check with auto-rollback on failure. There
+is no longer a two-directory staging step — the old `/root/Betting-Fund-Project`
+path still exists on the box but is unused.
 
-### Two-Directory Architecture on VPS
+### ⚠️ Why `data/` must never be synced
 
-| Path | Purpose | Who writes |
-|------|---------|------------|
-| `/root/Betting-Fund-Project/` | Staging area — rsync landing zone from Mac | rsync from Mac |
-| `/opt/betting-pod-shop/` | **LIVE** — service runs here, trade logs written here | systemd service |
+`/opt/betting-pod-shop/data/` holds the **authoritative live trade history**;
+the Mac copy is a stale snapshot. Overwriting it destroys records — this
+happened **March 21, 2026** (lost March 7–19 trades) when an rsync omitted
+`--exclude 'data/'`. `deploy.sh` bakes the exclusion in; never hand-roll an
+rsync without it.
 
-The systemd service (`betting-pod-shop.service`) has `WorkingDirectory=/opt/betting-pod-shop`. Code changes must be copied from staging → live. Data must NEVER be copied from staging → live.
+### What `deploy.sh restart` does NOT touch — and when that matters
 
-### After deploying, always clear __pycache__
+It restarts only `betting-pod-shop`. `betting-live-maker`,
+`betting-book-capture`, and `mlb-props-collector` keep running. This is
+deliberate: **P-016's gate sample (and any mid-validation pod's) must not be
+interrupted by a code deploy.** When a change must reach a standalone unit
+(book-capture, the maker, the collector), scp the file and
+`systemctl restart <unit>` that unit specifically. The MLB props collector
+writes to `/opt/mlb-props/` (outside the rsync target) — its data is safe but
+its **code drifts silently** and needs a manual scp.
 
-Python may use stale bytecode cache even when .py files are updated:
-```bash
-ssh root@129.212.176.202 "find /opt/betting-pod-shop -name '__pycache__' -exec rm -rf {} + 2>/dev/null; systemctl restart betting-pod-shop"
-```
+### Sync-only vs restart
+
+Use sync-only (no `restart` arg) for registry/doc/config changes the running
+process re-reads on its next cycle, or when you explicitly do not want to bounce
+the engine. Use `restart` when a `.py` change must take effect now. `deploy.sh`
+clears nothing by hand — systemd's restart reloads the code; there is no stale
+`__pycache__` step needed with the current flow.
 
 ---
 
@@ -308,6 +366,259 @@ remain open.
 | Book capture | started, ~2wk window | ~Aug 4 |
 | P-001 CLV | ~81 rows / 200 | slow |
 | P-015 tennis | 0/120 | US Open quals Aug 17–21 |
+
+---
+
+---
+
+## Known Open Gaps (current)
+
+Genuinely-open items as of 2026-07-22. Fixed/superseded items live in the
+archive. Cross-cutting infra items (429 budget, timezone, aggregate_risk P&L
+reset) are covered in System Overview and the July 21–22 entry.
+
+1. **`aggregate_risk` daily-P&L resets at UTC midnight** (= 8pm ET, mid-slate) —
+   a real risk-control weakening. Deferred while pods validate; scheduled fix
+   `fix-aggregate-risk-pnl-reset-tz` (~2026-09-15, gated on P-017 clearing).
+2. **P-001 `aggregate_risk` not wired** in `kalshi_moneyline.py`'s `from_config`
+   — minor; the guard still binds at the main-loop level.
+3. **NCAAB fuzzy matching broken** for 2–3-letter college codes (UK, ISU, KU…)
+   vs Odds API full names — scores below `min_team_score=50`. Blocks NCAAB on
+   P-001; fix is an abbreviation→full-name lookup in the matcher. (Seasonal.)
+4. **Odds API tennis `/scores` unreliable** (`completed=0` even after matches
+   finish) — P-015 settlement leans on the 14-day auto-void, so tennis P&L is
+   void-not-WIN/LOSS. Consider a tennis-specific settlement source before
+   trusting P-015 realized P&L.
+5. **Kalshi demo API never settles markets** (`status=active` always) — all
+   settlement runs off Odds API scores / public-API `result`, not the Kalshi
+   demo endpoint.
+6. **NHL has no moneyline/game-winner tickers** on Kalshi production (props
+   only) — any NHL moneyline pod is blocked at the venue.
+7. **Legacy vs multi-pod trade-log schema divergence** (`market_ticker` vs
+   `market_id`+`pod_id`+`venue`) complicates cross-pod log analysis.
+8. **Book capture is Kalshi-only, REST-sampled** (demo creds block the
+   websocket). The Polymarket-mid leg that R-EV-MAP Build 3 needs is not built.
+9. **Shelved-pod revival notes** (P-002/P-006 Polymarket matching: derivative-
+   event contamination + same-title-different-date collision; likely cause of
+   P-002's 74% void rate) are recorded in `manager/registry.yaml`. Fix those
+   before ever re-enabling.
+10. **Live-agent Tier 3** and three design-doc gaps (no [min,max] bounds, no
+    promotion margin, arm-budget arithmetic) remain open.
+
+---
+
+## File Map
+
+### Core Engine (src/)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `main.py` | ~150 | Backward-compat shim re-exporting symbols from config_loader, engine, cli |
+| `config_loader.py` | ~140 | YAML loading, deep merge, pod filtering, tennis enrichment |
+| `engine.py` | ~700 | Runtime engine: venue clients, shared deps, cycle callback, guarded loop |
+| `cli.py` | ~180 | CLI entry point, argument parser, logging setup |
+| `web_dashboard.py` | ~410 | Live web dashboard (API handlers + template loading) |
+| `pod_runner.py` | ~315 | Orchestrates scan cycles across active pods |
+| `capital_allocator.py` | ~494 | Pod-level bankroll allocation + performance tracking |
+| `aggregate_risk.py` | ~400 | Portfolio-level exposure/drawdown/halt controls |
+| `base_pod.py` | ~255 | Abstract BasePod interface + shared helpers |
+| `trade_store.py` | ~450 | Centralized in-memory indexed JSONL store with atomic writes |
+| `multi_executor.py` | ~280 | Venue-agnostic execution router |
+| `pod_registry.py` | ~100 | Decorator-based pod auto-discovery |
+| `pnl_calculator.py` | ~180 | Shared P&L calculator with venue-specific fees |
+| `trade_log_schema.py` | ~180 | Trade log normalization, validation, migration |
+| `constants.py` | ~30 | Centralized magic numbers |
+| `protocols.py` | ~140 | Protocol-based structural type hints |
+| `compat.py` | ~120 | Legacy adapter layer with deprecated aliases |
+| `watchdog.py` | ~60 | Systemd notify socket integration |
+| `settlement_bridge.py` | ~500 | Settlement orchestration for both venues |
+| `polymarket_client.py` | ~700 | Polymarket API wrapper (Gamma + CLOB) |
+| `polymarket_matcher.py` | ~260 | Odds API → Polymarket market matcher |
+| `polymarket_settler.py` | ~287 | P-006 settlement engine |
+
+### Pods (src/pods/)
+
+| File | Pod | Strategy |
+|------|-----|----------|
+| `kalshi_moneyline.py` | P-001 | Kalshi Moneyline Value (delegates to legacy Scanner) — **active** |
+| `live_game_pod.py` | P-014 | Live Game Agent (in-play consensus) — **active** |
+| `qualifier_favorite_pod.py` | P-015 | Tennis Qualifier Favorite — **active** |
+| `golf_topn_pod.py` | P-017 | Golf Top-N pre-tournament value — **active** |
+| `live_maker_pod.py` | P-016 | Live In-Play Maker — **retired** (own unit, idle) |
+| `cross_venue_arb.py` | P-002 | Cross-venue arb (Kalshi/Polymarket) — shelved |
+| `polymarket_consensus.py` | P-006 | Sportsbook-Polymarket consensus — shelved |
+| `forecastex_kalshi_arb.py` | P-004 | ForecastEx/Kalshi arb — disabled |
+| `crypto_options_arb.py` | P-013 | Kalshi-Deribit crypto options — disabled |
+| `signup_bonus_pod.py` / `boost_scanner_pod.py` / `macro_nowcast.py` | P-009/010/012 | disabled |
+
+Standalone (not in `src/pods/`): `src/golf_fade_maker.py` (P-017M, shelved),
+`src/book_capture.py` (book-capture daemon), `src/maker_challenger.py` (Tier-2
+challenger evaluator).
+
+### Templates (src/templates/)
+
+| File | Purpose |
+|------|---------|
+| `dashboard.html` | 815-line HTML/CSS/JS dashboard (extracted from web_dashboard.py) |
+
+### Legacy (Legacy/Kalshi Arb Project/src/)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `scanner.py` | ~850 | Kalshi scanner — sport-aware prefix filtering, synthetic pricing, game-started guard |
+| `settler.py` | ~603 | Kalshi settlement (rewritten: Odds API scores primary) |
+| `odds_client.py` | ~400 | The Odds API wrapper |
+| `matcher.py` | ~320 | Odds API → Kalshi market matcher — ticker prefix blocklist + fast rejection |
+| `edge_calculator.py` | ~200 | Pinnacle-weighted consensus edge computation |
+| `risk_manager.py` | ~350 | Per-pod risk limits + Ledger |
+| `kalshi_client.py` | ~400 | Kalshi API wrapper |
+| `logger_setup.py` | ~50 | structlog configuration |
+
+### Config
+
+| File | Purpose |
+|------|---------|
+| `config.yaml` | Base config (Kalshi settings, odds_api sports, risk limits) |
+| `config_multi_pod.yaml` | Multi-pod overlay (P-006 settings, aggregate risk, pod allocations) |
+
+### Scripts
+
+| File | Purpose |
+|------|---------|
+| `scripts/deploy.sh` | Pre-deploy tests, rsync, health check, auto-rollback |
+| `scripts/betting-pod-shop.service` | Hardened systemd unit (Type=notify, WatchdogSec, ProtectSystem) |
+| `scripts/server_setup.sh` | VPS provisioning (bettingbot user, venv, cron, journald) |
+| `scripts/rotate_trade_logs.py` | Monthly trade log archival to .jsonl.gz |
+| `scripts/migrate_trade_log.py` | One-time log schema migration script |
+
+### Tests
+
+| File | Tests | Purpose |
+|------|-------|---------|
+| `tests/test_trade_store.py` | ~30 | TradeStore unit tests |
+| `tests/test_pod_runner_concurrent.py` | ~10 | Concurrent scanning verification |
+| `tests/test_watchdog.py` | 7 | Systemd watchdog no-op and real socket |
+| `tests/test_rotate_trade_logs.py` | 5 | Trade log rotation |
+| `tests/test_trade_log_schema.py` | 15 | Schema normalize/validate/migrate |
+| `tests/test_integration.py` | 10 | End-to-end pipeline integration |
+| `tests/test_pnl_calculator.py` | 17 | P&L calculator with venue fees |
+
+---
+
+## Data Flow
+
+### Scanning
+
+```
+Every 5 min cycle:
+  1. Settler checks open positions → settles completed games
+  2. PolymarketSettler checks open positions → settles resolved markets
+  3. AggregateRiskGuard pre-cycle check (exposure/drawdown limits)
+  4. PodRunner.run_once() → each pod scans for edges
+     P-001: Kalshi markets × Odds API events → Matcher → EdgeCalculator → RiskManager → PLACED
+     P-006: Polymarket markets × Odds API events → Matcher → EdgeCalculator → RiskManager → PLACED
+  5. Callback: update dashboard, log metrics, persist trades via TradeStore
+```
+
+### Settlement
+
+```
+P-001 (Kalshi):
+  settler.settle_cycle()
+    → TradeStore.get_placed_entries() for unresolved PLACED
+    → For each: _check_scores(sport) via Odds API /v4/sports/{sport}/scores/?daysFrom=3
+    → Fuzzy match game by team names + time → determine winner from scores
+    → Map winner to YES/NO via yes_side field → _settle_position() writes WIN/LOSS to log
+    → Falls back to Kalshi API for non-sports markets
+
+P-006 (Polymarket):
+  polymarket_settler.settle_cycle()
+    → TradeStore.get_placed_entries() for unresolved P-006 PLACED
+    → For each: client.get_market_resolution(slug=market_slug)
+    → If closed=True and prices indicate resolution → determine result
+    → _calc_outcome_pnl() → write WIN/LOSS/VOID to trade log
+```
+
+### Dashboard Data
+
+```
+/api/status JSON payload:
+  engine_status: "running" | "halted" | "starting"
+  risk: { bankroll, total_exposure_usd/pct, daily_pnl, open_positions, halted, venue_exposure }
+  cycle: { cycle_number, duration_seconds, pods_scanned, placed/skipped/error_count, success_rate }
+  pods: { pod_id → { name, placed, wins, losses, win_pct, pnl, alloc_pct, max_position_usd, capital_usd } }
+  settlement: { total_pnl, total_settled, wins, losses, voids, win_rate }
+  trades: [ { status, timestamp_utc, event, market_ticker, side, position_size_usd, edge_pct, pnl_usd, settled_at_utc, ... } ]
+
+Trade status resolution (in _read_recent_placed_trades):
+  1. Match PLACED entry fingerprint → settlement entry fingerprint (exact match)
+  2. Fallback: match PLACED entry ticker → settlement entry ticker (for legacy/orphan entries)
+  3. If no match: status = "OPEN"
+```
+
+---
+
+## Pending / Known Gaps (ARCHIVED — see "Known Open Gaps (current)" above)
+
+*This March-2026 list mixed since-fixed items, now-shelved P-006/Polymarket
+notes, and a stale "35 test failures" line (the suite is green). The still-open
+items were curated into **Known Open Gaps (current)** near the top of this
+document; the Polymarket-matching detail lives in `manager/registry.yaml`.*
+---
+
+## Useful Commands
+
+```bash
+# ── Deploy (use the script; it excludes data/, chowns, health-checks) ──
+bash scripts/deploy.sh 129.212.176.202          # code only, no restart
+bash scripts/deploy.sh 129.212.176.202 restart  # + restart betting-pod-shop
+
+# ── Standalone units (deploy.sh restarts ONLY betting-pod-shop) ────────
+ssh root@129.212.176.202 'systemctl restart betting-book-capture'   # or ...-live-maker
+#   mlb-props-collector code lives in /opt/mlb-props (outside deploy.sh) — scp by hand
+
+# ── Live logs / status (any of the 4 services) ────────────────────────
+ssh root@129.212.176.202 'journalctl -u betting-pod-shop -f'
+ssh root@129.212.176.202 'systemctl status betting-pod-shop --no-pager'
+
+# ── 429 health (the shared per-IP budget) ─────────────────────────────
+ssh root@129.212.176.202 'journalctl -u betting-pod-shop --since "1 hour ago" --no-pager | grep -c "status_code=429"'
+
+# ── Daily brief / live state (authoritative) ──────────────────────────
+python3 manager/refresh.py && python3 manager/brief.py
+
+# ── Trade log stats ───────────────────────────────────────────────────
+ssh root@129.212.176.202 'grep -c "\"action\": \"PLACED\"" /opt/betting-pod-shop/data/trade_logs/trade_log.jsonl'
+
+# ── P-016 maker kill switch (already retired; leave in place) ──────────
+ssh root@129.212.176.202 'touch /opt/betting-pod-shop/data/KILL_MAKER'
+```
+
+---
+
+## Known Constraints
+
+- **Paper mode only** — `environment: demo` in config, orders logged but never actually placed. Dual safety gate: `place_order()` blocked unless `environment="live"` AND `I_UNDERSTAND_LIVE_TRADING` env var is set.
+- **Production API, paper mode** — reads production Kalshi
+  (`https://api.elections.kalshi.com/trade-api/v2`) for full market inventory;
+  the demo environment guard prevents real order placement. **Demo credentials
+  only** — no authenticated websocket/order access.
+- **Shared per-IP Kalshi rate budget** — all 4 services share one throttle
+  (`kalshi.rate_limit` = 2 req/s); new pollers must be rate-aware.
+- **Polymarket** — data only; no execution access.
+- **Odds API rate limits** — each /scores call costs 2 API requests per sport; cached per cycle
+- **Odds API plan limit** — `daysFrom` parameter capped at 3 (using 7 returns HTTP 422)
+- **Kalshi market page limit** — scanner now fetches up to 25 pages × 200 = 5000 markets per cycle (increased from 2000 in Session 5)
+- **P-006 SANITY_SKIP threshold** — set to 25% (0.25). Below 25% = legitimate edge; above 25% = likely mapping error. Lowering risks placing trades with inverted YES/NO mappings; raising risks missing real opportunities
+
+
+
+# 📁 ARCHIVE — historical session log (not maintained)
+
+Everything below reflects the state at its date. Much predates the July 2026
+Kalshi-only pivot (P-006/Polymarket-centric pods, old deploy procedure, etc.)
+and is kept for provenance only. For current state use the sections above,
+`manager/registry.yaml`, and the July 21–22 entry.
 
 ---
 
@@ -611,241 +922,3 @@ Wired settlers to call `allocator.record_settlement()` so pod performance table 
 Added hero metrics (Total Return, Sharpe, Max Drawdown, Profit Factor), returns analysis, risk metrics, and equity curve canvas chart.
 
 ---
-
-## File Map
-
-### Core Engine (src/)
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `main.py` | ~150 | Backward-compat shim re-exporting symbols from config_loader, engine, cli |
-| `config_loader.py` | ~140 | YAML loading, deep merge, pod filtering, tennis enrichment |
-| `engine.py` | ~700 | Runtime engine: venue clients, shared deps, cycle callback, guarded loop |
-| `cli.py` | ~180 | CLI entry point, argument parser, logging setup |
-| `web_dashboard.py` | ~410 | Live web dashboard (API handlers + template loading) |
-| `pod_runner.py` | ~315 | Orchestrates scan cycles across active pods |
-| `capital_allocator.py` | ~494 | Pod-level bankroll allocation + performance tracking |
-| `aggregate_risk.py` | ~400 | Portfolio-level exposure/drawdown/halt controls |
-| `base_pod.py` | ~255 | Abstract BasePod interface + shared helpers |
-| `trade_store.py` | ~450 | Centralized in-memory indexed JSONL store with atomic writes |
-| `multi_executor.py` | ~280 | Venue-agnostic execution router |
-| `pod_registry.py` | ~100 | Decorator-based pod auto-discovery |
-| `pnl_calculator.py` | ~180 | Shared P&L calculator with venue-specific fees |
-| `trade_log_schema.py` | ~180 | Trade log normalization, validation, migration |
-| `constants.py` | ~30 | Centralized magic numbers |
-| `protocols.py` | ~140 | Protocol-based structural type hints |
-| `compat.py` | ~120 | Legacy adapter layer with deprecated aliases |
-| `watchdog.py` | ~60 | Systemd notify socket integration |
-| `settlement_bridge.py` | ~500 | Settlement orchestration for both venues |
-| `polymarket_client.py` | ~700 | Polymarket API wrapper (Gamma + CLOB) |
-| `polymarket_matcher.py` | ~260 | Odds API → Polymarket market matcher |
-| `polymarket_settler.py` | ~287 | P-006 settlement engine |
-
-### Pods (src/pods/)
-
-| File | Pod | Strategy |
-|------|-----|----------|
-| `kalshi_moneyline.py` | P-001 | Kalshi vs Sharp's Strategy (delegates to legacy Scanner) |
-| `cross_venue_arb.py` | P-002 | Cross-venue arbitrage (Kalshi vs Polymarket) |
-| `forecastex_kalshi_arb.py` | P-004 | ForecastEx vs Kalshi arbitrage |
-| `polymarket_consensus.py` | P-006 | Sportsbook-Polymarket consensus |
-| `signup_bonus_pod.py` | P-009 | Sign-up bonus blitz (disabled) |
-| `boost_scanner_pod.py` | P-010 | Daily odds boost grind (disabled) |
-| `macro_nowcast.py` | P-012 | Macro economic nowcast (disabled) |
-
-### Templates (src/templates/)
-
-| File | Purpose |
-|------|---------|
-| `dashboard.html` | 815-line HTML/CSS/JS dashboard (extracted from web_dashboard.py) |
-
-### Legacy (Legacy/Kalshi Arb Project/src/)
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `scanner.py` | ~850 | Kalshi scanner — sport-aware prefix filtering, synthetic pricing, game-started guard |
-| `settler.py` | ~603 | Kalshi settlement (rewritten: Odds API scores primary) |
-| `odds_client.py` | ~400 | The Odds API wrapper |
-| `matcher.py` | ~320 | Odds API → Kalshi market matcher — ticker prefix blocklist + fast rejection |
-| `edge_calculator.py` | ~200 | Pinnacle-weighted consensus edge computation |
-| `risk_manager.py` | ~350 | Per-pod risk limits + Ledger |
-| `kalshi_client.py` | ~400 | Kalshi API wrapper |
-| `logger_setup.py` | ~50 | structlog configuration |
-
-### Config
-
-| File | Purpose |
-|------|---------|
-| `config.yaml` | Base config (Kalshi settings, odds_api sports, risk limits) |
-| `config_multi_pod.yaml` | Multi-pod overlay (P-006 settings, aggregate risk, pod allocations) |
-
-### Scripts
-
-| File | Purpose |
-|------|---------|
-| `scripts/deploy.sh` | Pre-deploy tests, rsync, health check, auto-rollback |
-| `scripts/betting-pod-shop.service` | Hardened systemd unit (Type=notify, WatchdogSec, ProtectSystem) |
-| `scripts/server_setup.sh` | VPS provisioning (bettingbot user, venv, cron, journald) |
-| `scripts/rotate_trade_logs.py` | Monthly trade log archival to .jsonl.gz |
-| `scripts/migrate_trade_log.py` | One-time log schema migration script |
-
-### Tests
-
-| File | Tests | Purpose |
-|------|-------|---------|
-| `tests/test_trade_store.py` | ~30 | TradeStore unit tests |
-| `tests/test_pod_runner_concurrent.py` | ~10 | Concurrent scanning verification |
-| `tests/test_watchdog.py` | 7 | Systemd watchdog no-op and real socket |
-| `tests/test_rotate_trade_logs.py` | 5 | Trade log rotation |
-| `tests/test_trade_log_schema.py` | 15 | Schema normalize/validate/migrate |
-| `tests/test_integration.py` | 10 | End-to-end pipeline integration |
-| `tests/test_pnl_calculator.py` | 17 | P&L calculator with venue fees |
-
----
-
-## Data Flow
-
-### Scanning
-
-```
-Every 5 min cycle:
-  1. Settler checks open positions → settles completed games
-  2. PolymarketSettler checks open positions → settles resolved markets
-  3. AggregateRiskGuard pre-cycle check (exposure/drawdown limits)
-  4. PodRunner.run_once() → each pod scans for edges
-     P-001: Kalshi markets × Odds API events → Matcher → EdgeCalculator → RiskManager → PLACED
-     P-006: Polymarket markets × Odds API events → Matcher → EdgeCalculator → RiskManager → PLACED
-  5. Callback: update dashboard, log metrics, persist trades via TradeStore
-```
-
-### Settlement
-
-```
-P-001 (Kalshi):
-  settler.settle_cycle()
-    → TradeStore.get_placed_entries() for unresolved PLACED
-    → For each: _check_scores(sport) via Odds API /v4/sports/{sport}/scores/?daysFrom=3
-    → Fuzzy match game by team names + time → determine winner from scores
-    → Map winner to YES/NO via yes_side field → _settle_position() writes WIN/LOSS to log
-    → Falls back to Kalshi API for non-sports markets
-
-P-006 (Polymarket):
-  polymarket_settler.settle_cycle()
-    → TradeStore.get_placed_entries() for unresolved P-006 PLACED
-    → For each: client.get_market_resolution(slug=market_slug)
-    → If closed=True and prices indicate resolution → determine result
-    → _calc_outcome_pnl() → write WIN/LOSS/VOID to trade log
-```
-
-### Dashboard Data
-
-```
-/api/status JSON payload:
-  engine_status: "running" | "halted" | "starting"
-  risk: { bankroll, total_exposure_usd/pct, daily_pnl, open_positions, halted, venue_exposure }
-  cycle: { cycle_number, duration_seconds, pods_scanned, placed/skipped/error_count, success_rate }
-  pods: { pod_id → { name, placed, wins, losses, win_pct, pnl, alloc_pct, max_position_usd, capital_usd } }
-  settlement: { total_pnl, total_settled, wins, losses, voids, win_rate }
-  trades: [ { status, timestamp_utc, event, market_ticker, side, position_size_usd, edge_pct, pnl_usd, settled_at_utc, ... } ]
-
-Trade status resolution (in _read_recent_placed_trades):
-  1. Match PLACED entry fingerprint → settlement entry fingerprint (exact match)
-  2. Fallback: match PLACED entry ticker → settlement entry ticker (for legacy/orphan entries)
-  3. If no match: status = "OPEN"
-```
-
----
-
-## Pending / Known Gaps
-
-1. **NHL has no moneyline/game-winner tickers on Kalshi production** — only player props (goals, assists, points, first goal). P-006 (Polymarket) still covers NHL moneylines via Gamma API.
-
-2. ~~**ATP Tennis fuzzy matching limited**~~ — **FIXED (Session 10).** Removed `KXATPCHALLENGERMATCH` / `KXWTACHALLENGERMATCH` from `_SPORT_TICKER_PREFIXES`. The Odds API only covers main-draw events; challengers never had matching data. Main-draw `KXATPMATCH` tickers match fine (76-100 scores).
-
-3. ~~**MLB matching pending regular season markets on Polymarket**~~ — **STALE, corrected 2026-07-21.** Polymarket `series_id=3` now returns current regular-season game markets (verified: 127 events under `series_id=3 + tag_id=100639`, 109 live after the expired-event filter, current-day slate present). Kalshi `KXMLBGAME` returns 68 open markets. The blocker described here no longer exists — but MLB is **still not safe to enable**, for two reasons found when the matching was finally exercised end-to-end:
-
-   - **The "team name formats are identical between venues" claim was wrong.** Kalshi uses city/market names (`"Chicago WS vs Texas Winner?"`), Polymarket uses full team names (`"Chicago White Sox vs. Texas Rangers"`). This turns out not to matter: `cross_venue_matcher._SPORT_CITY_TO_TEAM["mlb"]` already normalises both sides to nicknames (`"Rays vs Blue Jays"`), and live MLB matching scores 100.0. The claim was wrong; the conclusion was accidentally right.
-
-   - **Blocker A — non-moneyline event contamination (P-006).** `tag_id=100639` does **not** exclude derivative events. Of 127 events, 20 are `"... - First 5 Innings Winner"` and 19 are `"... - Player Props"`. These clear the 55.0 fuzzy threshold against the full-game Odds API event and are matched as if they were the moneyline: 63 matches collapse onto only 15 distinct games (4-5 Polymarket events per game). F5 markets price systematically **6-13c below** the full-game line (median ~9c), so every contaminated event presents a large one-directional phantom "edge" far above P-006's `min_edge_pct: 0.008`. Their `outcomes` are `['Yes','No']` / `['Over','Under']` rather than team names, so `_infer_yes_team` has no reliable signal either.
-
-   - **Blocker B — date collision within a series (P-002 and P-006).** MLB plays 3-4 game series against the same opponent, so Polymarket lists 3 events with **identical titles** on different dates (`mlb-min-cle-2026-07-21`, `-07-22`, `-07-23`). Matching is title-only and `skip_time_check=True`, so they are indistinguishable. Measured on `cross_venue_matcher` (P-002's path, already live on MLB via `_SPORT_TICKER_PREFIXES`): **32 of 58 MLB matches pair a Kalshi market with a Polymarket event for a different day.** Tomorrow's price vs today's fair value is a phantom edge. The fix key exists and is reliable — `markets[0].gameStartTime` is exact (matches Odds API `commence_time` to the minute), and the event slug carries the date.
-
-   Liquidity is **not** the blocker it was thought to be: today-slate game-winner books show a 1c spread and $88k-176k of depth within ±3c. The thin ~$700-900 / 40c books previously sampled were the alt-line and derivative markets (`Spread -1.5`, `1st 5 Innings O/U`, `Extra Innings` — median ~$900 depth), plus far-future stale events. P-006 reads `markets[0]`, which is consistently the true moneyline. A liquidity filter is worth adding for safety but is not what is holding MLB back.
-
-4. **P-001 `aggregate_risk` not wired** in `kalshi_moneyline.py`'s `from_config` — minor issue since the guard still works at the main loop level.
-
-5. ~~**settler_scores_fetch_error**~~ — **FIXED (Session 5):** Changed `daysFrom=7` to `daysFrom=3`.
-
-6. ~~**P-006 duplicate PLACED entries**~~ — **FIXED (Session 5):** Wired `trade_store` through to pods.
-
-7. **35 pre-existing test failures** — Present since before the optimization work. All are assertion mismatches in pre-existing tests, not regressions from Phase I-IV changes.
-
-8. ~~**VPS user migration pending**~~ — **FIXED (Session 10).** Created `bettingbot` system user, transferred ownership of `/opt/betting-pod-shop/`, installed systemd service with security hardening (`ProtectSystem=strict`, `NoNewPrivileges`, `PrivateTmp`). Process now runs as `bettingbot` via `systemctl`.
-
-9. **NCAAB fuzzy matching broken for college team abbreviations** — Kalshi uses 2-3 letter school codes (UK, ISU, KU, SJU, MIA, PUR) that score below the `min_team_score=50.0` fuzzy threshold when compared against Odds API full names (Kentucky Wildcats, Iowa State Cyclones, etc.). NBA works fine (city names match well). **Fix needed:** Add a college team abbreviation → full name lookup table to the matcher so short codes resolve correctly. This blocks all NCAAB March Madness trading on P-001.
-
-10. ~~**NCAAW not configured**~~ — **FIXED (Session 7).**
-
-11. **Odds API tennis scores unreliable** — The `/scores` endpoint returns `completed=0` for tennis sports even when matches have finished. This means the Settler cannot resolve tennis positions via scores — they rely entirely on the 24-hour auto-void. Tennis P&L is not tracked accurately (voided instead of WIN/LOSS). Consider adding a tennis-specific settlement source.
-
-12. **Kalshi demo API never settles markets** — `status=active` returned for ALL markets regardless of game completion. The Settler's Kalshi API fallback is useless in demo mode. Settlement depends entirely on Odds API scores (primary) and auto-void (safety net).
-
-13. ~~**P-006 activity not visible in recent logs**~~ — **FIXED (Session 9).** P-006 IS scanning and active. All matches were hitting SKIP_EDGE because `min_edge_pct` (2%) and `min_ev` (1%) were too high for Polymarket's efficient market. Lowered to 0.8% and 0.5% respectively. Edges still mostly below threshold (~0.1%–0.7%) but should capture opportunities during game-time line movement.
-
-16. **Polymarket market efficiency limits P-006 trade volume** — Polymarket sports markets are much more efficiently priced than Kalshi. Typical raw edges are 0.1%–0.7% vs 3%–10% on Kalshi. With `min_edge_pct=0.008`, P-006 will trade infrequently — mainly during game-time windows when sportsbook lines move faster than Polymarket prices update. This is by design (quality over quantity).
-
-14. **Legacy trade log entries have different schema than multi-pod entries** — P-001 writes `market_ticker` (no `pod_id`, no `venue`). P-006 writes `market_id` with `pod_id` and `venue`. The Settler only reads `market_ticker`, making P-006 entries invisible to it. This is by design (separate settlers), but complicates cross-pod trade log analysis.
-
-15. **126 duplicate trades from pre-fix period** — The event-level dedup fix prevents future duplicates, but existing duplicate positions from March 23 (3x per tennis match, 3x per NBA game) will settle/void naturally over 24 hours. No manual cleanup needed.
-
----
-
-## Useful Commands
-
-```bash
-# ── SAFE deploy (code only, protects live trade data) ──────────────────
-rsync -avz --exclude='data/' --exclude='*.pyc' --exclude='__pycache__/' -e ssh \
-  '/Users/samlawhon/Desktop/Betting Fund Project/' \
-  root@129.212.176.202:/opt/betting-pod-shop/
-# Fix ownership after deploy (rsync as root creates root-owned files)
-ssh root@129.212.176.202 'chown -R bettingbot:bettingbot /opt/betting-pod-shop'
-
-# ── Restart service ──────────────────────────────────────────────────
-ssh root@129.212.176.202 'systemctl restart betting-pod-shop'
-
-# ── View live logs ───────────────────────────────────────────────────
-ssh root@129.212.176.202 'journalctl -u betting-pod-shop -f'
-
-# ── Filter for key events ─────────────────────────────────────────────
-ssh root@129.212.176.202 'journalctl -u betting-pod-shop --no-pager | grep "PLACED\|settler_cycle_done\|auto_void\|ERROR"'
-ssh root@129.212.176.202 'journalctl -u betting-pod-shop --no-pager | grep "cycle.*placed" | tail -10'
-ssh root@129.212.176.202 'journalctl -u betting-pod-shop --no-pager | grep "P-006" | tail -20'
-
-# ── Check service status ─────────────────────────────────────────────
-ssh root@129.212.176.202 'systemctl status betting-pod-shop --no-pager'
-
-# ── Trade log stats ───────────────────────────────────────────────────
-grep -c '"action": "PLACED"' /opt/betting-pod-shop/data/trade_logs/trade_log.jsonl
-grep -c '"action": "WIN"' /opt/betting-pod-shop/data/trade_logs/trade_log.jsonl
-grep -c '"action": "LOSS"' /opt/betting-pod-shop/data/trade_logs/trade_log.jsonl
-grep -c '"action": "VOID"' /opt/betting-pod-shop/data/trade_logs/trade_log.jsonl
-
-# ── View recent trade log entries ─────────────────────────────────────
-tail -5 /opt/betting-pod-shop/data/trade_logs/trade_log.jsonl | python3 -m json.tool
-
-# ── Check open position count ─────────────────────────────────────────
-ssh root@129.212.176.202 'journalctl -u betting-pod-shop --no-pager | grep "settler_checking" | tail -1'
-```
-
----
-
-## Known Constraints
-
-- **Paper mode only** — `environment: demo` in config, orders logged but never actually placed. Dual safety gate: `place_order()` blocked unless `environment="live"` AND `I_UNDERSTAND_LIVE_TRADING` env var is set.
-- **Production API, paper mode** — config points at `trading-api.kalshi.co` (production) for full market inventory, but the demo environment guard prevents real order placement.
-- **Polymarket paper mode** — no wallet connected, orders simulated
-- **Gamma API condition_id lookup broken** — always returns Biden COVID market for sports; use slug-based lookups
-- **Odds API rate limits** — each /scores call costs 2 API requests per sport; cached per cycle
-- **Odds API plan limit** — `daysFrom` parameter capped at 3 (using 7 returns HTTP 422)
-- **Kalshi market page limit** — scanner now fetches up to 25 pages × 200 = 5000 markets per cycle (increased from 2000 in Session 5)
-- **P-006 SANITY_SKIP threshold** — set to 25% (0.25). Below 25% = legitimate edge; above 25% = likely mapping error. Lowering risks placing trades with inverted YES/NO mappings; raising risks missing real opportunities

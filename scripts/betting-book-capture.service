@@ -13,23 +13,28 @@ WorkingDirectory=/opt/betting-pod-shop
 # Separate unit from betting-pod-shop / betting-live-maker so a capture bug
 # cannot take down trading, and a trading restart cannot gap the capture.
 #
-# --rate 4.0 sized to COVERAGE, not to a round number.  The cap is
-# rate*cadence*safety/reqs_per_market = 4.0*60*0.6/2 = 72 markets, which covers
-# the 68 discovered on a full MLB slate with margin.  5.0 would give 90 — more
-# API budget than the job needs, and on this host budget is shared.
+# --rate 3.0 sized for STEADY coverage under shared-budget contention, not for
+# maximum reach.  cap = rate*cadence*safety/reqs_per_market = 3.0*60*0.6/2 = 54
+# markets.  That truncates ~14 of a 68-market slate (lowest 24h volume first),
+# and that is the deliberate trade: steady 54 beats a bouncing 72.
 #
-# History: this ran at 2.5 (45 markets, truncating ~23) from 2026-07-20 while
-# the 429 storm was being diagnosed.  Root cause turned out to be the legacy
-# shared KalshiClient defaulting to 5 req/s (kalshi.rate_limit now 2), NOT this
-# daemon — 98 of 98 429s came from [kalshi_client], zero from KalshiPublic.
-# With that fixed and the MLB props collector throttled to 2.0, the headroom
-# for full slate coverage exists.
+# Why not 4.0 (cap 72, full slate): it only covers the full slate WHEN THE
+# SHARED BUDGET IS CLEAR.  Kalshi throttles per-IP and this competes with
+# betting-pod-shop, betting-live-maker and mlb-props-collector, so at 4.0 the
+# daemon was bouncing 4.0 -> 2.0 several times an hour (cap 72 -> 36) as it
+# contended with the props collector.  For fill-rate / adverse-selection
+# analysis, continuous coverage of the high-volume markets is worth more than
+# intermittent coverage of all of them — and gaps correlate with contention,
+# i.e. exactly the active moments the study cares about.  The 14 dropped are
+# the thinnest books, which have the least to say about fill availability.
 #
-# Kalshi throttles per-IP, so this competes with betting-pod-shop,
-# betting-live-maker and mlb-props-collector.  The daemon halves its own rate
-# on any 429 and recovers at 5%/cycle, so it yields first if that is wrong.
-# Watch: journalctl -u betting-book-capture | grep 'throttling down'
-ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_book_capture --rate 4.0
+# History: ran at 2.5 (cap 45) 2026-07-20 while the 429 storm was diagnosed,
+# then 4.0 briefly for full coverage before the contention above showed up.
+# The 429 root cause was the legacy KalshiClient defaulting to 5 req/s
+# (kalshi.rate_limit now 2), NOT this daemon.  The daemon still halves its own
+# rate on any 429 and recovers at 5%/cycle, so it yields first if 3.0 is still
+# too high.  Watch: journalctl -u betting-book-capture | grep 'throttling down'
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_book_capture --rate 3.0
 
 Restart=always
 RestartSec=30

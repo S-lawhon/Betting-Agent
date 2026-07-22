@@ -400,7 +400,25 @@ workstreams:
         idle (kill file present). Fully reversible; leave the kill file in
         place until the unit is repurposed for v2 or decommissioned.
       lessons: research/POSTMORTEM_P016_2026-07-21.md
-      successor: research/SPEC_P016_v2_2026-07-21.md
+      successor_status: >
+        v2 (post-state-change suppression) was SPEC'd then TESTED and REJECTED
+        the same day (2026-07-21). Its founding premise — that the loss is
+        concentrated in a +/-15s post-event window (-8.78c vs -0.96c) — did not
+        reproduce on the full clean tape (inside ~-3c, outside ~-2c; 62% of the
+        loss is >60s from any state change). The offline grid found no arm turns
+        markout non-negative, and the true-event lag is not measurable. So the
+        loss is DIFFUSE and market-anchored MLB making does not appear to have
+        an edge here. No successor pod is queued. Any future attempt needs a
+        genuinely different edge (faster signal or a real fair-value model), not
+        a guardrail on v1. Full analysis:
+        research/P016_v2_offline_grid_2026-07-21.md; the spec is marked NO-GO at
+        research/SPEC_P016_v2_2026-07-21.md.
+      note_on_process: >
+        The -8.78/-0.96 figure that justified v2 came from an earlier agent
+        report relayed into the post-mortem BEFORE it was independently
+        verified. It was corrected within the hour when the offline step
+        reproduced the real (diffuse) shape. Lesson banked: reproduce a founding
+        number before it justifies a successor.
     summary: >
       RETIRED 2026-07-21 — failed its pre-registered gate (negative +5m
       markout). Kalshi MLB in-game home-YES market making, innings 1-8,

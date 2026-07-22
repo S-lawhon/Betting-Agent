@@ -57,14 +57,26 @@ Main Loop (src/main.py → src/engine.py)
 
 ## Active Pods
 
+> **⚠️ Roster as of 2026-07-22:** engine runs **P-001, P-014, P-015, P-017**.
+> **P-002 and P-006 are SHELVED** (no Polymarket execution access). **P-016 is
+> RETIRED** (failed gate). The per-pod detail below is partly pre-pivot — see
+> `manager/registry.yaml` for authoritative current state and the July 21–22
+> session notes below. P-006's section is retained for reference but it is not
+> running.
+
 ### P-001: Kalshi vs Sharp's Strategy
 
 - **File:** `src/pods/kalshi_moneyline.py` (wrapper) → `Legacy/Kalshi Arb Project/src/scanner.py`
 - **Strategy:** Finds mispriced moneyline markets on Kalshi using Odds API multi-book consensus (Pinnacle-weighted) as fair value
 - **Settlement:** `Legacy/Kalshi Arb Project/src/settler.py` — uses **Odds API `/v4/sports/{sport}/scores/?daysFrom=3`** as primary resolution source (NOT Kalshi API, which never settles sports markets in demo mode)
 
-### P-006: Sportsbook-Polymarket Consensus
+### P-006: Sportsbook-Polymarket Consensus — ⛔ SHELVED 2026-07-22
 
+- **SHELVED:** executes on Polymarket only, which this project cannot access, so
+  it can never graduate regardless of edge quality. NOT a judgement on the edge
+  (was the most trustworthy in the lifetime analysis). Known unfixed defect if
+  ever revived: the SANITY_SKIP mapping error (likely the derivative-event /
+  date-collision matching bug found this session). See `manager/registry.yaml`.
 - **File:** `src/pods/polymarket_consensus.py` (986 lines)
 - **Strategy:** Same edge logic as P-001 but executes on Polymarket (0% fees vs Kalshi's ~7%). Lower edge threshold (0.8% vs 3%) and lower min_ev (0.5% vs 1%).
 - **Market Discovery:** Gamma API `/events?series_id=X&tag_id=100639` → filters to game-day moneyline bets
@@ -136,6 +148,166 @@ Python may use stale bytecode cache even when .py files are updated:
 ```bash
 ssh root@129.212.176.202 "find /opt/betting-pod-shop -name '__pycache__' -exec rm -rf {} + 2>/dev/null; systemctl restart betting-pod-shop"
 ```
+
+---
+
+## Recent Changes (Session — July 21–22, 2026)
+
+> **Source-of-truth note:** the living project state is `manager/registry.yaml`
+> (per-workstream) and the daily brief (`python3 manager/brief.py`). This
+> narrative is a continuity summary; where they disagree, the registry wins.
+> 31 commits this session; `git log 5120383..HEAD` for the full list.
+
+### Pod roster changed materially
+
+| Pod | Before | Now | Why |
+|---|---|---|---|
+| P-016 Live Maker | validating (500-fill gate) | **RETIRED** | Failed its pre-registered gate — see below |
+| P-002 Cross-Venue Arb | paper | **SHELVED** | No Polymarket execution access |
+| P-006 Poly Consensus | paper | **SHELVED** | No Polymarket execution access (executes on Polymarket only) |
+| P-015b lower-tour tennis | proposed | **DROPPED** | Edge did not replicate on Challenger/ITF |
+| P-017M golf fade maker | promising | **SHELVED** | +9.1¢ was a weighting-bug artifact; true ~+3.3¢, below baseline |
+
+Engine now runs **4 active pods**: P-001, P-014, P-015, P-017 (down from 6).
+
+### P-016 Live Maker — RETIRED (failed gate), and its successor rejected too
+
+- Hit its pre-registered gate: **814 fills, +5m markout −1.29¢/contract
+  (−$107.59 net of fee)**, negative at every horizon. Gate required *positive*
+  markout → **KILL**. Retired via `data/KILL_MAKER` on the droplet (unit
+  `betting-live-maker` stays up but idle; fully reversible).
+- The result in two numbers: **spread capture +4.08¢, markout −1.29¢** — earned
+  the spread, lost more than all of it to adverse selection.
+- A **v2** (suppress/widen quotes after game-state changes) was spec'd, then
+  **tested and REJECTED the same day**. The offline grid found no arm turns
+  markout non-negative, and the founding premise (loss concentrated in a ±15s
+  window) **did not reproduce**: the loss is diffuse (62% of fills >60s from any
+  state change, still −2.2¢). Conclusion: market-anchored MLB in-play making
+  does not appear to have an edge here. No successor queued.
+- Docs: `research/POSTMORTEM_P016_2026-07-21.md`,
+  `research/SPEC_P016_v2_2026-07-21.md` (marked NO-GO),
+  `research/P016_v2_offline_grid_2026-07-21.md`.
+- **Process lesson banked:** a founding number (−8.78¢/−0.96¢) was relayed from
+  an agent report into a committed doc *before* independent verification, and it
+  didn't hold up. Reproduce a founding number before it justifies building on it.
+
+### The 429 storm — fixed, after two misattributions
+
+`betting-pod-shop` was taking ~829 HTTP 429s/24h (peaking ~137/hr), escalating
+with the MLB slate. Root-caused in three steps; **only the third was the fix**:
+
+1. **Scan concurrency** (`execution.max_scan_workers: 2`) — the engine opened one
+   Kalshi connection per active pod. Real but ~12% of the problem (137→120/hr).
+2. **Settlement cadence** (`settlement.interval_cycles: 6`, every 30 min) — all
+   four settlers polled every 5-min cycle for markets that settle daily. ~3%.
+3. **The actual fix: `kalshi.rate_limit.requests_per_second: 5 → 2`.** The shared
+   legacy `KalshiClient` (P-001 scanner, settlers) defaulted to 5 req/s because
+   `config_multi_pod.yaml` had no `kalshi:` block. 98 of 98 429s came from this
+   one client; **137/hr → 0**, and cycles got *faster* (retries were costlier
+   than the throttle).
+
+Key fact: **Kalshi throttles per-IP**, so process separation does not separate
+the budget. The correlation evidence that misled steps 1–2 was confounded — the
+settler runs immediately before the scan, so "429s cluster on settler minutes"
+was indistinguishable from "on scan minutes." Attribution (grep the emitter)
+beat correlation. See memory `kalshi-api-rate-saturation`.
+
+### New data-collection infrastructure (two daemons)
+
+- **Book capture** (`src/book_capture.py`, `scripts/run_book_capture.py`, unit
+  `betting-book-capture`): 1-minute Kalshi order-book snapshots, append-only
+  JSONL gzipped per UTC day. **REST not websocket** — the websocket needs
+  production credentials and this project holds demo-only keys. Rate **3.0 req/s**
+  (cap 54 markets, sized for steady coverage under shared-budget contention; was
+  briefly 4.0). Self-throttles on 429, logs every truncation as a `DISCOVERY`
+  record (no silent caps). Unblocks the sub-5-min book data three tracks needed.
+- **MLB props collector** was a manual script with no schedule; now a systemd
+  timer (`mlb-props-collector`, ET-anchored, `--rate 2.0`, writes to
+  `/opt/mlb-props/` outside the deploy rsync). Throttled + instrumented so its
+  429s are visible. **3 of ~27 game-days** collected toward the execution test.
+
+### Timezone audit — Kalshi encodes ET, hosts disagree by 5h
+
+Triggered by an MLB-props collector bug: naive `datetime.now()` on the UTC
+droplet truncated collection at 19:45 ET, silently dropping ~45% of first-pitch
+windows. Full audit found and fixed:
+
+- **`kalshi_live_discovery.py`** — a LIVE bug (P-014): built the Kalshi ticker
+  date tag from UTC, wrong for the evening slate 20:00–24:00 ET nightly.
+- **`clv_settlement.py`** and **`manager/checks.py`** — hardcoded UTC-4 (EDT),
+  latent until DST ends 2026-11-01.
+- New **`src/et_time.py`** centralises ET conversion (tzdata-based, documented
+  fallback). 12 tests + both DST boundaries.
+- **NOT fixed (deferred, records the tradeoff):** `aggregate_risk.py` resets
+  daily P&L at UTC midnight = 8pm ET, mid-slate — a genuine risk-control
+  weakening. Deferred because it's shared infra for 4 pods mid-validation;
+  **scheduled task `fix-aggregate-risk-pnl-reset-tz` set for ~2026-09-15**, gated
+  on P-017 clearing first. Strictly-more-conservative one-line fix.
+
+### AggregateRiskGuard — intra-cycle caps now bind
+
+`close_position` credited nothing back to venue/pod buckets (exposure ratcheted
+up forever, `CODE_REVIEW_2026-03-31.md:20`), and positions were only registered
+post-cycle — so a pod placing its whole book in one scan was checked against
+*last* cycle's (zero) exposure. This is why P-017 briefly ran ~32% of bankroll
+against a 25% cap. Added intra-cycle **reservations**; caps now bind within a
+scan. 280 new tests.
+
+### Golf P-017 — backtest extended, band drift found
+
+- Folded in THOC26/COPC26 (now settled): **Leg A holds at +6.92¢/ct, 11/12
+  tournaments positive** (was +6.81¢/10). Confirmation, not new signal; does NOT
+  satisfy the 8-live-tournament gate (that's about live paper fills).
+- **Leg B (fade maker) +9.1¢ was a contract-weighting bug** — one entry per fill
+  event regardless of size. Corrected: **+3.3¢, CI straddles zero even at 4
+  events**, below the +4.55¢ half-baseline → P-017M shelved.
+- **Band drift:** shipped pod runs 8–45¢ (`ask_cap 0.45`) but the validating
+  backtest ran 8–40¢. The pod was trading an unvalidated band. It tests slightly
+  *better* (+7.14¢), so no change needed — but that's luck, not process.
+
+### Fees, decisions, and manager tooling
+
+- **MLB prop maker-fee fix:** `series_maker_charges_fee()` over-charged 0.438¢/ct
+  on nine MLB prop series (its zero-fee list was golf-only). P-016 was
+  unaffected (no `series_ticker` → correct fallback). Longest-prefix table now
+  resolves `KXMLB`/`KXMLBHR`/`KXMLBHRDERBY` correctly.
+- **P-016 trigger restated:** the markout-vs-settlement open question resolved
+  (keep +5m markout); the trigger was mis-specified (counted 107 fills that were
+  really 5 games) → restated to ">=40 distinct settled games."
+- **Manager tooling:** fixed `collect.py` reporting `root: local` jobs as "does
+  not exist" (they run on the Mac); added a **registry-reconciliation check**
+  (catches pods trading-but-unregistered, or recorded-as-trading-but-not) and an
+  explicit **`tier:`** field per pod (validating/production/none — every pod is
+  currently `validating`, none `production`). Added a settler-construction
+  tripwire test (pods.active drives settler build via `engine.py:204/221`).
+- **Polymarket MLB blocker corrected:** the long-standing "pending regular-season
+  markets" note is stale — they're live. Real blockers found: derivative events
+  (First-5-Innings/Player-Props) priced as the moneyline, and identically-titled
+  events on different dates matched title-only (32/58 MLB matches paired the
+  wrong game day — the likely cause of P-002's 74% void rate).
+- **NCAAW removed from the odds-api scan list:** `HTTP 404 Unknown sport` (~1,164
+  errors/day), NOT a season issue — the key itself is wrong.
+- **Research answered:** Polymarket US has a real trading API but shares nothing
+  with the offshore CLOB (rewrite + KYC to use); MLB moneyline (`KXMLBGAME`) does
+  charge maker fees, props don't.
+
+### Live-agent recursive review
+
+Tier 1 was built; **Tier 2** (offline challenger evaluator, `src/maker_challenger.py`,
+33 tests) built this session — proposals-only, champion never touched. It's what
+measured P-016's adverse-selection profile and ran the v2 grid. Tier 3 and three
+design-doc gaps (no [min,max] bounds, no promotion margin, arm-budget arithmetic)
+remain open.
+
+### Current gate progress (all correctly time-blocked)
+
+| Track | Progress | Next milestone |
+|---|---|---|
+| P-017 golf | 1/8 tournaments | ~mid-Sept |
+| MLB props | 3/~27 game-days | ~Aug 17 (07-22 first clean full-slate day) |
+| Book capture | started, ~2wk window | ~Aug 4 |
+| P-001 CLV | ~81 rows / 200 | slow |
+| P-015 tennis | 0/120 | US Open quals Aug 17–21 |
 
 ---
 

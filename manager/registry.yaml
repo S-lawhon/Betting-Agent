@@ -371,13 +371,40 @@ workstreams:
 
   - id: P-016
     name: Live In-Play Maker
-    stage: paper
-    tier: validating
-    service: betting-live-maker
-    blocked_on: time
+    stage: killed
+    tier: none
+    service: betting-live-maker    # unit still runs, but KILL_MAKER pulls all quotes
+    blocked_on: nothing
+    retired:
+      decided: 2026-07-21
+      decided_by: Sam
+      verdict: KILLED per pre-registered gate
+      final_sample: >
+        814 fills / 500 threshold. +5m markout -1.29c/contract, -$107.59 net of
+        maker fee — NEGATIVE at every horizon (+1m -2.26c, +5m -1.29c,
+        +15m -1.94c). The gate required POSITIVE +5m markout, so it failed on
+        the headline arm before the ex-best-day robustness check was reached.
+        Verified with the project's own scripts.maker_report on the droplet,
+        not a hand computation.
+      the_diagnosis_in_two_numbers: >
+        Spread capture at fill was +4.08c (POSITIVE) while markout was -1.29c
+        (NEGATIVE). The pod earned the spread and then lost more than all of it
+        to adverse selection. Measured directly by Tier 2: fills within 15s of
+        an observed game-state change markout -8.78c vs -0.96c otherwise — the
+        Glosten-Milgrom pick-off, visible. Market-anchored quoting has no
+        defence against informed flow right after a pitch/score.
+      retired_how: >
+        data/KILL_MAKER touched on the droplet 2026-07-22 01:22 UTC. Verified:
+        last quote 01:22:40, final pull 01:23:02, no quotes after the pull,
+        fills ceased within one cycle. The betting-live-maker unit stays up but
+        idle (kill file present). Fully reversible; leave the kill file in
+        place until the unit is repurposed for v2 or decommissioned.
+      lessons: research/POSTMORTEM_P016_2026-07-21.md
+      successor: research/SPEC_P016_v2_2026-07-21.md
     summary: >
-      Kalshi MLB in-game home-YES market making, innings 1-8, settle-don't-trade-out.
-      Market-anchored quoting with +/-0.03 max tilt after first-night fixes.
+      RETIRED 2026-07-21 — failed its pre-registered gate (negative +5m
+      markout). Kalshi MLB in-game home-YES market making, innings 1-8,
+      settle-don't-trade-out. See retired: block and the post-mortem.
     gate:
       question: Positive fee-adjusted +5m markout across a real sample?
       metric: fills

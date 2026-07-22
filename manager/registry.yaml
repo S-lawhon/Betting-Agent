@@ -695,12 +695,23 @@ workstreams:
     name: Live In-Play Agent Research / Recursive Review
     stage: build
     owner_dir: live_agent_research
-    blocked_on: human
+    blocked_on: nothing
     action_required: >
-      Tier 1 (measurement + deterministic proposals) is built. Tiers 2 and 3 are
-      DESIGNED BUT NOT BUILT. Next step per the design doc: size challenger arm
-      count to the measured fill rate, build Tier 2 within pre-registered bounds,
-      keep champion frozen for the gate.
+      Tier 1 (measurement + deterministic proposals) and Tier 2 (offline
+      challenger evaluator) are BUILT — Tier 2 committed 2026-07-21
+      (src/maker_challenger.py, scripts/maker_challenger_report.py, 33 tests;
+      first proposal at live_agent_research/proposals/). Tier 3 remains
+      designed-not-built and is now MOOT for the current champion: P-016 hit
+      its 500-fill gate 2026-07-21 with negative +5m markout (-1.29c, -$99.89
+      net) and the pre-registered rule resolves to KILL. Tier 2's arms and
+      the adverse-selection signature it measured (fills within 15s of a state
+      change markout -8.78c vs -0.96c) are the starting point for whatever a
+      P-016 v2 looks like, not an optimisation of a champion that is being
+      retired. No build work is owed until a v2 exists to improve.
+      NOTE: three design-doc gaps still block any future auto-apply layer —
+      no [min,max] bounds recorded per parameter, no pre-registered promotion
+      margin, and the arm-budget arithmetic contradicts its parallel-eval
+      premise. Resolve those before Tier 3.
     governing_rule: >
       The system may become MORE CONSERVATIVE on its own authority; MORE
       AGGRESSIVE only within pre-registered bounds. LLM review is hypothesis

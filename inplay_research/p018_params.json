@@ -1,0 +1,19 @@
+{
+  "_note": "priors; backtest blocked on data (see REPORT)",
+  "_status": "priors \u2014 NOT backtest-validated until the REPORT shows a non-flat surprise-bucket table",
+  "quoting": {
+    "surprise_hi": 0.06,
+    "surprise_lo": 0.02,
+    "min_underreaction": 0.015,
+    "fade_window_s": 240.0,
+    "fade_size": 20.0,
+    "expected_widen": 0.03,
+    "base_half_width": 0.025,
+    "max_half_width": 0.06,
+    "flb_skew_coef": 0.04,
+    "inv_skew_coef": 0.5,
+    "max_quote_px": 0.95,
+    "min_quote_px": 0.05,
+    "fade_edge_frac": 0.5
+  }
+}

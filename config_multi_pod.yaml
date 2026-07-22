@@ -508,6 +508,38 @@ pods:
     risk:
       max_net_contracts: 200
 
+  P-018:
+    # Surprise-Gated In-Play Fade Maker — STANDALONE engine (planned;
+    # scripts/run_inplay_fade_maker.py). Adds a surprise gate on top of the
+    # P-016 maker: fade the crowd's OVERREACTION after a surprising in-play
+    # event, widen/step aside around EXPECTED events (informed continuation).
+    # Basis: "Deep Research - Durable EV Opportunities 2026-07.md" +
+    # inplay_research/. Deliberately NOT in pods.active (own fast loop).
+    # enabled:false AND the ENGINE IS NOT BUILT YET — P-018 does not ship
+    # until inplay_research/REPORT shows the surprise-bucket table is NOT
+    # flat (spec §8 gate #1). These are PRIORS, not validated params; the
+    # backtest overwrites inplay_research/p018_params.json. Kill switch:
+    # touch data/KILL_INPLAY_FADE.
+    enabled: false
+    environment: demo            # paper only — no order placement code path
+    sports: ["mlb"]             # add "nba" after NbaAdapter + NBA WP model
+    quoting:
+      surprise_hi: 0.06          # |wp_jump| >= this  => fade regime   [PAPER-TUNE]
+      surprise_lo: 0.02          # |wp_jump| <  this  => expected/widen [PAPER-TUNE]
+      min_underreaction: 0.015   # require market lag before fading
+      fade_window_s: 240         # seconds post-event to fade (~40%/min decay)
+      fade_size: 20              # contracts, tapered by secs_since_event
+      expected_widen: 0.03       # extra half-width in the expected regime
+      base_half_width: 0.025     # P-016 defaults reused for the normal regime
+      max_half_width: 0.06
+      flb_skew_coef: 0.04
+      inv_skew_coef: 0.5
+      max_quote_px: 0.95
+      min_quote_px: 0.05
+    risk:
+      max_net_contracts: 100
+      max_pod_exposure_pct: 0.25   # honored via AggregateRiskGuard.reserve_trade
+
 # ── DataGolf model feed (optional, used by P-017) ───────────────────
 # Off until DATAGOLF_API_KEY is in .env AND enabled: true. When disabled
 # or keyless, P-017 falls back to the validated structural edge_bump.

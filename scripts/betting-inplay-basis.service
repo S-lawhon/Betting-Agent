@@ -1,0 +1,50 @@
+[Unit]
+Description=Betting Pod Shop — In-play Basis Collector (Kalshi vs Polymarket MLB)
+After=network-online.target
+Wants=network-online.target
+
+# Installed + enabled on the VPS 2026-07-22 for research question Q3
+# (research/OPEN_QUESTIONS_2026-07-20.md). To (re)deploy after edits:
+#   scp scripts/betting-inplay-basis.service root@129.212.176.202:/etc/systemd/system/
+#   ssh root@129.212.176.202 'systemctl daemon-reload && systemctl restart betting-inplay-basis'
+# Sanity-check matching with:  python3 scripts/collect_inplay_basis.py --match-only
+
+[Service]
+Type=simple
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+
+# Measurement only — READ-ONLY on both venues (KalshiPublic + PolymarketClient
+# read paths). Places NO orders. Separate unit from betting-pod-shop /
+# betting-live-maker so a collector bug cannot touch trading, and vice versa.
+# --inplay-only samples only during the game window; per-row spread/liquidity
+# let analysis discard the thin Polymarket books the Q3 spec warns about.
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.collect_inplay_basis --inplay-only --sample-secs 45 --refresh-secs 600
+
+Restart=always
+RestartSec=30
+ExecStartPre=/bin/sleep 5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=betting-inplay-basis
+
+# Strictly lower priority than trading: if the box gets tight, this yields.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=384M
+
+# ── Security hardening (mirrors betting-book-capture.service) ────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

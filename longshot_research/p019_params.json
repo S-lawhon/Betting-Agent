@@ -1,0 +1,173 @@
+{
+  "generated": "2026-07-22 15:46 UTC",
+  "verdict": "NO-GO",
+  "lookback_days": 365,
+  "min_volume": 20.0,
+  "price_field": "px_midlife",
+  "n_usable": 5192,
+  "by_kind": {
+    "politics": 1330,
+    "sports_futures": 3862
+  },
+  "favorites_band": [
+    0.85,
+    0.95
+  ],
+  "longshot_band": [
+    0.03,
+    0.1
+  ],
+  "min_horizon_days": 14,
+  "bands": [
+    {
+      "band": [
+        0.0,
+        0.03
+      ],
+      "n": 658,
+      "n_events": 209,
+      "mean_price": 0.0153,
+      "realized_yes": 0.003,
+      "realized_ci": [
+        0.0,
+        0.0077
+      ],
+      "edge_vs_implied": -0.0123
+    },
+    {
+      "band": [
+        0.03,
+        0.1
+      ],
+      "n": 1201,
+      "n_events": 359,
+      "mean_price": 0.0579,
+      "realized_yes": 0.0658,
+      "realized_ci": [
+        0.05,
+        0.0824
+      ],
+      "edge_vs_implied": 0.0079
+    },
+    {
+      "band": [
+        0.1,
+        0.2
+      ],
+      "n": 839,
+      "n_events": 311,
+      "mean_price": 0.1425,
+      "realized_yes": 0.1323,
+      "realized_ci": [
+        0.1099,
+        0.1553
+      ],
+      "edge_vs_implied": -0.0102
+    },
+    {
+      "band": [
+        0.2,
+        0.35
+      ],
+      "n": 737,
+      "n_events": 299,
+      "mean_price": 0.2644,
+      "realized_yes": 0.2782,
+      "realized_ci": [
+        0.2438,
+        0.3126
+      ],
+      "edge_vs_implied": 0.0137
+    },
+    {
+      "band": [
+        0.35,
+        0.5
+      ],
+      "n": 630,
+      "n_events": 239,
+      "mean_price": 0.4291,
+      "realized_yes": 0.4508,
+      "realized_ci": [
+        0.3971,
+        0.5
+      ],
+      "edge_vs_implied": 0.0217
+    },
+    {
+      "band": [
+        0.5,
+        0.65
+      ],
+      "n": 423,
+      "n_events": 189,
+      "mean_price": 0.5615,
+      "realized_yes": 0.5745,
+      "realized_ci": [
+        0.5258,
+        0.6276
+      ],
+      "edge_vs_implied": 0.013
+    },
+    {
+      "band": [
+        0.65,
+        0.8
+      ],
+      "n": 262,
+      "n_events": 137,
+      "mean_price": 0.7239,
+      "realized_yes": 0.6985,
+      "realized_ci": [
+        0.6414,
+        0.7541
+      ],
+      "edge_vs_implied": -0.0254
+    },
+    {
+      "band": [
+        0.8,
+        0.9
+      ],
+      "n": 183,
+      "n_events": 105,
+      "mean_price": 0.8482,
+      "realized_yes": 0.8087,
+      "realized_ci": [
+        0.7347,
+        0.88
+      ],
+      "edge_vs_implied": -0.0395
+    },
+    {
+      "band": [
+        0.9,
+        0.97
+      ],
+      "n": 130,
+      "n_events": 83,
+      "mean_price": 0.9355,
+      "realized_yes": 0.9385,
+      "realized_ci": [
+        0.8714,
+        0.9855
+      ],
+      "edge_vs_implied": 0.0029
+    },
+    {
+      "band": [
+        0.97,
+        1.0
+      ],
+      "n": 129,
+      "n_events": 62,
+      "mean_price": 0.9859,
+      "realized_yes": 0.969,
+      "realized_ci": [
+        0.9333,
+        0.9931
+      ],
+      "edge_vs_implied": -0.017
+    }
+  ]
+}

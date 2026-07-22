@@ -148,6 +148,11 @@ paper. Kill switch for the maker unit: `touch data/KILL_MAKER`.
   `research/POSTMORTEM_P016_2026-07-21.md`.
 - **P-002 / P-006** — shelved 2026-07-22, no Polymarket execution access. P-006's
   edge was strong but unexecutable; do not read "shelved" as "refuted."
+- **P-019 Longshot Maker** — KILLED 2026-07-22 at the step-1 calibration gate,
+  before any engine code. The favorite-longshot bias does not replicate in our
+  universe (both proposed bands calibrated within CI on 5,192 event-clustered
+  settled contracts). See `longshot_research/REPORT_Longshot_2026-07.md`. Spec
+  retained at `research/SPEC_P019_Longshot_Maker.md` (banner-marked NO-GO).
 - **P-004, P-009, P-010, P-012, P-013** — legacy/disabled since the July pivot.
 
 ---
@@ -218,6 +223,25 @@ clears nothing by hand — systemd's restart reloads the code; there is no stale
 > (per-workstream) and the daily brief (`python3 manager/brief.py`). This
 > narrative is a continuity summary; where they disagree, the registry wins.
 > 31 commits this session; `git log 5120383..HEAD` for the full list.
+
+### P-019 Longshot Maker — killed at step-1 calibration gate (2026-07-22)
+
+Spec'd (`research/SPEC_P019_Longshot_Maker.md`) as a standalone maker harvesting
+the favorite-longshot bias (sell 3–10¢ longshots, buy 85–95¢ favorites) across
+politics + sports-futures. Per the spec's own build order, step 1 was a go/no-go:
+confirm the bias exists in *our* universe before writing any engine. It doesn't.
+Built `longshot_research/backtest_longshot.py` (staged, cached, resumable), pulled
+**29,476 settled Kalshi contracts** live, scored **5,192** usable with event-
+clustered bootstrap CIs, reference price = bid/ask mid at market mid-life (settled
+LIST nulls price/volume — candlesticks required). **Verdict NO-GO:** both proposed
+bands are calibrated within CI (sell-target 0.03–0.10 realized 6.6% vs implied
+5.8%; buy-target 0.80–0.90 realized 80.9% vs implied 84.8%, favorites if anything
+*over*priced). The only significant mispricing is the 0–3¢ tail — outside P-019's
+bands, ~1.2¢ against ~65:1 downside, unharvestable. Long-horizon slice (`px_open`)
+disconfirms hardest, exactly where the thesis claims the edge is strongest. **No
+engine, risk extension, runner, or systemd unit built** — the gate worked as
+designed (same pattern as P-016 and the tennis-favorite evaporation). Full write-up
++ decile table + robustness: `longshot_research/REPORT_Longshot_2026-07.md`.
 
 ### P-016 decommissioned — killed, drained, unit disabled (2026-07-22)
 

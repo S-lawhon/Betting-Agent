@@ -62,18 +62,24 @@ services:
       max_stale_minutes: 20
     severity: critical
 
-  - id: betting-live-maker
-    kind: systemd
-    description: P-016 Live Maker, 12s fast loop, separate unit (can't live in 5-min engine)
-    cycle_seconds: 12
-    heartbeat:
-      file: data/trade_logs/maker_quotes.jsonl
-      # Only quotes during live MLB games — long quiet stretches are NORMAL
-      # overnight. Staleness is only meaningful inside the games window, so the
-      # check is suppressed outside it (see checks.py: games_window).
-      max_stale_minutes: 45
-      only_during: mlb_games_window
-    severity: critical
+  # RETIRED 2026-07-22. P-016 (v1 and v2) both failed their pre-registered
+  # gates (v1 adverse selection; v2 founding premise refuted). Kill switch
+  # data/KILL_MAKER was hit 2026-07-22 01:22:40 UTC; the maker pulled all
+  # quotes within one cycle (last fill 01:23:00) and drained its open books.
+  # The heartbeat check cannot distinguish a wedged loop from a deliberately
+  # killed one, so leaving this entry in place paged CRITICAL every cycle
+  # ("silent for N min") for an intentionally-silent unit. The betting-live-
+  # maker systemd unit is being stopped + disabled; monitoring is removed so a
+  # retired unit fires neither the stale check nor service.down once inactive.
+  # - id: betting-live-maker
+  #   kind: systemd
+  #   description: P-016 Live Maker, 12s fast loop, separate unit (can't live in 5-min engine)
+  #   cycle_seconds: 12
+  #   heartbeat:
+  #     file: data/trade_logs/maker_quotes.jsonl
+  #     max_stale_minutes: 45
+  #     only_during: mlb_games_window
+  #   severity: critical
 
 # -----------------------------------------------------------------------------
 # SCHEDULED JOBS — the silent-failure surface. clv_settlement proved this:

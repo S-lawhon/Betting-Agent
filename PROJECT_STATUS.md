@@ -43,7 +43,9 @@ because the project has no Polymarket execution access.
 
 Standalone units (own fast loops, NOT in the 5-min engine):
   ├── betting-live-maker      — P-016 Live Maker. RETIRED 2026-07-21 (failed
-  │                             gate); unit runs but idle, KILL_MAKER present.
+  │                             gate). DECOMMISSIONED 2026-07-22: KILL_MAKER hit
+  │                             01:22:40 UTC, drained, unit stop+disabled ~06:05
+  │                             UTC; removed from manager/registry.yaml monitoring.
   ├── betting-book-capture    — 1-min Kalshi order-book capture (src/book_capture.py)
   └── mlb-props-collector     — MLB order-book snapshots (timer; writes /opt/mlb-props/)
 
@@ -55,8 +57,9 @@ P-012, P-013, P-016 (retired). P-017M golf fade maker shelved.
 
 - **Path:** `/opt/betting-pod-shop/` (service runs here; `data/` is the
   authoritative live trade history — never overwrite it, see Deployment Rules)
-- **Services (4):** `betting-pod-shop` (5-min engine), `betting-live-maker`
-  (P-016, idle post-retirement), `betting-book-capture`, `mlb-props-collector`
+- **Services (3):** `betting-pod-shop` (5-min engine), `betting-book-capture`,
+  `mlb-props-collector`. (`betting-live-maker` decommissioned 2026-07-22 —
+  stopped + disabled, dropped from registry monitoring.)
 - **User:** `bettingbot` (system user, no login shell) — rsync-as-root must
   `chown -R bettingbot:bettingbot` after; `deploy.sh` does this
 - **Python:** `/opt/betting-pod-shop/venv/bin/python` (3.12)
@@ -215,6 +218,21 @@ clears nothing by hand — systemd's restart reloads the code; there is no stale
 > (per-workstream) and the daily brief (`python3 manager/brief.py`). This
 > narrative is a continuity summary; where they disagree, the registry wins.
 > 31 commits this session; `git log 5120383..HEAD` for the full list.
+
+### P-016 decommissioned — killed, drained, unit disabled (2026-07-22)
+
+P-016 was retired 2026-07-21 but its `betting-live-maker` unit was left running
+idle. On 2026-07-22 the kill switch (`data/KILL_MAKER`) was hit at 01:22:40 UTC;
+the maker pulled all quotes within one cycle (last fill 01:23:00) and drained
+its open books via normal settlement. This surfaced a **monitor false alarm**:
+the heartbeat check (`maker_quotes.jsonl`, 45-min stale limit, `only_during:
+mlb_games_window`) cannot tell a *wedged* loop from a *deliberately killed* one,
+so it paged CRITICAL ("active but silent for N min") every cycle for an
+intentionally-silent unit. Fix: removed `betting-live-maker` from
+`manager/registry.yaml` `services:` (commented, with rationale) — a retired unit
+should fire neither the stale check nor `service.down` once inactive. Registry
+synced to droplet (no restart). A `maker-decom` systemd timer stops + disables
+the unit at ~06:05 UTC after the last games settle.
 
 ### Pod roster changed materially
 

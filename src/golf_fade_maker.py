@@ -40,6 +40,7 @@ from typing import Any, Dict, List, Optional
 
 from src.kalshi_fees import fee_per_contract
 from src.kalshi_public import KalshiPublic, fnum
+from src.order_flow import OrderFlowTracker
 from src.pod_registry import register_pod
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ class MarketBook:
     close_epoch: float
     ask_quote: Optional[MakerQuote] = None
     fills: List[MakerFill] = field(default_factory=list)
+    flow: OrderFlowTracker = field(default_factory=OrderFlowTracker)
     inventory: float = 0.0        # net YES (negative = short from selling)
     last_trade_epoch: float = 0.0
     done: bool = False
@@ -248,6 +250,8 @@ class GolfFadeMakerEngine:
                 "event": book.event_code, "ask": quote_px, "mid": mid,
                 "size": self.quote_size, "inventory": book.inventory,
                 "hours_to_close": round((book.close_epoch - now) / 3600.0, 2),
+                "vpin": book.flow.vpin,
+                "one_sidedness": book.flow.one_sidedness,
             })
 
     def _check_fills(self, book: MarketBook, mid: Optional[float]) -> None:
@@ -258,6 +262,9 @@ class GolfFadeMakerEngine:
         trades = self.kalshi.trades_since(book.ticker, since)
         if trades:
             book.last_trade_epoch = max(t["epoch"] for t in trades)
+        # Order-flow toxicity — updated from the single fetch site so each
+        # print feeds VPIN exactly once (telemetry only, no behavior change).
+        book.flow.update(trades)
         for t in trades:
             if t["epoch"] < q.active_from:
                 continue
@@ -284,6 +291,8 @@ class GolfFadeMakerEngine:
                 "trade_price": t["yes_price"], "trade_count": t["count"],
                 "taker_side": t.get("taker_side"), "mid_at_fill": mid,
                 "inventory_after": book.inventory,
+                "vpin_at_fill": book.flow.vpin,
+                "one_sidedness_at_fill": book.flow.one_sidedness,
             })
             logger.info("P-017M FILL sell_yes %s %.0f @ %.2f (inv %.0f)",
                         book.ticker, qty, q.price, book.inventory)

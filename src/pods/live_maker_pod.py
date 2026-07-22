@@ -40,6 +40,7 @@ from typing import Any, Dict, List, Optional
 
 from src.kalshi_fees import fee_per_contract
 from src.kalshi_public import KalshiPublic, fnum
+from src.order_flow import OrderFlowTracker
 from src.mlb_statsapi import (MlbGame, MlbLiveState, MlbStatsApi,
                               kalshi_team_code)
 from src.mlb_win_prob import (MlbGameSnapshot, home_win_probability,
@@ -77,6 +78,7 @@ class Fill:
     mid_at_fill: Optional[float]
     state_key: str
     markouts_done: set = field(default_factory=set)
+    next_event_done: bool = False   # event-clocked markout recorded?
     settled: bool = False
     # ── Telemetry for the Tier-1 diagnostic decomposition ────────────
     shadow: bool = False          # counterfactual (we were NOT quoting)
@@ -102,6 +104,7 @@ class GameBook:
     shadow_reason: str = ""
     inventory: float = 0.0    # net YES contracts (+long)
     fills: List[Fill] = field(default_factory=list)
+    flow: OrderFlowTracker = field(default_factory=OrderFlowTracker)
     last_trade_epoch: float = 0.0
     last_state_key: str = ""
     state_changed_at: float = 0.0   # when we OBSERVED the last state change
@@ -367,6 +370,10 @@ class LiveMakerEngine:
         trades = self.kalshi.trades_since(book.ticker, since)
         if trades:
             book.last_trade_epoch = max(t["epoch"] for t in trades)
+        # Order-flow toxicity is updated HERE — the single fetch site —
+        # so each print feeds VPIN exactly once even though _check_fills
+        # runs twice per cycle (real + shadow) on the same batch.
+        book.flow.update(trades)
         return trades
 
     def _check_fills(self, book: GameBook, mid: Optional[float],
@@ -443,6 +450,8 @@ class LiveMakerEngine:
                     "secs_since_state_change": since_state,
                     "inning": fill.inning, "is_top": fill.is_top,
                     "inventory_after": book.inventory,
+                    "vpin_at_fill": book.flow.vpin,
+                    "one_sidedness_at_fill": book.flow.one_sidedness,
                 })
                 logger.info(
                     "P-016 %sFILL %s %s %.0f @ %.2f (fair %.3f, inv %.0f) %s",
@@ -470,11 +479,41 @@ class LiveMakerEngine:
                 self._write(self.fills_log, {
                     "type": "MARKOUT", "fill_id": fill.fill_id,
                     "pod_id": "P-016", "ticker": book.ticker,
+                    "horizon_type": "wallclock",
                     "horizon_s": h, "mid": mid, "fair": fair,
                     "fill_price": fill.price, "side": fill.side,
                     "qty": fill.qty, "shadow": fill.shadow,
                     "markout_per_contract": sign * (ref - fill.price),
                 })
+
+    def _process_next_event_markouts(self, book: GameBook,
+                                     mid: Optional[float]) -> None:
+        """Event-clocked markout: on the first observed state_key change
+        at/after a fill, record signed (mid_now − fill_price).
+
+        Wall-clock 60/300/900s markouts miss WHICH game state picked us
+        off; this is the at-bat/possession-resolution markout.  A fill
+        that looks fine at +5m but is deeply negative here clustered right
+        before the next resolving event.  Called from the state-change
+        branch of the cycle, so ``mid`` is this cycle's mid at the NEW
+        state.  One record per fill (``next_event_done`` guards)."""
+        if mid is None:
+            return
+        now = self._now()
+        for fill in book.fills:
+            if fill.settled or fill.next_event_done or now < fill.epoch:
+                continue
+            fill.next_event_done = True
+            sign = 1.0 if fill.side == "buy" else -1.0
+            self._write(self.fills_log, {
+                "type": "MARKOUT", "fill_id": fill.fill_id,
+                "pod_id": "P-016", "ticker": book.ticker,
+                "horizon_type": "next_event", "horizon_s": None,
+                "secs_elapsed": now - fill.epoch,
+                "mid": mid, "fill_price": fill.price, "side": fill.side,
+                "qty": fill.qty, "shadow": fill.shadow,
+                "markout_per_contract": sign * (mid - fill.price),
+            })
 
     def _settle(self, book: GameBook, home_won: bool) -> None:
         result = 1.0 if home_won else 0.0
@@ -595,8 +634,12 @@ class LiveMakerEngine:
         # 2) Markouts due (real + shadow, tagged)
         self._process_markouts(book, mid, fv.home_wp)
 
-        # 3) Note observed state changes (drives the pick-off diagnostic)
+        # 3) Note observed state changes (drives the pick-off diagnostic).
+        #    An observed change is also the event clock for event-clocked
+        #    markouts — record them BEFORE bumping state_changed_at, using
+        #    this cycle's mid at the new state.
         if state_key != book.last_state_key:
+            self._process_next_event_markouts(book, mid)
             book.last_state_key = state_key
             book.state_changed_at = self._now()
 
@@ -681,6 +724,8 @@ class LiveMakerEngine:
                 "mkt_bid": best_bid, "mkt_ask": best_ask, "mid": mid,
                 "inning": state.inning, "is_top": state.is_top,
                 "inventory": book.inventory,
+                "vpin": book.flow.vpin,
+                "one_sidedness": book.flow.one_sidedness,
             })
 
     def mark_final_from_schedule(self, games: List[MlbGame]) -> None:

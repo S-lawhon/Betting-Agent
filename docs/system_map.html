@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Betting Pod Shop — System Map</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2230; --line:#2a3140;
+    --ink:#e6edf3; --dim:#9aa7b5; --faint:#6b7684;
+    --accent:#5aa9ff; --green:#3fb950; --amber:#e3b341; --red:#f85149;
+    --purple:#bc8cff; --teal:#39c5bb; --pink:#ff7b9c;
+    --research:#bc8cff; --data:#39c5bb; --brain:#5aa9ff; --pod:#3fb950;
+    --risk:#e3b341; --orch:#ff9e64; --settle:#ff7b9c; --view:#79c0ff; --ops:#f0883e; --monitor:#d29922;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent);text-decoration:none}
+  code{background:#0b0e13;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+    font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c9d6e5}
+  h1,h2,h3{line-height:1.2}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+
+  header{background:linear-gradient(180deg,#141a24,#0e1116);border-bottom:1px solid var(--line);padding:30px 0 22px}
+  header h1{margin:0 0 6px;font-size:27px;letter-spacing:-.4px}
+  header .sub{color:var(--dim);font-size:14.5px;max-width:820px}
+  .facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .fact{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:12.5px}
+  .fact b{color:var(--ink)} .fact span{color:var(--faint)}
+  .paperflag{background:rgba(63,185,80,.12);border-color:rgba(63,185,80,.4);color:#7ee787}
+
+  nav{position:sticky;top:0;z-index:50;background:rgba(14,17,22,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;gap:4px;overflow-x:auto;padding:8px 20px}
+  nav button{background:transparent;border:0;color:var(--dim);font-size:13.5px;font-weight:600;
+    padding:8px 13px;border-radius:8px;cursor:pointer;white-space:nowrap}
+  nav button:hover{color:var(--ink);background:var(--panel)}
+  nav button.on{color:#fff;background:var(--accent)}
+
+  section{display:none;padding:30px 0 60px}
+  section.on{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  section h2{font-size:22px;margin:0 0 4px;letter-spacing:-.3px}
+  .lede{color:var(--dim);margin:0 0 22px;max-width:840px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .card h3{margin:0 0 8px;font-size:16px}
+  .muted{color:var(--dim)}
+  .small{font-size:13px}
+
+  /* pipeline */
+  .pipe{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:6px 0 8px}
+  .stage{flex:1 1 150px;min-width:150px;background:var(--panel);border:1px solid var(--line);
+    border-top:3px solid var(--accent);border-radius:10px;padding:13px 14px;position:relative}
+  .stage .n{font-size:11px;color:var(--faint);font-weight:700;letter-spacing:.08em}
+  .stage h4{margin:3px 0 5px;font-size:14.5px}
+  .stage p{margin:0;font-size:12.5px;color:var(--dim)}
+  .stage .files{margin-top:8px;font-size:11.5px;color:var(--faint);font-family:ui-monospace,monospace;word-break:break-word}
+  .arrow{align-self:center;color:var(--faint);font-size:20px;flex:0 0 auto}
+
+  /* architecture layers */
+  .layer{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0;background:var(--panel)}
+  .layer>.ltitle{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14px;margin-bottom:11px}
+  .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+  .row{display:flex;flex-wrap:wrap;gap:9px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:12.5px;min-width:120px}
+  .chip b{display:block;font-size:13px}
+  .chip .d{color:var(--faint);font-size:11.5px;margin-top:2px}
+  .flowline{text-align:center;color:var(--faint);font-size:20px;margin:2px 0}
+
+  /* module search + grid */
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;
+    position:sticky;top:49px;z-index:20;background:var(--bg);padding:12px 0}
+  #q{flex:1 1 260px;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    border-radius:10px;padding:11px 14px;font-size:14px;outline:none}
+  #q:focus{border-color:var(--accent)}
+  .filters{display:flex;flex-wrap:wrap;gap:6px}
+  .filters button{background:var(--panel);border:1px solid var(--line);color:var(--dim);
+    border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .filters button.on{color:#0e1116;border-color:transparent}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  .mod{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:10px;padding:13px 15px;cursor:pointer;transition:border-color .15s}
+  .mod:hover{border-color:var(--accent)}
+  .mod .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .mod .name{font-family:ui-monospace,monospace;font-size:13px;color:#c9d6e5;font-weight:600}
+  .mod .lc{font-size:11px;color:var(--faint);flex:0 0 auto}
+  .mod .role{font-size:11px;font-weight:700;letter-spacing:.03em;margin:5px 0 6px;text-transform:uppercase}
+  .mod .desc{font-size:12.5px;color:var(--dim)}
+  .mod .fns{display:none;margin-top:9px;border-top:1px solid var(--line);padding-top:9px}
+  .mod.open .fns{display:block}
+  .mod .fns li{font-size:12px;color:var(--dim);margin:3px 0;list-style:none}
+  .mod .fns li code{font-size:11.5px}
+  .mod ul{margin:0;padding:0}
+  .hint{color:var(--faint);font-size:12px;margin-bottom:4px}
+
+  /* pod table */
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--faint);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
+  td .pid{font-weight:700}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .b-live{background:rgba(63,185,80,.15);color:#7ee787}
+  .b-shelf{background:rgba(227,179,65,.14);color:#e3b341}
+  .b-dead{background:rgba(248,81,73,.14);color:#ff7b72}
+  .b-build{background:rgba(90,169,255,.15);color:#79c0ff}
+  .tier{font-size:11px;color:var(--dim)}
+
+  ul.clean{margin:8px 0;padding-left:18px}
+  ul.clean li{margin:5px 0;color:var(--dim)}
+  ul.clean li b{color:var(--ink)}
+  .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:13px;margin:8px 0}
+  .kv div:nth-child(odd){color:var(--faint)}
+  .callout{border-left:3px solid var(--amber);background:rgba(227,179,65,.07);padding:11px 15px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px}
+  .callout.g{border-color:var(--green);background:rgba(63,185,80,.07)}
+  .callout.r{border-color:var(--red);background:rgba(248,81,73,.07)}
+  footer{border-top:1px solid var(--line);padding:22px 0;color:var(--faint);font-size:12px}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 14px;font-size:12px;color:var(--dim)}
+  .legend span{display:flex;align-items:center;gap:6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Betting Pod Shop — System Map</h1>
+    <div class="sub">How the whole machine fits together, from the first line of research to the code running live on the server. Every box below is a real file or component; click into <b>Modules</b> to search all of them and see what each function does.</div>
+    <div class="facts">
+      <div class="fact paperflag"><b>PAPER / DEMO MODE</b> <span>— no real money, ever</span></div>
+      <div class="fact"><b>4</b> <span>active pods</span></div>
+      <div class="fact"><b>~75</b> <span>Python modules</span></div>
+      <div class="fact"><b>1,357</b> <span>tests</span></div>
+      <div class="fact"><b>3</b> <span>services on the VPS</span></div>
+      <div class="fact"><span>repo</span> <b>S-lawhon/Betting-Agent</b></div>
+      <div class="fact"><span>as of</span> <b>Jul 23 2026</b></div>
+    </div>
+  </div>
+</header>
+
+<nav><div class="wrap" id="nav"></div></nav>
+
+<!-- ============ OVERVIEW ============ -->
+<section id="overview" class="on"><div class="wrap">
+  <h2>The 60-second picture</h2>
+  <p class="lede">Everything here exists to answer one question over and over: <i>“Is this betting market priced wrong, and by enough to beat the fees?”</i> When the answer is yes, the system places a (pretend) bet and later checks whether it was right.</p>
+
+  <div class="card">
+    <h3>What the whole thing is</h3>
+    <p class="muted">A <b>“pod shop”</b> is a collection of small, independent trading strategies (each one is a <b>pod</b>) that all run inside one engine. Each pod hunts for a specific kind of mispricing — a tennis favorite that's too cheap, a golfer under-priced to finish top-10, a live game where the crowd overreacts. They all share the same plumbing: the same way to size a bet, the same risk limits, the same trade ledger, the same scoreboard.</p>
+    <p class="muted">The system runs on a rented Linux server (a DigitalOcean <b>“VPS” / “droplet”</b>) and wakes up every 5 minutes to scan the markets. It is in <b>paper mode</b> — it records what it <i>would</i> bet and tracks the results, but never risks real money. The goal is to prove each strategy actually works <i>before</i> any real capital is considered.</p>
+  </div>
+
+  <div class="card">
+    <h3>The seven jobs, in plain words</h3>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--data)"></span>Get the data</span>
+      <span><span class="dot" style="background:var(--brain)"></span>Decide fair value</span>
+      <span><span class="dot" style="background:var(--pod)"></span>Run the strategies</span>
+      <span><span class="dot" style="background:var(--risk)"></span>Control the risk</span>
+      <span><span class="dot" style="background:var(--orch)"></span>Orchestrate the loop</span>
+      <span><span class="dot" style="background:var(--settle)"></span>Settle the results</span>
+      <span><span class="dot" style="background:var(--monitor)"></span>Watch over it all</span>
+    </div>
+    <ul class="clean">
+      <li><b>Get the data</b> — clients that fetch live prices & scores from Kalshi, Polymarket, sportsbooks (The Odds API), Deribit, MLB, and golf/econ feeds.</li>
+      <li><b>Decide fair value</b> — the math that turns messy market odds into a single honest probability (remove the bookmaker's cut, blend sources, model win probability).</li>
+      <li><b>Run the strategies</b> — the pods themselves; each compares fair value to the market price and flags a bet when the gap clears the fees.</li>
+      <li><b>Control the risk</b> — position sizing (Kelly), portfolio exposure caps, and a central ledger so no single pod can blow the budget.</li>
+      <li><b>Orchestrate the loop</b> — the engine that wires it all together and runs the 5-minute cycle.</li>
+      <li><b>Settle the results</b> — after games finish, look up who won and score every open bet.</li>
+      <li><b>Watch over it all</b> — a fund-manager layer that checks the system is healthy and emails you a daily brief.</li>
+    </ul>
+    <p class="small muted">Open the <b>Architecture</b> tab to see how these layers stack, or <b>Modules</b> to search every file by name.</p>
+  </div>
+
+  <div class="card">
+    <h3>How to use this map</h3>
+    <div class="kv">
+      <div>Lifecycle</div><div>The journey of one strategy — from a research idea to code running on the server and pushed to GitHub.</div>
+      <div>Architecture</div><div>The live system as stacked layers; follow the arrows to see the flow of a single scan.</div>
+      <div>Modules</div><div>A searchable card for every file. Click a card to expand its key functions.</div>
+      <div>Pods</div><div>The strategy roster — what's live, what's shelved, and the “gate” each must clear.</div>
+      <div>Deploy &amp; GitHub</div><div>The “drop”: how code gets from your Mac to the server and into the repo.</div>
+      <div>Monitoring</div><div>The fund-manager layer that keeps you informed without you watching dashboards.</div>
+      <div>Glossary</div><div>Plain-language definitions of every piece of jargon used here.</div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ LIFECYCLE ============ -->
+<section id="lifecycle"><div class="wrap">
+  <h2>Lifecycle of a strategy — idea → drop → repo</h2>
+  <p class="lede">This is the answer to “from the initial research to the drop to the GitHub repo.” Every pod travels this path. Nothing skips the validation steps — a strategy has to earn its way into the live engine.</p>
+
+  <div class="pipe">
+    <div class="stage" style="border-color:var(--research)"><div class="n">STAGE 1</div><h4>Research</h4><p>Survey what's tradable and where an edge might hide. The market-wide scan lives in <code>kalshi-ev-map/</code>; a per-strategy dig goes in its own <code>*_research/</code> folder.</p><div class="files">kalshi-ev-map/ · golf_research/ · tennis_research/ · mlb_props_research/</div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color:var(--research)"><div class="n">STAGE 2</div><h4>Hypothesis &amp; backtest</h4><p>Write the edge as a falsifiable claim, then test it on historical data. Output is a <b>REPORT</b> + a <b>params JSON</b> with the exact validated numbers.</p><div class="files">02_edge_hypotheses.md · 03_validation.md · backtest/REPORT_*.md</div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color:var(--research)"><div class="n">STAGE 3</div><h4>Spec &amp; gate</h4><p>Lock the decision rule <i>before</i> building: what must be true to keep it, and the pre-registered <b>gate</b> (e.g. “120 trades” or “8 tournaments”) that decides go/kill.</p><div class="files">P-0XX_Spec.md · DECISION_RULE.md</div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color:var(--pod)"><div class="n">STAGE 4</div><h4>Build the pod</h4><p>Write a <code>BasePod</code> subclass that bakes in the validated params, register it with <code>@register_pod</code>, and add tests. The engine auto-discovers it.</p><div class="files">src/pods/*.py · tests/</div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color:var(--risk)"><div class="n">STAGE 5</div><h4>Wire the config</h4><p>Turn it on by adding the pod ID to <code>pods.active</code> and its tuning block in the YAML. Config decides what actually loads — not the docs.</p><div class="files">config_multi_pod.yaml</div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color:var(--ops)"><div class="n">STAGE 6</div><h4>The drop (deploy)</h4><p>Run tests, sync the code to the server, restart the service, health-check it, and auto-rollback if it fails. One command.</p><div class="files">scripts/deploy.sh</div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color:var(--pod)"><div class="n">STAGE 7</div><h4>Paper-validate live</h4><p>The pod trades on paper, accumulating evidence toward its gate. The fund manager tracks how close it is and settlers score each bet.</p><div class="files">data/trade_logs/ · manager/registry.yaml</div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color:var(--monitor)"><div class="n">STAGE 8</div><h4>Gate verdict → repo</h4><p>Clear the gate ⇒ candidate for real money. Fail ⇒ KILL, with a post-mortem. Every step is committed &amp; pushed to <b>GitHub</b> as the permanent record.</p><div class="files">git commit / push → github.com/S-lawhon/Betting-Agent</div></div>
+  </div>
+
+  <div class="callout g"><b>Why the order matters.</b> The rule is <i>paper-first, CLV-gated</i>: prove the edge on historical data and lock the kill-criteria <b>before</b> writing the pod, so a losing idea can't be quietly rationalized into staying alive. This came from a real lesson — a strategy (P-013) lost $2,094 of paper money while its success criteria were still being argued after the fact.</div>
+
+  <div class="card">
+    <h3>Where the “initial research” actually lives</h3>
+    <p class="muted">The broadest research artifact is <code>kalshi-ev-map/</code> — a 5-step opportunity survey of the entire Kalshi venue (68,561 open markets pulled and analyzed). It reads like a funnel:</p>
+    <div class="pipe">
+      <div class="stage"><div class="n">01</div><h4>Universe survey</h4><p>Which market families have liquidity &amp; structure worth trading; the fee schedule.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">02</div><h4>Edge hypotheses</h4><p>Each candidate edge with its mechanism, counterparty, and falsification test.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">03</div><h4>Validation</h4><p>Calibration curves + fee-aware backtests: does the edge survive costs?</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">04</div><h4>Ranking</h4><p>Score survivors across 7 dimensions.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">05</div><h4>Build roadmap</h4><p>The main output: what to build, in order, with a kill-test each.</p></div>
+    </div>
+    <p class="small muted">From there, each promising edge spins off into its own <code>*_research/</code> folder (golf, tennis, MLB props, in-play, MLB totals…) that repeats the backtest→spec loop at strategy depth before any pod is written.</p>
+  </div>
+</div></section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="architecture"><div class="wrap">
+  <h2>Runtime architecture — one scan cycle</h2>
+  <p class="lede">This is the live system. Every 5 minutes the engine walks top-to-bottom: pull data → estimate fair value → each pod decides → risk approves → (paper) execute → log. Every 30 minutes, settlers score finished games. A separate monitor watches the whole thing.</p>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--orch)"></span>Orchestration</span>
+    <span><span class="dot" style="background:var(--data)"></span>Data clients</span>
+    <span><span class="dot" style="background:var(--brain)"></span>Fair-value engine</span>
+    <span><span class="dot" style="background:var(--pod)"></span>Pods</span>
+    <span><span class="dot" style="background:var(--risk)"></span>Risk &amp; capital</span>
+    <span><span class="dot" style="background:var(--settle)"></span>Settlement</span>
+    <span><span class="dot" style="background:var(--view)"></span>Dashboards</span>
+    <span><span class="dot" style="background:var(--monitor)"></span>Monitoring</span>
+  </div>
+
+  <div class="layer" style="border-color:var(--orch)">
+    <div class="ltitle"><span class="dot" style="background:var(--orch)"></span>1 · Entry &amp; orchestration — “start the loop, wire everything up”</div>
+    <div class="row">
+      <div class="chip"><b>main.py / cli.py</b><div class="d">the entrypoint you run</div></div>
+      <div class="chip"><b>engine.py</b><div class="d">builds clients + shared deps, runs the guarded loop</div></div>
+      <div class="chip"><b>pod_runner.py</b><div class="d">scans active pods concurrently each cycle</div></div>
+      <div class="chip"><b>pod_registry.py</b><div class="d">auto-discovers pods in src/pods/</div></div>
+      <div class="chip"><b>config_loader.py</b><div class="d">merges config.yaml + overlay</div></div>
+    </div>
+  </div>
+  <div class="flowline">↓ asks the data layer for prices &amp; scores</div>
+
+  <div class="layer" style="border-color:var(--data)">
+    <div class="ltitle"><span class="dot" style="background:var(--data)"></span>2 · Data clients — “get honest numbers from the outside world”</div>
+    <div class="row">
+      <div class="chip"><b>kalshi_public.py</b><div class="d">Kalshi prices/orderbook (read-only)</div></div>
+      <div class="chip"><b>live_odds_poller.py</b><div class="d">The Odds API live sportsbook lines</div></div>
+      <div class="chip"><b>polymarket_client.py</b><div class="d">Polymarket CLOB</div></div>
+      <div class="chip"><b>mlb_statsapi.py</b><div class="d">live MLB game state</div></div>
+      <div class="chip"><b>datagolf_client.py</b><div class="d">golf model predictions</div></div>
+      <div class="chip"><b>deribit_client.py</b><div class="d">crypto options chains</div></div>
+      <div class="chip"><b>forecastex_client.py</b><div class="d">IB econ contracts</div></div>
+      <div class="chip"><b>nowcast_http.py</b><div class="d">Fed/econ nowcasts</div></div>
+    </div>
+  </div>
+  <div class="flowline">↓ raw odds handed to the math</div>
+
+  <div class="layer" style="border-color:var(--brain)">
+    <div class="ltitle"><span class="dot" style="background:var(--brain)"></span>3 · Fair-value engine — “what SHOULD this cost?”</div>
+    <div class="row">
+      <div class="chip"><b>devig.py</b><div class="d">strip the bookmaker's cut → fair probability</div></div>
+      <div class="chip"><b>fair_value.py</b><div class="d">blend Pinnacle / Elo / consensus</div></div>
+      <div class="chip"><b>elo_model.py</b><div class="d">per-sport team strength ratings</div></div>
+      <div class="chip"><b>live_fair_value.py</b><div class="d">in-play consensus value</div></div>
+      <div class="chip"><b>mlb_win_prob.py</b><div class="d">live win-probability model</div></div>
+      <div class="chip"><b>crypto_options_pricer.py</b><div class="d">implied prob from options</div></div>
+      <div class="chip"><b>kalshi_fees.py</b><div class="d">the fee gate: is the edge net-positive?</div></div>
+    </div>
+  </div>
+  <div class="flowline">↓ fair value + market price → each strategy decides</div>
+
+  <div class="layer" style="border-color:var(--pod)">
+    <div class="ltitle"><span class="dot" style="background:var(--pod)"></span>4 · Pods (active) — “find the mispriced bet”</div>
+    <div class="row">
+      <div class="chip" style="border-color:var(--green)"><b>P-001</b><div class="d">Kalshi moneyline value</div></div>
+      <div class="chip" style="border-color:var(--green)"><b>P-014</b><div class="d">live game agent (in-play)</div></div>
+      <div class="chip" style="border-color:var(--green)"><b>P-015</b><div class="d">tennis qualifier favorites</div></div>
+      <div class="chip" style="border-color:var(--green)"><b>P-017</b><div class="d">golf top-N pre-tournament</div></div>
+      <div class="chip"><b>base_pod.py</b><div class="d">shared pod skeleton: sizing, dedup, risk hooks</div></div>
+    </div>
+    <p class="small muted" style="margin:9px 0 0">Each pod returns <code>ScanResult</code> objects — “here's a bet worth placing, at this size.”</p>
+  </div>
+  <div class="flowline">↓ every proposed bet must pass risk before it's placed</div>
+
+  <div class="layer" style="border-color:var(--risk)">
+    <div class="ltitle"><span class="dot" style="background:var(--risk)"></span>5 · Risk, sizing &amp; execution — “can we afford this, and route it”</div>
+    <div class="row">
+      <div class="chip"><b>aggregate_risk.py</b><div class="d">portfolio caps + intra-cycle reservations</div></div>
+      <div class="chip"><b>capital_allocator.py</b><div class="d">how much bankroll each pod gets</div></div>
+      <div class="chip"><b>multi_executor.py</b><div class="d">routes each bet to the right venue</div></div>
+      <div class="chip"><b>trade_store.py</b><div class="d">central in-memory trade ledger</div></div>
+      <div class="chip"><b>trade_log_schema.py</b><div class="d">normalizes every log row</div></div>
+    </div>
+  </div>
+  <div class="flowline">↓ approved bets written to the trade log (paper)</div>
+
+  <div class="layer" style="border-color:var(--settle)">
+    <div class="ltitle"><span class="dot" style="background:var(--settle)"></span>6 · Settlement — “who won? score the open bets” (every 30 min)</div>
+    <div class="row">
+      <div class="chip"><b>kalshi_tennis_settler.py</b><div class="d">scores P-015</div></div>
+      <div class="chip"><b>kalshi_golf_settler.py</b><div class="d">scores P-017</div></div>
+      <div class="chip"><b>polymarket_settler.py</b><div class="d">scores Poly-based pods</div></div>
+      <div class="chip"><b>pnl_calculator.py</b><div class="d">P&L net of venue fees</div></div>
+    </div>
+  </div>
+  <div class="flowline">↓ results feed dashboards &amp; the monitor</div>
+
+  <div class="layer" style="border-color:var(--view)">
+    <div class="ltitle"><span class="dot" style="background:var(--view)"></span>7 · Windows on the system</div>
+    <div class="row">
+      <div class="chip"><b>web_dashboard.py</b><div class="d">live web dashboard (:8080)</div></div>
+      <div class="chip"><b>dashboard.py</b><div class="d">terminal dashboard</div></div>
+      <div class="chip"><b>health_check.py</b><div class="d">8-point health report</div></div>
+      <div class="chip"><b>watchdog.py</b><div class="d">systemd heartbeat</div></div>
+    </div>
+  </div>
+
+  <div class="layer" style="border-color:var(--monitor)">
+    <div class="ltitle"><span class="dot" style="background:var(--monitor)"></span>8 · Fund manager (separate, read-only) — “tell me what needs me”</div>
+    <div class="row">
+      <div class="chip"><b>registry.yaml</b><div class="d">single source of truth for every workstream</div></div>
+      <div class="chip"><b>collect.py</b><div class="d">measures the real system (no LLM)</div></div>
+      <div class="chip"><b>checks.py</b><div class="d">facts → findings w/ severity</div></div>
+      <div class="chip"><b>alert.py → notify.py</b><div class="d">email + phone push</div></div>
+      <div class="chip"><b>brief.py</b><div class="d">daily brief (8:30am ET)</div></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:22px">
+    <h3>Two kinds of pods run in two places</h3>
+    <div class="kv">
+      <div>Standard pods</div><div>P-001, P-014, P-015, P-017 live <b>inside</b> the 5-minute engine. Slow, patient scans.</div>
+      <div>Standalone makers</div><div>P-016 (retired) &amp; P-017M run their <b>own fast loop</b> via a <code>scripts/run_*.py</code> as separate services — they quote and cancel far faster than 5 minutes, so they must not go in <code>pods.active</code>.</div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============ MODULES ============ -->
+<section id="modules"><div class="wrap">
+  <h2>Module reference — every file, searchable</h2>
+  <p class="lede">One card per source file. Type to filter by name, purpose, or function. Click a card to expand its key functions. Colored by the job it does.</p>
+  <div class="toolbar">
+    <input id="q" placeholder="Search files & functions — try 'fee', 'kelly', 'settle', 'kalshi'…" autocomplete="off">
+    <div class="filters" id="filters"></div>
+  </div>
+  <div class="hint" id="count"></div>
+  <div class="grid" id="grid"></div>
+</div></section>
+
+<!-- ============ PODS ============ -->
+<section id="pods"><div class="wrap">
+  <h2>The pod roster — strategies &amp; their gates</h2>
+  <p class="lede">Each pod is one betting strategy. A <b>gate</b> is the pre-registered amount of evidence it must gather in paper mode before anyone considers real money. <b>No pod has cleared its gate — everything is still validating.</b></p>
+  <table>
+    <thead><tr><th>Pod</th><th>Strategy — the edge in one line</th><th>Status</th><th>Gate to clear</th></tr></thead>
+    <tbody id="podrows"></tbody>
+  </table>
+
+  <div class="card">
+    <h3>How to read a pod's status</h3>
+    <ul class="clean">
+      <li><b><span class="badge b-live">active</span> validating</b> — running live on paper, gathering evidence toward its gate. Do not scale it up until the gate is met.</li>
+      <li><b><span class="badge b-shelf">shelved</span></b> — code exists and may work, but it's parked. P-002/P-006 are shelved because they'd have to <i>execute on Polymarket</i>, which this project has no access to — so they can never graduate regardless of results.</li>
+      <li><b><span class="badge b-dead">retired / killed</span></b> — failed its gate and was shut off, with a post-mortem. P-016's live-maker edge was <code>−1.29¢</code> markout (a loss after fees); P-017M's promising number turned out to be a weighting-bug artifact.</li>
+    </ul>
+  </div>
+
+  <div class="callout"><b>Why gates are locked in advance.</b> The fund manager reads the gate rule literally — “NO DECISION at n&lt;120” means no decision, no matter how good the numbers look mid-sample. This is the guardrail against fooling yourself with a lucky early streak.</div>
+
+  <div class="card">
+    <h3>The north-star metric: CLV, not P&amp;L</h3>
+    <p class="muted">Pods are judged on <b>CLV</b> (closing-line value) versus the de-vigged sharp close — i.e. did you get a better price than where the smartest book eventually settled — <i>not</i> on raw paper profit. Over small samples, P&amp;L is mostly luck; beating the closing line is the durable signal that an edge is real. Every edge must also clear the bet <b>net of fees + half the spread</b> before it counts.</p>
+  </div>
+</div></section>
+
+<!-- ============ DEPLOY / GITHUB ============ -->
+<section id="deploy"><div class="wrap">
+  <h2>The drop — Mac → server → GitHub</h2>
+  <p class="lede">“The drop” is deploying: getting code from your laptop onto the live server safely. It's one command, and it protects itself.</p>
+
+  <div class="card">
+    <h3>One command does the whole drop</h3>
+    <p class="muted"><code>bash scripts/deploy.sh 129.212.176.202 restart</code></p>
+    <div class="pipe">
+      <div class="stage"><div class="n">1</div><h4>Test first</h4><p>Runs the full pytest suite locally. Fails? It asks before continuing.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">2</div><h4>Sync</h4><p><code>rsync</code> the code up — <b>excluding</b> <code>data/</code>, git, caches &amp; secrets so live trade history is never overwritten.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">3</div><h4>Fix ownership</h4><p>rsync runs as root; the service runs as user <code>bettingbot</code>, so it <code>chown</code>s the files back.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">4</div><h4>Backup + restart</h4><p>Snapshots the current version, then restarts the systemd service.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">5</div><h4>Health-check</h4><p>Polls <code>/health</code> for up to 60s. Healthy ⇒ done, backup deleted.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage" style="border-color:var(--green)"><div class="n">6</div><h4>Auto-rollback</h4><p>Not healthy ⇒ restores the backup &amp; restarts the previous version automatically.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Where the code lives</h3>
+    <div class="kv">
+      <div>Your Mac</div><div><code>~/Desktop/Betting Fund Project</code> — where you edit and where this map lives.</div>
+      <div>The server (VPS)</div><div><code>129.212.176.202</code> · code at <code>/opt/betting-pod-shop/</code> · runs as user <code>bettingbot</code> · Python 3.12 venv.</div>
+      <div>GitHub repo</div><div><code>github.com/S-lawhon/Betting-Agent</code> — the permanent history. Current branch: <code>p018-inplay-fade-core</code>.</div>
+      <div>Dashboard</div><div><a href="https://dashboard.htxtrades.org/">dashboard.htxtrades.org</a> (TLS + password via Caddy; the raw :8080 port is closed to the public).</div>
+    </div>
+    <div class="callout"><b>Git ≠ deploy.</b> Committing to GitHub saves your history; <code>deploy.sh</code> pushes code to the running server. They're separate steps — the server syncs straight from your Mac via rsync, not by pulling from GitHub.</div>
+  </div>
+
+  <div class="card">
+    <h3>The three services running on the server</h3>
+    <table>
+      <thead><tr><th>Service (systemd unit)</th><th>What it runs</th><th>Cadence</th></tr></thead>
+      <tbody>
+        <tr><td><code>betting-pod-shop</code></td><td>The main 5-minute engine (P-001/014/015/017) + web dashboard</td><td>every 5 min</td></tr>
+        <tr><td><code>betting-book-capture</code></td><td>Records Kalshi order-book snapshots for research</td><td>every 1 min</td></tr>
+        <tr><td><code>mlb-props-collector</code></td><td>MLB order-book snapshots (systemd timer)</td><td>timer</td></tr>
+      </tbody>
+    </table>
+    <p class="small muted"><code>betting-live-maker</code> (P-016) was a fourth unit — decommissioned Jul 22 2026 after it failed its gate. Kalshi throttles <b>per-IP</b>, so all services share one rate budget (hence the 2 req/s limit on the main client).</p>
+  </div>
+
+  <div class="card">
+    <h3>Safety gates — why no real money can slip out</h3>
+    <ul class="clean">
+      <li><b>Demo environment</b> — Kalshi keys are demo-only; <code>KALSHI_ENVIRONMENT=demo</code>.</li>
+      <li><b>No live flag</b> — order placement stays gated unless an explicit <code>I_UNDERSTAND_LIVE_TRADING</code> flag is set (it isn't).</li>
+      <li><b>Global invariant</b> — the monitor treats <i>any</i> pod reporting a non-paper mode as a P1 critical alert.</li>
+      <li><b>Risk caps</b> — 25% Kelly sizing, 50% max portfolio exposure, 5% daily-loss cooldown, on a $1,000 paper bankroll.</li>
+    </ul>
+  </div>
+</div></section>
+
+<!-- ============ MONITORING ============ -->
+<section id="monitoring"><div class="wrap">
+  <h2>Fund manager — the layer that watches for you</h2>
+  <p class="lede">You shouldn't have to stare at a dashboard. The fund manager answers three questions every day: <b>Is production healthy? What's waiting on me? How close is each strategy to its decision point?</b></p>
+
+  <div class="card">
+    <h3>The design rules (they're the whole point)</h3>
+    <ul class="clean">
+      <li><b>The registry is the source of truth.</b> <code>registry.yaml</code> is the one place that says what every workstream is, its gate, and what it's blocked on — replacing state that used to be scattered across 9 memory files, 6 research dirs, a stale status doc, and two crontabs.</li>
+      <li><b>Alerting never touches an AI.</b> Threshold checks are plain Python — a model in the alert path can fail in ways that look like silence. The AI is for judgment on top of facts already collected.</li>
+      <li><b>Report by exception.</b> A strategy that just needs more calendar time stays silent until its gate fires. A daily report that repeats unchanged gets skimmed — and then it protects nothing.</li>
+      <li><b>Exit code 0 ≠ it worked.</b> Every scheduled job is judged on <i>output freshness</i>, never on whether it exited cleanly. (A settlement job once ran “successfully” while writing zero rows for 31 hours.)</li>
+      <li><b>Never write to the trading system.</b> The whole manager is read-only against data, configs, and logs — it can't cause an incident.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>How a day flows</h3>
+    <div class="pipe">
+      <div class="stage"><div class="n">every 15 min</div><h4>collect.py</h4><p>On the droplet: measures the real system → <code>status.json</code>.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">→</div><h4>checks.py</h4><p>Turns facts into findings with a severity level.</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">→</div><h4>alert.py</h4><p>Critical/warn findings dispatched with cooldown + dedupe…</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">→</div><h4>notify.py</h4><p>…to email (SMTP) and phone push (ntfy).</p></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="n">8:30am ET</div><h4>brief.py</h4><p>Renders the daily brief. Ask Claude “what's my status” to get it with ranking &amp; judgment.</p></div>
+    </div>
+    <p class="small muted"><code>refresh.py</code> runs the remote collector over SSH from your Mac and pulls the snapshot back, so you can generate a brief locally.</p>
+  </div>
+</div></section>
+
+<!-- ============ GLOSSARY ============ -->
+<section id="glossary"><div class="wrap">
+  <h2>Glossary — the jargon, in plain words</h2>
+  <p class="lede">Every specialized term used in this system and this map.</p>
+  <div class="grid" id="glossary-grid"></div>
+</div></section>
+
+<footer><div class="wrap">
+  Betting Pod Shop system map · generated Jul 23 2026 · all figures reflect the repo state at that date · paper/demo mode throughout, no real money deployed. This is a static reference — regenerate it after major structural changes.
+</div></footer>
+
+<script>
+/* ---------- NAV ---------- */
+const tabs=[["overview","Overview"],["lifecycle","Lifecycle"],["architecture","Architecture"],
+  ["modules","Modules"],["pods","Pods"],["deploy","Deploy & GitHub"],["monitoring","Monitoring"],["glossary","Glossary"]];
+const nav=document.getElementById('nav');
+tabs.forEach(([id,label],i)=>{const b=document.createElement('button');b.textContent=label;b.dataset.t=id;
+  if(i===0)b.classList.add('on');b.onclick=()=>show(id);nav.appendChild(b);});
+function show(id){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===id));
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
+  window.scrollTo({top:0,behavior:'instant'});}
+
+/* ---------- MODULE DATA ---------- */
+// group keys → {label,color}
+const GROUPS={
+  data:{label:"Data clients",color:"var(--data)"},
+  brain:{label:"Fair-value / math",color:"var(--brain)"},
+  pod:{label:"Pods (strategies)",color:"var(--pod)"},
+  risk:{label:"Risk & capital",color:"var(--risk)"},
+  orch:{label:"Orchestration",color:"var(--orch)"},
+  settle:{label:"Settlement",color:"var(--settle)"},
+  view:{label:"Dashboards / health",color:"var(--view)"},
+  maker:{label:"Standalone makers",color:"var(--pink)"},
+  ops:{label:"Scripts & ops",color:"var(--ops)"},
+  monitor:{label:"Fund manager",color:"var(--monitor)"},
+  util:{label:"Utilities",color:"var(--faint)"}
+};
+const MODS=[
+  // ---- data ----
+  {n:"kalshi_public.py",g:"data",lc:217,d:"Read-only Kalshi public-API client: open markets, single market, orderbook, recent trades. Handles Kalshi's stringified numerics and per-IP throttling.",f:["open_markets() / get_market()","orderbook() — best YES ask = 1 − best NO bid","trades_since()"]},
+  {n:"live_odds_poller.py",g:"data",lc:374,d:"Polls The Odds API for live/in-play sportsbook lines; tracks credits and line movement; extracts a Pinnacle line + consensus.",f:["poll() / poll_all()","get_pinnacle_line() / get_consensus_probs()","detect_line_movement()"]},
+  {n:"polymarket_client.py",g:"data",lc:699,d:"Polymarket CLOB client: normalize markets, order books, midpoints, place/cancel orders. (Execution unavailable to this project — read paths only.)",f:["get_markets() / get_book() / get_midpoint()","find_series_id() / get_sport_events()","place_order() / cancel_order()"]},
+  {n:"kalshi_tennis_client.py",g:"data",lc:124,d:"Read-only client scoped to Kalshi tennis match markets, feeding the P-015 qualifier pod.",f:["get_open_match_markets()","get_market()"]},
+  {n:"deribit_client.py",g:"data",lc:369,d:"Deribit public options-market client: index price, instruments, full option chains, orderbooks, historical vol — feeds crypto fair value.",f:["get_all_chains() / get_chain_for_expiry()","get_index_price() / get_orderbook()"]},
+  {n:"forecastex_client.py",g:"data",lc:245,d:"Interactive Brokers ForecastEx connector for economic-event contracts (legacy P-004 econ arb).",f:["connect() / get_price() / place_order()"]},
+  {n:"datagolf_client.py",g:"data",lc:237,d:"Cached DataGolf prediction feed with fuzzy player-name matching; optional model input for the golf pod. Falls back to a structural edge if the key is absent.",f:["prob_for() — model prob for a player","player_from_title() — parse Kalshi top-N titles"]},
+  {n:"mlb_statsapi.py",g:"data",lc:163,d:"MLB StatsAPI client: schedule + live linescore, plus a map from StatsAPI team codes to Kalshi ticker codes. Powers live win-probability.",f:["schedule() / linescore()","kalshi_team_code()"]},
+  {n:"nowcast_http.py",g:"data",lc:468,d:"HTTP adapters for economic nowcasts: Cleveland Fed CPI, Atlanta Fed GDPNow, FRED series — with a composite router.",f:["ClevelandFedAdapter / AtlantaFedAdapter / FredAdapter","CompositeNowcastAdapter.get_reading()"]},
+  {n:"nowcast_client.py",g:"data",lc:131,d:"Higher-level aggregator over the nowcast sources (legacy macro pod support).",f:["get_reading() / get_all_readings()"]},
+  {n:"book_capture.py",g:"data",lc:508,d:"Standalone daemon that polls a set of Kalshi markets on a fixed cadence and appends order-book snapshots to rotating gzip'd JSONL — the raw research data feed.",f:["BookCapture.run() / cycle() / snapshot_market()","RateBudget — shared token bucket","RotatingJsonlWriter — one file/day, gzip on roll"]},
+
+  // ---- brain ----
+  {n:"devig.py",g:"brain",lc:84,d:"De-vigging: convert vig-inflated sharp-book odds into a fair (no-vig) probability. The foundation of every 'fair value' number.",f:["american_to_prob() / decimal_to_prob()","devig_multiplicative() / devig_power() (Shin)","fair_from_american()"]},
+  {n:"fair_value.py",g:"brain",lc:296,d:"Multi-method fair-value estimator. Blends Pinnacle-only, Elo, and multi-book consensus into one probability + a confidence signal. Degrades gracefully if a source is missing.",f:["estimate() — the main call","_pinnacle_only_result() / _ensemble_result()"]},
+  {n:"elo_model.py",g:"brain",lc:243,d:"Simple per-sport Elo rating model; predicts win prob from team strengths, updates on results, persists to data/elo_ratings.json. Starts cold and warms up.",f:["predict() / update()","save() / team_count() / has_ratings()"]},
+  {n:"live_fair_value.py",g:"brain",lc:237,d:"Computes in-play fair value from a multi-book live-odds snapshot: weighted consensus, de-vig, staleness + confidence checks.",f:["estimate()","_weighted_consensus() / _devig_home()","_compute_confidence()"]},
+  {n:"mlb_win_prob.py",g:"brain",lc:241,d:"Analytical MLB live win-probability model from game state (inning, score, base/out), calibrated to a pre-game prior.",f:["home_win_probability()","implied_pregame_prob()","strength_drift_per_half_inning()"]},
+  {n:"crypto_options_pricer.py",g:"brain",lc:573,d:"Turns Deribit option chains into the implied probability an asset finishes above/below a strike — via spread, Black-Scholes, and delta methods, then blends.",f:["estimate_probability() / _below()","_bsm_method() / _delta_method() / _blend()"]},
+  {n:"kalshi_fees.py",g:"brain",lc:156,d:"Kalshi's series-aware fee model and the net-edge gate. THE cost check: is a bet still positive after fees? Maker fees differ props-vs-outcomes, matched by longest ticker prefix.",f:["fee_per_contract() / fee_total()","net_edge() — worth − price − fee","should_bet()"]},
+  {n:"momentum_detector.py",g:"brain",lc:291,d:"Detects when Kalshi's retail crowd overreacts to a live game event vs the consensus — overreaction & divergence signals for the live pod.",f:["record_snapshot() / detect() / detect_all()","_detect_overreaction() / _detect_divergence()"]},
+  {n:"inplay_surprise.py",g:"brain",lc:451,d:"The surprise-gated fade logic (P-018 core): detect a discrete in-play event, choose a quoting regime, and build a resting fade quote that tapers with the window.",f:["update_on_event() / select_regime()","build_quote() / _fade_spec()","settle_pnl() / fills_through()"]},
+  {n:"pnl_calculator.py",g:"brain",lc:200,d:"Computes trade profit/loss with venue-specific fees deducted; the settlers use it to score outcomes.",f:["compute() / compute_batch()","VenueFees / get_fees()"]},
+  {n:"promo_calculator.py",g:"brain",lc:338,d:"Math for sportsbook promos (legacy P-009/P-010): free-bet hedges, odds-boost EV, guaranteed-profit sizing.",f:["free_bet_hedge_size() / odds_boost_ev()","risk_free_ev() / odds_boost_locked_profit()"]},
+
+  // ---- pods ----
+  {n:"pods/kalshi_moneyline.py",g:"pod",lc:179,d:"P-001 · Kalshi moneyline value. Wraps the legacy scanner as a BasePod; buys mispriced moneylines vs Pinnacle-weighted consensus, gated on CLV.",f:["scan_once()","_passes_clv_gate() / _clv_net_edge()"]},
+  {n:"pods/live_game_pod.py",g:"pod",lc:803,d:"P-014 · Live game agent. In-play consensus-edge + momentum on Kalshi for NBA/MLB; live Kelly sizing, per-game exposure caps.",f:["scan_once()","_evaluate_consensus_edge() / _evaluate_momentum_signals()","_compute_live_position_size() / _kelly_fraction()"]},
+  {n:"pods/qualifier_favorite_pod.py",g:"pod",lc:368,d:"P-015 · Tennis qualifier favorites. Buys heavy favorites (ask 0.85–0.975) in ATP/WTA qualifying matches; validated +4.1¢/ct net, n=238.",f:["scan_once() / _evaluate_market()","is_qualifier()","on_settlement()"]},
+  {n:"pods/golf_topn_pod.py",g:"pod",lc:604,d:"P-017 · Golf top-N pre-tournament value. Buys under-priced mid-tier golfers in top-N markets; resolves the real event close from the MIN across markets (Kalshi timing quirk).",f:["scan_once() / _evaluate_market()","_resolve_event_closes() / _fair_prob()","_select_candidates() / on_settlement()"]},
+  {n:"pods/cross_venue_arb.py",g:"pod",lc:1005,d:"P-002 · Kalshi↔Polymarket dual-leg arb (SHELVED — no Poly execution). Fee-adjusted, both-teams-present validated.",f:["scan_once() / _evaluate_match()","_find_best_arb()","_place_kalshi() / _place_polymarket()"]},
+  {n:"pods/polymarket_consensus.py",g:"pod",lc:1250,d:"P-006 · Sportsbook→Polymarket consensus (SHELVED — Poly-only execution). Same edge logic, executes on Polymarket's 0% fees.",f:["scan_once() / _scan_sport()","_verify_market_slug()","_get_sport_override()"]},
+  {n:"pods/live_maker_pod.py",g:"pod",lc:736,d:"P-016 · Live MLB maker (RETIRED). Standalone quoting/fill/markout engine; failed its gate at −1.29¢ markout.",f:["LiveMakerEngine.cycle() / _compute_quotes()","_check_fills() / _process_markouts() / _settle()"]},
+  {n:"pods/boost_scanner_pod.py",g:"pod",lc:451,d:"P-010 · Odds-boost grind (disabled). Scans configured boosts for +EV and hedges to lock profit.",f:["scan_once() / _evaluate_boost()","_execute_ev() / _place_hedge()"]},
+  {n:"pods/signup_bonus_pod.py",g:"pod",lc:405,d:"P-009 · Sign-up bonus blitz (disabled). Tracks & hedges sportsbook sign-up bonuses and free bets.",f:["scan_once() / _evaluate_promo()","_evaluate_free_bet() / _place_hedge()"]},
+  {n:"pods/crypto_options_arb.py",g:"pod",lc:999,d:"P-013 · Kalshi↔Deribit crypto options arb (disabled). Prices Kalshi crypto binaries against Deribit-implied fair value.",f:["scan_once() / _evaluate_contract()","_refresh_deribit_data() / _find_matching_chain()"]},
+  {n:"pods/forecastex_kalshi_arb.py",g:"pod",lc:344,d:"P-004 · ForecastEx↔Kalshi economic arb (disabled). Matches econ symbols across the two venues.",f:["scan_once() / _scan_symbol()","_place_on_venue()"]},
+  {n:"pods/macro_nowcast.py",g:"pod",lc:349,d:"P-012 · Macro nowcast (disabled). Converts a Fed nowcast reading into a probability of crossing a Kalshi threshold.",f:["scan_once() / _evaluate_ticker()","nowcast_to_probability()"]},
+
+  // ---- risk ----
+  {n:"base_pod.py",g:"risk",lc:325,d:"Abstract base class every pod inherits. Provides the shared skeleton: dedup fingerprints, open-position checks, Kelly sizing, and the risk-reservation hooks.",f:["scan_once() (abstract) / from_config()","compute_position_size() / get_bankroll()","check_aggregate_risk() / release_aggregate_risk()","make_fingerprint() / is_duplicate()"]},
+  {n:"aggregate_risk.py",g:"risk",lc:599,d:"Portfolio-level risk guard across ALL pods: exposure & drawdown caps, plus intra-cycle RESERVATIONS so a pod placing its whole book in one scan can't breach the budget.",f:["check_trade() (read-only) / reserve_trade()","update_post_cycle() — reservations → positions","emergency_halt() / resume() / snapshot()"]},
+  {n:"capital_allocator.py",g:"risk",lc:552,d:"Splits the bankroll across active pods — equal, configured, or performance-weighted — and tracks each pod's rolling win-rate & P&L.",f:["pre_cycle() / post_cycle()","record_settlement() / _rebalance()","get_allocation() / get_performance()"]},
+  {n:"trade_store.py",g:"risk",lc:709,d:"The central in-memory trade ledger with indexed views (by fingerprint, ticker, pod, open/placed/settled). The single truth for 'what have we bet and what's open?'",f:["append() / load()","is_fingerprint_seen() / is_position_open()","get_open_trades() / get_settlement()"]},
+  {n:"trade_log_schema.py",g:"risk",lc:221,d:"Canonical schema for every trade-log row: normalize, validate, and migrate old files to the current field names.",f:["normalize() / validate() / migrate_file()"]},
+  {n:"protocols.py",g:"risk",lc:163,d:"The interface contracts (typing Protocols) that pods, executor, and risk guard agree on — lets test doubles stand in for real venue clients.",f:["EdgeCalculatorProtocol / RiskManagerProtocol","KalshiClientProtocol / PolymarketClientProtocol","TradeStoreProtocol"]},
+
+  // ---- orchestration ----
+  {n:"main.py",g:"orch",lc:259,d:"The program entrypoint — run `python3 -m src.main` to start the paper engine.",f:["main()"]},
+  {n:"cli.py",g:"orch",lc:330,d:"Command-line front door: argument parsing, logging setup, then hands off to the engine.",f:["main() / _build_parser() / setup_logging()"]},
+  {n:"engine.py",g:"orch",lc:910,d:"Assembles the whole system: builds venue clients, builds shared dependencies (risk, allocator, store, settlers), and runs the guarded scan loop with a per-cycle callback.",f:["build_venue_clients() / build_shared_deps()","make_cycle_callback() / _run_guarded_loop()","_compute_settlement_summary()"]},
+  {n:"pod_runner.py",g:"orch",lc:333,d:"Runs one scan cycle across all active pods (concurrently), collecting a CycleReport of placed trades & errors.",f:["run_once() / run_loop()","total_placed() / total_errors()"]},
+  {n:"pod_registry.py",g:"orch",lc:115,d:"The auto-discovery mechanism: pods tag themselves with @register_pod('P-0XX') and the engine finds them by importing src/pods/.",f:["register_pod() (decorator)","discover_pods() / get_pod_class()"]},
+  {n:"multi_executor.py",g:"orch",lc:427,d:"Takes each pod's proposed bet and routes it to the correct venue client (Kalshi / Polymarket / ForecastEx); runs the cycle sequentially or concurrently and always reserves risk.",f:["execute() / run_cycle()","_execute_kalshi() / _execute_polymarket()"]},
+  {n:"config_loader.py",g:"orch",lc:179,d:"Loads and deep-merges config.yaml (base) with config_multi_pod.yaml (overlay); can narrow the active-pod set and enrich sports with live tennis.",f:["load_config() / _deep_merge()","filter_pods() / enrich_sports_with_active_tennis()"]},
+  {n:"env_loader.py",g:"orch",lc:198,d:"Parses the .env secrets file into environment variables (API keys) with required-value checks.",f:["parse_env_file() / load() / get_required()"]},
+
+  // ---- settlement ----
+  {n:"kalshi_tennis_settler.py",g:"settle",lc:252,d:"Scores P-015 tennis positions by polling Kalshi's public API for settled results; writes settlement rows and net P&L.",f:["settle_cycle()","_open_placed_entries() / _write_settlement()"]},
+  {n:"kalshi_golf_settler.py",g:"settle",lc:340,d:"Scores P-017 golf top-N positions. Handles three golf quirks: 'closed'≠settled, 'scalar' result = withdrawn→void, and P&L booked net of the taker fee.",f:["settle_cycle()","_calc_outcome_pnl() / _stale_record()"]},
+  {n:"polymarket_settler.py",g:"settle",lc:632,d:"Scores Polymarket-based pods using Odds API scores + Polymarket's Gamma API; also updates the Elo model from results.",f:["settle_cycle() / _check_and_settle()","_check_scores() / _update_elo()"]},
+
+  // ---- dashboards / health ----
+  {n:"web_dashboard.py",g:"view",lc:529,d:"The live web dashboard: a background HTTP server serving JSON + HTML with basic-auth, plus the /manager routes for the fund-manager view.",f:["WebDashboardServer.start() / update()","DashboardState.to_json()","_serve_manager_html()"]},
+  {n:"dashboard.py",g:"view",lc:467,d:"Renders a full color terminal dashboard: risk panel, cycle panel, per-pod performance table, settlement bar.",f:["DashboardRenderer.render()","render_pods_table() / render_risk_panel()"]},
+  {n:"health_check.py",g:"view",lc:679,d:"An 8-point health report — endpoint up? cycles fresh? pod active? trades flowing? settlement sane? risk ok? config loads? — used by deploy & monitoring.",f:["run_health_check()","check_cycle_health() / check_settlement() / check_risk()"]},
+  {n:"watchdog.py",g:"view",lc:81,d:"Pings systemd's watchdog once per cycle so a hung engine gets auto-restarted; also sets a human-readable status string.",f:["notify_watchdog() / notify_ready() / notify_status()"]},
+
+  // ---- standalone makers ----
+  {n:"golf_fade_maker.py",g:"maker",lc:368,d:"P-017M · standalone golf fade-maker engine (SHELVED). Rests paper fade quotes over Kalshi top-N golf markets on its own fast loop.",f:["GolfFadeMakerEngine.cycle()","_check_fills() / _process_markouts() / _maybe_settle()"]},
+  {n:"maker_challenger.py",g:"maker",lc:579,d:"A/B framework for maker pods: replays 'challenger' quote variants against the champion's recorded fills, with cluster-bootstrap significance testing.",f:["evaluate_arm() / build_tape()","cluster_bootstrap_delta() / detectable_effect_c()"]},
+  {n:"inplay_sport_adapter.py",g:"maker",lc:284,d:"The sport-agnostic adapter interface for the in-play fade engine — the four things that differ per sport (discover, anchor, poll, event-risk). MLB implemented; NBA stubbed.",f:["SportAdapter (interface)","MlbAdapter / NbaAdapter","get_adapter()"]},
+
+  // ---- utilities ----
+  {n:"constants.py",g:"util",lc:39,d:"Centralized magic numbers and shared constants.",f:[]},
+  {n:"et_time.py",g:"util",lc:102,d:"Eastern-time helpers. The droplet runs UTC but Kalshi tickers encode ET — use these for every conversion so DST doesn't break parsing.",f:["et_now() / et_today_str()","et_date_tag() / parse_mlb_ticker_start()"]},
+  {n:"fuzzy_utils.py",g:"util",lc:93,d:"Fuzzy text matching for team/player names across venues (token-sort ratio, both-teams-present checks).",f:["token_sort_ratio()","team_name_in_text() / both_teams_present()"]},
+  {n:"cross_venue_matcher.py",g:"util",lc:454,d:"Matches the same event across Kalshi and Polymarket: normalizes titles, resolves cities→teams, detects sport from ticker, validates both teams present.",f:["match_all() / _validate_both_teams()","normalise_market_title() / _resolve_city_to_team()"]},
+  {n:"polymarket_matcher.py",g:"util",lc:297,d:"Matches an Odds API event to the right Polymarket market via fuzzy scoring on the question text.",f:["match() / match_all()","_extract_teams_from_question()"]},
+  {n:"kalshi_live_discovery.py",g:"util",lc:451,d:"Finds & caches the Kalshi market that corresponds to a live game (for the live pod), inferring the YES side and market type.",f:["find_market() / find_all_markets()","_match_game() / _infer_yes_side()"]},
+  {n:"game_state.py",g:"util",lc:385,d:"Tracks live game state by polling Odds API /scores; emits state-change events (score, phase) the live pod reacts to.",f:["GameStateTracker.update() / get_live_games()","_detect_events() / is_game_live()"]},
+  {n:"live_odds_snapshot",g:"util",lc:0,d:"",f:[],skip:true},
+
+  // ---- ops / scripts ----
+  {n:"scripts/deploy.sh",g:"ops",lc:0,d:"The DROP. Test → rsync to server (excluding data/) → chown to bettingbot → backup → restart → health-check → auto-rollback on failure.",f:["bash scripts/deploy.sh 129.212.176.202 restart"]},
+  {n:"scripts/server_setup.sh",g:"ops",lc:0,d:"One-time server bootstrap: create the bettingbot user, venv, systemd units.",f:[]},
+  {n:"scripts/run_golf_maker.py",g:"ops",lc:0,d:"Launches the standalone P-017M golf fade-maker loop.",f:[]},
+  {n:"scripts/run_live_maker.py",g:"ops",lc:0,d:"Launches the standalone P-016 live-maker loop (retired).",f:[]},
+  {n:"scripts/run_book_capture.py",g:"ops",lc:0,d:"Launches the Kalshi order-book capture daemon.",f:[]},
+  {n:"scripts/rotate_trade_logs.py",g:"ops",lc:0,d:"Archives + rotates the trade log (added after an out-of-memory incident from an unbounded log).",f:[]},
+  {n:"scripts/clv_settlement.py / clv_backfill.py",g:"ops",lc:0,d:"Compute closing-line value for placed trades — the north-star metric harness.",f:[]},
+  {n:"scripts/seed_elo.py",g:"ops",lc:0,d:"Seeds the Elo model from historical results so it doesn't start cold.",f:[]},
+  {n:"scripts/void_*.py / dedup_trades.py",g:"ops",lc:0,d:"Maintenance: void bad/mismatched trades, dedup duplicate positions.",f:[]},
+  {n:"scripts/*.service / *.timer",g:"ops",lc:0,d:"systemd unit files: betting-pod-shop, betting-book-capture, mlb-props-collector (+timer), betting-live-maker (retired).",f:[]},
+
+  // ---- monitor ----
+  {n:"manager/registry.yaml",g:"monitor",lc:0,d:"THE source of truth: every workstream, its stage/tier, its pre-registered gate, and what it's blocked on. Edited by hand when reality changes.",f:["invariants: all_trading_is_paper (P1)","services: heartbeat freshness","per-workstream gates & blocked_on"]},
+  {n:"manager/collect.py",g:"monitor",lc:0,d:"Runs on the droplet: measures the real system into status.json. No AI, no judgment — pure measurement.",f:[]},
+  {n:"manager/checks.py",g:"monitor",lc:0,d:"Deterministic rules that turn measured facts into findings with a severity. A failed probe is a finding, not a crash.",f:[]},
+  {n:"manager/alert.py",g:"monitor",lc:0,d:"Dispatches critical/warn findings with cooldown + dedupe so you aren't spammed.",f:[]},
+  {n:"manager/notify.py",g:"monitor",lc:0,d:"Delivery adapters: email (SMTP) and phone push (ntfy). `--selftest` verifies the path.",f:[]},
+  {n:"manager/brief.py",g:"monitor",lc:0,d:"Renders the daily brief (markdown/HTML) at 8:30am ET, ranked with deltas.",f:[]},
+  {n:"manager/refresh.py",g:"monitor",lc:0,d:"Runs the remote collector over SSH from your Mac and pulls the snapshot back for a local brief.",f:[]}
+];
+
+/* ---------- RENDER MODULES ---------- */
+const grid=document.getElementById('grid');
+const filtersEl=document.getElementById('filters');
+let activeFilter="all";
+const groupKeys=Object.keys(GROUPS);
+function makeFilterBtn(key,label,color){const b=document.createElement('button');b.textContent=label;
+  b.dataset.k=key;if(key==="all")b.classList.add('on');
+  b.onclick=()=>{activeFilter=key;document.querySelectorAll('#filters button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');render();};
+  if(color){b.style.borderColor=color;}
+  filtersEl.appendChild(b);}
+makeFilterBtn("all","All");
+groupKeys.forEach(k=>makeFilterBtn(k,GROUPS[k].label,GROUPS[k].color));
+
+function render(){
+  const q=(document.getElementById('q').value||"").toLowerCase().trim();
+  grid.innerHTML="";let shown=0;
+  MODS.filter(m=>!m.skip).forEach(m=>{
+    if(activeFilter!=="all"&&m.g!==activeFilter)return;
+    const hay=(m.n+" "+m.d+" "+(m.f||[]).join(" ")+" "+GROUPS[m.g].label).toLowerCase();
+    if(q&&!hay.includes(q))return;
+    shown++;
+    const el=document.createElement('div');el.className="mod";
+    el.style.borderLeftColor=GROUPS[m.g].color;
+    el.innerHTML=`<div class="top"><span class="name">${m.n}</span>${m.lc?`<span class="lc">${m.lc} ln</span>`:""}</div>
+      <div class="role" style="color:${GROUPS[m.g].color}">${GROUPS[m.g].label}</div>
+      <div class="desc">${m.d}</div>
+      ${(m.f&&m.f.length)?`<div class="fns"><ul>${m.f.map(x=>`<li>◦ <code>${x}</code></li>`).join("")}</ul></div>`:""}`;
+    if(m.f&&m.f.length)el.onclick=()=>el.classList.toggle('open');
+    grid.appendChild(el);
+  });
+  document.getElementById('count').textContent=`${shown} file${shown===1?"":"s"} shown${q?` for “${q}”`:""}${activeFilter!=="all"?` · ${GROUPS[activeFilter].label}`:""} — click a card to expand its functions`;
+}
+document.getElementById('q').addEventListener('input',render);
+render();
+
+/* ---------- PODS ---------- */
+const PODS=[
+  {id:"P-001",name:"Kalshi Moneyline Value",edge:"Buy Kalshi moneylines mispriced vs a Pinnacle-weighted multi-book consensus.",st:"live",stx:"active · validating",gate:"200 CLV rows (~81 so far)"},
+  {id:"P-014",name:"Live Game Agent",edge:"In-play: trade when Kalshi's retail crowd overreacts vs live consensus (NBA/MLB).",st:"live",stx:"active · validating",gate:"500 settled trades"},
+  {id:"P-018",name:"In-Play Fade Maker",edge:"Surprise-gated maker that fades in-play overshoots (core built: inplay_surprise.py). Current dev branch.",st:"build",stx:"in build · pre-backtest",gate:"backtest before wiring live"},
+  {id:"P-015",name:"Tennis Qualifier Favorite",edge:"Buy heavy favorites (0.85–0.975) in ATP/WTA qualifying matches. Validated +4.1¢/ct net.",st:"live",stx:"active · validating",gate:"120 trades (0 — US Open quals in Aug)"},
+  {id:"P-017",name:"Golf Top-N",edge:"Buy under-priced mid-tier golfers in pre-tournament top-N markets. Taker leg +6.8¢/ct.",st:"live",stx:"active · validating",gate:"8 tournaments (1 so far)"},
+  {id:"P-002",name:"Cross-Venue Arb",edge:"Dual-leg arbitrage across Kalshi & Polymarket, fee-adjusted.",st:"shelf",stx:"shelved",gate:"— no Poly execution access"},
+  {id:"P-006",name:"Sportsbook–Polymarket Consensus",edge:"Same consensus edge, executes on Polymarket's 0% fees.",st:"shelf",stx:"shelved",gate:"— can't execute on Poly"},
+  {id:"P-016",name:"Live MLB Maker",edge:"Rest maker quotes on live MLB, capture the spread + markout.",st:"dead",stx:"retired",gate:"failed: −1.29¢ markout"},
+  {id:"P-017M",name:"Golf Fade Maker",edge:"Rest fade quotes over golf top-N markets (standalone).",st:"dead",stx:"shelved",gate:"+9.1¢ was a weighting-bug artifact"},
+  {id:"P-013",name:"Kalshi–Deribit Crypto Arb",edge:"Price Kalshi crypto binaries vs Deribit-implied fair value.",st:"dead",stx:"disabled (Jul-18 pivot)",gate:"lost $2,094 w/ criteria undecided"},
+  {id:"P-004 / P-009 / P-010 / P-012",name:"Econ arb · sign-up bonus · odds boost · macro nowcast",edge:"Legacy strategies from before the Jul-2026 Kalshi-only pivot.",st:"dead",stx:"disabled",gate:"—"}
+];
+const badgeClass={live:"b-live",shelf:"b-shelf",dead:"b-dead",build:"b-build"};
+document.getElementById('podrows').innerHTML=PODS.map(p=>`<tr>
+  <td><span class="pid">${p.id}</span><br><span class="muted small">${p.name}</span></td>
+  <td>${p.edge}</td>
+  <td><span class="badge ${badgeClass[p.st]}">${p.stx}</span></td>
+  <td class="tier">${p.gate}</td></tr>`).join("");
+
+/* ---------- GLOSSARY ---------- */
+const GLOSS=[
+  ["Pod","One self-contained betting strategy. The system runs several at once; they share risk, sizing, and logging plumbing."],
+  ["Paper / demo mode","Trades are recorded and scored but no real money is used. Everything here is paper."],
+  ["VPS / droplet","A rented Linux server in the cloud (DigitalOcean) where the code runs 24/7."],
+  ["Fair value","The 'honest' probability of an outcome after removing the bookmaker's built-in margin — what a bet SHOULD cost."],
+  ["Vig / de-vig","Vig is the bookmaker's cut baked into the odds. De-vigging removes it to recover the true implied probability."],
+  ["Edge","How much cheaper the market price is than fair value. Only worth betting if the edge survives the fees."],
+  ["Kelly / fractional Kelly","A formula for bet size based on your edge and odds. 'Quarter Kelly' (0.25×) bets conservatively to reduce swings."],
+  ["Maker vs taker","A taker crosses the spread to trade now (pays a taker fee). A maker rests a quote and waits to be filled (often a lower/zero fee)."],
+  ["Markout","For a maker: how the market moves in your favor (or against you) shortly after your quote fills — the true quality of a fill."],
+  ["Spread","The gap between the best buy and best sell price. Edges must clear fees PLUS half the spread to be real."],
+  ["CLV (closing-line value)","Did you get a better price than where the sharpest book closed? The most reliable proof an edge is real over small samples."],
+  ["Gate","A pre-registered amount of evidence (e.g. 120 trades) a strategy must gather before any go/kill decision. Locked in advance."],
+  ["Tier","A pod's trust level: 'validating' (gathering evidence) vs 'production' (cleared its gate). Nothing is production yet."],
+  ["Settlement","After a game ends, looking up the result and scoring every open bet as win/loss/void with its P&L."],
+  ["Backtest","Running a strategy against historical data to estimate whether the edge would have worked, before building it live."],
+  ["The drop","Deploying: pushing code from your Mac to the live server safely (tests → sync → restart → health-check → rollback)."],
+  ["systemd service / unit","A background program the Linux server keeps running and auto-restarts. This project has three."],
+  ["rsync","A tool that copies changed files from your Mac to the server — used by the deploy script (it excludes live data)."],
+  ["Kalshi","A US-regulated exchange for event contracts (yes/no markets). The primary venue since the July 2026 pivot."],
+  ["Polymarket","A crypto-based prediction market. Used for research/matching, but this project has no execution access there."],
+  ["The Odds API","A paid feed of live sportsbook odds (incl. Pinnacle) used to build consensus fair value."],
+  ["Pinnacle","A sportsbook famous for sharp, low-margin lines — treated as the best single signal of fair value."],
+  ["Elo","A rating system (from chess) adapted to rate team strength and predict win probability."],
+  ["Fingerprint","A unique signature for a bet so the same opportunity isn't placed twice (deduplication)."],
+  ["Registry","`manager/registry.yaml` — the single hand-maintained file listing every workstream, its gate, and its status."],
+  ["ntfy","A simple push-notification service; the fund manager uses it to ping your phone about alerts."]
+];
+document.getElementById('glossary-grid').innerHTML=GLOSS.map(([t,d])=>`
+  <div class="mod" style="border-left-color:var(--teal);cursor:default">
+    <div class="name" style="font-family:inherit;font-size:14px;color:var(--ink)">${t}</div>
+    <div class="desc" style="margin-top:6px">${d}</div></div>`).join("");
+</script>
+</body>
+</html>

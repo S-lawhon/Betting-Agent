@@ -230,6 +230,90 @@ def test_markouts_written_at_horizons(tmp_path):
     assert horizons == {60.0, 300.0}
 
 
+def test_fill_stamps_vpin_telemetry(tmp_path):
+    """FILL records carry vpin_at_fill / one_sidedness_at_fill.  The
+    triggering print alone can't close a VPIN bucket (default 50), so
+    vpin is None but one_sidedness is live off the single classified
+    print."""
+    eng, clock = make_engine(tmp_path, LIVE_STATE)
+    book = make_book(eng)
+    eng.cycle()
+    bid = book.quotes["bid"].price
+    eng.kalshi.trades = [
+        {"epoch": 1005.0, "yes_price": bid - 0.01, "count": 5,
+         "taker_side": "no", "trade_id": "t1"},
+    ]
+    clock["t"] = 1012.0
+    eng.cycle()
+    recs = [json.loads(l) for l in
+            (tmp_path / "maker_fills.jsonl").read_text().splitlines()]
+    fill = next(r for r in recs if r["type"] == "FILL")
+    assert "vpin_at_fill" in fill and "one_sidedness_at_fill" in fill
+    # one print of 5 sells → fully one-sided; not enough to close a bucket
+    assert fill["vpin_at_fill"] is None
+    assert fill["one_sidedness_at_fill"] == 1.0
+
+
+def test_next_event_markout_recorded_on_state_change(tmp_path):
+    eng, clock = make_engine(tmp_path, LIVE_STATE)
+    book = make_book(eng)
+    eng.cycle()                       # post quotes at LIVE_STATE
+    bid = book.quotes["bid"].price
+    eng.kalshi.trades = [
+        {"epoch": 1005.0, "yes_price": bid - 0.01, "count": 5,
+         "taker_side": "no", "trade_id": "t1"},
+    ]
+    clock["t"] = 1012.0
+    eng.cycle()                       # fill (buy), no state change yet
+    assert len(book.fills) == 1
+    fills_before = [json.loads(l) for l in
+                    (tmp_path / "maker_fills.jsonl").read_text().splitlines()]
+    assert not any(r.get("horizon_type") == "next_event"
+                   for r in fills_before)
+    # Advance the game state (home scores) → observed state change
+    eng.statsapi.state = MlbLiveState(1, 2, 3, 5, True, 1, False, False,
+                                      False, False)
+    eng.kalshi.trades = []
+    clock["t"] = 1020.0
+    eng.cycle()
+    recs = [json.loads(l) for l in
+            (tmp_path / "maker_fills.jsonl").read_text().splitlines()]
+    ne = [r for r in recs if r.get("horizon_type") == "next_event"]
+    assert len(ne) == 1
+    # mid of the fake book (0.48/0.52) = 0.50; buy sign = +1
+    assert abs(ne[0]["markout_per_contract"] - (0.50 - bid)) < 1e-9
+    assert ne[0]["secs_elapsed"] == 1020.0 - 1005.0
+    # exactly one event-clocked markout per fill (idempotent)
+    eng.statsapi.state = MlbLiveState(1, 2, 4, 6, True, 0, False, False,
+                                      False, False)
+    clock["t"] = 1030.0
+    eng.cycle()
+    recs = [json.loads(l) for l in
+            (tmp_path / "maker_fills.jsonl").read_text().splitlines()]
+    assert sum(1 for r in recs if r.get("horizon_type") == "next_event") == 1
+
+
+def test_wallclock_markouts_tagged_horizon_type(tmp_path):
+    eng, clock = make_engine(tmp_path, LIVE_STATE)
+    book = make_book(eng)
+    eng.cycle()
+    bid = book.quotes["bid"].price
+    eng.kalshi.trades = [
+        {"epoch": 1005.0, "yes_price": bid - 0.01, "count": 5,
+         "taker_side": "no", "trade_id": "t1"},
+    ]
+    clock["t"] = 1012.0
+    eng.cycle()
+    clock["t"] = 1005.0 + 301.0
+    eng.kalshi.trades = []
+    eng.cycle()
+    recs = [json.loads(l) for l in
+            (tmp_path / "maker_fills.jsonl").read_text().splitlines()]
+    wc = [r for r in recs if r["type"] == "MARKOUT"
+          and r.get("horizon_type") == "wallclock"]
+    assert wc and all(r["horizon_s"] in (60.0, 300.0) for r in wc)
+
+
 def test_settlement_pnl_includes_maker_fee(tmp_path):
     eng, clock = make_engine(tmp_path, LIVE_STATE)
     book = make_book(eng)

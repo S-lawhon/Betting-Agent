@@ -1,0 +1,65 @@
+{
+  "pod_id": "P-025",
+  "name": "Music-Chart Mid-Week Edge",
+  "phase": "1 (settled-data backtest + $0 forward log)",
+  "verdict": "KILL",
+  "verdict_date": "2026-07-24",
+  "mode": "paper/research-only; nothing placed",
+  "thesis": "Billboard #1 is knowable from free public data days before Kalshi books close (Sun 23:59 ET) and stan-retail books lag it.",
+  "why_killed": "The free reproducible signal and the market lag are mutually exclusive across the two series: where the free signal is strong (albums, HITS 100%) the market is already at ~$1.00 with no size; where the market lags (songs, real gaps+volume) the free reproducible signal (kworb Spotify) is only 50-60% accurate because the Hot 100 is multi-metric (radio+sales+streams). Trading the free signal loses ~3c/ct.",
+  "series": {
+    "KXTOPSONG": {"title": "Billboard Hot 100 #1", "fee_type": "quadratic", "maker_fee": 0.0},
+    "KXTOPALBUM": {"title": "Billboard Top 200 #1", "fee_type": "quadratic", "maker_fee": 0.0}
+  },
+  "sample": {
+    "song_weeks": 10,
+    "album_weeks": 10,
+    "date_range": "2026-05-23 .. 2026-07-25",
+    "ties_observed": 0,
+    "album_all_no_weeks_excluded": ["KXTOPALBUM-26JUL25 (Billboard 200 #1 was an unlisted album)"]
+  },
+  "timing_model": {
+    "chart_sat": "Billboard chart date (Saturday, encoded in event ticker)",
+    "tracking_week": "Fri (chart_sat-15) .. Thu (chart_sat-9)",
+    "book_close": "Sun chart_sat-6 23:59 ET (validated vs live close_time)",
+    "announce": "Tue chart_sat-4",
+    "decision_times_ET": {
+      "T_mid": "Wed chart_sat-10 20:00",
+      "T_close": "Fri chart_sat-8 12:00",
+      "T_late": "Sat chart_sat-7 18:00"
+    }
+  },
+  "fee_model": "taker = 0.07*P*(1-P); maker = 0 (quadratic series)",
+  "fill_model": "entry=yes_ask.close_dollars at decision hour; fillable size capped at that hour's volume_fp; pnl/ct = settlement_value(signal_leader) - entry - taker_fee",
+  "trigger": "(1.0 - ask) > taker_fee + 0.03; trade the free-data SIGNAL LEADER (ex-ante), not the ex-post winner",
+  "signal_sources": {
+    "albums": "HITS Daily Double Midweek 20 album chart, dated archives /charts/midweek-20/<Thursday>, ranked by Activity (Billboard-200 consumption units)",
+    "songs": "kworb.net US Spotify daily via Wayback Machine (curl), ranked by 7-day stream column",
+    "totc": "Talk of the Charts self-audit cited as source claim only; NOT re-graded (X posts unfetchable); its 52/52 not laundered into a verified number"
+  },
+  "gate": {
+    "signal_accuracy_Tclose_widemargin": {"threshold": ">=0.95", "song": 0.75, "album": 1.00, "pass": false},
+    "net_edge_c_per_ct": {"threshold": ">=3.0", "song_Tclose": -2.9, "ci_excludes_zero": false, "pass": false},
+    "capacity_usd_per_week": {"threshold": ">=500", "album_best": 22, "song_best": "negative", "oracle_ceiling_song_Tclose": 118, "pass": false}
+  },
+  "regraded_accuracy": {
+    "KXTOPSONG": {"T_mid_all": 0.50, "T_close_all": 0.60, "T_mid_wide": 0.50, "T_close_wide": 0.75},
+    "KXTOPALBUM": {"T_mid_all": 1.00, "T_close_all": 1.00, "T_mid_wide": 1.00, "T_close_wide": 1.00}
+  },
+  "pnl_capacity_honest_signal": {
+    "KXTOPSONG": {"T_mid": {"n": 6, "c_per_ct": -3.5, "ev_usd_wk": 0}, "T_close": {"n": 5, "c_per_ct": -2.9, "ev_usd_wk": -21}, "T_late": {"n": 4, "c_per_ct": -3.2, "ev_usd_wk": -1}},
+    "KXTOPALBUM": {"T_mid": {"n": 1, "c_per_ct": 5.6, "cap_usd_wk": 377, "ev_usd_wk": 22}, "T_close": {"n": 0}}
+  },
+  "oracle_ceiling_perfect_signal": {
+    "KXTOPSONG": {"T_mid": {"tradeable_weeks": 3, "c_per_ct": 24.0, "ev_usd_wk": 9}, "T_close": {"tradeable_weeks": 2, "c_per_ct": 8.9, "cap_usd_wk": 942, "ev_usd_wk": 118}},
+    "KXTOPALBUM": {"T_mid": {"tradeable_weeks": 1, "c_per_ct": 5.6, "ev_usd_wk": 22}}
+  },
+  "zero_volume_decision_hours": 33,
+  "pickover_live_2026-07-24": "26AUG01 favourites (Choosin' Texas, Daughter From Hell) bid 0.99 with NO resting ask; cannot buy the discount",
+  "forward_log": {
+    "script": "chart_research/forward_log.py",
+    "cadence": "Tue & Fri, read-only, ~6 weeks",
+    "purpose": "prospective KILL re-check + decay/pick-over detector; captures HITS+kworb leader/margin and live Kalshi ask on leader & favourite",
+    "revisit_condition": "only if a ToTC-based (multi-metric) signal, logged from timestamped originals, proves both accurate AND ahead of a lagging, size-carrying Kalshi ask"
+  }
+}

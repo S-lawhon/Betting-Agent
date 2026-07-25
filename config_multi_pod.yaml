@@ -490,6 +490,14 @@ pods:
       # guard will NOT stop a breach — it only registers exposure in
       # post_cycle, and P-017 places its whole book inside one scan.
       max_open_positions: 30
+      # Per-tournament exposure cap, as a fraction of bankroll. max_open_
+      # positions bounds the whole book but one tournament can consume all of
+      # it, and a tournament's top-10/top-20 names are ONE correlated bet — so
+      # a single event's all-miss can breach a fund-level limit alone. On
+      # 2026-07-25, $161 (16%) on one tournament all missed and the -$171 loss
+      # tripped the 5% daily-loss halt. 0.08 x $1000 = $80/tournament caps that
+      # to ~1.5x the daily limit instead of ~4x. Set 0 to disable.
+      max_event_exposure_pct: 0.08
       depth_haircut: 0.5
 
   P-017M:

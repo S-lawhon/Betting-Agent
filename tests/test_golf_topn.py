@@ -407,3 +407,114 @@ def test_positions_dropped_after_approval_do_not_leak_reservations():
     reserved = sum(res["usd"] for res in guard._reservations.values())
     assert reserved == pytest.approx(sum(r.position_size_usd for r in placed))
     assert len(guard._reservations) == len(placed)
+
+
+# ── Per-event (per-tournament) exposure cap ──────────────────────────────
+# max_open_positions bounds the whole book but one tournament can consume
+# all of it; a tournament's top-10/top-20 names are one correlated bet, so a
+# single event's all-miss can breach a fund-level limit alone (2026-07-25:
+# $161 on one event tripped the 5% daily-loss halt). max_event_exposure_pct
+# caps USD staked per tournament. Tests run at DEFAULT_BANKROLL ($10,000).
+
+
+class _SizedStore(_StubStore):
+    """_StubStore that also reports each open position's USD size."""
+
+    def __init__(self, sized_market_ids):
+        # sized_market_ids: list of (ticker, position_size_usd)
+        super().__init__([mid for mid, _ in sized_market_ids])
+        self._sizes = dict(sized_market_ids)
+
+    def get_open_trades(self, pod_id=None):
+        return [{"pod_id": pod_id or "P-017", "market_id": m,
+                 "position_size_usd": self._sizes[m]}
+                for m in self._open]
+
+
+def _event_names(event, n, series="KXPGATOP20", ask=0.20, close=None):
+    """n distinct band markets in a single tournament `event`."""
+    return [_market(f"{series}-{event}-P{i:03d}", f"{series}-{event}",
+                    round(ask - 0.02, 4), ask, close)
+            for i in range(n)]
+
+
+def test_event_cap_limits_single_tournament():
+    now = _now()
+    close = now + timedelta(days=6)
+    # cap = 5% x $10,000 = $500; ~$100/position at ask 0.20 → ~5 fit
+    board = _event_names("XYZ26", 20, close=close)
+    pod = _pod(board, now, max_open_positions=100, max_event_exposure_pct=0.05)
+    results = pod.scan_once()
+    placed = [r for r in results if r.action == "PLACED"]
+
+    exposure = sum(r.position_size_usd for r in placed)
+    assert exposure <= 500.0 + 1e-6, f"event exposure {exposure} exceeded cap"
+    assert exposure > 400.0, "cap trimmed too aggressively — did not deploy"
+    assert any("event exposure cap" in (r.skip_reason or "")
+               for r in results if r.action == "SKIPPED_RISK")
+
+
+def test_event_cap_groups_top10_and_top20_of_one_tournament():
+    """Top-10 and top-20 of the same tournament share ONE budget."""
+    now = _now()
+    close = now + timedelta(days=6)
+    board = (_event_names("XYZ26", 10, series="KXPGATOP10", close=close)
+             + _event_names("XYZ26", 10, series="KXPGATOP20", close=close))
+    pod = _pod(board, now, max_open_positions=100, max_event_exposure_pct=0.05)
+    placed = [r for r in pod.scan_once() if r.action == "PLACED"]
+    # both series draw from the same $500 tournament budget, not $500 each
+    assert sum(r.position_size_usd for r in placed) <= 500.0 + 1e-6
+
+
+def test_event_cap_is_independent_across_tournaments():
+    now = _now()
+    close = now + timedelta(days=6)
+    board = (_event_names("XYZ26", 20, close=close)
+             + _event_names("ABC26", 20, close=close))
+    pod = _pod(board, now, max_open_positions=100, max_event_exposure_pct=0.05)
+    placed = [r for r in pod.scan_once() if r.action == "PLACED"]
+
+    by_event = {}
+    for r in placed:
+        code = r.market_id.split("-")[1]
+        by_event[code] = by_event.get(code, 0.0) + r.position_size_usd
+    assert set(by_event) == {"XYZ26", "ABC26"}
+    for code, usd in by_event.items():
+        assert usd <= 500.0 + 1e-6, f"{code} exposure {usd} exceeded its cap"
+    # both tournaments got their own budget — total ~2x a single cap
+    assert sum(by_event.values()) > 800.0
+
+
+def test_event_cap_seeds_from_open_positions():
+    """A tournament already at its cap gets no new bets; others still do."""
+    now = _now()
+    close = now + timedelta(days=6)
+    # XYZ26 already holds $500 open (= the 5% cap); ABC26 holds nothing
+    store = _SizedStore([(f"KXPGATOP20-XYZ26-OLD{i:03d}", 50.0)
+                         for i in range(10)])
+    board = (_event_names("XYZ26", 10, close=close)
+             + _event_names("ABC26", 10, close=close))
+    pod = _pod(board, now, max_open_positions=100,
+               max_event_exposure_pct=0.05, trade_store=store)
+    results = pod.scan_once()
+    placed = [r for r in results if r.action == "PLACED"]
+
+    events_placed = {r.market_id.split("-")[1] for r in placed}
+    assert "XYZ26" not in events_placed, "already-full tournament got new bets"
+    assert "ABC26" in events_placed, "a fresh tournament should still trade"
+    assert any("event exposure cap" in (r.skip_reason or "")
+               and "XYZ26" in (r.skip_reason or "")
+               for r in results if r.action == "SKIPPED_RISK")
+
+
+def test_event_cap_disabled_by_default():
+    """Default (0.0) leaves prior behaviour intact — no event-cap skips."""
+    now = _now()
+    close = now + timedelta(days=6)
+    board = _event_names("XYZ26", 20, close=close)
+    pod = _pod(board, now, max_open_positions=100)  # no max_event_exposure_pct
+    results = pod.scan_once()
+    assert not any("event exposure cap" in (r.skip_reason or "")
+                   for r in results)
+    # with the cap off, the position cap (100) is the only limit → all place
+    assert len([r for r in results if r.action == "PLACED"]) == 20

@@ -74,6 +74,20 @@ in post_cycle, and P-017 places its entire book within a single scan
 intra-cycle check_trade always sees zero pod exposure and approves.
 More strategy coverage requires more CAPITAL (raise the paper bankroll,
 which rescales every pod), not a bigger cap.
+
+max_open_positions bounds the WHOLE book but nothing stops one tournament
+from consuming all of it. A tournament's top-10 and top-20 names settle
+off the same leaderboard, so they are one correlated bet, not N
+independent ones — the backtest CIs are clustered by event for exactly
+this reason. max_event_exposure_pct (fraction of bankroll, default 8% via
+config; 0 disables) caps USD staked per tournament so a single event's
+all-miss cannot breach a bankroll-level limit on its own. On 2026-07-25
+the absence of this cap let P-017 stake ~$161 (16% of a $1000 bankroll)
+across 21 correlated longshots in one tournament; they all missed and the
+-$171 loss tripped the fund's 5% daily-loss halt. Like the position cap,
+it is seeded from open positions (_event_open_exposure) so it holds across
+cycles and restarts, and enforced intra-scan since the whole book is
+placed in one cycle.
 """
 from __future__ import annotations
 
@@ -155,6 +169,7 @@ class GolfTopNPod(BasePod):
         min_days_to_close: float = 4.0,
         max_days_to_close: float = 10.0,
         max_open_positions: int = 40,
+        max_event_exposure_pct: float = 0.0,
         depth_haircut: float = 0.5,
         skip_events: Optional[List[str]] = None,
         fair_prob_cap: float = 0.75,
@@ -186,6 +201,7 @@ class GolfTopNPod(BasePod):
         self.min_days_to_close = min_days_to_close
         self.max_days_to_close = max_days_to_close
         self.max_open_positions = max_open_positions
+        self.max_event_exposure_pct = max_event_exposure_pct
         self.depth_haircut = depth_haircut
         self.skip_events = {e.upper() for e in (skip_events or [])}
         self.fair_prob_cap = fair_prob_cap
@@ -193,6 +209,10 @@ class GolfTopNPod(BasePod):
         self.model_weight = model_weight
         self.min_net_edge_model = min_net_edge_model
         self._open_count = 0
+        # Per-event exposure state, (re)seeded at the top of every scan.
+        # _event_cap_usd <= 0 means the cap is disabled.
+        self._event_cap_usd: float = 0.0
+        self._event_committed: Dict[str, float] = {}
 
     # ── BasePod interface ────────────────────────────────────────────
 
@@ -238,6 +258,18 @@ class GolfTopNPod(BasePod):
                              m.get("ticker", "?"), exc)
 
         candidates = self._select_candidates(candidates)
+
+        # Seed the per-event exposure cap for this scan. Bankroll-relative so
+        # it rescales with capital (see class docstring), and seeded from the
+        # positions already open per event so it holds across cycles and
+        # restarts — the same reasoning as _open_position_count.
+        self._event_cap_usd = (
+            self.max_event_exposure_pct * self.get_bankroll()
+            if self.max_event_exposure_pct > 0 else 0.0
+        )
+        self._event_committed = (
+            self._event_open_exposure() if self._event_cap_usd > 0 else {}
+        )
 
         # Pass 2 — commit in selection order until the cap binds.
         n_hits = 0
@@ -371,6 +403,33 @@ class GolfTopNPod(BasePod):
                 logger.warning("P-017: open-position lookup failed: %s", exc)
         return self._open_count
 
+    def _event_open_exposure(self) -> Dict[str, float]:
+        """event_code → USD of currently-open P-017 positions, from the store.
+
+        Restart-safe / cross-cycle, like _open_position_count: a process
+        -local accumulator would hand every event a fresh cap on each deploy
+        while the real positions live on in the TradeStore. The event code is
+        derived from the ticker (KXPGATOP10-3MO26-CRAM → "3MO26"), which
+        groups a tournament's top-10 and top-20 markets together — they settle
+        off the same leaderboard and are one correlated bet.
+        """
+        out: Dict[str, float] = {}
+        store = self._trade_store
+        if store is None:
+            return out
+        try:
+            for t in store.get_open_trades(self.pod_id):
+                ticker = t.get("market_id") or t.get("market_ticker") or ""
+                parts = str(ticker).split("-")
+                code = parts[1] if len(parts) >= 2 else ""
+                if not code:
+                    continue
+                usd = float(t.get("position_size_usd", 0.0) or 0.0)
+                out[code] = out.get(code, 0.0) + usd
+        except Exception as exc:   # never let bookkeeping stop a scan
+            logger.warning("P-017: event-exposure lookup failed: %s", exc)
+        return out
+
     def _select_candidates(self, candidates: List[tuple]) -> List[tuple]:
         """Order candidates so the position cap truncates deliberately.
 
@@ -474,6 +533,23 @@ class GolfTopNPod(BasePod):
             return self._skip(m, ask, fair_prob, "SKIPPED_RISK",
                               "size < $1 after caps")
 
+        # Per-event (per-tournament) exposure cap. P-017 places its whole book
+        # in one scan and a tournament's top-10/top-20 names are one correlated
+        # bet, so without this a single event's all-miss can breach a bankroll
+        # -level limit on its own (2026-07-25: $161 on one event ≈ 16% of a
+        # $1000 bankroll, which tripped the 5% daily-loss halt). Trim to the
+        # remaining headroom, or skip once the event is full. Runs before the
+        # aggregate-risk call so the reservation matches the trimmed size.
+        if self._event_cap_usd > 0:
+            code = _event_code(m)
+            remaining = self._event_cap_usd - self._event_committed.get(code, 0.0)
+            if remaining < 1.0:
+                return self._skip(m, ask, fair_prob, "SKIPPED_RISK",
+                                  f"event exposure cap ${self._event_cap_usd:.0f} "
+                                  f"({code})")
+            if size > remaining:
+                size = remaining
+
         # Passing market_id RESERVES the exposure on approval, so the rest of
         # this scan sees it. Without that, P-017 — which places its whole book
         # in one scan — has every trade checked against the previous cycle's
@@ -487,6 +563,10 @@ class GolfTopNPod(BasePod):
         self.mark_seen(fp)
         self.mark_position_open(ticker)
         self._open_count += 1
+        if self._event_cap_usd > 0:
+            code = _event_code(m)
+            self._event_committed[code] = \
+                self._event_committed.get(code, 0.0) + size
 
         contracts = max(1, int(size / ask))
         ev = contracts * net
@@ -592,6 +672,8 @@ class GolfTopNPod(BasePod):
             min_days_to_close=float(strat.get("min_days_to_close", 4.0)),
             max_days_to_close=float(strat.get("max_days_to_close", 10.0)),
             max_open_positions=int(risk.get("max_open_positions", 40)),
+            max_event_exposure_pct=float(
+                risk.get("max_event_exposure_pct", 0.08)),
             depth_haircut=float(risk.get("depth_haircut", 0.5)),
             skip_events=strat.get("skip_events", []),
             fair_prob_cap=float(strat.get("fair_prob_cap", 0.75)),

@@ -60,6 +60,19 @@ services:
       # Engine writes constantly (~99% SKIPPED_EDGE rows). 20 min of silence
       # means the loop is wedged even if systemd still calls it "active".
       max_stale_minutes: 20
+      # ...EXCEPT when the aggregate-risk guard trips the daily-loss limit: it
+      # skips the whole scan cycle, so NO telemetry rows are written and the
+      # file above goes stale even though the loop is spinning (observed
+      # 2026-07-25: a P-017 golf tournament settled -19.7% and halted trading
+      # for the rest of the UTC day). The journal is the real liveness signal
+      # in that state — the loop logs a "guard halted" line every cycle. If a
+      # halt line appears within halt_signal.max_silent_journal_minutes, the
+      # silence is DELIBERATE, not a wedge: demote CRITICAL -> info. A loop that
+      # truly wedges while halted stops logging too, so the halt line ages out
+      # and the CRITICAL still fires — the safety property is preserved.
+      halt_signal:
+        pattern: "guard halted (daily_loss_limit"
+        max_silent_journal_minutes: 12   # > 2 scan cycles (300s each)
     severity: critical
 
   # RETIRED 2026-07-22. P-016 (v1 and v2) both failed their pre-registered

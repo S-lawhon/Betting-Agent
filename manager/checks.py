@@ -89,6 +89,29 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
         age = hb.get("age_minutes")
         limit = hb.get("max_stale_minutes")
         if age is not None and limit and age > limit:
+            # A daily-loss halt silences the heartbeat file deliberately: the
+            # guard skips the scan cycle so no telemetry rows are written, yet
+            # the loop is alive and logging a "guard halted" line every cycle.
+            # If that line is fresh in the journal, the silence is expected —
+            # demote to an info note instead of paging a wedged-loop CRITICAL.
+            # A genuine wedge stops the halt lines too, so this cannot mask one.
+            halt = hb.get("halt") or {}
+            if halt.get("halted"):
+                out.append(Finding(
+                    key="service.{}.halted".format(sid),
+                    severity="info",
+                    title="{} trading halted (daily loss) — loop alive".format(sid),
+                    detail=("Aggregate-risk guard has halted trading, so the "
+                            "engine is skipping scan cycles and the heartbeat "
+                            "file {} is stale by {:.0f} min BY DESIGN. The loop "
+                            "is confirmed alive: a halt line was logged {:.0f} "
+                            "min ago (limit {}). Clears at the next daily P&L "
+                            "reset (00:00 UTC)."
+                            .format(hb.get("file"), age,
+                                    halt.get("halt_age_minutes") or 0,
+                                    halt.get("max_silent_journal_minutes"))),
+                    value=halt.get("reason")))
+                continue
             # Some heartbeats are only meaningful in a time window (P-016 only
             # quotes during live MLB games; silence at 4am is correct).
             if hb.get("only_during") == "mlb_games_window":

@@ -295,7 +295,56 @@ class Collector:
                     "last_row_ts": iso(row_ts(last)) if last else None,
                     "only_during": hb.get("only_during"),
                 }
+                halt_cfg = hb.get("halt_signal")
+                if halt_cfg:
+                    rec["heartbeat"]["halt"] = self._halt_state(sid, halt_cfg)
             out.append(rec)
+        return out
+
+    def _halt_state(self, unit: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
+        """Is the unit currently in a deliberate trading halt?
+
+        When the aggregate-risk guard trips the daily-loss limit it skips the
+        whole scan cycle, so the heartbeat file (trade_log.jsonl) goes stale
+        while the loop is perfectly alive. That state is invisible in the file
+        but loud in the journal: a "guard halted" line every cycle. We read the
+        recent journal for that line; its AGE is the signal — recent means the
+        loop is spinning and halting on purpose, not wedged. Absent journal
+        (e.g. the Mac) yields halted=None: unknown, never a false 'healthy'.
+        """
+        pattern = str(cfg.get("pattern", ""))
+        limit = cfg.get("max_silent_journal_minutes")
+        out: Dict[str, Any] = {
+            "pattern": pattern,
+            "max_silent_journal_minutes": limit,
+            "halt_age_minutes": None,
+            "halted": None,
+            "reason": None,
+        }
+        if not pattern or not Path("/run/systemd/system").exists():
+            return out
+        try:
+            res = subprocess.run(
+                ["journalctl", "-u", unit, "--since", "30 min ago",
+                 "--no-pager", "-o", "short-iso"],
+                capture_output=True, text=True, timeout=30)
+        except (subprocess.SubprocessError, OSError) as exc:
+            out["error"] = str(exc)
+            return out
+        newest_ts, newest_line = None, None
+        for line in res.stdout.splitlines():
+            if pattern in line:
+                ts = parse_ts(line.split(" ", 1)[0])
+                if ts:                       # journal is chronological; last wins
+                    newest_ts, newest_line = ts, line
+        if newest_ts is not None:
+            age = round((now() - newest_ts).total_seconds() / 60.0, 1)
+            out["halt_age_minutes"] = age
+            out["reason"] = newest_line[-200:] if newest_line else None
+            if limit is not None:
+                out["halted"] = age <= limit
+        else:
+            out["halted"] = False           # journal read fine, no halt line
         return out
 
     def _systemd(self, unit: str) -> Dict[str, Any]:

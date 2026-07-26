@@ -176,14 +176,25 @@ def build_shared_deps(
         if kalshi_client:
             try:
                 from settler import Settler  # type: ignore
-                settler_inst = Settler.from_config(config, kalshi_client, ledger_inst)
+                # The SAME filter must reach settle_cycle(), not just the
+                # ledger rebuild below.  This settler runs first in the cycle
+                # and applies `result or "void"`; unscoped, it voids positions
+                # belonging to pods with a purpose-built settler that exists
+                # precisely because that rule is wrong for them.  On
+                # 2026-07-26 it voided 16 P-017 golf positions at $0.00
+                # seconds after a restart, because Kalshi leaves top-N markets
+                # `active` with an empty result for ~a day post-tournament.
+                settler_inst = Settler.from_config(
+                    config, kalshi_client, ledger_inst,
+                    pod_ids=_SETTLER_DEP_PODS["settler"],
+                )
                 # Only load P-001 and legacy (no pod_id) positions into
                 # the Scanner's Ledger.  Without this filter, positions
                 # from P-002, P-014, etc. inflate the open-position count
                 # and cause the RiskManager to block P-001 trades via
                 # MAX_POSITIONS even though those positions belong to
                 # other pods with their own risk management.
-                settler_inst.rebuild_ledger_from_log(pod_ids=("P-001", ""))
+                settler_inst.rebuild_ledger_from_log(pod_ids=_SETTLER_DEP_PODS["settler"])
                 deps["settler"] = settler_inst
                 logger.info("build_shared_deps: Settler loaded — will poll Kalshi for resolved markets")
             except ImportError:

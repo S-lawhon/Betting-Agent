@@ -153,10 +153,12 @@ class Settler:
         log_path: Path,
         odds_api_key: str = "",
         _now_fn: Optional[Callable[[], datetime]] = None,
+        pod_ids: Optional[tuple] = None,
     ) -> None:
         self._kalshi       = kalshi
         self._ledger       = ledger
         self._log_path     = log_path
+        self._pod_ids      = tuple(pod_ids) if pod_ids is not None else None
         self._odds_api_key = odds_api_key or os.environ.get("ODDS_API_KEY", "")
         self._now           = _now_fn or (lambda: datetime.now(tz=timezone.utc))
         # Cache scores per sport per cycle to avoid redundant API calls
@@ -436,6 +438,24 @@ class Settler:
                 continue
 
             if action == "PLACED":
+                # Pod scoping. Without this the generic settler walks EVERY
+                # open row and applies its own `result or "void"` rule to pods
+                # that have a purpose-built settler, whose whole reason for
+                # existing is that the rule is wrong for them.
+                #
+                # 2026-07-26, live: 16 recovered P-017 golf positions were
+                # voided at $0.00 nine seconds after a restart. Kalshi leaves
+                # top-N markets `status="active"` with an empty `result` for
+                # ~a day post-tournament, so "no result yet" was read as "void"
+                # — exactly what KalshiGolfSettler refuses to do. This settler
+                # runs first in the engine's cycle, so it won the race.
+                #
+                # rebuild_ledger_from_log() has always taken pod_ids; this path
+                # did not, and the gap was invisible for as long as those rows
+                # were orphaned out of the active log by rotation.
+                if self._pod_ids is not None:
+                    if (rec.get("pod_id") or "") not in self._pod_ids:
+                        continue
                 size = float(rec.get("position_size_usd") or 0)
                 if size > 0 and ticker:
                     # Key by fingerprint (unique per trade) when available,

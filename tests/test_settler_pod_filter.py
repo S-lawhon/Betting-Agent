@@ -221,3 +221,89 @@ class TestRebuildLedgerPodFilter(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSettleCyclePodFilter(unittest.TestCase):
+    """The settle path must respect pod_ids, not just the ledger rebuild.
+
+    Regression for a live incident on 2026-07-26. ``rebuild_ledger_from_log``
+    had always taken ``pod_ids``, but ``_open_placed_entries`` — which is what
+    ``settle_cycle`` walks — did not. The generic settler therefore processed
+    every open row in the log, including pods with a purpose-built settler.
+
+    It runs first in the engine cycle, so it won the race against
+    ``KalshiGolfSettler`` and voided 16 recovered P-017 golf positions at
+    $0.00 seconds after a restart: Kalshi leaves top-N markets
+    ``status="active"`` with an empty ``result`` for ~a day post-tournament,
+    and this settler reads "no result yet" as "void". That is precisely the
+    rule ``KalshiGolfSettler`` exists to refuse.
+
+    The gap stayed invisible for as long as those rows were orphaned out of
+    the active log by the truncating rotation; recovering them exposed it.
+    """
+
+    def _log_with_mixed_pods(self):
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w", delete=False) as f:
+            log_path = Path(f.name)
+        _write_log(log_path, [
+            _placed_entry("KXMLBGAME-26JUL26-NYY", pod_id="P-001"),
+            _placed_entry("KXNBA-LEGACY-001"),  # legacy, no pod_id
+            _placed_entry("KXPGATOP10-3MO26-ASMO", pod_id="P-017"),
+            _placed_entry("KXPGATOP20-3MO26-LGRI", pod_id="P-017"),
+            _placed_entry("KXATPMATCH-26JUL26-SVA", pod_id="P-015"),
+        ])
+        return log_path
+
+    def test_open_entries_scoped_to_pod_ids(self):
+        log_path = self._log_with_mixed_pods()
+        settler = Settler(
+            kalshi=MagicMock(), ledger=Ledger(initial_bankroll=1000.0,
+                                              _now_fn=lambda: FIXED_NOW),
+            log_path=log_path, odds_api_key="k",
+            _now_fn=lambda: FIXED_NOW, pod_ids=("P-001", ""),
+        )
+        pods = {r.get("pod_id", "") for r in settler._open_placed_entries().values()}
+        self.assertEqual(pods, {"P-001", ""})
+
+    def test_golf_positions_are_not_reachable_by_the_generic_settler(self):
+        """The specific rows that were voided in production."""
+        log_path = self._log_with_mixed_pods()
+        settler = Settler(
+            kalshi=MagicMock(), ledger=Ledger(initial_bankroll=1000.0,
+                                              _now_fn=lambda: FIXED_NOW),
+            log_path=log_path, odds_api_key="k",
+            _now_fn=lambda: FIXED_NOW, pod_ids=("P-001", ""),
+        )
+        tickers = {r.get("market_ticker") for r in settler._open_placed_entries().values()}
+        self.assertNotIn("KXPGATOP10-3MO26-ASMO", tickers)
+        self.assertNotIn("KXPGATOP20-3MO26-LGRI", tickers)
+        self.assertNotIn("KXATPMATCH-26JUL26-SVA", tickers)
+
+    def test_settle_cycle_never_touches_a_filtered_pod(self):
+        """End-to-end: an unresolved golf market must not produce a VOID.
+
+        The market is `active` with an empty result — the production shape.
+        """
+        log_path = self._log_with_mixed_pods()
+        kalshi = MagicMock()
+        kalshi.get_market.return_value = {"status": "active", "result": ""}
+        settler = Settler(
+            kalshi=kalshi, ledger=Ledger(initial_bankroll=1000.0,
+                                         _now_fn=lambda: FIXED_NOW),
+            log_path=log_path, odds_api_key="k",
+            _now_fn=lambda: FIXED_NOW, pod_ids=("P-001", ""),
+        )
+        settled = settler.settle_cycle()
+        touched = {r.get("market_ticker") for r in settled}
+        self.assertNotIn("KXPGATOP10-3MO26-ASMO", touched)
+        self.assertNotIn("KXPGATOP20-3MO26-LGRI", touched)
+
+    def test_unfiltered_settler_still_sees_everything(self):
+        """Backward compatibility: pod_ids=None keeps the old behaviour."""
+        log_path = self._log_with_mixed_pods()
+        settler = Settler(
+            kalshi=MagicMock(), ledger=Ledger(initial_bankroll=1000.0,
+                                              _now_fn=lambda: FIXED_NOW),
+            log_path=log_path, odds_api_key="k", _now_fn=lambda: FIXED_NOW,
+        )
+        self.assertEqual(len(settler._open_placed_entries()), 5)

@@ -62,9 +62,25 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
   KXMLBASGAME, KXMLBHRDERBY). Pass `series_ticker` to `fee_per_contract`. No arg
   → general maker rate (backward-compatible for P-016).
   `_SERIES_MAKER_FEE` matches by LONGEST prefix — required because KXMLB (charges)
-  ⊂ KXMLBHR (free) ⊂ KXMLBHRDERBY (charges). Verify new entries against
+  ⊂ KXMLBHR (free) ⊂ KXMLBHRDERBY (charges) ⊂ KXMLBHRDERBYR1LEAD (free). Verify
+  new entries against
   `GET /trade-api/v2/series/?category=Sports&limit=200` (`fee_type` field); this
-  table has drifted twice.
+  table has now drifted **four** times, and the 2026-07-26 run queue found three
+  separate missing slices in one day. **The durable fix is a fixture generated
+  from `/series` plus a CI check, not a fifth hand patch.**
+- **Prefix nesting is the trap, and it is not intuitive.** `KXPGATOP` does NOT
+  cover `KXPGAR1TOP5` — their shared prefix is only `KXPGA`, which charges — so
+  every round-based top-N series was silently billed a maker fee on markets
+  Kalshi bills at zero. Same shape for `KXLIVTOUR` vs `KXLIVTOP5` (disjoint, not
+  nested). When adding an entry, check what its *actual* longest match resolves
+  to; do not assume a similar-looking entry covers it.
+- **Leader markets are maker-free — all of them.** Swept 2026-07-26 across all
+  7,665 series in every category: 88 tickers contain `LEAD` and not one is
+  `quadratic_with_maker_fees`. Round leaders on every tour
+  (KXPGA/KXDPWORLDTOUR/KXLIV/KXLPGA/KXCHAMPTOUR `R{1,2,3}LEAD`) and the season
+  stat-leader family (`KXLEADER*`, 39 series) are all `quadratic`. Add round
+  leaders as FULL tickers, never a per-tour round prefix: `KXPGAR` would also
+  swallow KXPGARYDER, the one golf series that genuinely charges.
 
 ## Aggregate risk — reservations (added 2026-07-20)
 

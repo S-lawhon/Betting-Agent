@@ -210,16 +210,44 @@ workstreams:
       underdogs <50c with positive net-edge-maker.
     gate:
       question: Does realized underdog ROI follow the measured +1.4pp net-maker CLV?
-      metric: clv_forward_rows
-      source: clv_log
+      # RE-SCOPED 2026-07-26 (scenario D, approved by Sam). The metric is
+      # UNCHANGED — de-vigged Pinnacle close, net of maker fee. What changed is
+      # which trades are ELIGIBLE.
+      #
+      # The old gate counted rows in clv_log. It stood at 650 of a 200 threshold
+      # reading +1.39c/ct — almost exactly the +1.4pp target it was written
+      # against. Read literally, P-001 had passed. It should not have: the
+      # matcher broke fuzzy-score ties by list order, and every game of an MLB
+      # series shares team names, so 628 of 734 settled MLB bets (85.6%) were
+      # priced off a DIFFERENT DAY'S game. Correctly-matched rows carry
+      # +7.65c/ct (CI [+3.46,+12.05]); mismatched rows carry +0.19c/ct.
+      metric: admissible_clv_forward_rows
+      source: p001_checkpoint
+      reader: scripts/p001_checkpoint.py
       threshold: 200
-      current_key: clv.rows_since_gate
+      epoch_utc: 2026-07-26T21:31:00Z   # matcher fix live on the droplet
+      admissible_rule: "|ticker-encoded start - priced game_time| <= 3h, MLB only"
+      # progress is DERIVED by the reader. Do not hand-maintain it here.
       decision: >
         The open tension: dogs are CLV-positive but were ROI-negative
         retrospectively. Forward test must confirm ROI follows CLV. Until then
         do not scale P-001.
+        Scenario D: clean forward sample only. The 105 legacy admissible rows are
+        NOT carried in — they are non-randomly selected (the cases where the odds
+        list happened to hold one game for that pair; 83 of 105 are April), and
+        mixing two matcher regimes muddies the replication. At 5-8 MLB
+        settlements/day this lands late Aug - early Sept 2026.
+        Silence is not confirmation: if the clean sample never reaches 200 the
+        verdict stays NO DECISION and P-001 is not promoted by default.
     watch:
-      - clv_log freshness (currently BROKEN — see jobs.clv_settlement)
+      - >
+        clv_log freshness. NOT broken — corpus capture is 96.9% (650/671) with
+        zero API errors; see jobs.clv_settlement.
+      - >
+        The matcher defect is INVISIBLE in clv_log alone: its `commence` field
+        agrees with the ticker in 650 of 650 rows, because settlement re-derives
+        it from the ticker's own time. Only a join to the trade log's `game_time`
+        exposes it. Never audit this gate from clv_log by itself.
 
   - id: P-002
     name: Kalshi-Polymarket Cross-Venue Arb
@@ -547,16 +575,38 @@ workstreams:
       trade log, alongside 1077 SKIPPED_RISK (the position cap doing its job,
       not a fault). Config overlay reference stays at
       golf_research/p017_config_block.yaml.
-      Gate progress: tournament 1 of 8. Nothing is owed by Sam right now; the
-      pod needs event weeks to accumulate, not decisions.
+      Gate progress: 0 of 8 SETTLED tournaments (re-scoped 2026-07-26; the old
+      hand-typed "1 of 8" counted the 3M Open on entry day while 16 of its 38
+      positions were still open). The 3M Open is IN FLIGHT — 22 settled, 16 open
+      as of 2026-07-26 21:37Z, the latter recovered after a truncating log
+      rotation had orphaned them. Progress is now derived by
+      scripts/p017_checkpoint.py; do not hand-maintain it.
+      Nothing is owed by Sam right now; the pod needs event weeks, not decisions.
     gate:
       question: Does forward net CLV hold above half the backtest baseline?
-      metric: tournaments
+      # RE-SCOPED 2026-07-26 (approved by Sam). `progress: 1` used to live here as
+      # a hand-typed number, set on the day P-017 entered its first tournament and
+      # never moved. Nothing computed it; checks.py read it straight out of this
+      # file. As written the gate was satisfiable by PLACING INTO eight
+      # tournaments with most positions never resolving — a gate that can be met
+      # without a single observation of the thing it measures. When the re-scope
+      # was made, the 3M Open was counted as 1 of 8 while 16 of its 38 positions
+      # were still open and unsettleable.
+      metric: settled_tournaments
+      source: p017_checkpoint
+      reader: scripts/p017_checkpoint.py
       threshold: 8
-      progress: 1          # 3M Open (2026-07-21), in flight
+      # progress is DERIVED by the reader. Do not hand-maintain it here.
       decision: >
-        Go/no-go after ~8 tournaments, treating EACH TOURNAMENT as one
-        observation (not each bet — bets within a tournament are correlated).
+        Go/no-go after 8 SETTLED tournaments, treating EACH TOURNAMENT as one
+        observation (not each bet — bets within a tournament are correlated
+        through one leaderboard; per-bet weighting is how P-017M produced a
+        phantom +9.1c/ct). A tournament counts only when it has at least one
+        resolved position and ZERO still-open positions: golf top-N events settle
+        in two waves, missed-cut names at the Friday cut and the rest days later,
+        so a partially-resolved event is not an observation. Contract-weighted
+        within a tournament, equal weight across. VOIDs excluded (no risk taken);
+        scalar settlements are NOT voids and always count at their realised value.
         P-017M validates separately on fill quality (>=30% of quoted names fill)
         AND positive markout-implied net.
     watch:

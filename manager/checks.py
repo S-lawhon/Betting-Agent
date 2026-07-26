@@ -402,6 +402,38 @@ def check_config_drift(snap: Dict[str, Any],
         value={"only_live": only_live, "only_local": only_local, "flags": flag_diff})]
 
 
+def _gate_progress(snap: Dict[str, Any], pod_id: str,
+                   gate: Dict[str, Any]) -> Optional[float]:
+    """Gate progress, preferring a DERIVED value over the registry's own number.
+
+    When a gate names a ``source``, that source's checkpoint script is the
+    authority and the YAML figure is only a fallback for gates that have no
+    reader yet.  This ordering is the fix for a real integrity bug: P-017's
+    ``progress: 1`` was typed by hand on the day it entered its first tournament
+    and never moved, so the gate measured tournaments *entered* rather than
+    *settled* — satisfiable without a single observation of the thing under test.
+
+    A gate that declares a source but whose reader fails returns None rather than
+    silently falling back, because a stale hand-maintained number is exactly what
+    this is meant to stop being trusted.
+    """
+    source = gate.get("source")
+    if not source:
+        val = gate.get("progress")
+        return val if isinstance(val, (int, float)) else None
+
+    key = {"p017_checkpoint": "p017", "p001_checkpoint": "p001",
+           "p015_checkpoint": "p015"}.get(source)
+    if not key:
+        return None
+    block = snap.get(key) or {}
+    if not block.get("available"):
+        return None
+    cp = block.get("checkpoint") or {}
+    val = cp.get("progress")
+    return val if isinstance(val, (int, float)) else None
+
+
 def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]:
     """Evaluate pre-registered gates. These rules are locked — read, don't reinterpret."""
     out: List[Finding] = []
@@ -574,7 +606,8 @@ def check_registry_reconciliation(snap: Dict[str, Any],
         if w.get("tier") != "validating":
             continue
         gate = w.get("gate") or {}
-        threshold, progress = gate.get("threshold"), gate.get("progress")
+        threshold = gate.get("threshold")
+        progress = _gate_progress(snap, pid, gate)
         if not isinstance(threshold, (int, float)):
             continue
         if not isinstance(progress, (int, float)) or progress < threshold:

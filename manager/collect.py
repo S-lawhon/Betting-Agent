@@ -698,6 +698,61 @@ class Collector:
             out.update({"available": False, "error": str(exc)})
         return out
 
+    def _checkpoint(self, script_rel: str, pod_id: str) -> Dict[str, Any]:
+        """Shell out to a pod's sanctioned checkpoint reader and report it.
+
+        Same contract as ``p015_gate``: the decision rule names one script as the
+        single reader, so re-deriving n/edge/z here would create a second,
+        subtly-different number for a gate whose whole purpose is to be
+        unambiguous.  Reports what the script says, or that it could not run.
+        It never computes a fallback.
+        """
+        script = self.root / script_rel
+        out: Dict[str, Any] = {"id": pod_id, "reader": str(script)}
+        if not script.exists():
+            out["available"] = False
+            return out
+        py = self.root / "venv/bin/python"
+        exe = str(py) if py.exists() else sys.executable
+        try:
+            res = subprocess.run([exe, str(script), "--json"],
+                                 capture_output=True, text=True, timeout=120,
+                                 cwd=str(self.root))
+            raw = (res.stdout or "").strip()
+            if raw:
+                try:
+                    out.update({"available": True, "checkpoint": json.loads(raw)})
+                    return out
+                except json.JSONDecodeError:
+                    out.update({"available": True, "raw": raw[-2000:]})
+                    return out
+            out.update({"available": False,
+                        "error": (res.stderr or "no output")[-500:]})
+        except (subprocess.SubprocessError, OSError) as exc:
+            out.update({"available": False, "error": str(exc)})
+        return out
+
+    @safe("p017_gate")
+    def p017_gate(self) -> Dict[str, Any]:
+        """P-017 progress is DERIVED, never hand-maintained.
+
+        Until 2026-07-26 ``registry.yaml`` carried ``progress: 1`` set by hand on
+        the day P-017 entered its first tournament, while 16 of that event's 38
+        positions were still open.  A gate that counts entries rather than
+        settlements can be satisfied without observing the thing it measures.
+        """
+        return self._checkpoint("scripts/p017_checkpoint.py", "P-017")
+
+    @safe("p001_gate")
+    def p001_gate(self) -> Dict[str, Any]:
+        """P-001 progress under the re-scoped scenario-D gate.
+
+        The old row count reached 650 of a 200 threshold on a population where
+        86% of bets were priced off a different day's game.  This counts only
+        admissible rows placed after the matcher fix went live.
+        """
+        return self._checkpoint("scripts/p001_checkpoint.py", "P-001")
+
     # ---- invariants ------------------------------------------------------
     @safe("invariants")
     def invariants(self) -> Dict[str, Any]:
@@ -979,6 +1034,8 @@ class Collector:
             "trade": trade,
             "maker": self.maker_gate() or {},
             "p015": self.p015_gate() or {},
+            "p017": self.p017_gate() or {},
+            "p001": self.p001_gate() or {},
             "invariants": self.invariants() or {},
             "errors": self.recent_errors() or {},
             "workstreams": self.workstreams(trade) or [],

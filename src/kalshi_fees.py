@@ -31,9 +31,13 @@ MAKER_COEF = 0.0175
 # A naive `any(startswith(...))` over two flat tuples gets all three wrong.
 #
 # Verified against live /series metadata:
-#   golf 2026-07-19; MLB 2026-07-20 via
+#   golf 2026-07-19; MLB 2026-07-20; round-leader + stat-leader 2026-07-26 via
 #   GET /trade-api/v2/series/?category=Sports&limit=200  (per-series `fee_type`)
 # Re-verify with that call before adding entries — this table has drifted twice.
+#
+# 2026-07-26 sweep of ALL 7,665 series in EVERY category: 88 tickers contain
+# "LEAD" and not one is `quadratic_with_maker_fees`. Leader markets — round
+# leader, season stat leader — appear to be uniformly maker-free.
 _SERIES_MAKER_FEE: dict[str, bool] = {
     # ---- Golf: winner / outright series charge makers ----
     "KXPGA": True,            # PGA Championship winner
@@ -58,6 +62,40 @@ _SERIES_MAKER_FEE: dict[str, bool] = {
     "KXDPWTH2H": False,
     "KXLIVH2H": False,
     "KXPGACUTLINE": False,
+    # ---- Round-based top-N, and the non-PGA make-cut/top-N (added 2026-07-26) ----
+    # Found by P-023c and P-023 Phase 2. `KXPGATOP` above does NOT cover
+    # `KXPGAR1TOP5` — the shared prefix is only "KXPGA", which charges — so every
+    # round-based top-N fell through to the charging default. Likewise `KXLIVTOUR`
+    # is not a prefix of `KXLIVTOP5`, and nothing covered KXDPWORLDTOURMAKECUT.
+    # All verified `fee_type=quadratic` against GET /series?category=Sports on
+    # 2026-07-26 (3,005 series swept; every KXPGAR{1,2,3}TOP*, KXLIVTOP* and
+    # KXDPWORLDTOURMAKECUT returned quadratic, no exceptions).
+    "KXPGAR1TOP": False,
+    "KXPGAR2TOP": False,
+    "KXPGAR3TOP": False,
+    "KXLIVTOP": False,            # longer than KXLIVTOUR? No — disjoint. Both needed.
+    "KXDPWORLDTOURMAKECUT": False,
+    # ---- Round-leader series on the NON-PGA tours (added 2026-07-26) ----
+    # These used to fall through to the charging default, costing P-022 a
+    # phantom 0.0175*P*(1-P) — 0.129c/ct at P=0.08 — on the tours that supply
+    # most of its tournaments. Full tickers, NOT a short "KXLIVR"-style prefix:
+    # the PGA case proves short prefixes are unsafe, since "KXPGAR" would also
+    # swallow KXPGARYDER, the one golf series that genuinely charges.
+    "KXDPWORLDTOURR1LEAD": False,
+    "KXDPWORLDTOURR2LEAD": False,
+    "KXDPWORLDTOURR3LEAD": False,
+    "KXLIVR1LEAD": False,
+    "KXLIVR2LEAD": False,
+    "KXLIVR3LEAD": False,
+    "KXLPGAR1LEAD": False,
+    "KXLPGAR2LEAD": False,
+    "KXLPGAR3LEAD": False,
+    "KXCHAMPTOURR1LEAD": False,   # longer than KXCHAMPTOUR (True) — wins
+    # R2/R3 were NOT live on 2026-07-26 (the Champions Tour lists R1 only).
+    # Pre-registered on the verified family pattern so a mid-season launch
+    # cannot silently reintroduce the phantom fee; inert until they exist.
+    "KXCHAMPTOURR2LEAD": False,
+    "KXCHAMPTOURR3LEAD": False,
     # ---- MLB: game//league outcome series charge makers ----
     "KXMLB": True,            # league-level (also the conservative MLB default)
     "KXMLBGAME": True,
@@ -65,6 +103,11 @@ _SERIES_MAKER_FEE: dict[str, bool] = {
     "KXMLBNL": True,
     "KXMLBASGAME": True,
     "KXMLBHRDERBY": True,     # longer than KXMLBHR, so it wins — intentional
+    "KXMLBHRDERBYR1LEAD": False,   # ...and longer still, so IT wins over the
+    # derby. Found 2026-07-26: the derby's own round-leader market is
+    # `quadratic` like every other *LEAD series, but it sat behind
+    # KXMLBHRDERBY (True) and was being charged. Four alternating levels:
+    # KXMLB(T) < KXMLBHR(F) < KXMLBHRDERBY(T) < KXMLBHRDERBYR1LEAD(F).
     # ---- MLB: prop/derivative series are maker-free ----
     "KXMLBHIT": False,
     "KXMLBKS": False,
@@ -77,6 +120,13 @@ _SERIES_MAKER_FEE: dict[str, bool] = {
     "KXMLBSB": False,
     "KXMLBRFI": False,
     "KXMLBF5": False,
+    # ---- Season stat-leader family, all sports (added 2026-07-26) ----
+    # KXLEADERMLBWINS, KXLEADERNBAPTS, KXLEADERNFLSACKS, KXLEADERUCLGOALS...
+    # 39 live series on 2026-07-26, every one `quadratic`. Safe as a single
+    # family prefix: no entry above is a prefix of "KXLEADER" and "KXLEADER"
+    # is a prefix of none of them, so it neither shadows nor is shadowed.
+    # Relevant to P-026.
+    "KXLEADER": False,
 }
 
 

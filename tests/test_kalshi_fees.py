@@ -1,6 +1,7 @@
 import pytest
 from src.kalshi_fees import (fee_per_contract, fee_total, fee_fraction_of_stake,
-                             net_edge, should_bet, series_maker_charges_fee)
+                             net_edge, should_bet, series_maker_charges_fee,
+                             _SERIES_MAKER_FEE)
 
 def test_fee_peaks_at_50c():
     # per-contract fee is maximised at P=0.5
@@ -131,3 +132,167 @@ def test_fee_fraction_and_net_edge_honour_zero_maker_series():
         == pytest.approx(0.03)
     assert net_edge(0.53, 0.50, maker=True, series_ticker="KXMLBGAME") \
         == pytest.approx(0.03 - 0.0175 * 0.25)
+
+
+# ---------------------------------------------------------------------------
+# Round-leader + stat-leader series (added 2026-07-26).
+#
+# Ground truth re-read live on 2026-07-26 from
+#   GET https://api.elections.kalshi.com/trade-api/v2/series/?category=...
+# swept across EVERY category (7,665 series): 88 tickers contain "LEAD" and
+# ALL 88 are `fee_type=quadratic`. None charges a maker fee.
+#
+# Why this matters: P-022 (round-leader dead-heat fade) is measured against a
+# backtest that assumed zero maker fee. Only KXPGAR{1,2,3}LEAD were in the
+# table, so every other tour was billed a phantom 0.0175*P*(1-P) — a
+# systematic drag on the non-PGA tours, which supplied most of Phase 2's
+# tournaments. See golf_quirks_research/P022_DECISION_RULE.md §3.
+# ---------------------------------------------------------------------------
+
+# fee_type == "quadratic" (ZERO maker fee), verified live 2026-07-26
+GOLF_ROUND_LEADER_SERIES = [
+    "KXPGAR1LEAD", "KXPGAR2LEAD", "KXPGAR3LEAD",
+    "KXDPWORLDTOURR1LEAD", "KXDPWORLDTOURR2LEAD", "KXDPWORLDTOURR3LEAD",
+    "KXLIVR1LEAD", "KXLIVR2LEAD", "KXLIVR3LEAD",
+    "KXLPGAR1LEAD", "KXLPGAR2LEAD", "KXLPGAR3LEAD",
+    "KXCHAMPTOURR1LEAD",
+]
+
+# Season stat-leader family — 39 live series on 2026-07-26, all `quadratic`.
+STAT_LEADER_SERIES = [
+    "KXLEADERMLBWINS", "KXLEADERMLBHR", "KXLEADERMLBERA", "KXLEADERMLBWAR",
+    "KXLEADERMLBSTRIKEOUTS", "KXLEADERNBAPTS", "KXLEADERNBAAST",
+    "KXLEADERNFLSACKS", "KXLEADERNFLPYDS", "KXLEADERWNBAREB",
+    "KXLEADERUCLGOALS",
+]
+
+
+@pytest.mark.parametrize("series", GOLF_ROUND_LEADER_SERIES)
+def test_golf_round_leader_series_are_maker_free(series):
+    assert series_maker_charges_fee(series) is False
+    assert fee_per_contract(0.5, maker=True, series_ticker=series) == 0.0
+    # taker side is untouched by the series table
+    assert fee_per_contract(0.5, maker=False, series_ticker=series) \
+        == pytest.approx(0.0175)
+
+
+@pytest.mark.parametrize("series", STAT_LEADER_SERIES)
+def test_stat_leader_family_is_maker_free(series):
+    """All resolve through the single "KXLEADER" family prefix."""
+    assert series_maker_charges_fee(series) is False
+    assert fee_per_contract(0.5, maker=True, series_ticker=series) == 0.0
+
+
+def test_no_phantom_maker_fee_at_p022_working_price():
+    """The exact defect P022_DECISION_RULE.md §3 flagged: 0.129c/ct at P=0.08.
+
+    P-022 quotes cheap round-leader names (anchor in [0.03, 0.12]). Before the
+    fix, every non-PGA tour was charged 0.0175*0.08*0.92 = $0.001288/ct that
+    Kalshi does not charge, biasing the forward estimate down against a rule
+    calibrated on a fee-free backtest.
+    """
+    phantom = 0.0175 * 0.08 * 0.92          # $0.001288 == 0.129c
+    assert phantom == pytest.approx(0.001288)
+    for series in GOLF_ROUND_LEADER_SERIES:
+        assert fee_per_contract(0.08, maker=True, series_ticker=series) == 0.0
+    # and the fade's net edge is now unshaved
+    assert net_edge(0.06, 0.08, maker=True, series_ticker="KXLIVR1LEAD") \
+        == pytest.approx(-0.02)
+
+
+def test_round_leader_series_survive_longest_prefix_shadowing():
+    """Each new entry sits under a SHORTER, charging entry and must win.
+
+    KXCHAMPTOUR (True) < KXCHAMPTOURR1LEAD (False)
+    KXMLBHRDERBY (True) < KXMLBHRDERBYR1LEAD (False)
+    """
+    assert series_maker_charges_fee("KXCHAMPTOUR") is True
+    assert series_maker_charges_fee("KXCHAMPTOURR1LEAD") is False
+    # the derby chain now alternates FOUR times
+    assert series_maker_charges_fee("KXMLB") is True
+    assert series_maker_charges_fee("KXMLBHR") is False
+    assert series_maker_charges_fee("KXMLBHRDERBY") is True
+    assert series_maker_charges_fee("KXMLBHRDERBYR1LEAD") is False
+
+
+def test_new_entries_do_not_shadow_the_one_charging_golf_neighbour():
+    """KXPGARYDER is the trap: a short "KXPGAR" prefix would swallow it.
+
+    Live 2026-07-26, KXPGARYDER is the only golf series under "KXPGAR" that is
+    `quadratic_with_maker_fees`. This is why the round-leader entries are full
+    tickers rather than per-tour round prefixes.
+    """
+    assert series_maker_charges_fee("KXPGARYDER") is True
+    assert series_maker_charges_fee("KXPGARYDER-25") is True
+    # ...while the leader markets around it stay free
+    assert series_maker_charges_fee("KXPGAR1LEAD") is False
+    # unrelated families are unchanged
+    assert series_maker_charges_fee("KXLIVTOUR") is True
+    assert series_maker_charges_fee("KXLPGATOUR") is True
+
+
+def test_leader_markets_resolve_from_full_market_tickers():
+    """Real tickers carry an event suffix; the family must still resolve."""
+    assert series_maker_charges_fee("KXLPGAR2LEAD-26EVIAN") is False
+    assert series_maker_charges_fee("KXDPWORLDTOURR3LEAD-26DUBAI") is False
+    assert series_maker_charges_fee("KXLEADERMLBWINS-26") is False
+    assert fee_per_contract(0.08, maker=True,
+                            series_ticker="KXLIVR1LEAD-26CHICAGO") == 0.0
+
+
+def test_every_lead_entry_in_the_table_is_maker_free():
+    """Structural guard on the verified invariant.
+
+    All 88 "LEAD" tickers live across every category are `quadratic`. If a
+    future edit adds a charging *LEAD entry, either Kalshi changed its fee
+    schedule (re-verify and update this test) or the entry is a mistake.
+    """
+    charging = {k: v for k, v in _SERIES_MAKER_FEE.items()
+                if "LEAD" in k and v is True}
+    assert charging == {}, f"*LEAD series marked as charging makers: {charging}"
+
+
+def test_checkpoint_script_assertion_set_is_covered():
+    """scripts/p022_checkpoint.py --check-fees must print OK, not DRIFTED.
+
+    Keep this list in sync with the tuple in that script.
+    """
+    checked = ("KXPGAR1LEAD", "KXPGAR2LEAD", "KXPGAR3LEAD",
+               "KXDPWORLDTOURR1LEAD", "KXLIVR1LEAD",
+               "KXLPGAR1LEAD", "KXCHAMPTOURR1LEAD")
+    bad = [s for s in checked
+           if fee_per_contract(0.08, maker=True, series_ticker=s) > 0]
+    assert bad == []
+
+
+# ── Round-based top-N and non-PGA make-cut (added 2026-07-26, P-023c / P-023) ──
+
+@pytest.mark.parametrize("series", [
+    "KXPGAR1TOP5", "KXPGAR1TOP10", "KXPGAR1TOP20",
+    "KXPGAR2TOP5", "KXPGAR2TOP10",
+    "KXPGAR3TOP5", "KXPGAR3TOP10",
+    "KXLIVTOP5", "KXLIVTOP10",
+    "KXDPWORLDTOURMAKECUT",
+])
+def test_round_topn_and_nonpga_makecut_are_maker_free(series):
+    """All verified `fee_type=quadratic` against GET /series?category=Sports
+    on 2026-07-26 (3,005 series swept).
+
+    These fell through to the charging default for months. `KXPGATOP` does NOT
+    cover `KXPGAR1TOP5` — their shared prefix is only "KXPGA", which charges —
+    and `KXLIVTOUR` is not a prefix of `KXLIVTOP5`.
+    """
+    assert series_maker_charges_fee(series) is False
+    assert fee_per_contract(0.20, maker=True, series_ticker=series) == 0.0
+
+
+def test_round_topn_entries_do_not_shadow_the_charging_golf_neighbours():
+    """The regression that makes short prefixes dangerous here.
+
+    "KXPGAR" would swallow KXPGARYDER, which genuinely charges. The entries use
+    "KXPGAR1TOP"/"KXPGAR2TOP"/"KXPGAR3TOP", so the Ryder Cup is untouched.
+    """
+    assert series_maker_charges_fee("KXPGARYDER") is True
+    assert series_maker_charges_fee("KXPGA") is True
+    assert series_maker_charges_fee("KXPGATOUR") is True
+    assert series_maker_charges_fee("KXLIVTOUR") is True

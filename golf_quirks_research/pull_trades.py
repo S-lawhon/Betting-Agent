@@ -59,6 +59,23 @@ MODES: Dict[str, Dict[str, Any]] = {
         "band": (0.08, 0.45),
         "out": "livtopn_trades",
     },
+    # P-023c — the over-priced top-N flip side. Two modes because the two
+    # families anchor at different horizons (this is what the published
+    # P-023a table used, and it is what backtest_topn_fade.py replicates):
+    # full-tournament top-N at 48h (pre-R1), round-based top-N at 12h
+    # (pre-round), band 0.08-0.45 for both.
+    "topn_round": {
+        "series": qc.ROUND_TOPN_SERIES,
+        "hours": 12.0,
+        "band": (0.08, 0.45),
+        "out": "topn_round_trades",
+    },
+    "topn_full": {
+        "series": qc.FULL_TOPN_SERIES,
+        "hours": 48.0,
+        "band": (0.08, 0.45),
+        "out": "topn_full_trades",
+    },
 }
 
 

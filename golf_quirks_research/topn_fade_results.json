@@ -1,0 +1,3113 @@
+{
+  "band": [
+    0.08,
+    0.45
+  ],
+  "cohorts": {
+    "pga_top1020": {
+      "label": "CONTROL PGA top-10/20",
+      "anchor_h": 48.0,
+      "replication": {
+        "got": {
+          "n": 1627,
+          "tournaments": 12,
+          "mean": -0.032,
+          "ci_lo": -0.0504,
+          "ci_hi": -0.0104,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": -0.0431,
+            "COPC26": -0.0028,
+            "GESO26": -0.0523,
+            "ISC26": 0.0063,
+            "JODC26": -0.0803,
+            "PGC26": 0.0582,
+            "RBBCAN26": -0.0277,
+            "THCCBN26": -0.0098,
+            "THMTPBW26": -0.0763,
+            "THOC26": -0.0293,
+            "TRAV26": -0.0184,
+            "USO26": -0.0676
+          }
+        },
+        "published": [
+          1627,
+          12,
+          0.199,
+          0.167,
+          -0.032
+        ],
+        "pass": true
+      },
+      "decomposition": {
+        "n_two_sided": 1502,
+        "n_total": 1627,
+        "mean_anchor": 0.2004,
+        "mean_bid": 0.1762,
+        "mean_ask": 0.2027,
+        "mean_spread": 0.0265,
+        "mean_realized": 0.1651,
+        "mean_taker_fee_at_bid": 0.0094,
+        "fade_gross_all": {
+          "n": 1627,
+          "tournaments": 12,
+          "mean": 0.032,
+          "ci_lo": 0.0104,
+          "ci_hi": 0.0504,
+          "tourn_positive": 10,
+          "per_tournament": {
+            "CHSC26": 0.0431,
+            "COPC26": 0.0028,
+            "GESO26": 0.0523,
+            "ISC26": -0.0063,
+            "JODC26": 0.0803,
+            "PGC26": -0.0582,
+            "RBBCAN26": 0.0277,
+            "THCCBN26": 0.0098,
+            "THMTPBW26": 0.0763,
+            "THOC26": 0.0293,
+            "TRAV26": 0.0184,
+            "USO26": 0.0676
+          }
+        },
+        "fade_at_bid_nofee": {
+          "n": 1502,
+          "tournaments": 12,
+          "mean": 0.011,
+          "ci_lo": -0.0075,
+          "ci_hi": 0.0264,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.0245,
+            "COPC26": -0.0146,
+            "GESO26": 0.0386,
+            "ISC26": -0.0148,
+            "JODC26": 0.0489,
+            "PGC26": -0.0663,
+            "RBBCAN26": 0.0044,
+            "THCCBN26": -0.0043,
+            "THMTPBW26": 0.0531,
+            "THOC26": 0.0129,
+            "TRAV26": -0.0334,
+            "USO26": 0.031
+          }
+        },
+        "fade_at_bid_net": {
+          "n": 1502,
+          "tournaments": 12,
+          "mean": 0.0016,
+          "ci_lo": -0.017,
+          "ci_hi": 0.017,
+          "tourn_positive": 6,
+          "per_tournament": {
+            "CHSC26": 0.0152,
+            "COPC26": -0.0235,
+            "GESO26": 0.0296,
+            "ISC26": -0.0232,
+            "JODC26": 0.0399,
+            "PGC26": -0.0767,
+            "RBBCAN26": -0.0052,
+            "THCCBN26": -0.0135,
+            "THMTPBW26": 0.0425,
+            "THOC26": 0.003,
+            "TRAV26": -0.0431,
+            "USO26": 0.0216
+          }
+        },
+        "fade_at_ask_makerfee0": {
+          "n": 1502,
+          "tournaments": 12,
+          "mean": 0.0376,
+          "ci_lo": 0.0169,
+          "ci_hi": 0.0547,
+          "tourn_positive": 10,
+          "per_tournament": {
+            "CHSC26": 0.048,
+            "COPC26": 0.0447,
+            "GESO26": 0.0606,
+            "ISC26": 0.0515,
+            "JODC26": 0.083,
+            "PGC26": -0.0515,
+            "RBBCAN26": 0.0203,
+            "THCCBN26": 0.0094,
+            "THMTPBW26": 0.0672,
+            "THOC26": 0.0297,
+            "TRAV26": -0.0153,
+            "USO26": 0.0639
+          }
+        }
+      },
+      "anchor_composition": {
+        "from_trade": {
+          "n": 1464,
+          "tournaments": 12,
+          "mean": 0.0327,
+          "ci_lo": 0.0091,
+          "ci_hi": 0.0519,
+          "tourn_positive": 9,
+          "per_tournament": {
+            "CHSC26": 0.0449,
+            "COPC26": 0.0421,
+            "GESO26": 0.0479,
+            "ISC26": -0.0387,
+            "JODC26": 0.0781,
+            "PGC26": -0.0582,
+            "RBBCAN26": 0.0291,
+            "THCCBN26": -0.0014,
+            "THMTPBW26": 0.0763,
+            "THOC26": 0.0271,
+            "TRAV26": 0.0158,
+            "USO26": 0.0674
+          }
+        },
+        "from_two_sided_mid": {
+          "n": 163,
+          "tournaments": 10,
+          "mean": 0.0254,
+          "ci_lo": -0.0393,
+          "ci_hi": 0.0884,
+          "tourn_positive": 9,
+          "per_tournament": {
+            "CHSC26": 0.016,
+            "COPC26": -0.119,
+            "GESO26": 0.0781,
+            "ISC26": 0.0378,
+            "JODC26": 0.1114,
+            "RBBCAN26": 0.0167,
+            "THCCBN26": 0.1358,
+            "THOC26": 0.1113,
+            "TRAV26": 0.19,
+            "USO26": 0.1
+          }
+        }
+      },
+      "anchor_vs_mid": {
+        "n": 1339,
+        "mean_anchor": 0.2083,
+        "mean_mid": 0.1959,
+        "anchor_minus_mid": 0.0124,
+        "pct_anchor_at_ask": 44.1,
+        "pct_anchor_at_or_below_bid": 18.1
+      },
+      "fade_at_mid": {
+        "n": 1502,
+        "tournaments": 12,
+        "mean": 0.0243,
+        "ci_lo": 0.0055,
+        "ci_hi": 0.0399,
+        "tourn_positive": 10,
+        "per_tournament": {
+          "CHSC26": 0.0363,
+          "COPC26": 0.0151,
+          "GESO26": 0.0496,
+          "ISC26": 0.0183,
+          "JODC26": 0.066,
+          "PGC26": -0.0589,
+          "RBBCAN26": 0.0124,
+          "THCCBN26": 0.0025,
+          "THMTPBW26": 0.0601,
+          "THOC26": 0.0213,
+          "TRAV26": -0.0244,
+          "USO26": 0.0475
+        }
+      },
+      "mechanical_term": {
+        "nominal_N": 15.0,
+        "events": 24,
+        "mean_yes_settlements": 17.29,
+        "yes_over_n": 1.1528,
+        "excess_share_of_yes": 0.1325,
+        "realized": 0.1672,
+        "counterfactual_no_tie_realized": 0.145,
+        "fade_headwind_per_contract": -0.0222
+      },
+      "by_horizon": {
+        "H72": {
+          "gross": {
+            "n": 1644,
+            "tournaments": 12,
+            "mean": -0.01,
+            "ci_lo": -0.0365,
+            "ci_hi": 0.0112,
+            "tourn_positive": 6,
+            "per_tournament": {
+              "CHSC26": 0.008,
+              "COPC26": -0.0557,
+              "GESO26": 0.0305,
+              "ISC26": -0.1029,
+              "JODC26": 0.019,
+              "PGC26": -0.0965,
+              "RBBCAN26": 0.0256,
+              "THCCBN26": -0.0445,
+              "THMTPBW26": -0.0077,
+              "THOC26": -0.0272,
+              "TRAV26": 0.0482,
+              "USO26": 0.0161
+            }
+          },
+          "at_bid_net": {
+            "n": 1608,
+            "tournaments": 12,
+            "mean": -0.0446,
+            "ci_lo": -0.0729,
+            "ci_hi": -0.0232,
+            "tourn_positive": 1,
+            "per_tournament": {
+              "CHSC26": -0.0214,
+              "COPC26": -0.1315,
+              "GESO26": 0.001,
+              "ISC26": -0.1522,
+              "JODC26": -0.0145,
+              "PGC26": -0.1166,
+              "RBBCAN26": -0.0103,
+              "THCCBN26": -0.0733,
+              "THMTPBW26": -0.0364,
+              "THOC26": -0.0525,
+              "TRAV26": -0.009,
+              "USO26": -0.0143
+            }
+          }
+        },
+        "H48": {
+          "gross": {
+            "n": 1627,
+            "tournaments": 12,
+            "mean": 0.032,
+            "ci_lo": 0.0104,
+            "ci_hi": 0.0504,
+            "tourn_positive": 10,
+            "per_tournament": {
+              "CHSC26": 0.0431,
+              "COPC26": 0.0028,
+              "GESO26": 0.0523,
+              "ISC26": -0.0063,
+              "JODC26": 0.0803,
+              "PGC26": -0.0582,
+              "RBBCAN26": 0.0277,
+              "THCCBN26": 0.0098,
+              "THMTPBW26": 0.0763,
+              "THOC26": 0.0293,
+              "TRAV26": 0.0184,
+              "USO26": 0.0676
+            }
+          },
+          "at_bid_net": {
+            "n": 1502,
+            "tournaments": 12,
+            "mean": 0.0016,
+            "ci_lo": -0.017,
+            "ci_hi": 0.017,
+            "tourn_positive": 6,
+            "per_tournament": {
+              "CHSC26": 0.0152,
+              "COPC26": -0.0235,
+              "GESO26": 0.0296,
+              "ISC26": -0.0232,
+              "JODC26": 0.0399,
+              "PGC26": -0.0767,
+              "RBBCAN26": -0.0052,
+              "THCCBN26": -0.0135,
+              "THMTPBW26": 0.0425,
+              "THOC26": 0.003,
+              "TRAV26": -0.0431,
+              "USO26": 0.0216
+            }
+          }
+        },
+        "H24": {
+          "gross": {
+            "n": 1480,
+            "tournaments": 12,
+            "mean": 0.0697,
+            "ci_lo": 0.0486,
+            "ci_hi": 0.0873,
+            "tourn_positive": 11,
+            "per_tournament": {
+              "CHSC26": 0.0798,
+              "COPC26": 0.0359,
+              "GESO26": 0.1053,
+              "ISC26": 0.052,
+              "JODC26": 0.1141,
+              "PGC26": -0.0083,
+              "RBBCAN26": 0.0436,
+              "THCCBN26": 0.0675,
+              "THMTPBW26": 0.0992,
+              "THOC26": 0.0374,
+              "TRAV26": 0.0396,
+              "USO26": 0.1071
+            }
+          },
+          "at_bid_net": {
+            "n": 1428,
+            "tournaments": 12,
+            "mean": 0.0363,
+            "ci_lo": 0.0145,
+            "ci_hi": 0.0534,
+            "tourn_positive": 9,
+            "per_tournament": {
+              "CHSC26": 0.0532,
+              "COPC26": -0.0132,
+              "GESO26": 0.0689,
+              "ISC26": 0.0164,
+              "JODC26": 0.0714,
+              "PGC26": -0.0354,
+              "RBBCAN26": 0.0042,
+              "THCCBN26": 0.048,
+              "THMTPBW26": 0.0638,
+              "THOC26": 0.0181,
+              "TRAV26": -0.0435,
+              "USO26": 0.0766
+            }
+          }
+        },
+        "H12": {
+          "gross": {
+            "n": 1164,
+            "tournaments": 12,
+            "mean": 0.0936,
+            "ci_lo": 0.0685,
+            "ci_hi": 0.1148,
+            "tourn_positive": 11,
+            "per_tournament": {
+              "CHSC26": 0.1041,
+              "COPC26": 0.0884,
+              "GESO26": 0.1319,
+              "ISC26": 0.1151,
+              "JODC26": 0.1591,
+              "PGC26": -0.006,
+              "RBBCAN26": 0.1078,
+              "THCCBN26": 0.0784,
+              "THMTPBW26": 0.0697,
+              "THOC26": 0.0384,
+              "TRAV26": 0.0396,
+              "USO26": 0.0938
+            }
+          },
+          "at_bid_net": {
+            "n": 925,
+            "tournaments": 12,
+            "mean": 0.0323,
+            "ci_lo": 0.0094,
+            "ci_hi": 0.0536,
+            "tourn_positive": 10,
+            "per_tournament": {
+              "CHSC26": 0.0335,
+              "COPC26": 0.0277,
+              "GESO26": 0.0708,
+              "ISC26": 0.0582,
+              "JODC26": 0.099,
+              "PGC26": -0.0456,
+              "RBBCAN26": 0.0566,
+              "THCCBN26": 0.0041,
+              "THMTPBW26": 0.0305,
+              "THOC26": 0.0111,
+              "TRAV26": -0.0435,
+              "USO26": 0.0002
+            }
+          }
+        }
+      },
+      "by_price_band": {
+        "0.08-0.15": {
+          "n": 697,
+          "tournaments": 12,
+          "mean": 0.0123,
+          "ci_lo": -0.0106,
+          "ci_hi": 0.0324,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.0327,
+            "COPC26": -0.027,
+            "GESO26": 0.0256,
+            "ISC26": -0.0187,
+            "JODC26": 0.0751,
+            "PGC26": -0.0611,
+            "RBBCAN26": 0.0193,
+            "THCCBN26": 0.0238,
+            "THMTPBW26": 0.0494,
+            "THOC26": -0.0246,
+            "TRAV26": -0.0875,
+            "USO26": 0.0322
+          }
+        },
+        "0.15-0.25": {
+          "n": 576,
+          "tournaments": 12,
+          "mean": 0.039,
+          "ci_lo": 0.0048,
+          "ci_hi": 0.068,
+          "tourn_positive": 10,
+          "per_tournament": {
+            "CHSC26": 0.0515,
+            "COPC26": -0.043,
+            "GESO26": 0.0689,
+            "ISC26": 0.0092,
+            "JODC26": 0.0591,
+            "PGC26": -0.1186,
+            "RBBCAN26": 0.0129,
+            "THCCBN26": 0.0649,
+            "THMTPBW26": 0.1382,
+            "THOC26": 0.0946,
+            "TRAV26": 0.0604,
+            "USO26": 0.0554
+          }
+        },
+        "0.25-0.35": {
+          "n": 283,
+          "tournaments": 12,
+          "mean": 0.0357,
+          "ci_lo": -0.0204,
+          "ci_hi": 0.0853,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.0418,
+            "COPC26": 0.0174,
+            "GESO26": 0.2095,
+            "ISC26": -0.021,
+            "JODC26": 0.1448,
+            "PGC26": -0.0742,
+            "RBBCAN26": 0.0224,
+            "THCCBN26": -0.1068,
+            "THMTPBW26": -0.085,
+            "THOC26": 0.0884,
+            "TRAV26": -0.0607,
+            "USO26": 0.1227
+          }
+        },
+        "0.35-0.45": {
+          "n": 189,
+          "tournaments": 12,
+          "mean": 0.0961,
+          "ci_lo": 0.031,
+          "ci_hi": 0.1528,
+          "tourn_positive": 9,
+          "per_tournament": {
+            "CHSC26": 0.0258,
+            "COPC26": 0.2093,
+            "GESO26": -0.099,
+            "ISC26": -0.1175,
+            "JODC26": 0.0363,
+            "PGC26": 0.1393,
+            "RBBCAN26": 0.1689,
+            "THCCBN26": -0.0456,
+            "THMTPBW26": 0.215,
+            "THOC26": 0.0371,
+            "TRAV26": 0.1309,
+            "USO26": 0.215
+          }
+        }
+      },
+      "anchor_staleness": {
+        "median_lag_h": 67.68,
+        "median_staleness_h": 19.68,
+        "pct_stale_gt_2h": 99.9,
+        "pct_stale_gt_12h": 95.8
+      },
+      "anchor_vs_round_ends": {
+        "covered": 1527,
+        "pct_after_R1": 57.6,
+        "pct_after_R2": 4.3,
+        "pct_after_R3": 0.0
+      },
+      "scalar_sensitivity": {
+        "n_scalar_in_band": 7,
+        "fade_excl": 0.032,
+        "fade_incl_at_refund": 0.032
+      },
+      "leave_one_out": {
+        "gross": {
+          "CHSC26": 0.0308,
+          "COPC26": 0.0345,
+          "GESO26": 0.03,
+          "ISC26": 0.0352,
+          "JODC26": 0.0263,
+          "PGC26": 0.0379,
+          "RBBCAN26": 0.0325,
+          "THCCBN26": 0.0344,
+          "THMTPBW26": 0.029,
+          "THOC26": 0.0323,
+          "TRAV26": 0.0326,
+          "USO26": 0.0282
+        },
+        "at_bid_net": {
+          "CHSC26": 0.0001,
+          "COPC26": 0.0033,
+          "GESO26": -0.0013,
+          "ISC26": 0.0035,
+          "JODC26": -0.0029,
+          "PGC26": 0.007,
+          "RBBCAN26": 0.0024,
+          "THCCBN26": 0.0034,
+          "THMTPBW26": -0.0014,
+          "THOC26": 0.0015,
+          "TRAV26": 0.0036,
+          "USO26": -0.0001
+        }
+      }
+    },
+    "pga_top5": {
+      "label": "PGA top-5",
+      "anchor_h": 48.0,
+      "replication": {
+        "got": {
+          "n": 351,
+          "tournaments": 12,
+          "mean": -0.0369,
+          "ci_lo": -0.0525,
+          "ci_hi": -0.0215,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "CHSC26": -0.0164,
+            "COPC26": -0.0187,
+            "GESO26": -0.001,
+            "ISC26": 0.0068,
+            "JODC26": -0.0114,
+            "PGC26": -0.0231,
+            "RBBCAN26": -0.0894,
+            "THCCBN26": -0.0545,
+            "THMTPBW26": -0.0515,
+            "THOC26": -0.0614,
+            "TRAV26": -0.0729,
+            "USO26": -0.0455
+          }
+        },
+        "published": [
+          351,
+          12,
+          0.159,
+          0.122,
+          -0.037
+        ],
+        "pass": true
+      },
+      "decomposition": {
+        "n_two_sided": 319,
+        "n_total": 351,
+        "mean_anchor": 0.1605,
+        "mean_bid": 0.1336,
+        "mean_ask": 0.1583,
+        "mean_spread": 0.0247,
+        "mean_realized": 0.1285,
+        "mean_taker_fee_at_bid": 0.0076,
+        "fade_gross_all": {
+          "n": 351,
+          "tournaments": 12,
+          "mean": 0.0369,
+          "ci_lo": 0.0215,
+          "ci_hi": 0.0525,
+          "tourn_positive": 11,
+          "per_tournament": {
+            "CHSC26": 0.0164,
+            "COPC26": 0.0187,
+            "GESO26": 0.001,
+            "ISC26": -0.0068,
+            "JODC26": 0.0114,
+            "PGC26": 0.0231,
+            "RBBCAN26": 0.0894,
+            "THCCBN26": 0.0545,
+            "THMTPBW26": 0.0515,
+            "THOC26": 0.0614,
+            "TRAV26": 0.0729,
+            "USO26": 0.0455
+          }
+        },
+        "fade_at_bid_nofee": {
+          "n": 319,
+          "tournaments": 12,
+          "mean": 0.005,
+          "ci_lo": -0.0177,
+          "ci_hi": 0.0255,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": -0.0248,
+            "COPC26": -0.0361,
+            "GESO26": -0.016,
+            "ISC26": -0.0721,
+            "JODC26": -0.046,
+            "PGC26": 0.0073,
+            "RBBCAN26": 0.0554,
+            "THCCBN26": 0.0345,
+            "THMTPBW26": 0.0308,
+            "THOC26": 0.0456,
+            "TRAV26": 0.0191,
+            "USO26": 0.0409
+          }
+        },
+        "fade_at_bid_net": {
+          "n": 319,
+          "tournaments": 12,
+          "mean": -0.0026,
+          "ci_lo": -0.0252,
+          "ci_hi": 0.0179,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": -0.0322,
+            "COPC26": -0.044,
+            "GESO26": -0.0242,
+            "ISC26": -0.0799,
+            "JODC26": -0.0531,
+            "PGC26": 0.0001,
+            "RBBCAN26": 0.0479,
+            "THCCBN26": 0.0268,
+            "THMTPBW26": 0.023,
+            "THOC26": 0.0381,
+            "TRAV26": 0.011,
+            "USO26": 0.0335
+          }
+        },
+        "fade_at_ask_makerfee0": {
+          "n": 319,
+          "tournaments": 12,
+          "mean": 0.0298,
+          "ci_lo": 0.0126,
+          "ci_hi": 0.0458,
+          "tourn_positive": 10,
+          "per_tournament": {
+            "CHSC26": 0.0042,
+            "COPC26": 0.0174,
+            "GESO26": 0.0004,
+            "ISC26": -0.02,
+            "JODC26": -0.0087,
+            "PGC26": 0.02,
+            "RBBCAN26": 0.0696,
+            "THCCBN26": 0.0465,
+            "THMTPBW26": 0.0469,
+            "THOC26": 0.0639,
+            "TRAV26": 0.0378,
+            "USO26": 0.0668
+          }
+        }
+      },
+      "anchor_composition": {
+        "from_trade": {
+          "n": 329,
+          "tournaments": 12,
+          "mean": 0.0429,
+          "ci_lo": 0.0276,
+          "ci_hi": 0.058,
+          "tourn_positive": 11,
+          "per_tournament": {
+            "CHSC26": 0.0135,
+            "COPC26": 0.0807,
+            "GESO26": -0.023,
+            "ISC26": 0.0181,
+            "JODC26": 0.0345,
+            "PGC26": 0.0231,
+            "RBBCAN26": 0.0881,
+            "THCCBN26": 0.0545,
+            "THMTPBW26": 0.0503,
+            "THOC26": 0.0614,
+            "TRAV26": 0.0729,
+            "USO26": 0.0455
+          }
+        },
+        "from_two_sided_mid": {
+          "n": 22,
+          "tournaments": 7,
+          "mean": -0.0543,
+          "ci_lo": -0.1567,
+          "ci_hi": 0.0568,
+          "tourn_positive": 4,
+          "per_tournament": {
+            "CHSC26": 0.125,
+            "COPC26": -0.0975,
+            "GESO26": 0.097,
+            "ISC26": -0.1375,
+            "JODC26": -0.3475,
+            "RBBCAN26": 0.125,
+            "THMTPBW26": 0.095
+          }
+        }
+      },
+      "anchor_vs_mid": {
+        "n": 297,
+        "mean_anchor": 0.163,
+        "mean_mid": 0.1473,
+        "anchor_minus_mid": 0.0157,
+        "pct_anchor_at_ask": 45.8,
+        "pct_anchor_at_or_below_bid": 17.5
+      },
+      "fade_at_mid": {
+        "n": 319,
+        "tournaments": 12,
+        "mean": 0.0174,
+        "ci_lo": -0.0023,
+        "ci_hi": 0.0358,
+        "tourn_positive": 7,
+        "per_tournament": {
+          "CHSC26": -0.0103,
+          "COPC26": -0.0093,
+          "GESO26": -0.0078,
+          "ISC26": -0.0461,
+          "JODC26": -0.0273,
+          "PGC26": 0.0137,
+          "RBBCAN26": 0.0625,
+          "THCCBN26": 0.0405,
+          "THMTPBW26": 0.0389,
+          "THOC26": 0.0547,
+          "TRAV26": 0.0285,
+          "USO26": 0.0539
+        }
+      },
+      "mechanical_term": {
+        "nominal_N": 5.0,
+        "events": 12,
+        "mean_yes_settlements": 5.67,
+        "yes_over_n": 1.1333,
+        "excess_share_of_yes": 0.1176,
+        "realized": 0.1225,
+        "counterfactual_no_tie_realized": 0.1081,
+        "fade_headwind_per_contract": -0.0144
+      },
+      "by_horizon": {
+        "H72": {
+          "gross": {
+            "n": 300,
+            "tournaments": 12,
+            "mean": 0.0193,
+            "ci_lo": -0.0012,
+            "ci_hi": 0.0388,
+            "tourn_positive": 8,
+            "per_tournament": {
+              "CHSC26": -0.027,
+              "COPC26": 0.06,
+              "GESO26": 0.011,
+              "ISC26": -0.0353,
+              "JODC26": 0.058,
+              "PGC26": 0.0025,
+              "RBBCAN26": 0.0079,
+              "THCCBN26": -0.0174,
+              "THMTPBW26": 0.0515,
+              "THOC26": -0.0027,
+              "TRAV26": 0.0685,
+              "USO26": 0.0313
+            }
+          },
+          "at_bid_net": {
+            "n": 297,
+            "tournaments": 12,
+            "mean": -0.0067,
+            "ci_lo": -0.0246,
+            "ci_hi": 0.0096,
+            "tourn_positive": 5,
+            "per_tournament": {
+              "CHSC26": -0.0496,
+              "COPC26": 0.0297,
+              "GESO26": -0.0156,
+              "ISC26": -0.0576,
+              "JODC26": 0.0295,
+              "PGC26": -0.0163,
+              "RBBCAN26": -0.0118,
+              "THCCBN26": -0.039,
+              "THMTPBW26": 0.0295,
+              "THOC26": -0.0242,
+              "TRAV26": 0.0215,
+              "USO26": 0.0108
+            }
+          }
+        },
+        "H48": {
+          "gross": {
+            "n": 351,
+            "tournaments": 12,
+            "mean": 0.0369,
+            "ci_lo": 0.0215,
+            "ci_hi": 0.0525,
+            "tourn_positive": 11,
+            "per_tournament": {
+              "CHSC26": 0.0164,
+              "COPC26": 0.0187,
+              "GESO26": 0.001,
+              "ISC26": -0.0068,
+              "JODC26": 0.0114,
+              "PGC26": 0.0231,
+              "RBBCAN26": 0.0894,
+              "THCCBN26": 0.0545,
+              "THMTPBW26": 0.0515,
+              "THOC26": 0.0614,
+              "TRAV26": 0.0729,
+              "USO26": 0.0455
+            }
+          },
+          "at_bid_net": {
+            "n": 319,
+            "tournaments": 12,
+            "mean": -0.0026,
+            "ci_lo": -0.0252,
+            "ci_hi": 0.0179,
+            "tourn_positive": 7,
+            "per_tournament": {
+              "CHSC26": -0.0322,
+              "COPC26": -0.044,
+              "GESO26": -0.0242,
+              "ISC26": -0.0799,
+              "JODC26": -0.0531,
+              "PGC26": 0.0001,
+              "RBBCAN26": 0.0479,
+              "THCCBN26": 0.0268,
+              "THMTPBW26": 0.023,
+              "THOC26": 0.0381,
+              "TRAV26": 0.011,
+              "USO26": 0.0335
+            }
+          }
+        },
+        "H24": {
+          "gross": {
+            "n": 356,
+            "tournaments": 12,
+            "mean": 0.0658,
+            "ci_lo": 0.0464,
+            "ci_hi": 0.0851,
+            "tourn_positive": 12,
+            "per_tournament": {
+              "CHSC26": 0.0432,
+              "COPC26": 0.0506,
+              "GESO26": 0.1144,
+              "ISC26": 0.0241,
+              "JODC26": 0.0918,
+              "PGC26": 0.0273,
+              "RBBCAN26": 0.0486,
+              "THCCBN26": 0.0396,
+              "THMTPBW26": 0.1308,
+              "THOC26": 0.0951,
+              "TRAV26": 0.0452,
+              "USO26": 0.0388
+            }
+          },
+          "at_bid_net": {
+            "n": 318,
+            "tournaments": 12,
+            "mean": 0.0141,
+            "ci_lo": -0.0075,
+            "ci_hi": 0.0345,
+            "tourn_positive": 7,
+            "per_tournament": {
+              "CHSC26": 0.0093,
+              "COPC26": -0.0,
+              "GESO26": 0.058,
+              "ISC26": -0.0327,
+              "JODC26": 0.0308,
+              "PGC26": 0.0063,
+              "RBBCAN26": -0.0305,
+              "THCCBN26": 0.0127,
+              "THMTPBW26": 0.0693,
+              "THOC26": 0.0628,
+              "TRAV26": -0.0592,
+              "USO26": -0.0071
+            }
+          }
+        },
+        "H12": {
+          "gross": {
+            "n": 299,
+            "tournaments": 12,
+            "mean": 0.0786,
+            "ci_lo": 0.0599,
+            "ci_hi": 0.0963,
+            "tourn_positive": 12,
+            "per_tournament": {
+              "CHSC26": 0.0677,
+              "COPC26": 0.0923,
+              "GESO26": 0.0713,
+              "ISC26": 0.1118,
+              "JODC26": 0.078,
+              "PGC26": 0.1119,
+              "RBBCAN26": 0.0143,
+              "THCCBN26": 0.0672,
+              "THMTPBW26": 0.0968,
+              "THOC26": 0.0659,
+              "TRAV26": 0.0452,
+              "USO26": 0.1275
+            }
+          },
+          "at_bid_net": {
+            "n": 226,
+            "tournaments": 12,
+            "mean": 0.0053,
+            "ci_lo": -0.0214,
+            "ci_hi": 0.0288,
+            "tourn_positive": 8,
+            "per_tournament": {
+              "CHSC26": 0.0353,
+              "COPC26": 0.0099,
+              "GESO26": 0.0071,
+              "ISC26": -0.0304,
+              "JODC26": -0.0147,
+              "PGC26": 0.0743,
+              "RBBCAN26": -0.0811,
+              "THCCBN26": 0.0224,
+              "THMTPBW26": 0.0068,
+              "THOC26": 0.0191,
+              "TRAV26": -0.0592,
+              "USO26": 0.0425
+            }
+          }
+        }
+      },
+      "by_price_band": {
+        "0.08-0.15": {
+          "n": 221,
+          "tournaments": 12,
+          "mean": 0.0471,
+          "ci_lo": 0.0174,
+          "ci_hi": 0.0735,
+          "tourn_positive": 9,
+          "per_tournament": {
+            "CHSC26": 0.0329,
+            "COPC26": -0.12,
+            "GESO26": 0.1042,
+            "ISC26": -0.0022,
+            "JODC26": 0.0522,
+            "PGC26": 0.0227,
+            "RBBCAN26": 0.1097,
+            "THCCBN26": 0.0393,
+            "THMTPBW26": 0.0963,
+            "THOC26": 0.1046,
+            "TRAV26": -0.025,
+            "USO26": 0.0242
+          }
+        },
+        "0.15-0.25": {
+          "n": 94,
+          "tournaments": 12,
+          "mean": 0.0437,
+          "ci_lo": -0.0217,
+          "ci_hi": 0.1082,
+          "tourn_positive": 8,
+          "per_tournament": {
+            "CHSC26": 0.0782,
+            "COPC26": 0.075,
+            "GESO26": -0.1411,
+            "ISC26": 0.188,
+            "JODC26": -0.0358,
+            "PGC26": -0.0925,
+            "RBBCAN26": -0.135,
+            "THCCBN26": 0.1875,
+            "THMTPBW26": 0.04,
+            "THOC26": 0.0812,
+            "TRAV26": 0.2036,
+            "USO26": 0.0822
+          }
+        },
+        "0.25-0.35": {
+          "n": 35,
+          "tournaments": 12,
+          "mean": -0.1057,
+          "ci_lo": -0.2518,
+          "ci_hi": 0.0428,
+          "tourn_positive": 4,
+          "per_tournament": {
+            "CHSC26": -0.2125,
+            "COPC26": 0.11,
+            "GESO26": -0.4,
+            "ISC26": -0.67,
+            "JODC26": 0.28,
+            "PGC26": -0.225,
+            "RBBCAN26": 0.275,
+            "THCCBN26": -0.02,
+            "THMTPBW26": -0.2025,
+            "THOC26": -0.3967,
+            "TRAV26": 0.3167,
+            "USO26": -0.0433
+          }
+        },
+        "0.35-0.45": {
+          "n": 20,
+          "tournaments": 12,
+          "mean": 0.088,
+          "ci_lo": -0.1318,
+          "ci_hi": 0.2863,
+          "tourn_positive": 8,
+          "per_tournament": {
+            "CHSC26": 0.36,
+            "COPC26": 0.355,
+            "GESO26": 0.39,
+            "ISC26": -0.115,
+            "JODC26": -0.115,
+            "PGC26": 0.37,
+            "RBBCAN26": 0.425,
+            "THCCBN26": 0.35,
+            "THMTPBW26": 0.07,
+            "THOC26": -0.57,
+            "TRAV26": -0.62,
+            "USO26": 0.395
+          }
+        }
+      },
+      "anchor_staleness": {
+        "median_lag_h": 67.5,
+        "median_staleness_h": 19.5,
+        "pct_stale_gt_2h": 100.0,
+        "pct_stale_gt_12h": 93.7
+      },
+      "anchor_vs_round_ends": {
+        "covered": 325,
+        "pct_after_R1": 71.4,
+        "pct_after_R2": 6.8,
+        "pct_after_R3": 0.0
+      },
+      "scalar_sensitivity": {
+        "n_scalar_in_band": 0,
+        "fade_excl": 0.0369,
+        "fade_incl_at_refund": 0.0369
+      },
+      "leave_one_out": {
+        "gross": {
+          "CHSC26": 0.0393,
+          "COPC26": 0.0381,
+          "GESO26": 0.0396,
+          "ISC26": 0.0402,
+          "JODC26": 0.0395,
+          "PGC26": 0.038,
+          "RBBCAN26": 0.0325,
+          "THCCBN26": 0.0358,
+          "THMTPBW26": 0.0352,
+          "THOC26": 0.034,
+          "TRAV26": 0.0342,
+          "USO26": 0.0358
+        },
+        "at_bid_net": {
+          "CHSC26": 0.0009,
+          "COPC26": 0.0007,
+          "GESO26": -0.0007,
+          "ISC26": 0.0023,
+          "JODC26": 0.0027,
+          "PGC26": -0.0028,
+          "RBBCAN26": -0.007,
+          "THCCBN26": -0.0045,
+          "THMTPBW26": -0.0058,
+          "THOC26": -0.0077,
+          "TRAV26": -0.0036,
+          "USO26": -0.0052
+        }
+      }
+    },
+    "pga_top40": {
+      "label": "PGA top-40",
+      "anchor_h": 48.0,
+      "replication": {
+        "got": {
+          "n": 190,
+          "tournaments": 3,
+          "mean": 0.0148,
+          "ci_lo": -0.0279,
+          "ci_hi": 0.0784,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "PGC26": 0.0784,
+            "THOC26": -0.0279,
+            "USO26": 0.0249
+          }
+        },
+        "published": [
+          190,
+          3,
+          0.29,
+          0.305,
+          0.015
+        ],
+        "pass": true
+      },
+      "decomposition": {
+        "n_two_sided": 103,
+        "n_total": 190,
+        "mean_anchor": 0.2657,
+        "mean_bid": 0.2205,
+        "mean_ask": 0.2808,
+        "mean_spread": 0.0603,
+        "mean_realized": 0.2621,
+        "mean_taker_fee_at_bid": 0.0108,
+        "fade_gross_all": {
+          "n": 190,
+          "tournaments": 3,
+          "mean": -0.0148,
+          "ci_lo": -0.0784,
+          "ci_hi": 0.0279,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "PGC26": -0.0784,
+            "THOC26": 0.0279,
+            "USO26": -0.0249
+          }
+        },
+        "fade_at_bid_nofee": {
+          "n": 103,
+          "tournaments": 3,
+          "mean": -0.0417,
+          "ci_lo": -0.1145,
+          "ci_hi": 0.0108,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "PGC26": -0.1145,
+            "THOC26": -0.0385,
+            "USO26": 0.0108
+          }
+        },
+        "fade_at_bid_net": {
+          "n": 103,
+          "tournaments": 3,
+          "mean": -0.0524,
+          "ci_lo": -0.1267,
+          "ci_hi": -0.0001,
+          "tourn_positive": 0,
+          "per_tournament": {
+            "PGC26": -0.1267,
+            "THOC26": -0.0446,
+            "USO26": -0.0001
+          }
+        },
+        "fade_at_ask_makerfee0": {
+          "n": 103,
+          "tournaments": 3,
+          "mean": 0.0186,
+          "ci_lo": -0.0771,
+          "ci_hi": 0.0821,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "PGC26": -0.0771,
+            "THOC26": 0.0446,
+            "USO26": 0.0821
+          }
+        }
+      },
+      "anchor_composition": {
+        "from_trade": {
+          "n": 151,
+          "tournaments": 3,
+          "mean": -0.0419,
+          "ci_lo": -0.1148,
+          "ci_hi": 0.0324,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "PGC26": -0.1148,
+            "THOC26": 0.0324,
+            "USO26": -0.1006
+          }
+        },
+        "from_two_sided_mid": {
+          "n": 39,
+          "tournaments": 3,
+          "mean": 0.0901,
+          "ci_lo": -0.0171,
+          "ci_hi": 0.1396,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "PGC26": 0.0472,
+            "THOC26": -0.0171,
+            "USO26": 0.1396
+          }
+        }
+      },
+      "anchor_vs_mid": {
+        "n": 64,
+        "mean_anchor": 0.2945,
+        "mean_mid": 0.2703,
+        "anchor_minus_mid": 0.0242,
+        "pct_anchor_at_ask": 17.2,
+        "pct_anchor_at_or_below_bid": 18.8
+      },
+      "fade_at_mid": {
+        "n": 103,
+        "tournaments": 3,
+        "mean": -0.0115,
+        "ci_lo": -0.0958,
+        "ci_hi": 0.0464,
+        "tourn_positive": 2,
+        "per_tournament": {
+          "PGC26": -0.0958,
+          "THOC26": 0.0031,
+          "USO26": 0.0464
+        }
+      },
+      "mechanical_term": {
+        "nominal_N": 40.0,
+        "events": 4,
+        "mean_yes_settlements": 42.75,
+        "yes_over_n": 1.0688,
+        "excess_share_of_yes": 0.0643,
+        "realized": 0.3053,
+        "counterfactual_no_tie_realized": 0.2856,
+        "fade_headwind_per_contract": -0.0196
+      },
+      "by_horizon": {
+        "H72": {
+          "gross": {
+            "n": 167,
+            "tournaments": 3,
+            "mean": -0.1268,
+            "ci_lo": -0.2665,
+            "ci_hi": -0.0694,
+            "tourn_positive": 0,
+            "per_tournament": {
+              "PGC26": -0.0694,
+              "THOC26": -0.0765,
+              "USO26": -0.2665
+            }
+          },
+          "at_bid_net": {
+            "n": 95,
+            "tournaments": 3,
+            "mean": -0.2179,
+            "ci_lo": -0.3373,
+            "ci_hi": -0.113,
+            "tourn_positive": 0,
+            "per_tournament": {
+              "PGC26": -0.113,
+              "THOC26": -0.1192,
+              "USO26": -0.3373
+            }
+          }
+        },
+        "H48": {
+          "gross": {
+            "n": 190,
+            "tournaments": 3,
+            "mean": -0.0148,
+            "ci_lo": -0.0784,
+            "ci_hi": 0.0279,
+            "tourn_positive": 1,
+            "per_tournament": {
+              "PGC26": -0.0784,
+              "THOC26": 0.0279,
+              "USO26": -0.0249
+            }
+          },
+          "at_bid_net": {
+            "n": 103,
+            "tournaments": 3,
+            "mean": -0.0524,
+            "ci_lo": -0.1267,
+            "ci_hi": -0.0001,
+            "tourn_positive": 0,
+            "per_tournament": {
+              "PGC26": -0.1267,
+              "THOC26": -0.0446,
+              "USO26": -0.0001
+            }
+          }
+        },
+        "H24": {
+          "gross": {
+            "n": 168,
+            "tournaments": 3,
+            "mean": 0.0918,
+            "ci_lo": -0.0117,
+            "ci_hi": 0.1259,
+            "tourn_positive": 2,
+            "per_tournament": {
+              "PGC26": -0.0117,
+              "THOC26": 0.1094,
+              "USO26": 0.1259
+            }
+          },
+          "at_bid_net": {
+            "n": 122,
+            "tournaments": 3,
+            "mean": 0.0031,
+            "ci_lo": -0.0686,
+            "ci_hi": 0.1141,
+            "tourn_positive": 1,
+            "per_tournament": {
+              "PGC26": -0.0686,
+              "THOC26": -0.0608,
+              "USO26": 0.1141
+            }
+          }
+        },
+        "H12": {
+          "gross": {
+            "n": 157,
+            "tournaments": 3,
+            "mean": 0.1045,
+            "ci_lo": -0.057,
+            "ci_hi": 0.1976,
+            "tourn_positive": 2,
+            "per_tournament": {
+              "PGC26": -0.057,
+              "THOC26": 0.0884,
+              "USO26": 0.1976
+            }
+          },
+          "at_bid_net": {
+            "n": 74,
+            "tournaments": 3,
+            "mean": -0.027,
+            "ci_lo": -0.1386,
+            "ci_hi": 0.1185,
+            "tourn_positive": 1,
+            "per_tournament": {
+              "PGC26": -0.1386,
+              "THOC26": -0.0368,
+              "USO26": 0.1185
+            }
+          }
+        }
+      },
+      "by_price_band": {
+        "0.08-0.15": {
+          "n": 30,
+          "tournaments": 3,
+          "mean": 0.1192,
+          "ci_lo": 0.1146,
+          "ci_hi": 0.1317,
+          "tourn_positive": 3,
+          "per_tournament": {
+            "PGC26": 0.1317,
+            "THOC26": 0.1146,
+            "USO26": 0.1177
+          }
+        },
+        "0.15-0.25": {
+          "n": 40,
+          "tournaments": 3,
+          "mean": 0.027,
+          "ci_lo": -0.0275,
+          "ci_hi": 0.1182,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "PGC26": 0.055,
+            "THOC26": 0.1182,
+            "USO26": -0.0275
+          }
+        },
+        "0.25-0.35": {
+          "n": 69,
+          "tournaments": 3,
+          "mean": 0.0238,
+          "ci_lo": -0.1781,
+          "ci_hi": 0.1212,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "PGC26": -0.1781,
+            "THOC26": 0.1212,
+            "USO26": -0.0017
+          }
+        },
+        "0.35-0.45": {
+          "n": 66,
+          "tournaments": 3,
+          "mean": -0.0827,
+          "ci_lo": -0.0997,
+          "ci_hi": -0.0509,
+          "tourn_positive": 0,
+          "per_tournament": {
+            "PGC26": -0.0997,
+            "THOC26": -0.0979,
+            "USO26": -0.0509
+          }
+        }
+      },
+      "anchor_staleness": {
+        "median_lag_h": 68.51,
+        "median_staleness_h": 20.51,
+        "pct_stale_gt_2h": 100.0,
+        "pct_stale_gt_12h": 99.5
+      },
+      "anchor_vs_round_ends": {
+        "covered": 150,
+        "pct_after_R1": 12.0,
+        "pct_after_R2": 0.0,
+        "pct_after_R3": 0.0
+      },
+      "scalar_sensitivity": {
+        "n_scalar_in_band": 0,
+        "fade_excl": -0.0148,
+        "fade_incl_at_refund": -0.0148
+      },
+      "leave_one_out": {
+        "gross": {
+          "PGC26": 0.0022,
+          "THOC26": -0.0438,
+          "USO26": -0.0084
+        },
+        "at_bid_net": {
+          "PGC26": -0.009,
+          "THOC26": -0.0536,
+          "USO26": -0.1058
+        }
+      }
+    },
+    "r1top5": {
+      "label": "R1 top-5",
+      "anchor_h": 12.0,
+      "replication": {
+        "got": {
+          "n": 224,
+          "tournaments": 10,
+          "mean": -0.0479,
+          "ci_lo": -0.0763,
+          "ci_hi": -0.0178,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": -0.1133,
+            "GESO26": -0.0476,
+            "ISC26": 0.0469,
+            "JODC26": -0.1118,
+            "RBBCAN26": -0.0113,
+            "THCCBN26": 0.0254,
+            "THMTPBW26": -0.1037,
+            "THOC26": -0.0269,
+            "TRAV26": -0.0595,
+            "USO26": -0.0524
+          }
+        },
+        "published": [
+          224,
+          10,
+          0.133,
+          0.085,
+          -0.048
+        ],
+        "pass": true
+      },
+      "decomposition": {
+        "n_two_sided": 31,
+        "n_total": 224,
+        "mean_anchor": 0.1334,
+        "mean_bid": 0.0829,
+        "mean_ask": 0.15,
+        "mean_spread": 0.0671,
+        "mean_realized": 0.0968,
+        "mean_taker_fee_at_bid": 0.005,
+        "fade_gross_all": {
+          "n": 224,
+          "tournaments": 10,
+          "mean": 0.0479,
+          "ci_lo": 0.0178,
+          "ci_hi": 0.0763,
+          "tourn_positive": 8,
+          "per_tournament": {
+            "CHSC26": 0.1133,
+            "GESO26": 0.0476,
+            "ISC26": -0.0469,
+            "JODC26": 0.1118,
+            "RBBCAN26": 0.0113,
+            "THCCBN26": -0.0254,
+            "THMTPBW26": 0.1037,
+            "THOC26": 0.0269,
+            "TRAV26": 0.0595,
+            "USO26": 0.0524
+          }
+        },
+        "fade_at_bid_nofee": {
+          "n": 31,
+          "tournaments": 8,
+          "mean": -0.0139,
+          "ci_lo": -0.1439,
+          "ci_hi": 0.069,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": 0.03,
+            "GESO26": -0.092,
+            "ISC26": 0.075,
+            "JODC26": 0.14,
+            "RBBCAN26": -0.3033,
+            "THMTPBW26": 0.15,
+            "THOC26": 0.0718,
+            "TRAV26": -0.355
+          }
+        },
+        "fade_at_bid_net": {
+          "n": 31,
+          "tournaments": 8,
+          "mean": -0.0188,
+          "ci_lo": -0.1485,
+          "ci_hi": 0.0635,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": 0.028,
+            "GESO26": -0.0987,
+            "ISC26": 0.0702,
+            "JODC26": 0.1316,
+            "RBBCAN26": -0.3053,
+            "THMTPBW26": 0.1423,
+            "THOC26": 0.0672,
+            "TRAV26": -0.3626
+          }
+        },
+        "fade_at_ask_makerfee0": {
+          "n": 31,
+          "tournaments": 8,
+          "mean": 0.0532,
+          "ci_lo": -0.0765,
+          "ci_hi": 0.1345,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": 0.1225,
+            "GESO26": -0.04,
+            "ISC26": 0.135,
+            "JODC26": 0.15,
+            "RBBCAN26": -0.2133,
+            "THMTPBW26": 0.1933,
+            "THOC26": 0.1427,
+            "TRAV26": -0.285
+          }
+        }
+      },
+      "anchor_composition": {
+        "from_trade": {
+          "n": 207,
+          "tournaments": 10,
+          "mean": 0.0565,
+          "ci_lo": 0.0219,
+          "ci_hi": 0.0917,
+          "tourn_positive": 8,
+          "per_tournament": {
+            "CHSC26": 0.1185,
+            "GESO26": 0.0831,
+            "ISC26": -0.0745,
+            "JODC26": 0.1118,
+            "RBBCAN26": 0.1386,
+            "THCCBN26": -0.0254,
+            "THMTPBW26": 0.1029,
+            "THOC26": 0.0157,
+            "TRAV26": 0.1022,
+            "USO26": 0.0524
+          }
+        },
+        "from_two_sided_mid": {
+          "n": 17,
+          "tournaments": 7,
+          "mean": -0.0568,
+          "ci_lo": -0.2979,
+          "ci_hi": 0.0613,
+          "tourn_positive": 4,
+          "per_tournament": {
+            "CHSC26": 0.08,
+            "GESO26": -0.066,
+            "ISC26": 0.105,
+            "RBBCAN26": -0.88,
+            "THMTPBW26": 0.115,
+            "THOC26": 0.094,
+            "TRAV26": -0.71
+          }
+        }
+      },
+      "anchor_vs_mid": {
+        "n": 14,
+        "mean_anchor": 0.15,
+        "mean_mid": 0.1125,
+        "anchor_minus_mid": 0.0375,
+        "pct_anchor_at_ask": 50.0,
+        "pct_anchor_at_or_below_bid": 0.0
+      },
+      "fade_at_mid": {
+        "n": 31,
+        "tournaments": 8,
+        "mean": 0.0197,
+        "ci_lo": -0.11,
+        "ci_hi": 0.1011,
+        "tourn_positive": 5,
+        "per_tournament": {
+          "CHSC26": 0.0763,
+          "GESO26": -0.066,
+          "ISC26": 0.105,
+          "JODC26": 0.145,
+          "RBBCAN26": -0.2583,
+          "THMTPBW26": 0.1717,
+          "THOC26": 0.1073,
+          "TRAV26": -0.32
+        }
+      },
+      "mechanical_term": {
+        "nominal_N": 5.0,
+        "events": 11,
+        "mean_yes_settlements": 7.18,
+        "yes_over_n": 1.4364,
+        "excess_share_of_yes": 0.3038,
+        "realized": 0.0848,
+        "counterfactual_no_tie_realized": 0.0591,
+        "fade_headwind_per_contract": -0.0258
+      },
+      "by_horizon": {
+        "H24": {
+          "gross": {
+            "n": 163,
+            "tournaments": 10,
+            "mean": 0.0305,
+            "ci_lo": -0.008,
+            "ci_hi": 0.0659,
+            "tourn_positive": 6,
+            "per_tournament": {
+              "CHSC26": 0.1133,
+              "GESO26": 0.05,
+              "ISC26": -0.0417,
+              "JODC26": 0.124,
+              "RBBCAN26": -0.095,
+              "THCCBN26": -0.0356,
+              "THMTPBW26": 0.1044,
+              "THOC26": -0.0207,
+              "TRAV26": 0.0135,
+              "USO26": 0.0419
+            }
+          },
+          "at_bid_net": {
+            "n": 40,
+            "tournaments": 8,
+            "mean": 0.0194,
+            "ci_lo": -0.0364,
+            "ci_hi": 0.0988,
+            "tourn_positive": 7,
+            "per_tournament": {
+              "CHSC26": 0.042,
+              "GESO26": 0.0011,
+              "ISC26": 0.028,
+              "THCCBN26": 0.3439,
+              "THMTPBW26": 0.0891,
+              "THOC26": -0.0738,
+              "TRAV26": 0.0891,
+              "USO26": 0.0937
+            }
+          }
+        },
+        "H12": {
+          "gross": {
+            "n": 224,
+            "tournaments": 10,
+            "mean": 0.0479,
+            "ci_lo": 0.0178,
+            "ci_hi": 0.0763,
+            "tourn_positive": 8,
+            "per_tournament": {
+              "CHSC26": 0.1133,
+              "GESO26": 0.0476,
+              "ISC26": -0.0469,
+              "JODC26": 0.1118,
+              "RBBCAN26": 0.0113,
+              "THCCBN26": -0.0254,
+              "THMTPBW26": 0.1037,
+              "THOC26": 0.0269,
+              "TRAV26": 0.0595,
+              "USO26": 0.0524
+            }
+          },
+          "at_bid_net": {
+            "n": 31,
+            "tournaments": 8,
+            "mean": -0.0188,
+            "ci_lo": -0.1485,
+            "ci_hi": 0.0635,
+            "tourn_positive": 5,
+            "per_tournament": {
+              "CHSC26": 0.028,
+              "GESO26": -0.0987,
+              "ISC26": 0.0702,
+              "JODC26": 0.1316,
+              "RBBCAN26": -0.3053,
+              "THMTPBW26": 0.1423,
+              "THOC26": 0.0672,
+              "TRAV26": -0.3626
+            }
+          }
+        },
+        "H6": {
+          "gross": {
+            "n": 229,
+            "tournaments": 10,
+            "mean": 0.0563,
+            "ci_lo": 0.0109,
+            "ci_hi": 0.0925,
+            "tourn_positive": 7,
+            "per_tournament": {
+              "CHSC26": 0.1167,
+              "GESO26": 0.1048,
+              "ISC26": -0.0492,
+              "JODC26": 0.1276,
+              "RBBCAN26": -0.1892,
+              "THCCBN26": -0.0014,
+              "THMTPBW26": 0.1243,
+              "THOC26": 0.0559,
+              "TRAV26": 0.0729,
+              "USO26": 0.0486
+            }
+          },
+          "at_bid_net": {
+            "n": 16,
+            "tournaments": 6,
+            "mean": 0.0068,
+            "ci_lo": -0.0664,
+            "ci_hi": 0.072,
+            "tourn_positive": 5,
+            "per_tournament": {
+              "CHSC26": 0.028,
+              "GESO26": -0.1183,
+              "ISC26": 0.1177,
+              "RBBCAN26": 0.0093,
+              "THMTPBW26": 0.0093,
+              "THOC26": 0.0625
+            }
+          }
+        },
+        "H3": {
+          "gross": {
+            "n": 201,
+            "tournaments": 10,
+            "mean": 0.0848,
+            "ci_lo": 0.0257,
+            "ci_hi": 0.1339,
+            "tourn_positive": 9,
+            "per_tournament": {
+              "CHSC26": 0.107,
+              "GESO26": 0.1547,
+              "ISC26": 0.13,
+              "JODC26": 0.1583,
+              "RBBCAN26": -0.3022,
+              "THCCBN26": 0.0082,
+              "THMTPBW26": 0.1737,
+              "THOC26": 0.1108,
+              "TRAV26": 0.0825,
+              "USO26": 0.0486
+            }
+          },
+          "at_bid_net": {
+            "n": 3,
+            "tournaments": 3,
+            "mean": 0.0093,
+            "ci_lo": 0.0093,
+            "ci_hi": 0.0093,
+            "tourn_positive": 3,
+            "per_tournament": {
+              "RBBCAN26": 0.0093,
+              "THMTPBW26": 0.0093,
+              "THOC26": 0.0093
+            }
+          }
+        }
+      },
+      "by_price_band": {
+        "0.08-0.15": {
+          "n": 173,
+          "tournaments": 10,
+          "mean": 0.0412,
+          "ci_lo": 0.0058,
+          "ci_hi": 0.074,
+          "tourn_positive": 6,
+          "per_tournament": {
+            "CHSC26": 0.1031,
+            "GESO26": 0.1073,
+            "ISC26": -0.0469,
+            "JODC26": 0.1096,
+            "RBBCAN26": -0.0417,
+            "THCCBN26": -0.0106,
+            "THMTPBW26": -0.0121,
+            "THOC26": 0.0052,
+            "TRAV26": 0.0558,
+            "USO26": 0.0475
+          }
+        },
+        "0.15-0.25": {
+          "n": 60,
+          "tournaments": 9,
+          "mean": 0.0985,
+          "ci_lo": 0.0312,
+          "ci_hi": 0.1728,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.18,
+            "GESO26": -0.055,
+            "JODC26": 0.1567,
+            "RBBCAN26": 0.16,
+            "THCCBN26": -0.1014,
+            "THMTPBW26": 0.1812,
+            "THOC26": 0.186,
+            "TRAV26": 0.177,
+            "USO26": 0.0718
+          }
+        },
+        "0.25-0.35": {
+          "n": 6,
+          "tournaments": 4,
+          "mean": -0.3733,
+          "ci_lo": -0.73,
+          "ci_hi": 0.0775,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "GESO26": -0.195,
+            "THMTPBW26": 0.34,
+            "TRAV26": -0.71,
+            "USO26": -0.74
+          }
+        },
+        "0.35-0.45": {
+          "n": 1,
+          "tournaments": 1,
+          "mean": 0.43,
+          "ci_lo": null,
+          "ci_hi": null,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "THCCBN26": 0.43
+          }
+        }
+      },
+      "anchor_staleness": {
+        "median_lag_h": 19.01,
+        "median_staleness_h": 7.01,
+        "pct_stale_gt_2h": 77.7,
+        "pct_stale_gt_12h": 21.9
+      },
+      "anchor_vs_round_ends": {
+        "covered": 224,
+        "pct_after_R1": 0.0,
+        "pct_after_R2": 0.0,
+        "pct_after_R3": 0.0
+      },
+      "scalar_sensitivity": {
+        "n_scalar_in_band": 0,
+        "fade_excl": 0.0479,
+        "fade_incl_at_refund": 0.0479
+      },
+      "leave_one_out": {
+        "gross": {
+          "CHSC26": 0.0432,
+          "GESO26": 0.048,
+          "ISC26": 0.0538,
+          "JODC26": 0.0388,
+          "RBBCAN26": 0.0493,
+          "THCCBN26": 0.0567,
+          "THMTPBW26": 0.0439,
+          "THOC26": 0.0518,
+          "TRAV26": 0.0469,
+          "USO26": 0.0468
+        },
+        "at_bid_net": {
+          "CHSC26": -0.0258,
+          "GESO26": -0.0035,
+          "ISC26": -0.025,
+          "JODC26": -0.0239,
+          "RBBCAN26": 0.0119,
+          "THMTPBW26": -0.0361,
+          "THOC26": -0.0662,
+          "TRAV26": 0.0049
+        }
+      }
+    },
+    "r1top10": {
+      "label": "R1 top-10",
+      "anchor_h": 12.0,
+      "replication": {
+        "got": {
+          "n": 375,
+          "tournaments": 10,
+          "mean": -0.0663,
+          "ci_lo": -0.1066,
+          "ci_hi": -0.0289,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": 0.003,
+            "GESO26": -0.0875,
+            "ISC26": 0.062,
+            "JODC26": -0.0041,
+            "RBBCAN26": -0.0442,
+            "THCCBN26": -0.115,
+            "THMTPBW26": -0.0753,
+            "THOC26": -0.0688,
+            "TRAV26": -0.0775,
+            "USO26": -0.1865
+          }
+        },
+        "published": [
+          375,
+          10,
+          0.205,
+          0.139,
+          -0.066
+        ],
+        "pass": true
+      },
+      "decomposition": {
+        "n_two_sided": 39,
+        "n_total": 375,
+        "mean_anchor": 0.1777,
+        "mean_bid": 0.1428,
+        "mean_ask": 0.1949,
+        "mean_spread": 0.0521,
+        "mean_realized": 0.1026,
+        "mean_taker_fee_at_bid": 0.0082,
+        "fade_gross_all": {
+          "n": 375,
+          "tournaments": 10,
+          "mean": 0.0663,
+          "ci_lo": 0.029,
+          "ci_hi": 0.1066,
+          "tourn_positive": 8,
+          "per_tournament": {
+            "CHSC26": -0.003,
+            "GESO26": 0.0875,
+            "ISC26": -0.062,
+            "JODC26": 0.0041,
+            "RBBCAN26": 0.0442,
+            "THCCBN26": 0.115,
+            "THMTPBW26": 0.0753,
+            "THOC26": 0.0688,
+            "TRAV26": 0.0775,
+            "USO26": 0.1865
+          }
+        },
+        "fade_at_bid_nofee": {
+          "n": 39,
+          "tournaments": 6,
+          "mean": 0.0403,
+          "ci_lo": 0.0,
+          "ci_hi": 0.1082,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": -0.046,
+            "GESO26": 0.0225,
+            "JODC26": 0.21,
+            "RBBCAN26": 0.02,
+            "THCCBN26": 0.235,
+            "THOC26": 0.0429
+          }
+        },
+        "fade_at_bid_net": {
+          "n": 39,
+          "tournaments": 6,
+          "mean": 0.0321,
+          "ci_lo": -0.0082,
+          "ci_hi": 0.0989,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": -0.0543,
+            "GESO26": 0.0139,
+            "JODC26": 0.1984,
+            "RBBCAN26": 0.0186,
+            "THCCBN26": 0.2225,
+            "THOC26": 0.0348
+          }
+        },
+        "fade_at_ask_makerfee0": {
+          "n": 39,
+          "tournaments": 6,
+          "mean": 0.0923,
+          "ci_lo": 0.0659,
+          "ci_hi": 0.1639,
+          "tourn_positive": 6,
+          "per_tournament": {
+            "CHSC26": 0.028,
+            "GESO26": 0.0737,
+            "JODC26": 0.28,
+            "RBBCAN26": 0.12,
+            "THCCBN26": 0.265,
+            "THOC26": 0.0867
+          }
+        }
+      },
+      "anchor_composition": {
+        "from_trade": {
+          "n": 350,
+          "tournaments": 10,
+          "mean": 0.0711,
+          "ci_lo": 0.0325,
+          "ci_hi": 0.1112,
+          "tourn_positive": 8,
+          "per_tournament": {
+            "CHSC26": 0.0149,
+            "GESO26": 0.0981,
+            "ISC26": -0.062,
+            "JODC26": -0.0017,
+            "RBBCAN26": 0.0442,
+            "THCCBN26": 0.115,
+            "THMTPBW26": 0.0753,
+            "THOC26": 0.0831,
+            "TRAV26": 0.0775,
+            "USO26": 0.1865
+          }
+        },
+        "from_two_sided_mid": {
+          "n": 25,
+          "tournaments": 4,
+          "mean": -0.0004,
+          "ci_lo": -0.1767,
+          "ci_hi": 0.0581,
+          "tourn_positive": 3,
+          "per_tournament": {
+            "CHSC26": -0.3875,
+            "GESO26": 0.0314,
+            "JODC26": 0.245,
+            "THOC26": 0.02
+          }
+        }
+      },
+      "anchor_vs_mid": {
+        "n": 14,
+        "mean_anchor": 0.21,
+        "mean_mid": 0.1854,
+        "anchor_minus_mid": 0.0246,
+        "pct_anchor_at_ask": 57.1,
+        "pct_anchor_at_or_below_bid": 7.1
+      },
+      "fade_at_mid": {
+        "n": 39,
+        "tournaments": 6,
+        "mean": 0.0663,
+        "ci_lo": 0.033,
+        "ci_hi": 0.1335,
+        "tourn_positive": 5,
+        "per_tournament": {
+          "CHSC26": -0.009,
+          "GESO26": 0.0481,
+          "JODC26": 0.245,
+          "RBBCAN26": 0.07,
+          "THCCBN26": 0.25,
+          "THOC26": 0.0648
+        }
+      },
+      "mechanical_term": {
+        "nominal_N": 10.0,
+        "events": 11,
+        "mean_yes_settlements": 14.64,
+        "yes_over_n": 1.4636,
+        "excess_share_of_yes": 0.3168,
+        "realized": 0.1387,
+        "counterfactual_no_tie_realized": 0.0947,
+        "fade_headwind_per_contract": -0.0439
+      },
+      "by_horizon": {
+        "H24": {
+          "gross": {
+            "n": 265,
+            "tournaments": 10,
+            "mean": 0.0581,
+            "ci_lo": -0.0076,
+            "ci_hi": 0.102,
+            "tourn_positive": 8,
+            "per_tournament": {
+              "CHSC26": -0.0794,
+              "GESO26": 0.0766,
+              "ISC26": -0.2975,
+              "JODC26": 0.1639,
+              "RBBCAN26": 0.2825,
+              "THCCBN26": 0.0375,
+              "THMTPBW26": 0.0256,
+              "THOC26": 0.0914,
+              "TRAV26": 0.1019,
+              "USO26": 0.1031
+            }
+          },
+          "at_bid_net": {
+            "n": 38,
+            "tournaments": 4,
+            "mean": 0.0338,
+            "ci_lo": 0.0052,
+            "ci_hi": 0.0986,
+            "tourn_positive": 3,
+            "per_tournament": {
+              "CHSC26": 0.0939,
+              "GESO26": -0.0244,
+              "THOC26": 0.0248,
+              "USO26": 0.1064
+            }
+          }
+        },
+        "H12": {
+          "gross": {
+            "n": 375,
+            "tournaments": 10,
+            "mean": 0.0663,
+            "ci_lo": 0.029,
+            "ci_hi": 0.1066,
+            "tourn_positive": 8,
+            "per_tournament": {
+              "CHSC26": -0.003,
+              "GESO26": 0.0875,
+              "ISC26": -0.062,
+              "JODC26": 0.0041,
+              "RBBCAN26": 0.0442,
+              "THCCBN26": 0.115,
+              "THMTPBW26": 0.0753,
+              "THOC26": 0.0688,
+              "TRAV26": 0.0775,
+              "USO26": 0.1865
+            }
+          },
+          "at_bid_net": {
+            "n": 39,
+            "tournaments": 6,
+            "mean": 0.0321,
+            "ci_lo": -0.0082,
+            "ci_hi": 0.0989,
+            "tourn_positive": 5,
+            "per_tournament": {
+              "CHSC26": -0.0543,
+              "GESO26": 0.0139,
+              "JODC26": 0.1984,
+              "RBBCAN26": 0.0186,
+              "THCCBN26": 0.2225,
+              "THOC26": 0.0348
+            }
+          }
+        },
+        "H6": {
+          "gross": {
+            "n": 345,
+            "tournaments": 10,
+            "mean": 0.1137,
+            "ci_lo": 0.0726,
+            "ci_hi": 0.1482,
+            "tourn_positive": 9,
+            "per_tournament": {
+              "CHSC26": 0.06,
+              "GESO26": 0.1097,
+              "ISC26": -0.0786,
+              "JODC26": 0.0316,
+              "RBBCAN26": 0.0819,
+              "THCCBN26": 0.2067,
+              "THMTPBW26": 0.131,
+              "THOC26": 0.1389,
+              "TRAV26": 0.121,
+              "USO26": 0.2035
+            }
+          },
+          "at_bid_net": {
+            "n": 15,
+            "tournaments": 5,
+            "mean": 0.119,
+            "ci_lo": 0.0293,
+            "ci_hi": 0.1463,
+            "tourn_positive": 5,
+            "per_tournament": {
+              "CHSC26": 0.028,
+              "GESO26": 0.1476,
+              "JODC26": 0.0748,
+              "RBBCAN26": 0.0186,
+              "THOC26": 0.1503
+            }
+          }
+        },
+        "H3": {
+          "gross": {
+            "n": 311,
+            "tournaments": 10,
+            "mean": 0.1222,
+            "ci_lo": 0.0771,
+            "ci_hi": 0.1576,
+            "tourn_positive": 9,
+            "per_tournament": {
+              "CHSC26": 0.0754,
+              "GESO26": 0.1132,
+              "ISC26": -0.01,
+              "JODC26": 0.0215,
+              "RBBCAN26": 0.0365,
+              "THCCBN26": 0.1421,
+              "THMTPBW26": 0.195,
+              "THOC26": 0.1549,
+              "TRAV26": 0.1236,
+              "USO26": 0.2025
+            }
+          },
+          "at_bid_net": {
+            "n": 9,
+            "tournaments": 4,
+            "mean": 0.0167,
+            "ci_lo": -0.3722,
+            "ci_hi": 0.1347,
+            "tourn_positive": 3,
+            "per_tournament": {
+              "GESO26": 0.1476,
+              "JODC26": -0.7631,
+              "RBBCAN26": 0.0186,
+              "THOC26": 0.113
+            }
+          }
+        }
+      },
+      "by_price_band": {
+        "0.08-0.15": {
+          "n": 105,
+          "tournaments": 8,
+          "mean": 0.0277,
+          "ci_lo": -0.09,
+          "ci_hi": 0.0858,
+          "tourn_positive": 6,
+          "per_tournament": {
+            "CHSC26": 0.0335,
+            "GESO26": 0.077,
+            "ISC26": -0.54,
+            "JODC26": -0.2327,
+            "RBBCAN26": 0.13,
+            "THMTPBW26": 0.1475,
+            "THOC26": 0.0647,
+            "USO26": 0.1164
+          }
+        },
+        "0.15-0.25": {
+          "n": 206,
+          "tournaments": 10,
+          "mean": 0.0585,
+          "ci_lo": 0.0015,
+          "ci_hi": 0.1175,
+          "tourn_positive": 8,
+          "per_tournament": {
+            "CHSC26": -0.071,
+            "GESO26": 0.089,
+            "ISC26": 0.0164,
+            "JODC26": 0.0888,
+            "RBBCAN26": 0.005,
+            "THCCBN26": 0.2344,
+            "THMTPBW26": 0.0044,
+            "THOC26": 0.0726,
+            "TRAV26": -0.0011,
+            "USO26": 0.1921
+          }
+        },
+        "0.25-0.35": {
+          "n": 82,
+          "tournaments": 10,
+          "mean": 0.1662,
+          "ci_lo": 0.1196,
+          "ci_hi": 0.2218,
+          "tourn_positive": 10,
+          "per_tournament": {
+            "CHSC26": 0.2786,
+            "GESO26": 0.2833,
+            "ISC26": 0.27,
+            "JODC26": 0.1371,
+            "RBBCAN26": 0.1117,
+            "THCCBN26": 0.0671,
+            "THMTPBW26": 0.1431,
+            "THOC26": 0.13,
+            "TRAV26": 0.1724,
+            "USO26": 0.3025
+          }
+        },
+        "0.35-0.45": {
+          "n": 20,
+          "tournaments": 7,
+          "mean": 0.094,
+          "ci_lo": 0.0078,
+          "ci_hi": 0.2453,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": 0.38,
+            "GESO26": 0.0867,
+            "ISC26": 0.39,
+            "THMTPBW26": 0.35,
+            "THOC26": -0.105,
+            "TRAV26": -0.0271,
+            "USO26": 0.18
+          }
+        }
+      },
+      "anchor_staleness": {
+        "median_lag_h": 18.67,
+        "median_staleness_h": 6.67,
+        "pct_stale_gt_2h": 82.4,
+        "pct_stale_gt_12h": 18.9
+      },
+      "anchor_vs_round_ends": {
+        "covered": 375,
+        "pct_after_R1": 0.0,
+        "pct_after_R2": 0.0,
+        "pct_after_R3": 0.0
+      },
+      "scalar_sensitivity": {
+        "n_scalar_in_band": 1,
+        "fade_excl": 0.0663,
+        "fade_incl_at_refund": 0.0664
+      },
+      "leave_one_out": {
+        "gross": {
+          "CHSC26": 0.0758,
+          "GESO26": 0.0635,
+          "ISC26": 0.0717,
+          "JODC26": 0.0744,
+          "RBBCAN26": 0.068,
+          "THCCBN26": 0.0636,
+          "THMTPBW26": 0.0653,
+          "THOC26": 0.0658,
+          "TRAV26": 0.0653,
+          "USO26": 0.0495
+        },
+        "at_bid_net": {
+          "CHSC26": 0.0448,
+          "GESO26": 0.0368,
+          "JODC26": 0.0277,
+          "RBBCAN26": 0.0328,
+          "THCCBN26": 0.0218,
+          "THOC26": 0.0289
+        }
+      }
+    },
+    "r2top10": {
+      "label": "R2 top-10",
+      "anchor_h": 12.0,
+      "replication": {
+        "got": {
+          "n": 125,
+          "tournaments": 9,
+          "mean": -0.0234,
+          "ci_lo": -0.0876,
+          "ci_hi": 0.0466,
+          "tourn_positive": 4,
+          "per_tournament": {
+            "CHSC26": 0.0492,
+            "GESO26": -0.1521,
+            "JODC26": -0.1391,
+            "RBBCAN26": 0.095,
+            "THCCBN26": 0.152,
+            "THMTPBW26": -0.1229,
+            "THOC26": -0.0286,
+            "TRAV26": -0.0167,
+            "USO26": 0.0096
+          }
+        },
+        "published": [
+          125,
+          9,
+          0.255,
+          0.232,
+          -0.023
+        ],
+        "pass": true
+      },
+      "decomposition": {
+        "n_two_sided": 5,
+        "n_total": 125,
+        "mean_anchor": 0.16,
+        "mean_bid": 0.11,
+        "mean_ask": 0.184,
+        "mean_spread": 0.074,
+        "mean_realized": 0.2,
+        "mean_taker_fee_at_bid": 0.0066,
+        "fade_gross_all": {
+          "n": 125,
+          "tournaments": 9,
+          "mean": 0.0234,
+          "ci_lo": -0.0464,
+          "ci_hi": 0.0878,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": -0.0492,
+            "GESO26": 0.1521,
+            "JODC26": 0.1391,
+            "RBBCAN26": -0.095,
+            "THCCBN26": -0.152,
+            "THMTPBW26": 0.1229,
+            "THOC26": 0.0286,
+            "TRAV26": 0.0167,
+            "USO26": -0.0096
+          }
+        },
+        "fade_at_bid_nofee": {
+          "n": 5,
+          "tournaments": 4,
+          "mean": -0.09,
+          "ci_lo": -0.3129,
+          "ci_hi": 0.16,
+          "tourn_positive": 3,
+          "per_tournament": {
+            "GESO26": 0.06,
+            "THCCBN26": -0.375,
+            "THOC26": 0.04,
+            "USO26": 0.2
+          }
+        },
+        "fade_at_bid_net": {
+          "n": 5,
+          "tournaments": 4,
+          "mean": -0.0966,
+          "ci_lo": -0.3199,
+          "ci_hi": 0.1509,
+          "tourn_positive": 3,
+          "per_tournament": {
+            "GESO26": 0.0561,
+            "THCCBN26": -0.3826,
+            "THOC26": 0.0373,
+            "USO26": 0.1888
+          }
+        },
+        "fade_at_ask_makerfee0": {
+          "n": 5,
+          "tournaments": 4,
+          "mean": -0.016,
+          "ci_lo": -0.2457,
+          "ci_hi": 0.245,
+          "tourn_positive": 3,
+          "per_tournament": {
+            "GESO26": 0.11,
+            "THCCBN26": -0.31,
+            "THOC26": 0.14,
+            "USO26": 0.29
+          }
+        }
+      },
+      "anchor_composition": {
+        "from_trade": {
+          "n": 122,
+          "tournaments": 9,
+          "mean": 0.0205,
+          "ci_lo": -0.0501,
+          "ci_hi": 0.087,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": -0.0492,
+            "GESO26": 0.1582,
+            "JODC26": 0.1391,
+            "RBBCAN26": -0.095,
+            "THCCBN26": -0.152,
+            "THMTPBW26": 0.1229,
+            "THOC26": 0.0268,
+            "TRAV26": 0.0167,
+            "USO26": -0.0292
+          }
+        },
+        "from_two_sided_mid": {
+          "n": 3,
+          "tournaments": 3,
+          "mean": 0.14,
+          "ci_lo": 0.085,
+          "ci_hi": 0.245,
+          "tourn_positive": 3,
+          "per_tournament": {
+            "GESO26": 0.085,
+            "THOC26": 0.09,
+            "USO26": 0.245
+          }
+        }
+      },
+      "mechanical_term": {
+        "nominal_N": 10.0,
+        "events": 11,
+        "mean_yes_settlements": 12.27,
+        "yes_over_n": 1.2273,
+        "excess_share_of_yes": 0.1852,
+        "realized": 0.232,
+        "counterfactual_no_tie_realized": 0.189,
+        "fade_headwind_per_contract": -0.043
+      },
+      "by_horizon": {
+        "H24": {
+          "gross": {
+            "n": 36,
+            "tournaments": 7,
+            "mean": -0.1708,
+            "ci_lo": -0.4118,
+            "ci_hi": -0.0621,
+            "tourn_positive": 1,
+            "per_tournament": {
+              "CHSC26": -0.23,
+              "RBBCAN26": -0.685,
+              "THCCBN26": -0.458,
+              "THMTPBW26": -0.36,
+              "THOC26": -0.0,
+              "TRAV26": 0.0167,
+              "USO26": -0.1046
+            }
+          },
+          "at_bid_net": {
+            "n": 2,
+            "tournaments": 1,
+            "mean": 0.0093,
+            "ci_lo": null,
+            "ci_hi": null,
+            "tourn_positive": 1,
+            "per_tournament": {
+              "USO26": 0.0093
+            }
+          }
+        },
+        "H12": {
+          "gross": {
+            "n": 125,
+            "tournaments": 9,
+            "mean": 0.0234,
+            "ci_lo": -0.0464,
+            "ci_hi": 0.0878,
+            "tourn_positive": 5,
+            "per_tournament": {
+              "CHSC26": -0.0492,
+              "GESO26": 0.1521,
+              "JODC26": 0.1391,
+              "RBBCAN26": -0.095,
+              "THCCBN26": -0.152,
+              "THMTPBW26": 0.1229,
+              "THOC26": 0.0286,
+              "TRAV26": 0.0167,
+              "USO26": -0.0096
+            }
+          },
+          "at_bid_net": {
+            "n": 5,
+            "tournaments": 4,
+            "mean": -0.0966,
+            "ci_lo": -0.3199,
+            "ci_hi": 0.1509,
+            "tourn_positive": 3,
+            "per_tournament": {
+              "GESO26": 0.0561,
+              "THCCBN26": -0.3826,
+              "THOC26": 0.0373,
+              "USO26": 0.1888
+            }
+          }
+        },
+        "H6": {
+          "gross": {
+            "n": 133,
+            "tournaments": 9,
+            "mean": 0.0964,
+            "ci_lo": 0.0668,
+            "ci_hi": 0.1299,
+            "tourn_positive": 8,
+            "per_tournament": {
+              "CHSC26": 0.1782,
+              "GESO26": 0.113,
+              "JODC26": 0.0955,
+              "RBBCAN26": -0.0783,
+              "THCCBN26": 0.144,
+              "THMTPBW26": 0.085,
+              "THOC26": 0.0683,
+              "TRAV26": 0.1517,
+              "USO26": 0.0789
+            }
+          },
+          "at_bid_net": {
+            "n": 5,
+            "tournaments": 3,
+            "mean": -0.0161,
+            "ci_lo": -0.0956,
+            "ci_hi": 0.1506,
+            "tourn_positive": 2,
+            "per_tournament": {
+              "GESO26": 0.0561,
+              "THCCBN26": 0.1506,
+              "THMTPBW26": -0.0956
+            }
+          }
+        },
+        "H3": {
+          "gross": {
+            "n": 125,
+            "tournaments": 9,
+            "mean": 0.147,
+            "ci_lo": 0.1042,
+            "ci_hi": 0.2057,
+            "tourn_positive": 9,
+            "per_tournament": {
+              "CHSC26": 0.2793,
+              "GESO26": 0.1364,
+              "JODC26": 0.1264,
+              "RBBCAN26": 0.1013,
+              "THCCBN26": 0.1511,
+              "THMTPBW26": 0.1231,
+              "THOC26": 0.0804,
+              "TRAV26": 0.312,
+              "USO26": 0.1013
+            }
+          },
+          "at_bid_net": {
+            "n": 1,
+            "tournaments": 1,
+            "mean": 0.1888,
+            "ci_lo": null,
+            "ci_hi": null,
+            "tourn_positive": 1,
+            "per_tournament": {
+              "THMTPBW26": 0.1888
+            }
+          }
+        }
+      },
+      "by_price_band": {
+        "0.08-0.15": {
+          "n": 31,
+          "tournaments": 8,
+          "mean": 0.0195,
+          "ci_lo": -0.1926,
+          "ci_hi": 0.1205,
+          "tourn_positive": 6,
+          "per_tournament": {
+            "CHSC26": 0.115,
+            "GESO26": 0.085,
+            "JODC26": 0.15,
+            "RBBCAN26": 0.12,
+            "THCCBN26": -0.5533,
+            "THMTPBW26": -0.09,
+            "THOC26": 0.1231,
+            "USO26": 0.106
+          }
+        },
+        "0.15-0.25": {
+          "n": 48,
+          "tournaments": 8,
+          "mean": 0.0534,
+          "ci_lo": -0.026,
+          "ci_hi": 0.1147,
+          "tourn_positive": 5,
+          "per_tournament": {
+            "CHSC26": -0.1233,
+            "GESO26": 0.2033,
+            "JODC26": 0.205,
+            "RBBCAN26": -0.14,
+            "THCCBN26": -0.04,
+            "THMTPBW26": 0.02,
+            "THOC26": 0.1213,
+            "USO26": 0.0508
+          }
+        },
+        "0.25-0.35": {
+          "n": 30,
+          "tournaments": 9,
+          "mean": -0.1337,
+          "ci_lo": -0.3053,
+          "ci_hi": 0.0093,
+          "tourn_positive": 3,
+          "per_tournament": {
+            "CHSC26": -0.0233,
+            "GESO26": 0.0033,
+            "JODC26": -0.3833,
+            "RBBCAN26": -0.71,
+            "THCCBN26": -0.37,
+            "THMTPBW26": 0.13,
+            "THOC26": -0.1433,
+            "TRAV26": 0.27,
+            "USO26": -0.74
+          }
+        },
+        "0.35-0.45": {
+          "n": 32,
+          "tournaments": 9,
+          "mean": 0.0644,
+          "ci_lo": -0.0938,
+          "ci_hi": 0.2195,
+          "tourn_positive": 4,
+          "per_tournament": {
+            "CHSC26": -0.095,
+            "GESO26": 0.224,
+            "JODC26": 0.422,
+            "RBBCAN26": 0.44,
+            "THCCBN26": -0.2633,
+            "THMTPBW26": 0.135,
+            "THOC26": -0.0883,
+            "TRAV26": -0.11,
+            "USO26": -0.115
+          }
+        }
+      },
+      "anchor_staleness": {
+        "median_lag_h": 15.67,
+        "median_staleness_h": 3.67,
+        "pct_stale_gt_2h": 67.2,
+        "pct_stale_gt_12h": 8.8
+      },
+      "anchor_vs_round_ends": {
+        "covered": 125,
+        "pct_after_R1": 83.2,
+        "pct_after_R2": 0.0,
+        "pct_after_R3": 0.0
+      },
+      "scalar_sensitivity": {
+        "n_scalar_in_band": 0,
+        "fade_excl": 0.0234,
+        "fade_incl_at_refund": 0.0234
+      },
+      "leave_one_out": {
+        "gross": {
+          "CHSC26": 0.0311,
+          "GESO26": 0.0097,
+          "JODC26": 0.0122,
+          "RBBCAN26": 0.0293,
+          "THCCBN26": 0.0473,
+          "THMTPBW26": 0.0077,
+          "THOC26": 0.0213,
+          "TRAV26": 0.0235,
+          "USO26": 0.0275
+        },
+        "at_bid_net": {
+          "GESO26": -0.1348,
+          "THCCBN26": 0.0941,
+          "THOC26": -0.1301,
+          "USO26": -0.1679
+        }
+      }
+    },
+    "r3top10": {
+      "label": "R3 top-10",
+      "anchor_h": 12.0,
+      "replication": {
+        "got": {
+          "n": 82,
+          "tournaments": 9,
+          "mean": -0.1137,
+          "ci_lo": -0.1784,
+          "ci_hi": -0.0442,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": -0.175,
+            "GESO26": -0.1692,
+            "JODC26": -0.31,
+            "RBBCAN26": -0.1733,
+            "THCCBN26": 0.0258,
+            "THMTPBW26": -0.0415,
+            "THOC26": -0.2193,
+            "TRAV26": 0.062,
+            "USO26": -0.14
+          }
+        },
+        "published": [
+          82,
+          9,
+          0.272,
+          0.159,
+          -0.114
+        ],
+        "pass": true
+      },
+      "decomposition": {
+        "n_two_sided": 6,
+        "n_total": 82,
+        "mean_anchor": 0.3658,
+        "mean_bid": 0.3367,
+        "mean_ask": 0.4017,
+        "mean_spread": 0.065,
+        "mean_realized": 0.3333,
+        "mean_taker_fee_at_bid": 0.0154,
+        "fade_gross_all": {
+          "n": 82,
+          "tournaments": 9,
+          "mean": 0.1137,
+          "ci_lo": 0.0445,
+          "ci_hi": 0.1785,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.175,
+            "GESO26": 0.1692,
+            "JODC26": 0.31,
+            "RBBCAN26": 0.1733,
+            "THCCBN26": -0.0258,
+            "THMTPBW26": 0.0415,
+            "THOC26": 0.2193,
+            "TRAV26": -0.062,
+            "USO26": 0.14
+          }
+        },
+        "fade_at_bid_nofee": {
+          "n": 6,
+          "tournaments": 3,
+          "mean": 0.0033,
+          "ci_lo": -0.63,
+          "ci_hi": 0.3,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": 0.3,
+            "GESO26": 0.0875,
+            "THCCBN26": -0.63
+          }
+        },
+        "fade_at_bid_net": {
+          "n": 6,
+          "tournaments": 3,
+          "mean": -0.0121,
+          "ci_lo": -0.6463,
+          "ci_hi": 0.2853,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": 0.2853,
+            "GESO26": 0.0721,
+            "THCCBN26": -0.6463
+          }
+        },
+        "fade_at_ask_makerfee0": {
+          "n": 6,
+          "tournaments": 3,
+          "mean": 0.0683,
+          "ci_lo": -0.62,
+          "ci_hi": 0.33,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": 0.33,
+            "GESO26": 0.175,
+            "THCCBN26": -0.62
+          }
+        }
+      },
+      "anchor_composition": {
+        "from_trade": {
+          "n": 78,
+          "tournaments": 9,
+          "mean": 0.1128,
+          "ci_lo": 0.0397,
+          "ci_hi": 0.181,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.175,
+            "GESO26": 0.245,
+            "JODC26": 0.31,
+            "RBBCAN26": 0.1733,
+            "THCCBN26": -0.0258,
+            "THMTPBW26": 0.0415,
+            "THOC26": 0.2193,
+            "TRAV26": -0.062,
+            "USO26": 0.14
+          }
+        },
+        "from_two_sided_mid": {
+          "n": 4,
+          "tournaments": 1,
+          "mean": 0.1313,
+          "ci_lo": null,
+          "ci_hi": null,
+          "tourn_positive": 1,
+          "per_tournament": {
+            "GESO26": 0.1313
+          }
+        }
+      },
+      "mechanical_term": {
+        "nominal_N": 10.0,
+        "events": 11,
+        "mean_yes_settlements": 11.09,
+        "yes_over_n": 1.1091,
+        "excess_share_of_yes": 0.0984,
+        "realized": 0.1585,
+        "counterfactual_no_tie_realized": 0.1429,
+        "fade_headwind_per_contract": -0.0156
+      },
+      "by_horizon": {
+        "H24": {
+          "gross": {
+            "n": 40,
+            "tournaments": 6,
+            "mean": 0.0475,
+            "ci_lo": -0.0688,
+            "ci_hi": 0.1983,
+            "tourn_positive": 5,
+            "per_tournament": {
+              "CHSC26": 0.24,
+              "GESO26": 0.0789,
+              "THCCBN26": 0.205,
+              "THMTPBW26": -0.1429,
+              "THOC26": 0.1967,
+              "USO26": 0.1537
+            }
+          },
+          "at_bid_net": {
+            "n": 8,
+            "tournaments": 4,
+            "mean": 0.1104,
+            "ci_lo": 0.0505,
+            "ci_hi": 0.2902,
+            "tourn_positive": 4,
+            "per_tournament": {
+              "CHSC26": 0.2853,
+              "GESO26": 0.04,
+              "THMTPBW26": 0.295,
+              "THOC26": 0.1031
+            }
+          }
+        },
+        "H12": {
+          "gross": {
+            "n": 82,
+            "tournaments": 9,
+            "mean": 0.1137,
+            "ci_lo": 0.0445,
+            "ci_hi": 0.1785,
+            "tourn_positive": 7,
+            "per_tournament": {
+              "CHSC26": 0.175,
+              "GESO26": 0.1692,
+              "JODC26": 0.31,
+              "RBBCAN26": 0.1733,
+              "THCCBN26": -0.0258,
+              "THMTPBW26": 0.0415,
+              "THOC26": 0.2193,
+              "TRAV26": -0.062,
+              "USO26": 0.14
+            }
+          },
+          "at_bid_net": {
+            "n": 6,
+            "tournaments": 3,
+            "mean": -0.0121,
+            "ci_lo": -0.6463,
+            "ci_hi": 0.2853,
+            "tourn_positive": 2,
+            "per_tournament": {
+              "CHSC26": 0.2853,
+              "GESO26": 0.0721,
+              "THCCBN26": -0.6463
+            }
+          }
+        },
+        "H6": {
+          "gross": {
+            "n": 104,
+            "tournaments": 9,
+            "mean": 0.1428,
+            "ci_lo": 0.0521,
+            "ci_hi": 0.2171,
+            "tourn_positive": 7,
+            "per_tournament": {
+              "CHSC26": 0.1533,
+              "GESO26": 0.12,
+              "JODC26": 0.2254,
+              "RBBCAN26": 0.3775,
+              "THCCBN26": 0.1075,
+              "THMTPBW26": -0.0647,
+              "THOC26": 0.2257,
+              "TRAV26": -0.17,
+              "USO26": 0.255
+            }
+          },
+          "at_bid_net": {
+            "n": 5,
+            "tournaments": 3,
+            "mean": 0.0608,
+            "ci_lo": -0.6463,
+            "ci_hi": 0.2602,
+            "tourn_positive": 2,
+            "per_tournament": {
+              "GESO26": 0.2602,
+              "THCCBN26": -0.6463,
+              "USO26": 0.1697
+            }
+          }
+        },
+        "H3": {
+          "gross": {
+            "n": 92,
+            "tournaments": 9,
+            "mean": 0.1648,
+            "ci_lo": 0.0707,
+            "ci_hi": 0.2406,
+            "tourn_positive": 7,
+            "per_tournament": {
+              "CHSC26": 0.1944,
+              "GESO26": 0.45,
+              "JODC26": 0.222,
+              "RBBCAN26": 0.3633,
+              "THCCBN26": 0.2073,
+              "THMTPBW26": -0.0647,
+              "THOC26": 0.27,
+              "TRAV26": -0.0433,
+              "USO26": 0.1734
+            }
+          },
+          "at_bid_net": {
+            "n": 3,
+            "tournaments": 2,
+            "mean": 0.273,
+            "ci_lo": 0.2179,
+            "ci_hi": 0.3832,
+            "tourn_positive": 2,
+            "per_tournament": {
+              "GESO26": 0.3832,
+              "USO26": 0.2179
+            }
+          }
+        }
+      },
+      "by_price_band": {
+        "0.08-0.15": {
+          "n": 14,
+          "tournaments": 7,
+          "mean": 0.1307,
+          "ci_lo": 0.1233,
+          "ci_hi": 0.14,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.132,
+            "RBBCAN26": 0.14,
+            "THCCBN26": 0.12,
+            "THMTPBW26": 0.115,
+            "THOC26": 0.15,
+            "TRAV26": 0.15,
+            "USO26": 0.14
+          }
+        },
+        "0.15-0.25": {
+          "n": 24,
+          "tournaments": 8,
+          "mean": 0.0696,
+          "ci_lo": -0.109,
+          "ci_hi": 0.1963,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.2,
+            "GESO26": 0.23,
+            "RBBCAN26": 0.19,
+            "THCCBN26": 0.03,
+            "THMTPBW26": -0.47,
+            "THOC26": 0.185,
+            "TRAV26": 0.15,
+            "USO26": 0.2
+          }
+        },
+        "0.25-0.35": {
+          "n": 33,
+          "tournaments": 8,
+          "mean": 0.2429,
+          "ci_lo": 0.1392,
+          "ci_hi": 0.3034,
+          "tourn_positive": 7,
+          "per_tournament": {
+            "CHSC26": 0.296,
+            "GESO26": 0.3017,
+            "JODC26": 0.31,
+            "THCCBN26": -0.67,
+            "THMTPBW26": 0.29,
+            "THOC26": 0.3044,
+            "TRAV26": 0.32,
+            "USO26": 0.1813
+          }
+        },
+        "0.35-0.45": {
+          "n": 18,
+          "tournaments": 7,
+          "mean": -0.0356,
+          "ci_lo": -0.2129,
+          "ci_hi": 0.0791,
+          "tourn_positive": 2,
+          "per_tournament": {
+            "CHSC26": -0.07,
+            "GESO26": -0.06,
+            "THCCBN26": -0.09,
+            "THMTPBW26": 0.14,
+            "THOC26": 0.1275,
+            "TRAV26": -0.55,
+            "USO26": -0.085
+          }
+        }
+      },
+      "anchor_staleness": {
+        "median_lag_h": 17.01,
+        "median_staleness_h": 5.01,
+        "pct_stale_gt_2h": 74.4,
+        "pct_stale_gt_12h": 20.7
+      },
+      "anchor_vs_round_ends": {
+        "covered": 82,
+        "pct_after_R1": 93.9,
+        "pct_after_R2": 89.0,
+        "pct_after_R3": 0.0
+      },
+      "scalar_sensitivity": {
+        "n_scalar_in_band": 0,
+        "fade_excl": 0.1137,
+        "fade_incl_at_refund": 0.1137
+      },
+      "leave_one_out": {
+        "gross": {
+          "CHSC26": 0.1011,
+          "GESO26": 0.1093,
+          "JODC26": 0.1113,
+          "RBBCAN26": 0.1115,
+          "THCCBN26": 0.1376,
+          "THMTPBW26": 0.1273,
+          "THOC26": 0.0901,
+          "TRAV26": 0.1251,
+          "USO26": 0.1088
+        },
+        "at_bid_net": {
+          "CHSC26": -0.0716,
+          "GESO26": -0.1805,
+          "THCCBN26": 0.1148
+        }
+      }
+    }
+  },
+  "replication_pass": true
+}

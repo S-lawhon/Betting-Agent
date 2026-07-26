@@ -1,0 +1,2031 @@
+{
+  "generated": "backtest_topn_fade_fills.py",
+  "quote_size": 25.0,
+  "side": "sell_yes (maker fade: rest a YES offer at anchor + offset)",
+  "maker_fee": 0.0,
+  "maker_fee_source": "live GET /series?category=Sports 2026-07-26: KXPGATOP5/10/20/40 and KXPGAR{1,2,3}TOP{5,10,20} all fee_type=quadratic -> maker fee 0. NOTE src/kalshi_fees.py is MISSING the round-based KXPGAR*TOP* prefixes and so charges a maker fee on them (4th recorded drift).",
+  "cohorts": {
+    "pga_top1020": {
+      "label": "CONTROL PGA top-10/20",
+      "anchor_h": 48.0,
+      "n_markets": 1532,
+      "n_tournaments": 11,
+      "n_prints": 160469,
+      "pct_taker_yes": 75.4,
+      "tournaments": [
+        "CHSC26",
+        "COPC26",
+        "GESO26",
+        "ISC26",
+        "JODC26",
+        "RBBCAN26",
+        "THCCBN26",
+        "THMTPBW26",
+        "THOC26",
+        "TRAV26",
+        "USO26"
+      ],
+      "grid": {
+        "H48_off+0.00": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.0,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 1211,
+          "fill_rate": 0.7905,
+          "contracts_filled": 28551.5,
+          "net_per_contract": -0.0074,
+          "ci95_lo": -0.049,
+          "ci95_hi": 0.0213,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2145,
+          "mean_quote_posted": 0.1984,
+          "mean_quote_filled": 0.2071,
+          "naive_edge_if_all_filled": 0.0379,
+          "pnl_usd": -211.92,
+          "collateral_usd": 22638.46,
+          "return_on_collateral": -0.0094,
+          "tournaments_positive": 5,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2892.3,
+              "net_per_contract": -0.0008
+            },
+            "COPC26": {
+              "contracts": 1575.8,
+              "net_per_contract": -0.1919
+            },
+            "GESO26": {
+              "contracts": 2916.8,
+              "net_per_contract": 0.0216
+            },
+            "ISC26": {
+              "contracts": 1780.8,
+              "net_per_contract": -0.1325
+            },
+            "JODC26": {
+              "contracts": 3098.8,
+              "net_per_contract": 0.047
+            },
+            "RBBCAN26": {
+              "contracts": 2790.6,
+              "net_per_contract": -0.0311
+            },
+            "THCCBN26": {
+              "contracts": 3326.9,
+              "net_per_contract": -0.0165
+            },
+            "THMTPBW26": {
+              "contracts": 2261.7,
+              "net_per_contract": 0.0659
+            },
+            "THOC26": {
+              "contracts": 3426.9,
+              "net_per_contract": 0.0107
+            },
+            "TRAV26": {
+              "contracts": 1204.4,
+              "net_per_contract": -0.0569
+            },
+            "USO26": {
+              "contracts": 3276.5,
+              "net_per_contract": 0.0441
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-CHSC26-SFIS",
+            -23.0,
+            0.08,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.00_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.0,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 950,
+          "fill_rate": 0.6201,
+          "contracts_filled": 21963.0,
+          "net_per_contract": -0.0063,
+          "ci95_lo": -0.031,
+          "ci95_hi": 0.0139,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2191,
+          "mean_quote_posted": 0.1984,
+          "mean_quote_filled": 0.2129,
+          "naive_edge_if_all_filled": 0.0379,
+          "pnl_usd": -137.89,
+          "collateral_usd": 17288.11,
+          "return_on_collateral": -0.008,
+          "tournaments_positive": 5,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2396.8,
+              "net_per_contract": -0.0048
+            },
+            "COPC26": {
+              "contracts": 793.5,
+              "net_per_contract": 0.0035
+            },
+            "GESO26": {
+              "contracts": 2268.3,
+              "net_per_contract": -0.0055
+            },
+            "ISC26": {
+              "contracts": 1053.0,
+              "net_per_contract": -0.0707
+            },
+            "JODC26": {
+              "contracts": 2379.5,
+              "net_per_contract": 0.0207
+            },
+            "RBBCAN26": {
+              "contracts": 1834.0,
+              "net_per_contract": -0.0781
+            },
+            "THCCBN26": {
+              "contracts": 2659.8,
+              "net_per_contract": -0.0307
+            },
+            "THMTPBW26": {
+              "contracts": 1756.7,
+              "net_per_contract": 0.0637
+            },
+            "THOC26": {
+              "contracts": 2956.0,
+              "net_per_contract": 0.0013
+            },
+            "TRAV26": {
+              "contracts": 1059.0,
+              "net_per_contract": -0.062
+            },
+            "USO26": {
+              "contracts": 2806.5,
+              "net_per_contract": 0.0297
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-GESO26-WKIM",
+            -23.0,
+            0.08,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.00_cancel24h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.0,
+          "quote_size": 25.0,
+          "window_end_h": 24.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 1140,
+          "fill_rate": 0.7441,
+          "contracts_filled": 26462.9,
+          "net_per_contract": 0.0072,
+          "ci95_lo": -0.0178,
+          "ci95_hi": 0.0264,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2012,
+          "mean_quote_posted": 0.1984,
+          "mean_quote_filled": 0.2084,
+          "naive_edge_if_all_filled": 0.0379,
+          "pnl_usd": 191.76,
+          "collateral_usd": 20948.05,
+          "return_on_collateral": 0.0092,
+          "tournaments_positive": 6,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2756.6,
+              "net_per_contract": 0.0179
+            },
+            "COPC26": {
+              "contracts": 974.4,
+              "net_per_contract": -0.0695
+            },
+            "GESO26": {
+              "contracts": 2808.2,
+              "net_per_contract": 0.0209
+            },
+            "ISC26": {
+              "contracts": 1340.8,
+              "net_per_contract": -0.0682
+            },
+            "JODC26": {
+              "contracts": 2934.8,
+              "net_per_contract": 0.0401
+            },
+            "RBBCAN26": {
+              "contracts": 2566.9,
+              "net_per_contract": -0.0386
+            },
+            "THCCBN26": {
+              "contracts": 3127.7,
+              "net_per_contract": -0.0123
+            },
+            "THMTPBW26": {
+              "contracts": 2170.7,
+              "net_per_contract": 0.0687
+            },
+            "THOC26": {
+              "contracts": 3400.9,
+              "net_per_contract": 0.0169
+            },
+            "TRAV26": {
+              "contracts": 1158.0,
+              "net_per_contract": -0.0686
+            },
+            "USO26": {
+              "contracts": 3223.8,
+              "net_per_contract": 0.0419
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-GESO26-WKIM",
+            -23.0,
+            0.08,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 1059,
+          "fill_rate": 0.6913,
+          "contracts_filled": 24389.6,
+          "net_per_contract": -0.0166,
+          "ci95_lo": -0.0641,
+          "ci95_hi": 0.0166,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2511,
+          "mean_quote_posted": 0.2183,
+          "mean_quote_filled": 0.2346,
+          "naive_edge_if_all_filled": 0.0577,
+          "pnl_usd": -404.12,
+          "collateral_usd": 18668.75,
+          "return_on_collateral": -0.0216,
+          "tournaments_positive": 5,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2479.6,
+              "net_per_contract": -0.0093
+            },
+            "COPC26": {
+              "contracts": 1356.3,
+              "net_per_contract": -0.234
+            },
+            "GESO26": {
+              "contracts": 2426.2,
+              "net_per_contract": 0.0134
+            },
+            "ISC26": {
+              "contracts": 1604.1,
+              "net_per_contract": -0.145
+            },
+            "JODC26": {
+              "contracts": 2650.9,
+              "net_per_contract": 0.047
+            },
+            "RBBCAN26": {
+              "contracts": 2455.1,
+              "net_per_contract": -0.0349
+            },
+            "THCCBN26": {
+              "contracts": 2705.4,
+              "net_per_contract": -0.0334
+            },
+            "THMTPBW26": {
+              "contracts": 1804.5,
+              "net_per_contract": 0.0509
+            },
+            "THOC26": {
+              "contracts": 2836.6,
+              "net_per_contract": 0.0001
+            },
+            "TRAV26": {
+              "contracts": 1135.4,
+              "net_per_contract": -0.0561
+            },
+            "USO26": {
+              "contracts": 2935.5,
+              "net_per_contract": 0.0542
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-CHSC26-SFIS",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 709,
+          "fill_rate": 0.4628,
+          "contracts_filled": 15973.6,
+          "net_per_contract": -0.0427,
+          "ci95_lo": -0.0707,
+          "ci95_hi": -0.0179,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2859,
+          "mean_quote_posted": 0.2183,
+          "mean_quote_filled": 0.2432,
+          "naive_edge_if_all_filled": 0.0577,
+          "pnl_usd": -681.57,
+          "collateral_usd": 12088.28,
+          "return_on_collateral": -0.0564,
+          "tournaments_positive": 3,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 1683.9,
+              "net_per_contract": -0.0571
+            },
+            "COPC26": {
+              "contracts": 599.0,
+              "net_per_contract": -0.0343
+            },
+            "GESO26": {
+              "contracts": 1538.4,
+              "net_per_contract": -0.0473
+            },
+            "ISC26": {
+              "contracts": 902.5,
+              "net_per_contract": -0.0917
+            },
+            "JODC26": {
+              "contracts": 1769.0,
+              "net_per_contract": -0.0215
+            },
+            "RBBCAN26": {
+              "contracts": 1402.5,
+              "net_per_contract": -0.1109
+            },
+            "THCCBN26": {
+              "contracts": 1811.9,
+              "net_per_contract": -0.103
+            },
+            "THMTPBW26": {
+              "contracts": 1105.1,
+              "net_per_contract": 0.0009
+            },
+            "THOC26": {
+              "contracts": 2071.6,
+              "net_per_contract": -0.029
+            },
+            "TRAV26": {
+              "contracts": 888.0,
+              "net_per_contract": 0.0054
+            },
+            "USO26": {
+              "contracts": 2201.7,
+              "net_per_contract": 0.0114
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-GESO26-WKIM",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_cancel24h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 24.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 967,
+          "fill_rate": 0.6312,
+          "contracts_filled": 21899.4,
+          "net_per_contract": 0.0012,
+          "ci95_lo": -0.0277,
+          "ci95_hi": 0.0244,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2359,
+          "mean_quote_posted": 0.2183,
+          "mean_quote_filled": 0.2371,
+          "naive_edge_if_all_filled": 0.0577,
+          "pnl_usd": 26.59,
+          "collateral_usd": 16706.31,
+          "return_on_collateral": 0.0016,
+          "tournaments_positive": 7,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2283.9,
+              "net_per_contract": 0.0069
+            },
+            "COPC26": {
+              "contracts": 779.9,
+              "net_per_contract": -0.1125
+            },
+            "GESO26": {
+              "contracts": 2267.6,
+              "net_per_contract": 0.0082
+            },
+            "ISC26": {
+              "contracts": 1154.1,
+              "net_per_contract": -0.0856
+            },
+            "JODC26": {
+              "contracts": 2466.0,
+              "net_per_contract": 0.0355
+            },
+            "RBBCAN26": {
+              "contracts": 2213.8,
+              "net_per_contract": -0.0493
+            },
+            "THCCBN26": {
+              "contracts": 2508.6,
+              "net_per_contract": -0.0333
+            },
+            "THMTPBW26": {
+              "contracts": 1701.5,
+              "net_per_contract": 0.0512
+            },
+            "THOC26": {
+              "contracts": 2730.3,
+              "net_per_contract": 0.0059
+            },
+            "TRAV26": {
+              "contracts": 938.0,
+              "net_per_contract": 0.0126
+            },
+            "USO26": {
+              "contracts": 2855.8,
+              "net_per_contract": 0.0591
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-GESO26-WKIM",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.04": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.04,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 974,
+          "fill_rate": 0.6358,
+          "contracts_filled": 22289.0,
+          "net_per_contract": -0.0165,
+          "ci95_lo": -0.0696,
+          "ci95_hi": 0.0207,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2748,
+          "mean_quote_posted": 0.2385,
+          "mean_quote_filled": 0.2583,
+          "naive_edge_if_all_filled": 0.0779,
+          "pnl_usd": -368.79,
+          "collateral_usd": 16532.78,
+          "return_on_collateral": -0.0223,
+          "tournaments_positive": 5,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2271.0,
+              "net_per_contract": -0.0058
+            },
+            "COPC26": {
+              "contracts": 1235.4,
+              "net_per_contract": -0.2588
+            },
+            "GESO26": {
+              "contracts": 2115.0,
+              "net_per_contract": 0.0076
+            },
+            "ISC26": {
+              "contracts": 1428.2,
+              "net_per_contract": -0.165
+            },
+            "JODC26": {
+              "contracts": 2537.9,
+              "net_per_contract": 0.0575
+            },
+            "RBBCAN26": {
+              "contracts": 2259.6,
+              "net_per_contract": -0.033
+            },
+            "THCCBN26": {
+              "contracts": 2489.4,
+              "net_per_contract": -0.0322
+            },
+            "THMTPBW26": {
+              "contracts": 1540.9,
+              "net_per_contract": 0.0402
+            },
+            "THOC26": {
+              "contracts": 2585.9,
+              "net_per_contract": 0.001
+            },
+            "TRAV26": {
+              "contracts": 1036.0,
+              "net_per_contract": -0.0595
+            },
+            "USO26": {
+              "contracts": 2789.8,
+              "net_per_contract": 0.0679
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-CHSC26-SFIS",
+            -22.0,
+            0.12,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.04_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.04,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 618,
+          "fill_rate": 0.4034,
+          "contracts_filled": 13709.7,
+          "net_per_contract": -0.0417,
+          "ci95_lo": -0.078,
+          "ci95_hi": -0.0109,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.3077,
+          "mean_quote_posted": 0.2385,
+          "mean_quote_filled": 0.266,
+          "naive_edge_if_all_filled": 0.0779,
+          "pnl_usd": -571.73,
+          "collateral_usd": 10063.09,
+          "return_on_collateral": -0.0568,
+          "tournaments_positive": 2,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 1514.8,
+              "net_per_contract": -0.0449
+            },
+            "COPC26": {
+              "contracts": 478.0,
+              "net_per_contract": -0.0819
+            },
+            "GESO26": {
+              "contracts": 1158.1,
+              "net_per_contract": -0.0873
+            },
+            "ISC26": {
+              "contracts": 679.9,
+              "net_per_contract": -0.1332
+            },
+            "JODC26": {
+              "contracts": 1581.8,
+              "net_per_contract": -0.0253
+            },
+            "RBBCAN26": {
+              "contracts": 1194.8,
+              "net_per_contract": -0.1076
+            },
+            "THCCBN26": {
+              "contracts": 1527.9,
+              "net_per_contract": -0.1017
+            },
+            "THMTPBW26": {
+              "contracts": 974.0,
+              "net_per_contract": -0.0207
+            },
+            "THOC26": {
+              "contracts": 1828.2,
+              "net_per_contract": -0.0061
+            },
+            "TRAV26": {
+              "contracts": 832.0,
+              "net_per_contract": 0.013
+            },
+            "USO26": {
+              "contracts": 1940.2,
+              "net_per_contract": 0.0369
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-GESO26-WKIM",
+            -22.0,
+            0.12,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.04_cancel24h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.04,
+          "quote_size": 25.0,
+          "window_end_h": 24.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 870,
+          "fill_rate": 0.5679,
+          "contracts_filled": 19536.3,
+          "net_per_contract": 0.0044,
+          "ci95_lo": -0.0301,
+          "ci95_hi": 0.0307,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2562,
+          "mean_quote_posted": 0.2385,
+          "mean_quote_filled": 0.2606,
+          "naive_edge_if_all_filled": 0.0779,
+          "pnl_usd": 84.99,
+          "collateral_usd": 14445.83,
+          "return_on_collateral": 0.0059,
+          "tournaments_positive": 6,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2064.1,
+              "net_per_contract": 0.0074
+            },
+            "COPC26": {
+              "contracts": 658.9,
+              "net_per_contract": -0.1554
+            },
+            "GESO26": {
+              "contracts": 1925.8,
+              "net_per_contract": -0.0028
+            },
+            "ISC26": {
+              "contracts": 957.2,
+              "net_per_contract": -0.0993
+            },
+            "JODC26": {
+              "contracts": 2321.8,
+              "net_per_contract": 0.0503
+            },
+            "RBBCAN26": {
+              "contracts": 2054.9,
+              "net_per_contract": -0.0479
+            },
+            "THCCBN26": {
+              "contracts": 2200.4,
+              "net_per_contract": -0.0342
+            },
+            "THMTPBW26": {
+              "contracts": 1403.4,
+              "net_per_contract": 0.0472
+            },
+            "THOC26": {
+              "contracts": 2459.9,
+              "net_per_contract": 0.028
+            },
+            "TRAV26": {
+              "contracts": 857.0,
+              "net_per_contract": 0.0175
+            },
+            "USO26": {
+              "contracts": 2633.0,
+              "net_per_contract": 0.068
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-GESO26-WKIM",
+            -22.0,
+            0.12,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_staleT": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": false,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 959,
+          "fill_rate": 0.626,
+          "contracts_filled": 22026.9,
+          "net_per_contract": -0.0431,
+          "ci95_lo": -0.0959,
+          "ci95_hi": -0.0068,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.2781,
+          "mean_quote_posted": 0.2183,
+          "mean_quote_filled": 0.2349,
+          "naive_edge_if_all_filled": 0.0577,
+          "pnl_usd": -950.18,
+          "collateral_usd": 16852.1,
+          "return_on_collateral": -0.0564,
+          "tournaments_positive": 4,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2169.8,
+              "net_per_contract": -0.046
+            },
+            "COPC26": {
+              "contracts": 1232.9,
+              "net_per_contract": -0.2782
+            },
+            "GESO26": {
+              "contracts": 2301.7,
+              "net_per_contract": 0.0046
+            },
+            "ISC26": {
+              "contracts": 1346.3,
+              "net_per_contract": -0.212
+            },
+            "JODC26": {
+              "contracts": 2385.5,
+              "net_per_contract": 0.0244
+            },
+            "RBBCAN26": {
+              "contracts": 2313.9,
+              "net_per_contract": -0.0501
+            },
+            "THCCBN26": {
+              "contracts": 2463.8,
+              "net_per_contract": -0.0599
+            },
+            "THMTPBW26": {
+              "contracts": 1555.6,
+              "net_per_contract": 0.0194
+            },
+            "THOC26": {
+              "contracts": 2496.1,
+              "net_per_contract": -0.0314
+            },
+            "TRAV26": {
+              "contracts": 1054.4,
+              "net_per_contract": -0.0724
+            },
+            "USO26": {
+              "contracts": 2706.9,
+              "net_per_contract": 0.0359
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-CHSC26-SFIS",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_atOrThrough": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": false,
+          "post_at_anchor": true,
+          "posted_markets": 1532,
+          "posted_tournaments": 11,
+          "filled_markets": 1127,
+          "fill_rate": 0.7356,
+          "contracts_filled": 26063.7,
+          "net_per_contract": -0.0034,
+          "ci95_lo": -0.0486,
+          "ci95_hi": 0.0282,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1606,
+          "e_settle_filled": 0.235,
+          "mean_quote_posted": 0.2183,
+          "mean_quote_filled": 0.2316,
+          "naive_edge_if_all_filled": 0.0577,
+          "pnl_usd": -89.12,
+          "collateral_usd": 20027.78,
+          "return_on_collateral": -0.0044,
+          "tournaments_positive": 5,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 2580.7,
+              "net_per_contract": -0.0029
+            },
+            "COPC26": {
+              "contracts": 1490.3,
+              "net_per_contract": -0.1937
+            },
+            "GESO26": {
+              "contracts": 2730.1,
+              "net_per_contract": 0.0308
+            },
+            "ISC26": {
+              "contracts": 1646.3,
+              "net_per_contract": -0.1375
+            },
+            "JODC26": {
+              "contracts": 2856.3,
+              "net_per_contract": 0.06
+            },
+            "RBBCAN26": {
+              "contracts": 2569.6,
+              "net_per_contract": -0.027
+            },
+            "THCCBN26": {
+              "contracts": 2902.1,
+              "net_per_contract": -0.018
+            },
+            "THMTPBW26": {
+              "contracts": 1993.8,
+              "net_per_contract": 0.0655
+            },
+            "THOC26": {
+              "contracts": 3082.6,
+              "net_per_contract": 0.0136
+            },
+            "TRAV26": {
+              "contracts": 1160.4,
+              "net_per_contract": -0.0454
+            },
+            "USO26": {
+              "contracts": 3051.5,
+              "net_per_contract": 0.0589
+            }
+          },
+          "worst_market": [
+            "KXPGATOP10-CHSC26-SFIS",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        }
+      },
+      "headline_key": "H48_off+0.02",
+      "verdict": "KILL",
+      "leave_one_out": {
+        "CHSC26": -0.0174,
+        "COPC26": -0.0038,
+        "GESO26": -0.0199,
+        "ISC26": -0.0075,
+        "JODC26": -0.0243,
+        "RBBCAN26": -0.0145,
+        "THCCBN26": -0.0145,
+        "THMTPBW26": -0.022,
+        "THOC26": -0.0188,
+        "TRAV26": -0.0147,
+        "USO26": -0.0263
+      }
+    },
+    "pga_top5": {
+      "label": "PGA top-5",
+      "anchor_h": 48.0,
+      "n_markets": 325,
+      "n_tournaments": 11,
+      "n_prints": 65792,
+      "pct_taker_yes": 70.6,
+      "tournaments": [
+        "CHSC26",
+        "COPC26",
+        "GESO26",
+        "ISC26",
+        "JODC26",
+        "RBBCAN26",
+        "THCCBN26",
+        "THMTPBW26",
+        "THOC26",
+        "TRAV26",
+        "USO26"
+      ],
+      "grid": {
+        "H48_off+0.00": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.0,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 254,
+          "fill_rate": 0.7815,
+          "contracts_filled": 6019.6,
+          "net_per_contract": 0.0027,
+          "ci95_lo": -0.0316,
+          "ci95_hi": 0.0306,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.1661,
+          "mean_quote_posted": 0.161,
+          "mean_quote_filled": 0.1688,
+          "naive_edge_if_all_filled": 0.0379,
+          "pnl_usd": 16.16,
+          "collateral_usd": 5003.44,
+          "return_on_collateral": 0.0032,
+          "tournaments_positive": 6,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 686.8,
+              "net_per_contract": -0.0166
+            },
+            "COPC26": {
+              "contracts": 327.0,
+              "net_per_contract": -0.1335
+            },
+            "GESO26": {
+              "contracts": 410.0,
+              "net_per_contract": -0.0695
+            },
+            "ISC26": {
+              "contracts": 377.8,
+              "net_per_contract": -0.0876
+            },
+            "JODC26": {
+              "contracts": 650.0,
+              "net_per_contract": -0.0238
+            },
+            "RBBCAN26": {
+              "contracts": 575.0,
+              "net_per_contract": 0.07
+            },
+            "THCCBN26": {
+              "contracts": 375.0,
+              "net_per_contract": 0.0293
+            },
+            "THMTPBW26": {
+              "contracts": 702.6,
+              "net_per_contract": 0.0231
+            },
+            "THOC26": {
+              "contracts": 712.5,
+              "net_per_contract": 0.0524
+            },
+            "TRAV26": {
+              "contracts": 454.0,
+              "net_per_contract": 0.049
+            },
+            "USO26": {
+              "contracts": 748.9,
+              "net_per_contract": 0.0285
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-COPC26-SMAZ",
+            -23.0,
+            0.08,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.00_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.0,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 203,
+          "fill_rate": 0.6246,
+          "contracts_filled": 4777.9,
+          "net_per_contract": -0.013,
+          "ci95_lo": -0.0526,
+          "ci95_hi": 0.0185,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.1898,
+          "mean_quote_posted": 0.161,
+          "mean_quote_filled": 0.1769,
+          "naive_edge_if_all_filled": 0.0379,
+          "pnl_usd": -61.99,
+          "collateral_usd": 3932.87,
+          "return_on_collateral": -0.0158,
+          "tournaments_positive": 6,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 580.9,
+              "net_per_contract": -0.0407
+            },
+            "COPC26": {
+              "contracts": 107.0,
+              "net_per_contract": -0.2413
+            },
+            "GESO26": {
+              "contracts": 325.0,
+              "net_per_contract": -0.1292
+            },
+            "ISC26": {
+              "contracts": 187.9,
+              "net_per_contract": -0.102
+            },
+            "JODC26": {
+              "contracts": 496.9,
+              "net_per_contract": -0.0709
+            },
+            "RBBCAN26": {
+              "contracts": 490.0,
+              "net_per_contract": 0.0642
+            },
+            "THCCBN26": {
+              "contracts": 350.0,
+              "net_per_contract": 0.0193
+            },
+            "THMTPBW26": {
+              "contracts": 589.1,
+              "net_per_contract": 0.0075
+            },
+            "THOC26": {
+              "contracts": 635.0,
+              "net_per_contract": 0.0476
+            },
+            "TRAV26": {
+              "contracts": 402.0,
+              "net_per_contract": 0.0205
+            },
+            "USO26": {
+              "contracts": 614.0,
+              "net_per_contract": 0.0045
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-ISC26-AWIS",
+            -23.0,
+            0.08,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 225,
+          "fill_rate": 0.6923,
+          "contracts_filled": 5291.3,
+          "net_per_contract": 0.0063,
+          "ci95_lo": -0.0314,
+          "ci95_hi": 0.0369,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.189,
+          "mean_quote_posted": 0.1809,
+          "mean_quote_filled": 0.1953,
+          "naive_edge_if_all_filled": 0.0578,
+          "pnl_usd": 33.2,
+          "collateral_usd": 4258.08,
+          "return_on_collateral": 0.0078,
+          "tournaments_positive": 6,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 651.8,
+              "net_per_contract": -0.0126
+            },
+            "COPC26": {
+              "contracts": 302.0,
+              "net_per_contract": -0.1329
+            },
+            "GESO26": {
+              "contracts": 360.0,
+              "net_per_contract": -0.0703
+            },
+            "ISC26": {
+              "contracts": 328.8,
+              "net_per_contract": -0.0949
+            },
+            "JODC26": {
+              "contracts": 600.0,
+              "net_per_contract": -0.0171
+            },
+            "RBBCAN26": {
+              "contracts": 467.0,
+              "net_per_contract": 0.0727
+            },
+            "THCCBN26": {
+              "contracts": 275.0,
+              "net_per_contract": 0.0036
+            },
+            "THMTPBW26": {
+              "contracts": 576.6,
+              "net_per_contract": 0.0276
+            },
+            "THOC26": {
+              "contracts": 627.5,
+              "net_per_contract": 0.0671
+            },
+            "TRAV26": {
+              "contracts": 424.6,
+              "net_per_contract": 0.0641
+            },
+            "USO26": {
+              "contracts": 677.9,
+              "net_per_contract": 0.0414
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-COPC26-SMAZ",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 163,
+          "fill_rate": 0.5015,
+          "contracts_filled": 3760.1,
+          "net_per_contract": -0.0187,
+          "ci95_lo": -0.0701,
+          "ci95_hi": 0.0192,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.2266,
+          "mean_quote_posted": 0.1809,
+          "mean_quote_filled": 0.2079,
+          "naive_edge_if_all_filled": 0.0578,
+          "pnl_usd": -70.39,
+          "collateral_usd": 2978.46,
+          "return_on_collateral": -0.0236,
+          "tournaments_positive": 4,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 470.4,
+              "net_per_contract": -0.0239
+            },
+            "COPC26": {
+              "contracts": 107.0,
+              "net_per_contract": -0.2213
+            },
+            "GESO26": {
+              "contracts": 225.0,
+              "net_per_contract": -0.22
+            },
+            "ISC26": {
+              "contracts": 169.8,
+              "net_per_contract": -0.0798
+            },
+            "JODC26": {
+              "contracts": 425.0,
+              "net_per_contract": -0.0818
+            },
+            "RBBCAN26": {
+              "contracts": 326.0,
+              "net_per_contract": 0.0525
+            },
+            "THCCBN26": {
+              "contracts": 214.8,
+              "net_per_contract": -0.0405
+            },
+            "THMTPBW26": {
+              "contracts": 435.4,
+              "net_per_contract": -0.0203
+            },
+            "THOC26": {
+              "contracts": 550.0,
+              "net_per_contract": 0.0541
+            },
+            "TRAV26": {
+              "contracts": 347.6,
+              "net_per_contract": 0.0279
+            },
+            "USO26": {
+              "contracts": 489.0,
+              "net_per_contract": 0.0477
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-ISC26-AWIS",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.04": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.04,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 205,
+          "fill_rate": 0.6308,
+          "contracts_filled": 4773.5,
+          "net_per_contract": 0.0102,
+          "ci95_lo": -0.0275,
+          "ci95_hi": 0.0435,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.2095,
+          "mean_quote_posted": 0.201,
+          "mean_quote_filled": 0.2197,
+          "naive_edge_if_all_filled": 0.078,
+          "pnl_usd": 48.81,
+          "collateral_usd": 3724.69,
+          "return_on_collateral": 0.0131,
+          "tournaments_positive": 6,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 528.2,
+              "net_per_contract": -0.0291
+            },
+            "COPC26": {
+              "contracts": 302.0,
+              "net_per_contract": -0.1129
+            },
+            "GESO26": {
+              "contracts": 360.0,
+              "net_per_contract": -0.0503
+            },
+            "ISC26": {
+              "contracts": 306.0,
+              "net_per_contract": -0.0975
+            },
+            "JODC26": {
+              "contracts": 552.5,
+              "net_per_contract": -0.0148
+            },
+            "RBBCAN26": {
+              "contracts": 425.0,
+              "net_per_contract": 0.0835
+            },
+            "THCCBN26": {
+              "contracts": 275.0,
+              "net_per_contract": 0.0236
+            },
+            "THMTPBW26": {
+              "contracts": 475.0,
+              "net_per_contract": 0.0237
+            },
+            "THOC26": {
+              "contracts": 501.5,
+              "net_per_contract": 0.0659
+            },
+            "TRAV26": {
+              "contracts": 415.6,
+              "net_per_contract": 0.0816
+            },
+            "USO26": {
+              "contracts": 632.7,
+              "net_per_contract": 0.054
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-COPC26-SMAZ",
+            -22.0,
+            0.12,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.04_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.04,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 146,
+          "fill_rate": 0.4492,
+          "contracts_filled": 3280.3,
+          "net_per_contract": -0.0255,
+          "ci95_lo": -0.0824,
+          "ci95_hi": 0.0186,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.2597,
+          "mean_quote_posted": 0.201,
+          "mean_quote_filled": 0.2343,
+          "naive_edge_if_all_filled": 0.078,
+          "pnl_usd": -83.57,
+          "collateral_usd": 2511.85,
+          "return_on_collateral": -0.0333,
+          "tournaments_positive": 4,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 420.4,
+              "net_per_contract": -0.0241
+            },
+            "COPC26": {
+              "contracts": 107.0,
+              "net_per_contract": -0.2013
+            },
+            "GESO26": {
+              "contracts": 225.0,
+              "net_per_contract": -0.2
+            },
+            "ISC26": {
+              "contracts": 147.0,
+              "net_per_contract": -0.1046
+            },
+            "JODC26": {
+              "contracts": 365.0,
+              "net_per_contract": -0.1055
+            },
+            "RBBCAN26": {
+              "contracts": 301.0,
+              "net_per_contract": 0.061
+            },
+            "THCCBN26": {
+              "contracts": 169.9,
+              "net_per_contract": -0.0762
+            },
+            "THMTPBW26": {
+              "contracts": 333.6,
+              "net_per_contract": -0.0594
+            },
+            "THOC26": {
+              "contracts": 429.0,
+              "net_per_contract": 0.0486
+            },
+            "TRAV26": {
+              "contracts": 338.6,
+              "net_per_contract": 0.0438
+            },
+            "USO26": {
+              "contracts": 443.8,
+              "net_per_contract": 0.0578
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-ISC26-AWIS",
+            -22.0,
+            0.12,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_staleT": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": false,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 193,
+          "fill_rate": 0.5938,
+          "contracts_filled": 4565.0,
+          "net_per_contract": -0.0207,
+          "ci95_lo": -0.0602,
+          "ci95_hi": 0.0154,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.2191,
+          "mean_quote_posted": 0.1809,
+          "mean_quote_filled": 0.1984,
+          "naive_edge_if_all_filled": 0.0578,
+          "pnl_usd": -94.35,
+          "collateral_usd": 3659.34,
+          "return_on_collateral": -0.0258,
+          "tournaments_positive": 5,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 495.9,
+              "net_per_contract": -0.0684
+            },
+            "COPC26": {
+              "contracts": 300.0,
+              "net_per_contract": -0.1358
+            },
+            "GESO26": {
+              "contracts": 360.0,
+              "net_per_contract": -0.0703
+            },
+            "ISC26": {
+              "contracts": 286.0,
+              "net_per_contract": -0.1334
+            },
+            "JODC26": {
+              "contracts": 485.0,
+              "net_per_contract": -0.0708
+            },
+            "RBBCAN26": {
+              "contracts": 442.0,
+              "net_per_contract": 0.0661
+            },
+            "THCCBN26": {
+              "contracts": 248.7,
+              "net_per_contract": -0.0099
+            },
+            "THMTPBW26": {
+              "contracts": 476.6,
+              "net_per_contract": 0.003
+            },
+            "THOC26": {
+              "contracts": 482.3,
+              "net_per_contract": 0.0367
+            },
+            "TRAV26": {
+              "contracts": 424.6,
+              "net_per_contract": 0.0641
+            },
+            "USO26": {
+              "contracts": 563.9,
+              "net_per_contract": 0.0088
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-COPC26-SMAZ",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_atOrThrough": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": false,
+          "post_at_anchor": true,
+          "posted_markets": 325,
+          "posted_tournaments": 11,
+          "filled_markets": 241,
+          "fill_rate": 0.7415,
+          "contracts_filled": 5630.2,
+          "net_per_contract": 0.0143,
+          "ci95_lo": -0.0209,
+          "ci95_hi": 0.0435,
+          "n_fill_tournaments": 11,
+          "e_settle_posted": 0.1231,
+          "e_settle_filled": 0.1776,
+          "mean_quote_posted": 0.1809,
+          "mean_quote_filled": 0.1919,
+          "naive_edge_if_all_filled": 0.0578,
+          "pnl_usd": 80.7,
+          "collateral_usd": 4549.52,
+          "return_on_collateral": 0.0177,
+          "tournaments_positive": 6,
+          "per_tournament": {
+            "CHSC26": {
+              "contracts": 651.8,
+              "net_per_contract": -0.0126
+            },
+            "COPC26": {
+              "contracts": 327.0,
+              "net_per_contract": -0.1135
+            },
+            "GESO26": {
+              "contracts": 385.0,
+              "net_per_contract": -0.0592
+            },
+            "ISC26": {
+              "contracts": 353.8,
+              "net_per_contract": -0.079
+            },
+            "JODC26": {
+              "contracts": 625.0,
+              "net_per_contract": -0.0088
+            },
+            "RBBCAN26": {
+              "contracts": 492.5,
+              "net_per_contract": 0.0769
+            },
+            "THCCBN26": {
+              "contracts": 344.4,
+              "net_per_contract": 0.0409
+            },
+            "THMTPBW26": {
+              "contracts": 602.6,
+              "net_per_contract": 0.0324
+            },
+            "THOC26": {
+              "contracts": 694.5,
+              "net_per_contract": 0.071
+            },
+            "TRAV26": {
+              "contracts": 450.6,
+              "net_per_contract": 0.0681
+            },
+            "USO26": {
+              "contracts": 702.9,
+              "net_per_contract": 0.0438
+            }
+          },
+          "worst_market": [
+            "KXPGATOP5-COPC26-SMAZ",
+            -22.5,
+            0.1,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        }
+      },
+      "headline_key": "H48_off+0.02",
+      "verdict": "MARGINAL",
+      "leave_one_out": {
+        "CHSC26": 0.0089,
+        "COPC26": 0.0147,
+        "GESO26": 0.0118,
+        "ISC26": 0.013,
+        "JODC26": 0.0092,
+        "RBBCAN26": -0.0002,
+        "THCCBN26": 0.0064,
+        "THMTPBW26": 0.0037,
+        "THOC26": -0.0019,
+        "TRAV26": 0.0012,
+        "USO26": 0.0011
+      }
+    },
+    "pga_top40": {
+      "label": "PGA top-40",
+      "anchor_h": 48.0,
+      "n_markets": 149,
+      "n_tournaments": 2,
+      "n_prints": 3144,
+      "pct_taker_yes": 76.6,
+      "tournaments": [
+        "THOC26",
+        "USO26"
+      ],
+      "grid": {
+        "H48_off+0.00": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.0,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 116,
+          "fill_rate": 0.7785,
+          "contracts_filled": 2738.0,
+          "net_per_contract": -0.0867,
+          "ci95_lo": -0.0901,
+          "ci95_hi": -0.0828,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.3926,
+          "mean_quote_posted": 0.2891,
+          "mean_quote_filled": 0.3059,
+          "naive_edge_if_all_filled": 0.0005,
+          "pnl_usd": -237.41,
+          "collateral_usd": 1900.41,
+          "return_on_collateral": -0.1249,
+          "tournaments_positive": 0,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 1266.9,
+              "net_per_contract": -0.0828
+            },
+            "USO26": {
+              "contracts": 1471.1,
+              "net_per_contract": -0.0901
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-USO26-JPAR",
+            -20.5,
+            0.18,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.00_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.0,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 95,
+          "fill_rate": 0.6376,
+          "contracts_filled": 2044.5,
+          "net_per_contract": -0.0012,
+          "ci95_lo": -0.0086,
+          "ci95_hi": 0.0079,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.3023,
+          "mean_quote_posted": 0.2891,
+          "mean_quote_filled": 0.3011,
+          "naive_edge_if_all_filled": 0.0005,
+          "pnl_usd": -2.47,
+          "collateral_usd": 1428.97,
+          "return_on_collateral": -0.0017,
+          "tournaments_positive": 1,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 916.6,
+              "net_per_contract": 0.0079
+            },
+            "USO26": {
+              "contracts": 1127.9,
+              "net_per_contract": -0.0086
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-THOC26-SBUR",
+            -19.5,
+            0.22,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 100,
+          "fill_rate": 0.6711,
+          "contracts_filled": 2310.0,
+          "net_per_contract": -0.1352,
+          "ci95_lo": -0.1478,
+          "ci95_hi": -0.1249,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.4654,
+          "mean_quote_posted": 0.309,
+          "mean_quote_filled": 0.3302,
+          "naive_edge_if_all_filled": 0.0204,
+          "pnl_usd": -312.23,
+          "collateral_usd": 1547.2,
+          "return_on_collateral": -0.2018,
+          "tournaments_positive": 0,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 1031.5,
+              "net_per_contract": -0.1478
+            },
+            "USO26": {
+              "contracts": 1278.5,
+              "net_per_contract": -0.1249
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-USO26-JPAR",
+            -20.0,
+            0.2,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 78,
+          "fill_rate": 0.5235,
+          "contracts_filled": 1596.0,
+          "net_per_contract": -0.0539,
+          "ci95_lo": -0.0695,
+          "ci95_hi": -0.0423,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.3822,
+          "mean_quote_posted": 0.309,
+          "mean_quote_filled": 0.3282,
+          "naive_edge_if_all_filled": 0.0204,
+          "pnl_usd": -86.08,
+          "collateral_usd": 1072.18,
+          "return_on_collateral": -0.0803,
+          "tournaments_positive": 0,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 681.2,
+              "net_per_contract": -0.0695
+            },
+            "USO26": {
+              "contracts": 914.8,
+              "net_per_contract": -0.0423
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-THOC26-SBUR",
+            -19.0,
+            0.24,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.04": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.04,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 89,
+          "fill_rate": 0.5973,
+          "contracts_filled": 2041.5,
+          "net_per_contract": -0.1725,
+          "ci95_lo": -0.1794,
+          "ci95_hi": -0.1667,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.5266,
+          "mean_quote_posted": 0.3289,
+          "mean_quote_filled": 0.3541,
+          "naive_edge_if_all_filled": 0.0403,
+          "pnl_usd": -352.1,
+          "collateral_usd": 1318.62,
+          "return_on_collateral": -0.267,
+          "tournaments_positive": 0,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 928.1,
+              "net_per_contract": -0.1794
+            },
+            "USO26": {
+              "contracts": 1113.4,
+              "net_per_contract": -0.1667
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-USO26-JPAR",
+            -19.5,
+            0.22,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.04_cancel36h": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.04,
+          "quote_size": 25.0,
+          "window_end_h": 36.0,
+          "strict_through": true,
+          "post_at_anchor": true,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 63,
+          "fill_rate": 0.4228,
+          "contracts_filled": 1250.9,
+          "net_per_contract": -0.1352,
+          "ci95_lo": -0.1389,
+          "ci95_hi": -0.1323,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.4876,
+          "mean_quote_posted": 0.3289,
+          "mean_quote_filled": 0.3524,
+          "naive_edge_if_all_filled": 0.0403,
+          "pnl_usd": -169.14,
+          "collateral_usd": 810.15,
+          "return_on_collateral": -0.2088,
+          "tournaments_positive": 0,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 556.2,
+              "net_per_contract": -0.1389
+            },
+            "USO26": {
+              "contracts": 694.7,
+              "net_per_contract": -0.1323
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-THOC26-SBUR",
+            -18.5,
+            0.26,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_staleT": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": true,
+          "post_at_anchor": false,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 93,
+          "fill_rate": 0.6242,
+          "contracts_filled": 2118.4,
+          "net_per_contract": -0.1695,
+          "ci95_lo": -0.1837,
+          "ci95_hi": -0.1579,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.5075,
+          "mean_quote_posted": 0.309,
+          "mean_quote_filled": 0.338,
+          "naive_edge_if_all_filled": 0.0204,
+          "pnl_usd": -359.04,
+          "collateral_usd": 1402.43,
+          "return_on_collateral": -0.256,
+          "tournaments_positive": 0,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 954.4,
+              "net_per_contract": -0.1837
+            },
+            "USO26": {
+              "contracts": 1164.0,
+              "net_per_contract": -0.1579
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-USO26-JPAR",
+            -20.0,
+            0.2,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        },
+        "H48_off+0.02_atOrThrough": {
+          "side": "sell_yes",
+          "hours": 48.0,
+          "offset": 0.02,
+          "quote_size": 25.0,
+          "window_end_h": 0.0,
+          "strict_through": false,
+          "post_at_anchor": true,
+          "posted_markets": 149,
+          "posted_tournaments": 2,
+          "filled_markets": 105,
+          "fill_rate": 0.7047,
+          "contracts_filled": 2433.0,
+          "net_per_contract": -0.1136,
+          "ci95_lo": -0.117,
+          "ci95_hi": -0.1095,
+          "n_fill_tournaments": 2,
+          "e_settle_posted": 0.2886,
+          "e_settle_filled": 0.4418,
+          "mean_quote_posted": 0.309,
+          "mean_quote_filled": 0.3283,
+          "naive_edge_if_all_filled": 0.0204,
+          "pnl_usd": -276.32,
+          "collateral_usd": 1634.28,
+          "return_on_collateral": -0.1691,
+          "tournaments_positive": 0,
+          "per_tournament": {
+            "THOC26": {
+              "contracts": 1124.5,
+              "net_per_contract": -0.1095
+            },
+            "USO26": {
+              "contracts": 1308.5,
+              "net_per_contract": -0.117
+            }
+          },
+          "worst_market": [
+            "KXPGATOP40-USO26-JPAR",
+            -20.0,
+            0.2,
+            1.0,
+            25.0
+          ],
+          "skipped_no_anchor": 0,
+          "maker_fee": 0.0
+        }
+      },
+      "headline_key": "H48_off+0.02",
+      "verdict": "KILL",
+      "leave_one_out": {
+        "THOC26": -0.1249,
+        "USO26": -0.1478
+      }
+    }
+  }
+}

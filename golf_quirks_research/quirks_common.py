@@ -64,6 +64,12 @@ LEADER_SERIES = (
 MAKECUT_SERIES_PGA = ("KXPGAMAKECUT",)
 MAKECUT_SERIES_DPW = ("KXDPWORLDTOURMAKECUT",)
 LIV_TOPN_SERIES = ("KXLIVTOP5", "KXLIVTOP10")
+# P-023c cohorts. The published P-023a gate anchors the full-tournament book
+# at 48h (pre-R1) and the round-based book at 12h (pre-round) — verified by
+# exact replication of all seven published cells in backtest_topn_fade.py.
+FULL_TOPN_SERIES = ("KXPGATOP5", "KXPGATOP10", "KXPGATOP20", "KXPGATOP40")
+ROUND_TOPN_SERIES = ("KXPGAR1TOP5", "KXPGAR1TOP10",
+                     "KXPGAR2TOP10", "KXPGAR3TOP10")
 
 
 # ── scalars ──────────────────────────────────────────────────────────────

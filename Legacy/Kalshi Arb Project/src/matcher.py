@@ -44,7 +44,7 @@ import difflib
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -435,6 +435,54 @@ _BLOCKED_TICKER_PREFIXES = (
 )
 
 
+# ── Event start time from the ticker ──────────────────────────────────────────
+#
+# Kalshi encodes the ET wall-clock start in the ticker body: the segment
+# 26JUL201910 in KXMLBGAME-26JUL201910BALBOS-BOS is 2026-07-20 19:10 ET.
+# Verified against 650 P-001 MLB games on 2026-07-26: the Odds API
+# commence_time for the matched game sits a MEDIAN OF ONE MINUTE from the
+# ticker-encoded start, i.e. this is a far better event-start reference than
+# close_time (which is the market's *closing* stamp, hours later, and per
+# CLAUDE.md is a far-future placeholder on several Kalshi series).
+#
+# Deliberately implemented here rather than imported from src.et_time: legacy
+# modules are loaded by bare name off a separate sys.path entry, and adding a
+# cross-package import would couple them.
+
+_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+           "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
+
+# Only matches when the ticker carries a TIME as well as a date. Date-only
+# tickers (KXNBAGAME-26APR03UTAHOU) deliberately fall through to close_time.
+_TICKER_DATETIME_RE = re.compile(r"^(\d{2})([A-Z]{3})(\d{2})(\d{2})(\d{2})")
+
+try:                                    # pragma: no cover - trivial
+    from zoneinfo import ZoneInfo
+    _ET = ZoneInfo("America/New_York")
+except Exception:                       # pragma: no cover - host without tzdata
+    _ET = timezone(timedelta(hours=-4))
+
+
+def _ticker_start_time(ticker: str) -> Optional[datetime]:
+    """UTC start encoded in a Kalshi ticker, or None if it encodes no time."""
+    parts = (ticker or "").split("-")
+    if len(parts) < 2:
+        return None
+    m = _TICKER_DATETIME_RE.match(parts[1])
+    if not m:
+        return None
+    yy, mon, dd, hh, mm = m.groups()
+    month = _MONTHS.get(mon)
+    if month is None:
+        return None
+    try:
+        local = datetime(2000 + int(yy), month, int(dd), int(hh), int(mm),
+                         tzinfo=_ET)
+    except ValueError:                  # impossible date, e.g. 26FEB31
+        return None
+    return local.astimezone(timezone.utc)
+
+
 # ── Fuzzy matching ─────────────────────────────────────────────────────────────
 
 def _fuzzy_score(a: str, b: str) -> float:
@@ -565,10 +613,14 @@ class Matcher:
         unmatched_log_path: Optional[Path] = None,
         blocked_ticker_prefixes: Optional[tuple] = None,
         _now_fn: Optional[Callable[[], datetime]] = None,
+        ticker_time_window_minutes: float = 720.0,
+        score_tie_epsilon: float = 1.0,
     ) -> None:
         self._threshold      = float(fuzzy_threshold)
         self._min_team_score = float(min_team_score)
         self._window_minutes = float(time_window_minutes)
+        self._ticker_window_minutes = float(ticker_time_window_minutes)
+        self._tie_epsilon = float(score_tie_epsilon)
         self._sports: frozenset = frozenset(configured_sports or [])
         self._log_path = (
             unmatched_log_path
@@ -597,6 +649,8 @@ class Matcher:
             fuzzy_threshold=m_cfg.get("fuzzy_threshold", 60.0),
             min_team_score=m_cfg.get("min_team_score", 50.0),
             time_window_minutes=m_cfg.get("time_window_minutes", 43200.0),
+            ticker_time_window_minutes=m_cfg.get("ticker_time_window_minutes", 720.0),
+            score_tie_epsilon=m_cfg.get("score_tie_epsilon", 1.0),
             configured_sports=sports,
             unmatched_log_path=log_path,
             blocked_ticker_prefixes=blocked,
@@ -632,7 +686,14 @@ class Matcher:
         """
         ticker      = kalshi_market.get("ticker", "")
         title       = kalshi_market.get("title", "")
-        kalshi_time = self._parse_kalshi_time(kalshi_market)
+        # Prefer the ticker-encoded start when the ticker carries one: it is
+        # the true event start (median 1 min from the Odds API commence_time
+        # over 650 MLB games), whereas close_time is the market's closing
+        # stamp. `ticker_time` being non-None also means the tighter
+        # ticker_time_window_minutes applies — a loose window is only needed
+        # for the untrustworthy close_time/open_time fallbacks.
+        ticker_time = _ticker_start_time(ticker)
+        kalshi_time = ticker_time or self._parse_kalshi_time(kalshi_market)
 
         # ── 0. Ticker prefix blocklist (fast reject) ─────────────────────────
         ticker_upper = ticker.upper()
@@ -681,17 +742,33 @@ class Matcher:
             working_title = expanded
 
         # ── 4. Fuzzy name match ───────────────────────────────────────────────
-        best_event: Optional[OddsEvent] = None
-        best_score: float = -1.0
-        best_label: str = ""
-
+        #
+        # Ties are broken by START-TIME PROXIMITY, not by list order.
+        #
+        # This used to be a plain `if score > best_score`, which keeps the
+        # FIRST maximal event. Every game of an MLB series carries the same
+        # two team names, so all of them score identically and the winner was
+        # whichever the Odds API happened to return first. Measured over the
+        # whole P-001 corpus on 2026-07-26: 528 of 671 settled MLB bets
+        # (79%) had been placed on a Kalshi market for a *different day's*
+        # game than the Odds API event whose price produced the edge — the
+        # pod priced Friday's game and traded Saturday's market. Their CLV
+        # rows were consequently ~0 (+0.19c/ct) while the correctly-matched
+        # rows ran +7.65c/ct.
+        scored = []
         for event in odds_events:
             label = f"{event.home_team} {event.away_team}"
-            score = _match_score(working_title, label)
-            if score > best_score:
-                best_score = score
-                best_event = event
-                best_label = label
+            scored.append((_match_score(working_title, label), event, label))
+
+        best_score = max(s for s, _, _ in scored)
+        near_best = [t for t in scored if t[0] >= best_score - self._tie_epsilon]
+        if kalshi_time is not None and len(near_best) > 1:
+            _, best_event, best_label = min(
+                near_best,
+                key=lambda t: abs((t[1].commence_time - kalshi_time).total_seconds()),
+            )
+        else:
+            _, best_event, best_label = near_best[0]
 
         if best_score < self._threshold:
             self._reject(
@@ -741,7 +818,9 @@ class Matcher:
             delta_minutes = abs(
                 (best_event.commence_time - kalshi_time).total_seconds() / 60.0
             )
-            if delta_minutes > self._window_minutes:
+            window = (self._ticker_window_minutes if ticker_time is not None
+                      else self._window_minutes)
+            if delta_minutes > window:
                 self._reject(
                     ticker, title, kalshi_time, REASON_TIME_WINDOW_EXCEEDED,
                     best_candidate=best_label,

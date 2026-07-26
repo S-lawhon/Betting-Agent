@@ -115,7 +115,14 @@ paper. Kill switch for the maker unit: `touch data/KILL_MAKER`.
   Mispriced Kalshi moneylines vs Odds API multi-book (Pinnacle-weighted) consensus.
 - Settlement: `Legacy/.../settler.py` via **Odds API `/scores`** (Kalshi demo
   never settles sports). Gate: forward CLV must follow the +1.4pp net-maker CLV
-  measured in backtest (`clv_log.jsonl`, ~81/200 rows). Do not scale until 200.
+  measured in backtest (`clv_log.jsonl`). Do not scale until 200.
+- **Gate progress is NOT 81/200 and NOT 650/200 — treat it as blocked (2026-07-26
+  capture diagnostic).** `clv_log.jsonl` holds 650 rows, but 84% of them were
+  placed on a Kalshi market for a *different day's game* than the Odds API event
+  that produced the edge (matcher tie-break bug, fix written but not deployed).
+  Only **105 rows are admissible** (ticker start within 3h of the priced game).
+  The blended +1.39¢/ct would read as a PASS on a population that does not test
+  the hypothesis. Re-scope proposed, awaiting Sam's decision.
 
 ### P-014 — Live Game Agent
 

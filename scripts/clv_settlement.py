@@ -9,6 +9,8 @@ ROOT="/opt/betting-pod-shop"; sys.path.insert(0,ROOT)
 from src.devig import devig_two_way, american_to_prob
 from src.kalshi_fees import fee_per_contract
 from src.et_time import parse_mlb_ticker_start
+from src.clv_close import close_fair as _close_fair_reason, norm as _norm
+from src.mlb_teams import teams_from_mlb_ticker
 CLV_LOG=f"{ROOT}/data/trade_logs/clv_log.jsonl"
 KEY=re.search(r'ODDS_API_KEY=([^\n\r"\']+)',open(f"{ROOT}/.env").read()).group(1).strip()
 BASE="https://api.the-odds-api.com/v4"
@@ -21,23 +23,31 @@ def get(u):
 # nearest game, so drift there can mis-select or miss a game outright.
 # Now delegated to src.et_time, which resolves the offset from tzdata.
 parse_ticker = parse_mlb_ticker_start
-def norm(s): return re.sub(r'[^a-z]','',s.lower())
+norm=_norm
+# close_fair() used to have FIVE silent `return None` paths that the caller
+# could not tell apart, which is why "10 of 14 settled bets produced no CLV
+# record" (2026-07-21) stayed unexplained. The logic now lives in
+# src/clv_close.py and returns (result, reason); this wrapper preserves the
+# original single-value contract while `reasons` accumulates the histogram
+# printed at the end of the run.
+reasons=collections.Counter()
+def clv_names(r):
+    """Normalised team names to look the closing line up by.
+
+    Prefer the TICKER's teams over the row's `event` string. `event` records
+    the Odds API game the pod priced from, which is not always the market it
+    traded: 4 of 671 settled MLB rows (2026-07-26 audit) name two teams that
+    appear nowhere in their own ticker, and those rows can never match a
+    snapshot. The ticker names the market whose close we are trying to price.
+    Falls back to `event` when the ticker cannot be parsed.
+    """
+    t=teams_from_mlb_ticker(r.get('market_ticker') or '')
+    if t: return [norm(t[0]),norm(t[1])]
+    return [norm(x) for x in (r.get('event') or '').split(' vs ')]
 def close_fair(expected,names):
-    try: d=get(f"{BASE}/historical/sports/baseball_mlb/odds?apiKey={KEY}&regions=eu&markets=h2h&oddsFormat=american&date={expected.strftime('%Y-%m-%dT%H:%M:%SZ')}")
-    except Exception: return None
-    cands=[e for e in d.get('data',[]) if {norm(e['home_team']),norm(e['away_team'])}=={names[0],names[1]}]
-    if not cands: return None
-    e=min(cands,key=lambda e:abs((datetime.fromisoformat(e['commence_time'].replace('Z','+00:00'))-expected).total_seconds()))
-    if abs((datetime.fromisoformat(e['commence_time'].replace('Z','+00:00'))-expected).total_seconds())>3*3600: return None
-    for b in e.get('bookmakers',[]):
-        if b['key']=='pinnacle':
-            h=next((m for m in b['markets'] if m['key']=='h2h'),None)
-            if h:
-                px={o['name']:o['price'] for o in h['outcomes']}
-                if e['home_team'] in px and e['away_team'] in px:
-                    fh=devig_two_way(american_to_prob(px[e['home_team']]),american_to_prob(px[e['away_team']]))
-                    return e['home_team'],e['away_team'],fh,e['commence_time']
-    return None
+    res,why=_close_fair_reason(expected,list(names),KEY)
+    reasons[why]+=1
+    return res
 
 done=set()
 if os.path.exists(CLV_LOG):
@@ -95,7 +105,7 @@ with open(CLV_LOG,"a") as out:
         if expected is None:
             print(f"clv_settlement: WARNING unparseable ticker {rs[0]['market_ticker']}",file=sys.stderr)
             continue
-        res=close_fair(expected,[norm(x) for x in rs[0]['event'].split(' vs ')])
+        res=close_fair(expected,clv_names(rs[0]))
         if not res: continue
         home,away,fh,com=res
         for r in rs:
@@ -110,3 +120,6 @@ with open(CLV_LOG,"a") as out:
             out.write(json.dumps(rec)+"\n"); written+=1
 print(f"clv_settlement: scanned {scanned} rows (active + last {ARCHIVE_LOOKBACK} archives), "
       f"{len(new)} new settled bets, {len(games)} games, wrote {written} CLV records to clv_log.jsonl")
+if reasons:
+    print("clv_settlement: close_fair reasons " +
+          " ".join(f"{k}={v}" for k,v in reasons.most_common()))

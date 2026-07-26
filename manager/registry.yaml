@@ -119,9 +119,23 @@ jobs:
       CLV_ARCHIVE_LOOKBACK (default 3) archives. Safe by construction — the job
       already deduped by fingerprint, so re-reading captured rows is a no-op.
       Recovered 4 records immediately (25 -> 29 rows).
-      OPEN: of 14 newly-found settled bets, only 4 produced records — close_fair()
-      returned nothing for 10 games. Cause unknown (Odds API historical depth,
-      quota, or team-name normalisation). Worth a look; it caps capture rate.
+      RESOLVED 2026-07-26 (CLV capture diagnostic, run-queue task 4). The
+      "10 of 14" was NOT a close_fair() defect: corpus-wide capture is 650/671
+      settled MLB bets = 96.9%, and the replay over all nine archives produced
+      ZERO API_ERROR (quota was never near — 4.87M of ~5M credits remain). A
+      same-day miss simply self-heals, because the job re-reads 10 archives and
+      dedupes by fingerprint. Residual after five months: 21 bets (9 TIME_GT_3H,
+      7 NO_TEAM_MATCH, 1 NO_PINNACLE, 4 recovered by taking team names from the
+      ticker instead of the free-text `event` field).
+      THE REAL PROBLEM IS UPSTREAM: the P-001 matcher broke fuzzy-score ties by
+      list order, so 528 of 671 settled MLB bets (79%) were placed on a Kalshi
+      market for a DIFFERENT DAY'S GAME than the Odds API event that produced
+      the edge. Those rows carry +0.19c/ct CLV (CI [-0.28,+0.69]) vs +7.65c/ct
+      for the correctly-matched 105. The 650-row log therefore MEETS the 200-row
+      gate on a number (+1.39c/ct) that does not test the hypothesis.
+      Fix written but NOT DEPLOYED (Legacy/Kalshi Arb Project/src/matcher.py:
+      time-proximity tie-break + ticker-derived start window; regression tests in
+      tests/test_clv_capture.py). Gate re-scope proposed, awaiting Sam.
 
   - id: rotate_active_log
     host: droplet

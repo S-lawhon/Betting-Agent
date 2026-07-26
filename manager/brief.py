@@ -138,6 +138,7 @@ def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any
         "critical": crit, "warn": warn, "actions": actions, "info": infos,
         "services": snap.get("services", []),
         "trade": snap.get("trade", {}),
+        "work": snap.get("work_today", {}),
         "gates": gates,
         "accumulating": accumulating,
         "active_dirs": active_dirs,
@@ -213,6 +214,35 @@ def render_markdown(b: Dict[str, Any]) -> str:
             L.append("  - {}: placed {} / settled {} (W{} L{} V{})".format(
                 pod, st.get("placed", 0), st.get("settled", 0),
                 st.get("won", 0), st.get("lost", 0), st.get("void", 0)))
+    L.append("")
+
+    work = b.get("work") or {}
+    win = work.get("window_hours", 24)
+    L.append("## Work completed (last {}h)".format(win))
+    L.append("")
+    if not work.get("available"):
+        L.append("_Work summary unavailable — {}._".format(
+            work.get("note") or "no git source configured"))
+    else:
+        commits = work.get("commits") or []
+        if commits:
+            for c in commits:
+                when = (c.get("iso") or "")[:16].replace("T", " ")
+                L.append("- `{}` {} — {}".format(
+                    c.get("hash"), when, c.get("subject")))
+        else:
+            L.append("_Nothing committed in the last {}h._".format(win))
+        areas = work.get("research_areas") or []
+        if areas:
+            L.append("")
+            L.append("Research areas touched: {}".format(", ".join(areas)))
+        unc = work.get("uncommitted_research_files") or 0
+        if unc:
+            L.append("_+ {} uncommitted research file{} in progress._".format(
+                unc, "s" if unc != 1 else ""))
+        if work.get("fetched") is False:
+            L.append("")
+            L.append("_(git mirror fetch failed — list may be stale)_")
     L.append("")
 
     if b["gates"]:
@@ -340,6 +370,36 @@ def render_html(b: Dict[str, Any]) -> str:
         P.append("<li>24h: {} real actions, {} scan rows, realized P&amp;L ${:.2f}</li>"
                  .format(real, sum(acts.values()), trade.get("realized_pnl_24h") or 0.0))
     P.append("</ul>")
+
+    work = b.get("work") or {}
+    win = work.get("window_hours", 24)
+    P.append("<h2>Work completed <span class='dim'>(last {}h)</span></h2>".format(win))
+    if not work.get("available"):
+        P.append("<div class='dim'>Work summary unavailable — {}.</div>".format(
+            e(str(work.get("note") or "no git source configured"))))
+    else:
+        commits = work.get("commits") or []
+        if commits:
+            P.append("<ul>")
+            for c in commits:
+                when = (c.get("iso") or "")[:16].replace("T", " ")
+                P.append("<li><code>{}</code> <span class='dim'>{}</span> — {}</li>"
+                         .format(e(str(c.get("hash"))), e(when),
+                                 e(str(c.get("subject")))))
+            P.append("</ul>")
+        else:
+            P.append("<div class='dim'>Nothing committed in the last {}h.</div>"
+                     .format(win))
+        areas = work.get("research_areas") or []
+        if areas:
+            P.append("<div>Research areas touched: <b>{}</b></div>".format(
+                e(", ".join(areas))))
+        unc = work.get("uncommitted_research_files") or 0
+        if unc:
+            P.append("<div class='dim'>+ {} uncommitted research file{} in progress.</div>"
+                     .format(unc, "s" if unc != 1 else ""))
+        if work.get("fetched") is False:
+            P.append("<div class='dim'>(git mirror fetch failed — list may be stale)</div>")
 
     if b["gates"]:
         P.append("<h2>Gate progress</h2>")

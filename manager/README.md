@@ -98,6 +98,26 @@ python3 manager/notify.py --selftest
 
 `12:30 UTC` = 8:30am ET. The `sleep 30` lets the collector finish first.
 
+### 3. Git mirror (the "Work completed" section)
+
+The daily brief reports what was actually done each day — research verdicts,
+code updates — by reading git commit messages. That history lives on the Mac;
+the droplet is not a git repo (deploy excludes `.git`). So the collector reads a
+dedicated **read-only clone of the public repo**, which it `git fetch`es at the
+top of every cycle:
+
+```bash
+git clone https://github.com/S-lawhon/Betting-Agent.git /opt/betting-agent-mirror
+```
+
+`collect.py` auto-detects it (`MIRROR_PATH`, overridable via `MANAGER_GIT_REPO`);
+on the Mac it reads the working tree in place instead. Only **pushed** commits
+appear — push your feature branches. The section spans all branches (`--all`),
+since `main` on GitHub often lags the branch work happens on. If the clone is
+missing the section renders "unavailable" rather than failing; recreate it after
+a droplet rebuild. It is separate from `/opt/betting-pod-shop` and untouched by
+deploy.
+
 ## Maintaining the registry
 
 **Edit `registry.yaml` when reality changes.** The machinery is only as good as

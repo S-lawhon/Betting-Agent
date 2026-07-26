@@ -48,6 +48,11 @@ HERE = Path(__file__).resolve().parent
 STATE_DIR = HERE / "state"
 UTC = timezone.utc
 
+# The droplet is not a git repo (deploy excludes .git), so the collector reads
+# development history from a dedicated read-only clone of the public repo. See
+# manager/README.md § git mirror. Overridable via MANAGER_GIT_REPO.
+MIRROR_PATH = Path("/opt/betting-agent-mirror")
+
 
 # --------------------------------------------------------------------------
 # helpers
@@ -855,6 +860,112 @@ class Collector:
             return None
         return round((now().timestamp() - newest) / 3600.0, 1)
 
+    # ---- work completed (git history) -----------------------------------
+    def _git_repo(self) -> Tuple[Optional[Path], bool]:
+        """Resolve which git repo to read development history from.
+
+        Returns ``(path, is_mirror)``. ``is_mirror`` is True for the droplet's
+        dedicated read-only clone of the public repo — which we ``fetch`` before
+        reading — and False for a live dev working tree (the Mac), which we must
+        never mutate. The source of truth is the same commits either way; the
+        droplet just can't see them directly because deploy excludes ``.git``.
+        """
+        env = os.environ.get("MANAGER_GIT_REPO")
+        if env:
+            p = Path(env)
+            return (p, True) if (p / ".git").exists() else (None, False)
+        # Mac dev path: the project root is itself a git checkout — read in place.
+        for cand in (self.root, self.local_root):
+            if (cand / ".git").exists():
+                return cand, False
+        # Droplet default: the manager's read-only mirror (see manager/README.md).
+        if (MIRROR_PATH / ".git").exists():
+            return MIRROR_PATH, True
+        return None, False
+
+    @safe("work_today")
+    def work_today(self, window_hours: int = 24) -> Dict[str, Any]:
+        """Summarise recent development work from git.
+
+        What was actually done each day — research verdicts, code updates — lives
+        in commit messages, not in the running system's logs. This reads them so
+        the daily brief can report them. Follows the same rule as every other
+        probe: a git failure becomes a recorded note, never a crash, and never a
+        blank section masquerading as "no work".
+        """
+        repo, is_mirror = self._git_repo()
+        result: Dict[str, Any] = {
+            "available": False,
+            "window_hours": window_hours,
+            "repo": str(repo) if repo else None,
+            "is_mirror": is_mirror,
+        }
+        if not repo:
+            result["note"] = ("no git repo available — clone the mirror to "
+                              "/opt/betting-agent-mirror or set MANAGER_GIT_REPO")
+            return result
+
+        def git(*a: str, timeout: int = 30) -> subprocess.CompletedProcess:
+            return subprocess.run(["git", "-C", str(repo), *a],
+                                  capture_output=True, text=True, timeout=timeout)
+
+        # Refresh the mirror so the log reflects the latest pushed work. Only the
+        # mirror is fetched — never the Mac's live working tree. Best-effort: a
+        # fetch failure (offline, GitHub hiccup) still lets us log what's present.
+        if is_mirror:
+            try:
+                fr = git("fetch", "--all", "--prune", "--quiet", timeout=60)
+                result["fetched"] = fr.returncode == 0
+                if fr.returncode != 0:
+                    result["fetch_error"] = (fr.stderr or "").strip()[-200:]
+            except (subprocess.SubprocessError, OSError) as exc:
+                result["fetched"] = False
+                result["fetch_error"] = "{}: {}".format(type(exc).__name__, exc)
+
+        since = "{} hours ago".format(window_hours)
+        sep = "\x1f"
+        # --all spans every branch (main on GitHub lags; work lands on feature
+        # branches); git dedupes a commit reachable from several refs by SHA.
+        log = git("log", "--all", "--no-merges", "--since", since,
+                  "--date=iso-strict",
+                  "--pretty=format:%h{0}%cI{0}%s{0}%an".format(sep))
+        commits: List[Dict[str, Any]] = []
+        seen = set()
+        for line in (log.stdout or "").splitlines():
+            parts = line.split(sep)
+            if len(parts) < 3 or parts[0] in seen:
+                continue
+            seen.add(parts[0])
+            commits.append({
+                "hash": parts[0], "iso": parts[1], "subject": parts[2],
+                "author": parts[3] if len(parts) > 3 else None,
+            })
+        result["commits"] = commits
+        result["commit_count"] = len(commits)
+
+        # Research areas the committed work touched (authoritative on any host).
+        names = git("log", "--all", "--no-merges", "--since", since,
+                    "--name-only", "--pretty=format:")
+        areas = set()
+        for path_line in (names.stdout or "").splitlines():
+            top = path_line.strip().split("/", 1)[0]
+            if top.endswith("_research") or top == "research":
+                areas.add(top)
+        # Uncommitted research still in progress — only visible on the dev tree,
+        # never on the mirror (a fresh clone has a clean status).
+        uncommitted = 0
+        if not is_mirror:
+            st = git("status", "--porcelain")
+            for row in (st.stdout or "").splitlines():
+                top = row[3:].strip().split("/", 1)[0]
+                if top.endswith("_research") or top == "research":
+                    uncommitted += 1
+                    areas.add(top)
+        result["research_areas"] = sorted(areas)
+        result["uncommitted_research_files"] = uncommitted
+        result["available"] = True
+        return result
+
     # ---- orchestration ---------------------------------------------------
     def run(self) -> Dict[str, Any]:
         trade = self.trade_activity() or {}
@@ -871,6 +982,7 @@ class Collector:
             "invariants": self.invariants() or {},
             "errors": self.recent_errors() or {},
             "workstreams": self.workstreams(trade) or [],
+            "work_today": self.work_today() or {},
             "faults": self.faults,
         }
         return snapshot

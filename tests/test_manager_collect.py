@@ -190,6 +190,96 @@ def test_checks_surfaces_uncheckable_as_explicit_finding():
     assert "unknown" in finding.title.lower()
 
 
+def _init_repo(path: Path) -> None:
+    import subprocess
+    path.mkdir(parents=True, exist_ok=True)
+    for args in (
+        ["init", "-q"],
+        ["config", "user.email", "t@example.com"],
+        ["config", "user.name", "Tester"],
+        ["config", "commit.gpgsign", "false"],
+    ):
+        subprocess.run(["git", "-C", str(path), *args], check=True,
+                       capture_output=True, text=True)
+
+
+def _commit(path: Path, message: str) -> None:
+    import subprocess
+    subprocess.run(["git", "-C", str(path), "add", "-A"], check=True,
+                   capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(path), "commit", "-q", "-m", message],
+                   check=True, capture_output=True, text=True)
+
+
+def test_work_today_reads_commits_and_research_areas(tmp_path, monkeypatch):
+    """The daily brief's work summary: commits + touched research dirs from git."""
+    import shutil
+    if not shutil.which("git"):
+        pytest.skip("git not available")
+    monkeypatch.setattr(collect, "MIRROR_PATH", tmp_path / "no-mirror")
+
+    project = tmp_path / "repo"
+    _init_repo(project)
+    (project / "foo_research").mkdir()
+    (project / "foo_research" / "REPORT.md").write_text("v", encoding="utf-8")
+    (project / "src").mkdir()
+    (project / "src" / "pod.py").write_text("x = 1\n", encoding="utf-8")
+    _commit(project, "P-999 research: KILL at Phase-1")
+    # An uncommitted research file — visible only on a live working tree.
+    (project / "foo_research" / "scratch.md").write_text("wip", encoding="utf-8")
+
+    reg = write_registry(tmp_path, str(project), str(project))
+    col = collect.Collector(reg, root=project, local_root=project)
+    w = col.work_today()
+
+    assert w["available"] is True
+    assert w["is_mirror"] is False, "a live working tree must not be treated as a mirror"
+    assert w["commit_count"] == 1
+    assert w["commits"][0]["subject"] == "P-999 research: KILL at Phase-1"
+    assert "foo_research" in w["research_areas"]
+    assert w["uncommitted_research_files"] == 1
+    assert col.faults == [], "a clean git read must record no fault"
+
+
+def test_work_today_window_excludes_old_commits(tmp_path, monkeypatch):
+    import shutil
+    import subprocess
+    if not shutil.which("git"):
+        pytest.skip("git not available")
+    monkeypatch.setattr(collect, "MIRROR_PATH", tmp_path / "no-mirror")
+
+    project = tmp_path / "repo"
+    _init_repo(project)
+    (project / "a.txt").write_text("1", encoding="utf-8")
+    # Backdate the commit well outside a 24h window.
+    env = {"GIT_AUTHOR_DATE": "2020-01-01T00:00:00",
+           "GIT_COMMITTER_DATE": "2020-01-01T00:00:00"}
+    subprocess.run(["git", "-C", str(project), "add", "-A"], check=True,
+                   capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(project), "commit", "-q", "-m", "ancient"],
+                   check=True, capture_output=True, text=True,
+                   env={**__import__("os").environ, **env})
+
+    reg = write_registry(tmp_path, str(project), str(project))
+    col = collect.Collector(reg, root=project, local_root=project)
+    w = col.work_today(window_hours=24)
+    assert w["available"] is True
+    assert w["commit_count"] == 0, "a 2020 commit is not today's work"
+
+
+def test_work_today_without_git_is_unavailable_not_a_crash(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect, "MIRROR_PATH", tmp_path / "no-mirror")
+    monkeypatch.delenv("MANAGER_GIT_REPO", raising=False)
+    project = tmp_path / "plain"
+    project.mkdir()
+    reg = write_registry(tmp_path, str(project), str(project))
+    col = collect.Collector(reg, root=project, local_root=project)
+    w = col.work_today()
+    assert w["available"] is False
+    assert "note" in w
+    assert col.faults == [], "a missing repo is a reported gap, not a crash"
+
+
 def test_snapshot_is_json_serialisable(tmp_path):
     """write_state uses json.dumps; None-valued fields must round-trip."""
     project = tmp_path / "opt" / "betting-pod-shop"

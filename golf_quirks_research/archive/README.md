@@ -9,10 +9,24 @@ exactly how the 2026-07-25 loss happened: the working caches were invisible to
 
 | Archive | Expands to | Re-pullable? |
 |---|---|---|
-| `leader_trades.tar.gz` | `data/leader_trades/` — 364 round-leader markets, executed trade prints | **NO.** Kalshi's `/markets/{t}/trades` history reaches back only ~1 month and rolls off. This window (late-June → late-July 2026) is gone from the API. It is the entire Phase-2 tick-replay sample for P-022. |
+| `leader_trades.tar.gz` | `data/leader_trades/` — 364 round-leader markets, executed trade prints | Re-pullable as of 2026-07-26, but do not count on it — see the note below. It is the entire Phase-2 tick-replay sample for P-022. |
+| `makecut_trades.tar.gz` | `data/makecut_trades/` — 615 make-cut markets (566 PGA + 43 DPW with candles), 14 k prints | Yes as of 2026-07-26, ~8 min of the shared 2 req/s budget. P-023 Phase-2 sample. |
+| `livtopn_trades.tar.gz` | `data/livtopn_trades/` — 57 LIV top-N markets, 236 prints | Yes, ~1 min. P-023 MARGINAL cohort. |
 | `candles.tar.gz` | `data/candles/` — 11,349 settled golf markets, 1m candlesticks | Yes, but ~95 min of the shared 2 req/s Kalshi budget. |
 | `settled_meta.jsonl.gz` | `data/settled_meta.jsonl` — settled-market metadata incl. `settlement_value_dollars` | Yes, cheaply. |
 | `pull_logs.tar.gz` | `data/trades_pull.log`, `data/candle_pull.log` | n/a — provenance record of how the pulls were made. |
+
+## Correction (2026-07-26) — the "~1 month" roll-off
+
+The original version of this file asserted that `/markets/{t}/trades` only reaches
+back ~1 month and that the late-June → late-July window was already gone. **That is
+wrong.** Probing one market per tournament on 2026-07-26 returned prints for all 15
+golf tournaments in the cache, back to **2026-05-20** — over two months. The make-cut
+tick pull re-fetched history from May without difficulty.
+
+Keep archiving the caches anyway (they cost API budget to rebuild, and the roll-off
+horizon is undocumented and could change), but do not treat "the data is gone from
+the API" as a reason to trust a stale cache over a fresh pull.
 
 ## Restore
 

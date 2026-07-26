@@ -1,0 +1,58 @@
+{
+  "generated_utc": "2026-07-26",
+  "source": "golf_quirks_research/backtest_makecut_fills.py",
+  "p022_round_leader_fade": {
+    "status": "Phase-2 GREEN-LIGHT (validated, reproduced 2026-07-26)",
+    "series": [
+      "KXPGAR1LEAD",
+      "KXPGAR2LEAD",
+      "KXPGAR3LEAD",
+      "KXDPWORLDTOURR1LEAD",
+      "KXDPWORLDTOURR2LEAD",
+      "KXDPWORLDTOURR3LEAD",
+      "KXLPGAR1LEAD",
+      "KXLPGAR2LEAD",
+      "KXLPGAR3LEAD",
+      "KXLIVR1LEAD",
+      "KXLIVR2LEAD",
+      "KXLIVR3LEAD",
+      "KXCHAMPTOURR1LEAD"
+    ],
+    "band": [
+      0.03,
+      0.12
+    ],
+    "anchor_hours_before_close": 12,
+    "side": "sell_yes",
+    "quote_offset": 0.02,
+    "net_per_contract": 0.034,
+    "ci95": [
+      0.017,
+      0.051
+    ],
+    "tournaments_positive": "16/19",
+    "maker_fee": 0.0,
+    "research_quote_size": 25
+  },
+  "p023_makecut": {
+    "status": "KILL",
+    "series": [
+      "KXPGAMAKECUT"
+    ],
+    "band": [
+      0.4,
+      0.6
+    ],
+    "anchor_hours_before_close": 48,
+    "side": "buy_yes",
+    "quote_offset": 0.02,
+    "net_per_contract": -0.1378,
+    "ci95": [
+      -0.2386,
+      -0.0409
+    ],
+    "tournaments_positive": "1/10",
+    "maker_fee": 0.0,
+    "research_quote_size": 25.0
+  }
+}

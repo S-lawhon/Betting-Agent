@@ -1,0 +1,106 @@
+{
+  "hypothesis_id": "P-020",
+  "name": "Cross-venue signal: Polymarket -> Kalshi (politics/world)",
+  "phase": 1,
+  "verdict": "KILL",
+  "run_date": "2026-07-26",
+  "study_window_utc": [
+    "2026-06-15",
+    "2026-07-27"
+  ],
+  "window_binding_constraint": "Polymarket CLOB /prices-history retains ~30 days; markets ending before ~2026-06-20 return an empty history array (verified 2026-07-26).",
+  "universe": {
+    "poly_closed_markets_scanned": 3752,
+    "kalshi_settled_markets_scanned": 86825,
+    "kalshi_series_scanned": 1942,
+    "candidate_pairs": 390,
+    "pairs_HIGH": 152,
+    "pairs_MED": 108,
+    "pairs_LOW": 130,
+    "pairs_after_poly_volume_floor_1000usd": 325,
+    "pairs_with_usable_dual_venue_history_HIGH": 34,
+    "pairs_with_usable_dual_venue_history_HIGH_MED": 81,
+    "observations_HIGH": 209,
+    "clusters_HIGH": 5,
+    "observations_HIGH_MED": 435,
+    "clusters_HIGH_MED": 15
+  },
+  "match_rules": {
+    "fuzzy_min_score": 78.0,
+    "max_close_date_skew_hours": 48,
+    "strike_token_equality_required": true,
+    "polarity_conflict_rejected": true,
+    "kalshi_yes_sub_title_must_appear_in_poly_question": true,
+    "audited_false_match_rate_HIGH": 0.0,
+    "audited_false_match_rate_HIGH_n": 40,
+    "audited_false_match_rate_HIGH_upper95": 0.075,
+    "audited_false_match_rate_pre_gates": 0.37,
+    "outcome_agreement_HIGH": 0.99
+  },
+  "observation_filters": {
+    "anchors_hours_before_close": [
+      168,
+      120,
+      96,
+      72,
+      48,
+      36,
+      24,
+      18,
+      12,
+      8,
+      6
+    ],
+    "require_two_sided_quote": true,
+    "max_kalshi_spread": 0.06,
+    "mid_range": [
+      0.03,
+      0.97
+    ],
+    "poly_min_market_volume_usd": 1000,
+    "kalshi_quote_max_staleness_hours": 72,
+    "poly_price_max_staleness_hours": 12,
+    "execution_price": "kalshi ask for YES, 1-bid for NO (never the mid)",
+    "fees": "series-aware taker fee via src.kalshi_fees.fee_per_contract"
+  },
+  "headline": {
+    "brier_kalshi_HIGH": 0.13730828947368431,
+    "brier_poly_HIGH": 0.1444606686602871,
+    "brier_diff_kalshi_minus_poly": -0.007152379186602868,
+    "brier_diff_ci": [
+      -0.044754582236842116,
+      0.006328987215909098
+    ],
+    "optimal_poly_blend_weight": 0.0,
+    "net_pnl_c_per_contract_margin0_HIGH": 0.6604914661016955,
+    "net_pnl_ci": [
+      -6.942571428571427,
+      11.077256177083335
+    ],
+    "net_clv_c_per_contract_margin0_HIGH": -0.4197717111111122,
+    "net_clv_ci": [
+      -1.077255250000001,
+      4.6178813684210525
+    ],
+    "median_abs_basis_c": 2.100000000000002,
+    "median_corridor_c": 1.9838250000000008,
+    "pct_observations_outside_corridor": 0.5645933014354066,
+    "poly_deeper_share_of_observations": 0.32,
+    "median_poly_over_kalshi_dollar_volume": 0.5
+  },
+  "kill_reasons": [
+    "Founding premise fails: on the matched politics universe Kalshi is the DEEPER venue (median Poly/Kalshi dollar volume 0.50; Poly deeper in only 32% of observations).",
+    "Polymarket is not the sharper reference: Brier 0.1445 vs Kalshi 0.1373; the Brier-minimising blend weight on Polymarket is 0.0 (monotone).",
+    "No money net of cost: net PnL +0.66c/ct at margin 0 with an event-clustered CI of [-6.94, +11.08], negative point estimate at every larger margin, and negative net CLV at 0/1/2c margins.",
+    "The lead-lag that survives on 5 clusters (beta +0.30) collapses to +0.045 [-0.039, +0.143] on the 15-cluster HIGH+MED universe."
+  ],
+  "notable_negative_result": {
+    "h2_corridor_prior": "NOT confirmed on politics. The ev-map H2 study found a fee-bounded +/-2c corridor in the liquid sports head. On matched politics markets the basis breaches the corridor 56% of the time (median |gap| 2.10c vs median corridor 1.98c, p90 6.00c). The corridor is not what stops this trade; the absence of information in the gap is.",
+    "implication": "Any future Kalshi<->Polymarket work must not assume the basis is arbitraged flat outside sports."
+  },
+  "monetisation_blocker": "N/A for P-020 by construction \u2014 it executes on Kalshi only, so the Polymarket-execution blocker that shelved P-002/P-006 does not apply. The blocker here is that the signal does not exist.",
+  "do_not_retest_without": [
+    "A politics/world universe where Polymarket is demonstrably the deeper book (e.g. a US general election cycle), measured dollar-for-dollar BEFORE any signal work.",
+    "A Polymarket price history longer than ~30 days (own capture, or a paid historical feed), so the sample is not 3 Trump-speech events plus 2 primaries."
+  ]
+}

@@ -1,0 +1,6 @@
+# API response cache (~271 MB): Polymarket Gamma universe, Kalshi settled set,
+# per-market candlesticks and price history.  Regenerate with harvest.py +
+# build_pairs.py.  NOTE: Polymarket /prices-history retains only ~30 days, so a
+# regenerated cache will NOT reproduce the 2026-06/07 window — treat this dir as
+# irreplaceable locally even though it is not committed.
+data/

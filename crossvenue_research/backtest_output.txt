@@ -1,0 +1,77 @@
+pairs after Poly-depth filter (vol>=$1,000): 325
+observations: 652 over 29 event clusters, 129 kalshi markets
+HIGH-confidence observations: 209
+
+[ALL] n=652 clusters=29
+  Brier Kalshi  0.1580
+  Brier Poly    0.2148
+  Brier 50/50   0.1714
+  Brier(K)-Brier(P) -0.05675  CI[-0.10385,-0.01422]   (>0 means Poly sharper)
+  LogLoss K 0.4917  P 0.6499
+
+[HIGH] n=209 clusters=5
+  Brier Kalshi  0.1373
+  Brier Poly    0.1445
+  Brier 50/50   0.1401
+  Brier(K)-Brier(P) -0.00715  CI[-0.04475,+0.00633]   (>0 means Poly sharper)
+  LogLoss K 0.4382  P 0.4563
+
+CORRIDOR SENSITIVITY (HIGH-confidence pairs, taker on Kalshi)
+ margin     n  clus trades/pair               net PnL c/ct               net CLV c/ct   hit%
+     0c   118     5        3.47     +0.66c [-6.94, +11.08]      -0.42c [-1.08, +4.62]  44.9%
+     1c    81     4        2.79      -1.06c [-7.92, +9.67]      -0.28c [-1.44, +5.50]  39.5%
+     2c    46     3        2.09    -1.18c [-20.52, +10.86]      -0.13c [-1.11, +2.18]  43.5%
+     3c    31     3        2.07    +5.39c [-33.33, +19.48]      +0.52c [-1.32, +5.01]  51.6%
+     5c    12     3        2.00   -17.04c [-56.11, +12.57]      +3.10c [-0.37, +5.01]  33.3%
+     8c     9     3        2.25   -18.34c [-56.11, +34.39]      +0.94c [-4.10, +5.01]  33.3%
+    12c     5     1        5.00   -56.11c [-56.11, -56.11]      +5.01c [+5.01, +5.01]   0.0%
+
+BY GAP BUCKET (margin=0, HIGH)
+  |gap|   0-  3c  n=  38 clus=  5  PnL +3.25c [-3.41, +13.25]  CLV -0.21c [-3.01, +0.29]  dBrier +0.0023 [-0.0015,+0.0081]
+  |gap|   3-  6c  n=  59 clus=  5  PnL +0.26c [-15.25, +37.72]  CLV -1.49c [-2.71, +6.01]  dBrier +0.0009 [-0.0122,+0.0287]
+  |gap|   6- 10c  n=  12 clus=  3  PnL +8.69c [-15.55, +22.83]  CLV +4.53c [+2.08, +11.87]  dBrier +0.0073 [-0.0296,+0.0284]
+  |gap|  10- 20c  n=   4 clus=  2  PnL +28.87c [+27.03, +34.39]  CLV -1.77c [-4.10, +2.89]  dBrier +0.0635 [+0.0591,+0.0769]
+  |gap|  20-100c  n=   5 clus=  1  PnL -56.11c [-56.11, -56.11]  CLV +5.01c [+5.01, +5.01]  dBrier -0.3804 [-0.3804,-0.3804]
+
+BY ANCHOR HORIZON (margin=2c, HIGH)
+  T-  72h  n=   1 clus=  1  PnL -50.75c [-50.75, -50.75]
+  T-  48h  n=   4 clus=  2  PnL +7.57c [+3.00, +12.14]
+  T-  36h  n=   8 clus=  3  PnL -3.84c [-56.73, +17.16]
+  T-  24h  n=  11 clus=  3  PnL +2.28c [-49.57, +18.14]
+  T-  18h  n=  11 clus=  3  PnL -12.38c [-25.43, -0.78]
+  T-  12h  n=   4 clus=  2  PnL +30.87c [+15.90, +75.76]
+  T-   8h  n=   2 clus=  1  PnL -23.19c [-23.19, -23.19]
+  T-   6h  n=   5 clus=  2  PnL +6.14c [-49.75, +20.11]
+
+LOO (margin=2c): min -8.24c  max +3.52c   positive clusters 1/3
+
+LEAD-LAG  d(kalshi mid) over next 24h  vs  gap
+  [HIGH] n=165 clus=5  beta=+0.300 CI[+0.105,+1.242]  (1.0 = Kalshi fully converges to Poly)
+  [HIGH+MED] n=335 clus=15  beta=+0.045 CI[-0.039,+0.143]  (1.0 = Kalshi fully converges to Poly)
+
+BLEND WEIGHT on Poly (Brier), HIGH
+  w=0.0  Brier 0.1373  CI[0.0576,0.2438]
+  w=0.1  Brier 0.1377  CI[0.0577,0.2453]
+  w=0.25 Brier 0.1385  CI[0.0577,0.2478]
+  w=0.5  Brier 0.1401  CI[0.0580,0.2527]
+  w=0.75 Brier 0.1421  CI[0.0583,0.2586]
+  w=1.0  Brier 0.1445  CI[0.0587,0.2729]
+
+BASIS DISTRIBUTION (|poly_mid - kalshi_mid|)
+  [HIGH] n=209  median |gap| 2.10c  p75 4.00c  p90 6.00c  | median corridor 1.98c  | >2c: 56%  >corridor: 56%
+  [HIGH+MED] n=435  median |gap| 3.00c  p75 6.50c  p90 24.50c  | median corridor 2.01c  | >2c: 66%  >corridor: 65%
+
+CORRIDOR SENSITIVITY (HIGH+MED — 3x the event clusters)
+     0c   282    15  PnL      -0.73c [-5.33, +6.66]  CLV      -1.23c [-2.57, -0.27]
+     1c   226    14  PnL      -1.06c [-5.87, +7.39]  CLV      -0.96c [-2.51, +0.50]
+     2c   164    13  PnL     -3.43c [-10.36, +7.89]  CLV      -1.36c [-3.35, +0.16]
+     3c   138    11  PnL    -3.13c [-13.37, +11.08]  CLV      -2.04c [-4.46, -0.27]
+     5c    99    10  PnL     -8.93c [-20.24, +9.41]  CLV      -2.15c [-4.49, -0.34]
+     8c    82    10  PnL    -9.76c [-22.32, +12.78]  CLV      -1.67c [-4.50, +0.83]
+    12c    68     9  PnL   -11.28c [-26.61, +15.05]  CLV      -1.83c [-5.37, +1.02]
+
+SPLIT BY WHICH VENUE IS DEEPER (HIGH+MED, margin=0)
+  Poly deeper    n=  87 clus= 15  PnL -3.61c [-16.60, +8.91]  dBrier -0.0389 [-0.1034,+0.0053]
+  Kalshi deeper  n= 195 clus= 11  PnL +0.55c [-5.95, +9.98]  dBrier -0.0416 [-0.0896,+0.0124]
+
+wrote crossvenue_research/results.json

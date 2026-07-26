@@ -59,6 +59,8 @@ rsync -avz --progress \
   --exclude='.mypy_cache' \
   --exclude='.pytest_cache' \
   --exclude='venv/' \
+  --exclude='.claude/worktrees/' \
+  --exclude='manager/state/' \
   ./ "${REMOTE_USER}@${SERVER_IP}:${REMOTE_DIR}/"
 
 echo "==> Sync complete."

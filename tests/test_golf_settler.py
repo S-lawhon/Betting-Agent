@@ -8,8 +8,10 @@ validation if handled the way the tennis settler handles them:
 
   * status="closed" with an empty result — the ~1-day finalization lag.
     Must NOT settle (booking these as VOID zeroes a whole tournament).
-  * result="scalar" — competitor withdrew; market cancelled, not
-    resolved.  Must VOID, and be labelled as such.
+  * result="scalar" — a PARTIAL PAYOUT at ``settlement_value_dollars``,
+    either a dead-heat $1/n split or a cancellation marked to fair
+    value.  Must NEVER be booked as a void: that erases the exact event
+    P-022 exists to harvest and overstates P-017's withdrawals.
 
 Plus the tie case that is P-017's entire thesis: an event may settle far
 more than N markets YES, and every one pays in full.
@@ -21,7 +23,12 @@ from pathlib import Path
 
 import pytest
 
-from src.kalshi_golf_settler import KalshiGolfSettler, _calc_outcome_pnl
+from src.kalshi_golf_settler import (
+    KalshiGolfSettler,
+    ScalarSettlementValueMissing,
+    _calc_outcome_pnl,
+    scalar_settlement_value,
+)
 
 
 NOW = datetime(2026, 7, 27, 12, 0, tzinfo=timezone.utc)
@@ -59,6 +66,7 @@ def _placed(ticker, size=100.0, fill=0.20, contracts=500,
 
 
 def _write_log(tmp_path: Path, entries) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     p = tmp_path / "P-017.jsonl"
     p.write_text("".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8")
     return p
@@ -106,19 +114,167 @@ def test_whole_tournament_in_lag_window_settles_nothing(tmp_path):
     assert s.settle_cycle() == []
 
 
-# ── Withdrawn competitors (result="scalar") ──────────────────────────
+# ── Scalar = PARTIAL PAYOUT, not a void ──────────────────────────────
+#
+# Verified against 24,195 cached settled golf markets + the live
+# per-ticker GET (2026-07-26):
+#   * KX*LEAD scalar events pay exactly $1/n — 21/21 events matched
+#     (2-way 0.50, 3-way 0.33, 4-way 0.25, 5-way 0.20, 6-way 0.16).
+#   * top-N / make-cut scalars are withdrawals marked to FAIR VALUE, not
+#     refunded: COPC26's 8 names settle monotone TOP5<=TOP10<=TOP20<=
+#     MAKECUT (8/8), e.g. TMOO 0.11/0.16/0.36/0.51.
+# Both settle at settlement_value_dollars.  Booking either as a void is
+# the bug this block exists to prevent regressing.
 
-def test_scalar_result_voids_as_withdrawn(tmp_path):
+
+def _scalar_market(value, key="settlement_value_dollars"):
+    return {"status": "finalized", "result": "scalar", key: value}
+
+
+def test_scalar_yes_side_settles_at_partial_payout(tmp_path):
+    """2-way dead heat: bought YES at 8c, split pays 50c -> profit."""
     s = _settler(
         tmp_path,
-        [_placed("KXPGATOP10-3MO26-WD")],
-        {"KXPGATOP10-3MO26-WD": {"status": "finalized", "result": "scalar"}},
+        [_placed("KXPGAR1LEAD-3MO26-TIE", size=8.0, fill=0.08,
+                 contracts=100, taker_fee=0.0)],
+        {"KXPGAR1LEAD-3MO26-TIE": _scalar_market("0.5000")},
     )
     out = s.settle_cycle()
     assert len(out) == 1
-    assert out[0]["outcome"] == "VOID"
-    assert out[0]["resolution_source"] == "kalshi_withdrawn"
-    assert out[0]["pnl_gross_usd"] == 0.0
+    r = out[0]
+    assert r["outcome"] == "WIN"                     # never VOID
+    assert r["result"] == "scalar"
+    assert r["settlement_kind"] == "scalar_partial"
+    assert r["settlement_value"] == pytest.approx(0.50)
+    assert r["resolution_source"] == "kalshi_scalar"
+    # 100 contracts * (0.50 - 0.08)
+    assert r["pnl_gross_usd"] == pytest.approx(42.0)
+
+
+def test_scalar_no_side_settles_at_complement(tmp_path):
+    """The fade side: sold YES at 8c (= bought NO at 92c), tie pays 50c.
+
+    NO receives notional - settlement_value = 0.50, having paid 0.92 ->
+    a 42c/contract LOSS.  This is P-022's tail, and booking it as a void
+    would hide the only way the pod can lose badly.
+    """
+    placed = {**_placed("KXPGAR1LEAD-3MO26-FADE", size=92.0, fill=0.08,
+                        contracts=100, taker_fee=0.0), "side": "NO"}
+    s = _settler(
+        tmp_path, [placed],
+        {"KXPGAR1LEAD-3MO26-FADE": _scalar_market("0.5000")},
+    )
+    r = s.settle_cycle()[0]
+    assert r["outcome"] == "LOSS"
+    assert r["settlement_kind"] == "scalar_partial"
+    assert r["pnl_gross_usd"] == pytest.approx(-42.0)
+
+
+def test_scalar_two_way_and_five_way_splits(tmp_path):
+    """$1/n scales with the tie count, read from the API not re-derived."""
+    for n, value in ((2, "0.5000"), (5, "0.2000")):
+        placed = {**_placed(f"KXPGAR1LEAD-3MO26-N{n}", size=92.0, fill=0.08,
+                            contracts=100, taker_fee=0.0), "side": "NO"}
+        s = _settler(
+            tmp_path / f"n{n}", [placed],
+            {f"KXPGAR1LEAD-3MO26-N{n}": _scalar_market(value)},
+        )
+        r = s.settle_cycle()[0]
+        # NO collected 0.92, pays out (1 - 1/n)
+        expected = 100 * ((1.0 - float(value)) - 0.92)
+        assert r["pnl_gross_usd"] == pytest.approx(expected, abs=0.01)
+        assert r["settlement_value"] == pytest.approx(float(value))
+
+
+def test_scalar_withdrawal_marked_to_fair_value_is_a_small_loss(tmp_path):
+    """The P-017 regime: bought TOP10 at 20c, cancelled at 16c fair value.
+
+    Old behaviour booked VOID / pnl 0 and overstated the pod by 4c/ct.
+    """
+    s = _settler(
+        tmp_path,
+        [_placed("KXPGATOP10-COPC26-TMOO", size=100.0, fill=0.20,
+                 contracts=500, taker_fee=0.0)],
+        {"KXPGATOP10-COPC26-TMOO": _scalar_market("0.1600")},
+    )
+    r = s.settle_cycle()[0]
+    assert r["outcome"] == "LOSS"
+    assert r["settlement_kind"] == "scalar_partial"
+    assert r["pnl_gross_usd"] == pytest.approx(-20.0)   # 500 * -0.04
+
+
+def test_scalar_missing_settlement_value_does_not_become_a_void(tmp_path):
+    """Fail loudly: leave OPEN rather than guess a payout."""
+    s = _settler(
+        tmp_path,
+        [_placed("KXPGAR1LEAD-3MO26-NOVAL")],
+        {"KXPGAR1LEAD-3MO26-NOVAL": {"status": "finalized",
+                                     "result": "scalar"}},
+    )
+    assert s.settle_cycle() == []
+
+
+def test_scalar_missing_value_stays_open_across_cycles(tmp_path):
+    """And it must not decay into a void on the next pass either."""
+    s = _settler(
+        tmp_path,
+        [_placed("KXPGAR1LEAD-3MO26-NOVAL")],
+        {"KXPGAR1LEAD-3MO26-NOVAL": {"status": "finalized",
+                                     "result": "scalar",
+                                     "settlement_value_dollars": ""}},
+    )
+    assert s.settle_cycle() == []
+    assert s.settle_cycle() == []
+
+
+def test_scalar_helper_raises_rather_than_defaulting():
+    with pytest.raises(ScalarSettlementValueMissing):
+        _calc_outcome_pnl("YES", "scalar", 100.0, 0.20)
+
+
+def test_scalar_settlement_value_accepts_cents_fallback():
+    assert scalar_settlement_value(
+        {"settlement_value_dollars": "0.3300"}) == pytest.approx(0.33)
+    assert scalar_settlement_value(
+        {"settlement_value": 33}) == pytest.approx(0.33)
+    assert scalar_settlement_value(
+        {"settlement_value_dollars": None, "settlement_value": None}) is None
+    assert scalar_settlement_value({}) is None
+
+
+@pytest.mark.parametrize("side,size,fill", [
+    ("YES", 100.0, 0.20), ("NO", 80.0, 0.20),
+])
+def test_scalar_at_bounds_matches_binary_settlement(side, size, fill, tmp_path):
+    """Invariant: scalar at $1.00 == a YES win, at $0.00 == a YES loss.
+
+    Guards the contract-count derivation from drifting apart from the
+    WIN/LOSS formulas it has to stay consistent with.
+    """
+    for value, binary in (("1.0000", "yes"), ("0.0000", "no")):
+        placed = {**_placed("KX-BOUND", size=size, fill=fill,
+                            contracts=0, taker_fee=0.0), "side": side}
+        scal = _settler(tmp_path / f"s{value}{side}", [placed],
+                        {"KX-BOUND": _scalar_market(value)}).settle_cycle()[0]
+        binr = _settler(tmp_path / f"b{value}{side}", [placed],
+                        {"KX-BOUND": {"status": "finalized",
+                                      "result": binary}}).settle_cycle()[0]
+        assert scal["pnl_gross_usd"] == pytest.approx(
+            binr["pnl_gross_usd"], abs=0.01)
+        assert scal["outcome"] == binr["outcome"]
+
+
+def test_void_and_partial_payout_are_distinguishable(tmp_path):
+    """The whole point: two rows, two settlement_kinds, never merged."""
+    s = _settler(
+        tmp_path,
+        [_placed("KX-SCALAR"),
+         _placed("KX-STALE", close_utc="2026-07-01T00:00:00+00:00")],
+        {"KX-SCALAR": _scalar_market("0.3300"),
+         "KX-STALE": {"status": "closed", "result": ""}},
+    )
+    kinds = {r["market_id"]: r["settlement_kind"] for r in s.settle_cycle()}
+    assert kinds == {"KX-SCALAR": "scalar_partial", "KX-STALE": "void"}
 
 
 def test_unknown_result_is_left_open_not_voided(tmp_path):
@@ -179,12 +335,17 @@ def test_loss_pnl_includes_fee(tmp_path):
 
 
 def test_void_refunds_stake_but_not_fee(tmp_path):
+    """A genuine void (stale, never resolved) refunds stake, keeps fee."""
     s = _settler(
         tmp_path,
-        [_placed("KXPGATOP10-3MO26-V", contracts=500, taker_fee=0.0112)],
-        {"KXPGATOP10-3MO26-V": {"status": "finalized", "result": "scalar"}},
+        [_placed("KXPGATOP10-3MO26-V", contracts=500, taker_fee=0.0112,
+                 close_utc="2026-07-01T00:00:00+00:00")],
+        {"KXPGATOP10-3MO26-V": {"status": "closed", "result": ""}},
     )
     r = s.settle_cycle()[0]
+    assert r["outcome"] == "VOID"
+    assert r["settlement_kind"] == "void"
+    assert r["settlement_value"] is None
     assert r["pnl_gross_usd"] == 0.0
     assert r["pnl_usd"] == pytest.approx(-5.6)
 
@@ -278,10 +439,21 @@ def test_settlement_appended_to_log(tmp_path):
 # ── P&L helper ───────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("result,expected", [
-    ("yes", "WIN"), ("no", "LOSS"), ("scalar", "VOID"), ("", "VOID"),
+    ("yes", "WIN"), ("no", "LOSS"), ("", "VOID"), ("banana", "VOID"),
 ])
 def test_calc_outcome_labels(result, expected):
     outcome, _ = _calc_outcome_pnl("YES", result, 100.0, 0.25)
+    assert outcome == expected
+
+
+@pytest.mark.parametrize("value,expected", [
+    (0.50, "WIN"), (0.33, "WIN"), (0.25, "LOSS"), (0.10, "LOSS"),
+])
+def test_scalar_label_follows_sign_never_void(value, expected):
+    """Bought YES at 25c: a scalar is a WIN or a LOSS, never a VOID."""
+    outcome, _ = _calc_outcome_pnl(
+        "YES", "scalar", 100.0, 0.25, settlement_value=value,
+    )
     assert outcome == expected
 
 

@@ -147,13 +147,41 @@ resolved, `_open_count` pegged at the cap, pod mute after one tournament.
   `result` for ~a day post-tournament (156/156 observed). The tennis settler's
   `result or "void"` idiom would VOID a whole tournament. Settle only on a
   populated `result`; the stale guard (10d after `close_utc`) backstops.
-- **`result="scalar"` is a real third value** (9/200 settled) — competitor never
-  teed off, market cancelled not resolved. VOID, labelled `kalshi_withdrawn`.
+- **`result="scalar"` is a PARTIAL PAYOUT, never a void** (532/24,195 settled golf
+  markets, 2.2%; 102/3,206 = 3.2% inside P-017's own KXPGATOP10/20 universe).
+  Kalshi settles the market at `settlement_value_dollars`: YES receives it, NO
+  receives `1 − it` (notional is $1.00). **Corrected 2026-07-26 — this section
+  previously said scalar meant "competitor never teed off, market cancelled →
+  VOID", and the settler booked $0 P&L on every one.** Two regimes produce
+  scalar and both settle the same way:
+  - **Dead-heat $1/n split** on round-leader series (`KX*LEAD`). Verified exactly
+    on all 21 scalar LEAD events in the census — 2-way 0.50, 3-way 0.33, 4-way
+    0.25, 5-way 0.20, 6-way 0.16. This is P-022's entire thesis; voiding it
+    erases the event the pod exists to harvest.
+  - **Withdrawal cancelled at FAIR VALUE** on top-N / make-cut. A golfer who
+    never teed off is marked to the prevailing price, **not refunded at your
+    fill**. Verified on COPC26: the same 8 names settle monotone TOP5 ≤ TOP10 ≤
+    TOP20 ≤ MAKECUT (8/8), e.g. TMOO 0.11/0.16/0.36/0.51 — a probability
+    surface, not $1/n and not a refund.
+
+  Scalar now yields WIN or LOSS on the sign of realised P&L and **never** VOID;
+  `settlement_kind` (`scalar_partial` / `void` / `binary`) and `settlement_value`
+  keep the two apart in the log. A scalar with no `settlement_value_dollars` is
+  left OPEN with a logged ERROR — never defaulted. Do not add a new `outcome`
+  value: `WIN`/`LOSS`/`VOID` is hard-coded in `trade_store`, `engine`,
+  `aggregate_risk`, and `capital_allocator`, and an unrecognised outcome would
+  leak exposure.
 - **P&L is booked NET of the taker fee**, since the go/no-go compares against a
   fee-net baseline (+6.8¢/ct). `pnl_gross_usd`/`fees_usd` recorded alongside.
 
 Use `KalshiPublic.get_market(ticker)` for settlement state — LIST endpoints null
-out fields on settled markets.
+out fields on settled markets (but they DO carry `settlement_value_dollars`;
+`settlement_value` in integer cents is usually null on these series).
+
+Rows already booked by the buggy version carry
+`resolution_source="kalshi_withdrawn"`. Re-derive them with
+`scripts/backfill_golf_scalar_corrections.py`, which writes a corrected series to
+a NEW file and never touches trade history.
 
 ## Canonical docs
 

@@ -19,13 +19,35 @@ Three golf-specific behaviours that the tennis settler does NOT have
     the P&L for a whole tournament.  We settle ONLY on a populated
     ``result`` and let the stale guard be the backstop.
 
-2.  ``result="scalar"`` is a real, recurring third value (9/200 settled
-    markets).  These are competitors who never teed off — the market
-    carries an empty ``expiration_value`` and zero open interest, i.e.
-    it was cancelled rather than resolved.  Correct treatment is VOID
-    (stake refunded), but we classify it explicitly so it shows up in
-    the log as ``withdrawn`` instead of being swept into a generic
-    unknown-result bucket.
+2.  ``result="scalar"`` is a real, recurring third value (532/24,195
+    settled golf markets in the cached census, 2.2%).  **It is a PARTIAL
+    PAYOUT, not a void.**  Kalshi settles the market at
+    ``settlement_value_dollars`` — YES holders receive that amount per
+    contract and NO holders receive ``notional − settlement_value``
+    (notional is always $1.00 on these series).  Two distinct regimes
+    produce it, and both settle the same way:
+
+      * **Dead-heat split** on round-leader series (KX*LEAD).  A tie for
+        the round lead pays $1/n.  Verified exactly on all 21 scalar
+        LEAD events in the census: 2-way → 0.50, 3-way → 0.33, 4-way →
+        0.25, 5-way → 0.20, 6-way → 0.16.  This is the entire economic
+        thesis of P-022; booking it as a void erases the event the pod
+        exists to harvest.
+      * **Withdrawal cancelled at fair value** on top-N / make-cut
+        series.  A golfer who never teed off has his markets cancelled
+        and settled at the prevailing fair value, NOT refunded at your
+        fill.  Verified on the COPC26 cohort: the same 8 names settle
+        monotonically TOP5 ≤ TOP10 ≤ TOP20 ≤ MAKECUT (8/8), e.g. TMOO
+        0.11/0.16/0.36/0.51 — a probability surface, not $1/n and not a
+        refund.
+
+    The old code booked BOTH as ``VOID`` with zero P&L, which silently
+    overstated P-017 by ``(fill_price − settlement_value)`` per contract
+    on every withdrawal and would have zeroed every P-022 dead heat.
+    Scalar now settles at the realised value and NEVER produces outcome
+    ``VOID`` — a partial payout and a genuine void must stay
+    distinguishable in the log.  ``settlement_kind`` carries that
+    distinction explicitly.
 
 3.  P&L is booked NET of the taker fee already paid at placement.  The
     P-017 validation gate is "realized net edge vs the +6.8c/contract
@@ -57,23 +79,96 @@ logger = logging.getLogger(__name__)
 RESOLVED_STATUSES = ("settled", "finalized", "determined")
 PENDING_STATUSES = ("closed",)
 
-# Kalshi reports this instead of yes/no for a market that was cancelled
-# rather than resolved (golfer withdrew before teeing off).
+# Kalshi reports this instead of yes/no when a market settles at a
+# fractional value: a dead-heat $1/n split, or a cancelled market marked
+# to fair value.  Either way ``settlement_value_dollars`` is the realised
+# per-contract payout.  This is NOT a void.
 SCALAR_RESULT = "scalar"
+
+# All golf series carry a $1.00 notional; asserted rather than assumed
+# because a scalar payout is meaningless without it.
+DEFAULT_NOTIONAL = 1.0
+
+
+class ScalarSettlementValueMissing(ValueError):
+    """A market resolved ``scalar`` but carried no settlement value.
+
+    Raised rather than defaulted: guessing zero would book a full loss
+    and guessing the fill price would book a void, and both are wrong in
+    the one place P-022's entire edge lives.
+    """
+
+
+def scalar_settlement_value(market: Dict[str, Any]) -> Optional[float]:
+    """Realised per-contract payout (dollars) for a ``scalar`` market.
+
+    The per-ticker GET carries ``settlement_value_dollars`` as a decimal
+    string ("0.5000").  ``settlement_value`` (integer cents) is usually
+    null on these series but is accepted as a fallback.  Returns None if
+    neither is usable — the caller must NOT substitute a default.
+    """
+    raw = market.get("settlement_value_dollars")
+    if raw not in (None, ""):
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            pass
+    raw = market.get("settlement_value")
+    if raw not in (None, ""):
+        try:
+            return float(raw) / 100.0
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def _contracts_from_stake(side: str, size_usd: float, fill_price: float) -> float:
+    """Contracts implied by collateral posted at the entry price.
+
+    Derived (not read from ``extra``) so that a scalar settling at $1.00
+    is arithmetically identical to a WIN and one settling at $0.00 is
+    identical to a LOSS.  That invariant is tested.
+    """
+    entry = fill_price if (side or "YES").strip().upper() == "YES" \
+        else (1.0 - fill_price)
+    return size_usd / max(entry, 1e-9)
 
 
 def _calc_outcome_pnl(
-    side: str, result: str, size_usd: float, fill_price: float,
+    side: str,
+    result: str,
+    size_usd: float,
+    fill_price: float,
+    settlement_value: Optional[float] = None,
+    notional: float = DEFAULT_NOTIONAL,
 ) -> Tuple[str, float]:
-    """Outcome label and GROSS P&L for a settled Kalshi binary.
+    """Outcome label and GROSS P&L for a settled Kalshi market.
 
     P-017 only buys YES, but NO is handled for completeness.  fill_price
     is the YES price paid.  WIN pnl is profit only (stake excluded),
     LOSS is -stake, VOID is 0 — matching the tennis/Polymarket
     convention so downstream accounting stays uniform.
+
+    ``scalar`` settles at ``settlement_value``: YES receives it, NO
+    receives ``notional − settlement_value``.  The label is WIN or LOSS
+    on the sign of the realised P&L and is **never** VOID, so a partial
+    payout can never be mistaken for a refund downstream.
     """
     result_l = (result or "").strip().lower()
     side_u = (side or "YES").strip().upper()
+
+    if result_l == SCALAR_RESULT:
+        if settlement_value is None:
+            raise ScalarSettlementValueMissing(
+                "result=scalar requires settlement_value_dollars"
+            )
+        contracts = _contracts_from_stake(side_u, size_usd, fill_price)
+        if side_u == "YES":
+            per_ct = settlement_value - fill_price
+        else:
+            per_ct = (notional - settlement_value) - (notional - fill_price)
+        pnl = round(contracts * per_ct, 2)
+        return ("WIN" if pnl > 0 else "LOSS"), pnl
 
     if result_l not in ("yes", "no"):
         return "VOID", 0.0
@@ -141,18 +236,38 @@ class KalshiGolfSettler:
                     continue
 
                 if result == SCALAR_RESULT:
-                    # Competitor never teed off — market cancelled, not
-                    # resolved.  Refund.
-                    logger.info(
-                        "kalshi_golf_settler: %s cancelled (result=scalar, "
-                        "competitor withdrew) — voiding", market_id,
-                    )
-                    settled.append(
-                        self._write_settlement(
-                            market_id, entry, "void", "kalshi_withdrawn"
+                    # PARTIAL PAYOUT, not a void.  Either a dead-heat
+                    # $1/n split (round-leader series) or a cancelled
+                    # market marked to fair value (top-N / make-cut);
+                    # settlement_value_dollars is the realised payout in
+                    # both cases.
+                    value = scalar_settlement_value(market)
+                    if value is None:
+                        # Fail loudly.  Leaving it open costs a cycle;
+                        # defaulting it would silently mis-book the one
+                        # settlement regime P-022 depends on.
+                        logger.error(
+                            "kalshi_golf_settler: %s result=scalar but NO "
+                            "settlement value (settlement_value_dollars=%r "
+                            "settlement_value=%r) — leaving OPEN, will not "
+                            "guess a payout",
+                            market_id,
+                            market.get("settlement_value_dollars"),
+                            market.get("settlement_value"),
                         )
-                    )
-                    continue
+                    else:
+                        logger.info(
+                            "kalshi_golf_settler: %s scalar settlement at "
+                            "$%.4f/contract (partial payout, NOT a void)",
+                            market_id, value,
+                        )
+                        settled.append(
+                            self._write_settlement(
+                                market_id, entry, SCALAR_RESULT,
+                                "kalshi_scalar", settlement_value=value,
+                            )
+                        )
+                        continue
 
                 if result:
                     # Unexpected fourth value.  Do NOT guess — leave the
@@ -273,6 +388,7 @@ class KalshiGolfSettler:
         placed_entry: Dict[str, Any],
         result: str,
         resolution_source: str,
+        settlement_value: Optional[float] = None,
     ) -> Dict[str, Any]:
         extra = placed_entry.get("extra") or {}
         side = placed_entry.get("side", "YES")
@@ -283,7 +399,8 @@ class KalshiGolfSettler:
             or 0.5
         )
         outcome, pnl_gross = _calc_outcome_pnl(
-            side, result, size_usd, fill_price
+            side, result, size_usd, fill_price,
+            settlement_value=settlement_value,
         )
 
         # Taker fee was charged at placement and is sunk on WIN and LOSS
@@ -294,12 +411,25 @@ class KalshiGolfSettler:
         fees_usd = round(contracts * fee_per_ct, 4)
         pnl_net = round(pnl_gross - fees_usd, 2)
 
+        # A partial payout and a refunded void must never collapse into
+        # the same row again.  settlement_kind is the explicit
+        # discriminator for downstream readers; settlement_value carries
+        # the realised per-contract payout (None for binaries/voids).
+        if result == SCALAR_RESULT:
+            settlement_kind = "scalar_partial"
+        elif outcome == "VOID":
+            settlement_kind = "void"
+        else:
+            settlement_kind = "binary"
+
         now = self._now()
         record: Dict[str, Any] = {
             **placed_entry,
             "action": outcome,
             "outcome": outcome,
             "result": result,
+            "settlement_kind": settlement_kind,
+            "settlement_value": settlement_value,
             "pnl_usd": pnl_net,
             "pnl_gross_usd": pnl_gross,
             "fees_usd": fees_usd,
@@ -316,9 +446,11 @@ class KalshiGolfSettler:
         else:
             self._append_log(record)
         logger.info(
-            "kalshi_golf_settler: settled %s | result=%s outcome=%s "
-            "pnl_net=%.2f (gross=%.2f fees=%.2f)",
-            market_id, result, outcome, pnl_net, pnl_gross, fees_usd,
+            "kalshi_golf_settler: settled %s | result=%s kind=%s value=%s "
+            "outcome=%s pnl_net=%.2f (gross=%.2f fees=%.2f)",
+            market_id, result, settlement_kind,
+            "-" if settlement_value is None else f"{settlement_value:.4f}",
+            outcome, pnl_net, pnl_gross, fees_usd,
         )
         return record
 

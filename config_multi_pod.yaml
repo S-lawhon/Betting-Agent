@@ -516,6 +516,39 @@ pods:
     risk:
       max_net_contracts: 200
 
+  P-022:
+    # Round-Leader Dead-Heat Fade maker — STANDALONE engine
+    # (scripts/run_round_leader_fade.py, unit betting-round-leader-fade).
+    # Deliberately NOT in pods.active: it runs its own fast loop.
+    #
+    # These values are GATE CONDITIONS under golf_quirks_research/
+    # P022_DECISION_RULE.md §7, not tuning knobs. Changing any of them is a new
+    # hypothesis (P-022b) and RESETS the tournament counter T to 0 under §8.1.
+    # The block is written out explicitly rather than left to code defaults so
+    # a drift is visible in a config diff.
+    quoting:
+      # §1 anchor band. The pod shipped (0.03, 0.10) — narrower than the rule it
+      # is tested against — which would have quoted a different population from
+      # the one Phase 2 measured.
+      mid_band: [0.03, 0.12]
+      quote_offset: 0.02
+      # §7 posting window: quote only at H ~ 12-24h pre-round; once rested, a
+      # quote stays to close. Phase 2 showed H=6h collapses to marginal.
+      fade_start_h: 24.0
+      no_new_quote_h: 12.0
+    risk:
+      # §7 caps, as PERCENTAGES of bankroll. They were fixed dollars ($5/$50/$150
+      # equivalents) which matched the rule only by coincidence at a $1,000
+      # bankroll and would have silently breached it at any other. Sizing is on
+      # COLLATERAL at risk — a fade sold at 5c posts 95c of collateral per
+      # contract — never on contract count.
+      pct_per_name: 0.005        # <= 0.5% of bankroll on one strike
+      pct_per_tournament: 0.05   # <= 5%   across all names/rounds of one event
+      pct_total: 0.15            # <= 15%  aggregate live P-022 collateral
+      # Secondary bound only; collateral binds first. At a 5c fade the per-name
+      # collateral cap allows ~5 contracts, so this never binds at $1k bankroll.
+      max_contracts_per_name: 25
+
 # ── DataGolf model feed (optional, used by P-017) ───────────────────
 # Off until DATAGOLF_API_KEY is in .env AND enabled: true. When disabled
 # or keyless, P-017 falls back to the validated structural edge_bump.

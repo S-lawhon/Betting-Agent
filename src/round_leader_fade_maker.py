@@ -560,10 +560,19 @@ class RoundLeaderFadeMakerPod:
         r = cfg.get("risk", {}) or {}
         # Bankroll comes from the shared config, so P-022's caps track the same
         # number every other pod sizes against rather than a private copy.
+        # The live key is `risk.initial_bankroll` (config_multi_pod.yaml:34).
+        # Reading only `bankroll` would silently fall back to the 1000.0 default
+        # — correct today purely by coincidence, and wrong the moment the paper
+        # bankroll is changed. That is the same "right by accident" failure the
+        # fixed-dollar caps had, so the key list is explicit and ordered.
+        _risk = config.get("risk", {}) or {}
+        _cap = config.get("capital", {}) or {}
         bankroll = float(
             r.get("bankroll")
-            or (config.get("risk", {}) or {}).get("bankroll")
-            or (config.get("capital", {}) or {}).get("bankroll")
+            or r.get("initial_bankroll")
+            or _risk.get("bankroll")
+            or _risk.get("initial_bankroll")
+            or _cap.get("bankroll")
             or 1000.0
         )
         return RoundLeaderFadeMakerEngine(

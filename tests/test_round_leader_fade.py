@@ -420,3 +420,25 @@ def test_no_guard_is_a_no_op(tmp_path):
     eng.discover()
     eng.cycle()
     assert eng.books[TICKER].ask_quote is not None
+
+
+def test_bankroll_is_read_from_the_live_config_key():
+    """The live key is `risk.initial_bankroll`, not `risk.bankroll`.
+
+    Reading only `bankroll` fell back to the 1000.0 default — correct today by
+    coincidence, wrong the moment the paper bankroll changes. That is the same
+    failure mode as the fixed-dollar caps this reconciliation removed.
+    """
+    from src.round_leader_fade_maker import RoundLeaderFadeMakerPod as P
+    eng = P.from_config({"risk": {"initial_bankroll": 4000.0}})
+    assert abs(eng.bankroll - 4000.0) < 1e-9
+    assert abs(eng.max_collateral_per_name - 20.0) < 1e-9      # 0.5%
+    assert abs(eng.max_collateral_per_tournament - 200.0) < 1e-9  # 5%
+    assert abs(eng.max_total_collateral - 600.0) < 1e-9        # 15%
+
+
+def test_pod_block_overrides_win_over_the_global_bankroll():
+    from src.round_leader_fade_maker import RoundLeaderFadeMakerPod as P
+    eng = P.from_config({"risk": {"initial_bankroll": 4000.0},
+                         "pods": {"P-022": {"risk": {"bankroll": 250.0}}}})
+    assert abs(eng.bankroll - 250.0) < 1e-9

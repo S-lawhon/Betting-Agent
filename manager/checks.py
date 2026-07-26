@@ -60,6 +60,40 @@ def _parse(ts: Optional[str]) -> Optional[datetime]:
         return None
 
 
+# Stages at which a pod's fate is SETTLED. Once a pod is killed or shelved the
+# decision is made and recorded in the registry's `retired:` block — so the
+# checks that exist to PROMPT a decision (the gate) or to flag a possibly-
+# accidental state (the kill switch) must stop firing daily. A killed pod
+# re-failing its now-frozen gate tape every morning, and its deliberately-left
+# kill file being re-flagged as "needs a look" every morning, is exactly the
+# never-actionable daily noise the module docstring warns trains you to ignore
+# the channel. Concrete case: P-016, killed 2026-07-21 per its pre-registered
+# gate, kill file intentionally left in place per registry.yaml `retired:`.
+#
+# `parked` is deliberately NOT terminal — a parked pod may resume, so its gate
+# prompts should survive.
+_TERMINAL_STAGES = frozenset({"killed", "shelved"})
+
+
+def _pod_stage(snap: Dict[str, Any], pod_id: str) -> Optional[str]:
+    """The registry `stage` for a pod, as captured into the snapshot.
+
+    Reads the collected `workstreams` list (collect.py stamps `stage` there),
+    NOT the registry argument — the brief renders with an empty registry, so the
+    snapshot is the only stage source that is always present. If the workstreams
+    probe faulted the pod is simply unknown here, so callers fall back to their
+    normal (louder) behaviour rather than wrongly going quiet on a live pod.
+    """
+    for ws in snap.get("workstreams", []) or []:
+        if ws.get("id") == pod_id:
+            return ws.get("stage")
+    return None
+
+
+def _is_terminal(snap: Dict[str, Any], pod_id: str) -> bool:
+    return _pod_stage(snap, pod_id) in _TERMINAL_STAGES
+
+
 # --------------------------------------------------------------------------
 # individual check groups
 # --------------------------------------------------------------------------
@@ -236,8 +270,14 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
             # Output path is visible from here but nothing is there to measure.
             continue
         if job.get("stale"):
-            sev = {"critical": "critical", "warn": "warn"}.get(
-                job.get("severity", "info"), "warn")
+            # Honour the registry's declared severity. The old map only listed
+            # critical/warn, so a job declared `severity: info` (e.g.
+            # rotate_active_log, which is size-triggered and benign when idle)
+            # fell through to the "warn" default and was silently promoted into
+            # "needs a look" every day. Pass through any valid severity; default
+            # to info, matching the collector's own default for the field.
+            declared = job.get("severity", "info")
+            sev = declared if declared in SEVERITY_ORDER else "info"
             out.append(Finding(
                 key="job.{}.stale".format(jid),
                 severity=sev,
@@ -269,12 +309,24 @@ def check_invariants(snap: Dict[str, Any]) -> List[Finding]:
             value=non_paper))
 
     if inv.get("kill_switch_present"):
+        # For a killed/shelved pod the kill file is the intended end state — the
+        # `retired:` block says to leave it in place until the unit is repurposed
+        # or decommissioned. So it is quiet context (info: never pushed, no
+        # "needs a look"), not a warning. It stays a warn for a NON-terminal pod,
+        # where an unexplained kill file is genuinely alarming.
+        killed = _is_terminal(snap, "P-016")
         out.append(Finding(
             key="invariant.kill_switch",
-            severity="warn",
-            title="P-016 kill switch is engaged",
-            detail="data/KILL_MAKER exists, so the live maker is halted. "
-                   "Expected if you killed it deliberately; alarming if not.",
+            severity="info" if killed else "warn",
+            title=("P-016 kill switch engaged (expected — pod retired)"
+                   if killed else "P-016 kill switch is engaged"),
+            detail=("data/KILL_MAKER exists, so the live maker is halted. This "
+                    "is the intended resting state for a retired pod — the kill "
+                    "file is left in place until the unit is repurposed or "
+                    "decommissioned."
+                    if killed else
+                    "data/KILL_MAKER exists, so the live maker is halted. "
+                    "Expected if you killed it deliberately; alarming if not."),
             workstream="P-016"))
 
     # P-013 must stay dead. It is the reason P-015's rule is pre-registered.
@@ -355,8 +407,12 @@ def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]
     out: List[Finding] = []
 
     # ---- P-016 maker gate ----
+    # The gate is a DECISION PROMPT. Once P-016 is killed the decision is made
+    # (registry `retired:` block), so re-evaluating its frozen post-kill fill
+    # tape and re-announcing "FAILED its gate" every day is pure noise — skip
+    # the whole block for a terminal pod.
     maker = snap.get("maker", {}) or {}
-    if maker.get("available"):
+    if maker.get("available") and not _is_terminal(snap, "P-016"):
         fills = maker.get("fills_clean") or 0
         thresh = maker.get("threshold", 500)
         if maker.get("gate_met"):

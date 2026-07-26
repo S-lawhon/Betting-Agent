@@ -30,7 +30,13 @@ Rule summary (see the doc for the derivation)
 PASS authorises more paper allocation within the caps and a written
 promotion proposal.  It does NOT authorise live money.
 
-STATUS: stub.  The P-022 pod does not exist yet and this script is
+STATUS: live.  The pod was reconciled against the rule and the runner
+restarted 2026-07-26 22:36 UTC, which is when T started counting.  The
+earlier "stub / pod does not exist" note was wrong even when written --
+betting-round-leader-fade.service had been running since 2026-07-23, but
+it could never quote (see rule §11b), so T was genuinely 0.
+
+Historical note: this script is
 expected to print "NO DECISION — no settled trades".  It reads the row
 shape the pod will write; if the pod ships a different shape, fix the
 LOADER here rather than the RULE.
@@ -134,7 +140,8 @@ def per_contract_cents(rec: Dict[str, Any]) -> float:
 
 def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not trades:
-        return {"T": 0, "n_contracts": 0, "verdict": "NO DECISION",
+        return {"T": 0, "progress": 0, "threshold": MIN_T_DECISION,
+                "n_contracts": 0, "verdict": "NO DECISION",
                 "reason": "no settled P-022 trades yet",
                 "tournaments": {}}
 
@@ -189,7 +196,8 @@ def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
                   f"separable. Single extension to T={MIN_T_EXTENSION} at "
                   f"UNCHANGED parameters ({MIN_T_EXTENSION - T} more).")
 
-    return {"T": T, "n_contracts": n_contracts, "edge_cents": edge,
+    return {"T": T, "progress": T, "threshold": MIN_T_DECISION,
+            "n_contracts": n_contracts, "edge_cents": edge,
             "sd_cents": sd, "se_cents": se, "z": z, "pnl_usd": pnl,
             "tournaments_positive": positive,
             "tournaments": per_t, "verdict": verdict, "reason": reason}
@@ -230,7 +238,8 @@ def main() -> int:
     if r["T"] == 0:
         print("  settled trades : 0   tournaments: 0")
         print(f"\n  VERDICT: {r['verdict']} — {r['reason']}")
-        print("\n  (The P-022 pod does not exist yet. This is expected.)")
+        print("\n  (T counts from 2026-07-26 22:36 UTC, when the reconciled"
+              "\n   runner restarted. Golf events accrue ~15-19/month.)")
         print("  Rule: golf_quirks_research/P022_DECISION_RULE.md")
         return 0
 

@@ -410,3 +410,42 @@ reservation lifecycle. **All 11 fail against the pod as it shipped.** Full suite
 **Still not authorised by this document:** the fixed pod has NOT been deployed, and
 `betting-round-leader-fade.service` is still running the 2026-07-23 code that cannot
 quote. Starting T is Sam's call.
+
+---
+
+## 12. T-START — the counter is running
+
+**Sam approved starting T on 2026-07-26, having read §11 in full.**
+
+| | |
+|---|---|
+| **T starts** | **2026-07-26 22:36:52 UTC** (`betting-round-leader-fade` restarted onto the reconciled code) |
+| T before this | **0** — the service had been up since 2026-07-23 but could not quote, so no observation was made or lost |
+| Threshold | **T = 14** (§4), single extension to T = 40 (§4a) |
+| Reader | `scripts/p022_checkpoint.py` — the only sanctioned reader (§10) |
+| Expected T=14 | ~3–4 weeks at 15–19 qualifying tournaments/month |
+
+Parameters live, read back from the merged droplet config:
+
+```
+bankroll  $1,000     band (0.03, 0.12)     offset +0.02
+caps      per-name $5.00 (0.5%)   per-tournament $50.00 (5%)   total $150.00 (15%)
+window    [12h, 24h]              series 13                    NOT in pods.active
+```
+
+Registered in `manager/registry.yaml` with `source: p022_checkpoint`, so progress is
+**derived** and cannot be hand-typed — the P-017 failure mode. The systemd unit is
+now monitored, which it was not while it sat dead for three days.
+
+### One thing NOT verified, recorded as a known gap
+
+There were **no open round-leader markets at the restart** — golf tournaments had
+concluded and the next week's were unlisted, so `discover()` returned 0. The
+close-time fix is verified by unit test *and* against three real Kalshi payloads
+(`close_time` chosen over an `occurrence_datetime` 16–17 days later), but **not yet
+by an actual live quote.**
+
+`watch` on the registry entry says so explicitly: if markets relist and no quote
+appears, investigate before assuming the window logic is right. A pod that cannot
+quote is exactly the failure this reconciliation existed to fix, and it would be
+careless to call it closed on a day when nothing was listed to quote against.

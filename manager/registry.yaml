@@ -51,6 +51,22 @@ invariants:
 # SERVICES — process-level liveness
 # -----------------------------------------------------------------------------
 services:
+  # P-022's standalone maker loop. Registered 2026-07-26 because it had been
+  # "active" and doing nothing since 2026-07-23 and NOTHING NOTICED — it could
+  # not quote at all (far-future close field; see the P-022 workstream), and
+  # with no monitoring entry the manager had no opinion about it either way.
+  #
+  # Deliberately NO heartbeat file. Its quotes log only appears once it quotes,
+  # and long silences are legitimate: golf round-leader markets are unlisted
+  # between tournaments, and quotes are only placed in a 12-24h pre-round
+  # window. A stale-file check here would page nightly for correct behaviour.
+  # The gate reader (scripts/p022_checkpoint.py) is what catches "running but
+  # never producing"; this entry only catches the unit being down.
+  - id: betting-round-leader-fade
+    kind: systemd
+    description: P-022 round-leader dead-heat fade maker (standalone, paper)
+    severity: warn
+
   - id: betting-pod-shop
     kind: systemd
     description: Main 5-minute multi-pod engine (P-001/002/006/014/015) + dashboard
@@ -678,6 +694,62 @@ workstreams:
   # ---------------------------------------------------------------------------
   # DISABLED / KILLED
   # ---------------------------------------------------------------------------
+  - id: P-022
+    name: Round-Leader Dead-Heat Fade Maker
+    stage: paper
+    tier: validating
+    owner_dir: golf_quirks_research
+    blocked_on: time
+    # Declares the unit so the reconciliation check knows this pod trades
+    # WITHOUT being in pods.active — it is a standalone loop, not an engine pod.
+    service: betting-round-leader-fade
+    summary: >
+      STANDALONE maker (scripts/run_round_leader_fade.py, unit
+      betting-round-leader-fade). Deliberately NOT in pods.active — it runs its
+      own fast loop. Sells YES on cheap Kalshi round-leader names; a tie for the
+      round lead splits the payout $1/n, so a name that leads realises only
+      ~$0.63. Validated Phase 1 (+4-6c/ct settled) and Phase 2 (+3.4c/ct at
+      offset +0.02, tournament-clustered CI [+1.7,+5.1], 16/19 tournaments
+      positive), and Phase 2 was independently reproduced from a from-scratch
+      harness on 2026-07-26.
+      HISTORY WORTH KNOWING: the service ran from 2026-07-23 21:15 UTC but wrote
+      ZERO quotes and zero fills for three days — `_close_epoch` preferred
+      `occurrence_datetime`, which on this family is a far-future placeholder
+      13-18 days past `close_time`, so the 12-24h placement window opened long
+      after each round had settled. Reconciled against the locked rule and
+      restarted 2026-07-26 22:36 UTC. T counts from that restart; nothing was
+      lost, because nothing was ever quoted.
+      Capacity is deliberately small (~$140 P&L on ~$3.8k collateral per month).
+    gate:
+      question: Does the +3.4c/ct dead-heat fade replicate forward, net of adverse selection?
+      metric: settled_tournaments
+      source: p022_checkpoint
+      reader: scripts/p022_checkpoint.py
+      threshold: 14           # 90% power vs the measured +3.4c effect (rule §5)
+      t_start_utc: 2026-07-26T22:36:52Z
+      # progress is DERIVED by the reader. Do not hand-maintain it here.
+      decision: >
+        LOCKED in golf_quirks_research/P022_DECISION_RULE.md — read it, do not
+        reinterpret. HARD KILL at any T if z <= -2.0. T<14 is NO DECISION
+        (underpowered; a T=8 look has 23% power against half the effect and is
+        explicitly forbidden). At T>=14: KILL if edge<=0, PASS if z>=2.0, else
+        ONE extension to T=40 at byte-identical parameters and then KILL if
+        still z<2.0. Caps are GATE CONDITIONS: a tournament with any cap
+        breached is EXCLUDED from T, and raising a cap resets T to 0 under a new
+        pod ID. PASS authorises more paper allocation and a written promotion
+        proposal — never live money.
+    watch:
+      - >
+        First quotes. There were no open round-leader markets at the 2026-07-26
+        restart (tournaments concluded, next week unlisted), so the fix is
+        verified by test and against real settled payloads but NOT yet by a live
+        quote. If no quote appears once golf markets relist, investigate before
+        assuming the window logic is right.
+      - >
+        Aggregate risk is enforced against P-022's OWN book only — it is a
+        separate process from the 5-minute engine, so the 15% cap does not span
+        both. See rule §11d.
+
   - id: P-013
     name: Kalshi-Deribit Crypto Options
     stage: killed

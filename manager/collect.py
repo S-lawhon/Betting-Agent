@@ -743,6 +743,17 @@ class Collector:
         """
         return self._checkpoint("scripts/p017_checkpoint.py", "P-017")
 
+    @safe("p022_gate")
+    def p022_gate(self) -> Dict[str, Any]:
+        """P-022 progress against its pre-registered T=14 rule.
+
+        T counts settled TOURNAMENTS from 2026-07-26 22:36 UTC, when the
+        reconciled runner restarted. Before that the service had been up since
+        2026-07-23 but could never quote — `_close_epoch` preferred a
+        far-future placeholder field — so T was genuinely 0 and nothing was lost.
+        """
+        return self._checkpoint("scripts/p022_checkpoint.py", "P-022")
+
     @safe("p001_gate")
     def p001_gate(self) -> Dict[str, Any]:
         """P-001 progress under the re-scoped scenario-D gate.
@@ -1036,6 +1047,7 @@ class Collector:
             "p015": self.p015_gate() or {},
             "p017": self.p017_gate() or {},
             "p001": self.p001_gate() or {},
+            "p022": self.p022_gate() or {},
             "invariants": self.invariants() or {},
             "errors": self.recent_errors() or {},
             "workstreams": self.workstreams(trade) or [],

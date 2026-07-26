@@ -104,6 +104,20 @@ exposure — the guard rejected nothing, and only the pod's own
   de-vigged sharp close as the north-star metric, not raw P&L.
 - Bootstrap CIs for backtests cluster by event/tournament (within-event outcomes
   correlate) — treat each event as one observation.
+- **Commit research artifacts at each gate, not at the end of the run.** On
+  2026-07-25 the `golf_quirks_research/` harness `.py` files were never committed
+  and vanished; the reports survived only as session copies. Before ending a
+  research session or handing one off, run:
+  ```bash
+  bash scripts/check_research_committed.sh
+  ```
+  It fails if any `*_research` `.py`, `REPORT*.md`, or `*_params.json` is
+  untracked, modified, or **hidden by `.gitignore`** — the last check is the one
+  that matters, since `data/`, `*.jsonl` and `*.log` are ignored repo-wide and the
+  lost files never showed up in `git status` at all. When a research cache is worth
+  keeping, commit it gzipped under `<pod>_research/archive/` (see
+  `golf_quirks_research/archive/README.md`); Kalshi trade history rolls off after
+  ~1 month and cannot be re-pulled.
 
 ## Recent work — P-017 Golf (July 2026)
 

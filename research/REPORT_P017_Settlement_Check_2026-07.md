@@ -166,3 +166,78 @@ Independently re-verified by the orchestrating session: golf-settler journal lin
 (48/50/48/52, zero on Jul 26), the `39893 entries (22 placed, … 5 open)` load line, the
 verbatim `: > "$LOG"` truncation at `scripts/rotate_active_log.sh:11`, and the
 `0 6 * * *` cron entry.
+
+---
+
+# Addendum — 2026-07-26 recovery, and the incident it caused
+
+The recovery in "Needs Sam's decision" item 1 was carried out. It surfaced a
+second, independent defect, which is recorded here because the sequence matters.
+
+## What was done
+
+1. Backed up the droplet's active trade log (`/root/p017_recovery_20260726T211917Z/`).
+2. Ran `scripts/rotate_active_log.py --recover-open-from-archives 3 --pod P-017`
+   (dry-run first: 16 rows, P-017 only, no P-002/P-006 contamination). Append-only;
+   47,223 → 47,239 rows.
+3. Restarted `betting-pod-shop` so `TradeStore.load()` would re-read the rows.
+
+## The incident
+
+**Nine seconds after the restart, the generic Kalshi `Settler` voided all 16 at
+$0.00** (`settlement.kalshi: 16 positions resolved this cycle`, 21:21:27–21:21:35Z).
+All 16 markets were still `status="active"` with an empty `result` on Kalshi at
+that moment — verified by direct API query before the recovery.
+
+**Root cause.** `rebuild_ledger_from_log()` has always accepted `pod_ids`.
+`_open_placed_entries()` — which is what `settle_cycle()` actually walks — did
+not. The generic settler therefore processed every open row in the log regardless
+of pod, and it runs first in the engine cycle (`engine.py:762`, ahead of
+`KalshiGolfSettler` at `:845`), so it won the race and applied its
+`result or "void"` rule to markets `KalshiGolfSettler` exists to protect.
+
+**Why it had never fired.** The truncating rotation had orphaned those rows out of
+the active log. With nothing to walk, the unscoped scan had nothing to damage. The
+two defects masked each other; fixing the first exposed the second. Same shape as
+the P-006 Polymarket incident that `scripts/fix_void_trades.py` was written for —
+market closed but unresolved, read as void.
+
+## Resolution
+
+- **Fix:** `Settler` now takes `pod_ids` and applies it in `_open_placed_entries`;
+  `engine.py` passes `_SETTLER_DEP_PODS["settler"]` to both the constructor and the
+  ledger rebuild so the two paths cannot drift apart again. Four regression tests,
+  three of which fail without the fix, including an end-to-end `settle_cycle`
+  against a market mocked in the production shape (`status="active"`, `result=""`).
+- **Deployed** 21:31Z with the settler scalar fix and the fee-table fix.
+  `scripts/deploy.sh` also gained `--exclude='.claude/worktrees/'` and
+  `--exclude='manager/state/'` first — without the latter, the deploy would have
+  overwritten the droplet's live fund-manager state.
+- **Corrected:** `scripts/undo_p017_spurious_voids.py` removed exactly the 16 bad
+  VOID rows (allow-listed by ticker, bounded to the 8-second incident window,
+  refuses to run if the count is not exactly 16). Service stopped for the rewrite.
+
+## Verified end state (21:37Z)
+
+```
+trade_store: loaded 47390 entries (65 placed, 61 settlements, 26 open)
+settler_cycle_done   [settler] checked=9  settled=0        # scoped to P-001 + legacy
+kalshi_golf_settler: cycle done — checked=16 settled=0 awaiting_result=0
+```
+
+P-017: **16 OPEN**, 21 LOSS, 1 VOID. The single remaining VOID is
+`KXPGATOP20-3MO26-JDAY` (`kalshi_withdrawn`, 2026-07-23) — the pre-existing scalar
+mis-booking, deliberately untouched. **Re-booking it at $0.24/ct is still owed**
+(`scripts/backfill_golf_scalar_corrections.py`).
+
+The 16 positions are open and settleable, and `KalshiGolfSettler` is now the only
+settler that can reach them. It will book them when Kalshi populates `result`,
+expected within ~a day of the tournament ending.
+
+## Lesson
+
+The generic settler's pod scoping was documented in `CLAUDE.md` and in this
+report's own §1 — and was true of the code path everyone had looked at. It was not
+true of the one that mattered. **A filter asserted in a docstring, applied in one
+call path, is not a filter.** Before restoring data that a component was not
+seeing, enumerate every consumer that will start seeing it.

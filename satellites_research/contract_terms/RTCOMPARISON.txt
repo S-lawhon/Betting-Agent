@@ -1,0 +1,86 @@
+SOURCE: https://assets.kalshi.com/contract_terms/RTCOMPARISON.pdf
+
+RTCOMPARISON
+Scope:
+	These	rules	shall	apply	to	this	contract.
+Underlying:
+	Rotten	Tomatoes’	Tomatometer	“All	Critics”	Tomatometer	score	for	<movie>	the
+	
+10:00	AM	ET	after	the	last	day	in	<period>.	The	score	used	will	be	the	one	reported	by	Rotten
+	
+Tomatoes,	without	decimals.	Revisions	to	the	Underlying	made	after	Expiration	will	not	be
+	
+accounted	for	in	determining	the	Expiration	Value.
+Instructions:	
+Rotten	Tomatoes	can	be	found	
+here
+.
+	These	instructions	on	how	to	access	the
+	
+Underlying	are	provided	for	convenience	only	and	are	not	part	of	the	binding	Terms	and
+	
+Conditions	of	the	Contract.	They	may	be	clarified	at	any	time.	
+Source	Agency:
+	The	Source	Agency	is	Rotten	Tomatoes.
+Type:
+	The	type	of	Contract	is	an	Event	Contract.
+Issuance:
+	After	the	initial	Contract,	Contract	iterations	will	be	listed	on	an	as-needed	basis	at
+	
+the	discretion	of	the	Exchange	and	corresponding	to	the	risk	management	needs	of	Members.	
+<period>:	
+<period>	refers	to	a	calendar	time	period	specified	by	Kalshi.	Kalshi	may	list
+	
+iterations	of	the	Contract	corresponding	to	variations	of	<period>.
+<movie>:	
+<movie>	refers	to	a	motion	picture	specified	by	Kalshi.	Kalshi	may	list	iterations	of
+	
+the	Contract	corresponding	to	<movie>	values	for	movies	listed	on	Rotten	Tomatoes’	site	and
+	
+intends	to	only	list	markets	for	films	that	have	been	significantly	covered	by	industry	trade
+	
+publications	such	as	
+Variety
+,	
+Vulture
+,	and	
+Deadline
+.	
+Payout	Criterion:
+	The	Payout	Criterion	for	the	Contract	encompasses	the	Expiration	Values	that
+	
+<movie>	has	the	highest	score	of	any	movie	which	had	its	wide	release	in	<period>	and	has	at
+	
+least	50	reviews.	If	<movie>	is	tied	with	another	<movie>,	then	both	would	be	encompassed	by
+	
+the	Payout	Criterion.
+Minimum	Tick:
+	The	Minimum	Tick	size	for	the	referred	Contract	shall	be	$0.01.
+Position	Limit:
+	The	Position	Limit	for	the	$1	referred	Contract	shall	be	$25,000	per	strike,	per
+	
+Member.
+Last	Trading	Date:
+	The	Last	Trading	Date	of	the	Contract	will	be	the	last	day	in	<period>.	The
+	
+Last	Trading	Time	will	be	11:59	PM	ET.
+Settlement	Date:
+	The	Settlement	Date	of	the	Contract	shall	be	no	later	than	the	day	after	the
+	
+Expiration	Date,	unless	the	Market	Outcome	is	under	review	pursuant	to	Rule	7.1.
+Expiration	Date:
+	The	Expiration	Date	of	the	Contract	shall	be	the	10:00	AM	ET	after	<period>
+	
+ends.
+Expiration	time:
+	The	Expiration	time	of	the	Contract	shall	be	10:00	AM	ET.
+Settlement	Value:
+	The	Settlement	Value	for	this	Contract	is	$1.00.
+Expiration	Value:
+	The	Expiration	Value	is	the	value	of	the	Underlying	as	documented	by	the
+	
+Source	Agency	on	the	Expiration	Date	at	the	Expiration	time.	
+Contingencies:
+	Before	Settlement,	Kalshi	may,	at	its	sole	discretion,	initiate	the	Market
+	
+Outcome	Review	Process	pursuant	to	Rule	6.3(c)	of	the	Rulebook.

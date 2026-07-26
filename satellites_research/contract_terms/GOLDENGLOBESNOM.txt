@@ -1,0 +1,145 @@
+SOURCE: https://assets.kalshi.com/contract_terms/GOLDENGLOBESNOM.pdf
+
+Official Product Name:   “Will <candidate> be <rank> on <list> in <time period>?”
+Rulebook:
+  RANKLIST
+RANKLIST
+Scope:
+  These rules shall apply to this contract.
+Underlying:
+  The Underlying for this Contract is the official published ranking of <candidate>
+ 
+on <list> during <time period>. Revisions to the Underlying made after Expiration will not be
+ 
+accounted for in determining the Expiration Value.
+Source Agency:
+  The Source Agencies are the organization that publishes <list>, The New
+ 
+York Times, the Associated Press, Bloomberg News, Reuters, Axios, Politico, Semafor, The
+ 
+Information, The Washington Post, The Wall Street Journal, ABC, CBS, CNN, Fox News, MSNBC,
+ 
+and NBC.
+Type:
+  The type of Contract is an Event Contract.
+Issuance:
+  After the initial Contract, Contract iterations will be listed on an as-needed basis at
+ 
+the discretion of the Exchange and corresponding to the risk management needs of Members.
+<candidate>:
+  <candidate> refers to an entity, individual, group, institution, location, or
+ 
+item that could appear on <list>. The Exchange may list iterations of the Contract with
+ 
+<candidate> values including but not limited to:
+Educational institutions (universities, colleges, schools)
+Geographic locations (countries, states, cities, regions)
+Companies or organizations
+Individuals or groups of individuals
+Products, services, or brands
+Any other rankable entity
+A singular <candidate> or group of candidates by description of a characteristic (e.g. Any
+ 
+Northeastern school[a])
+"None" or "No entity" options
+<rank>:
+  <rank> refers to a position on <list> specified by the Exchange. The Exchange may
+ 
+list iterations of the Contract with <rank> values including but not limited to:
+Specific numerical positions (e.g., "1st", "5th", "100th")
+Ranges (e.g., "top 10", "11-20", "top 50")
+Thresholds (e.g., "top 25 or better", "below 50th")
+Relative positions (e.g., "highest ranked", "lowest ranked")
+Categories within rankings (e.g., "best in region", "top public institution")
+"Unranked" or "Not listed"
+<list>:
+  <list> refers to a published ranking, list, or index specified by the Exchange. The
+ 
+Exchange will specify the publisher's name and specific list name (e.g., "U.S. News & World
+ 
+Report's Best States Rankings", "Forbes 400", "Time 100").
+<time period>:
+  <time period> refers to the edition, year, or date range of <list> specified
+ 
+by the Exchange. May include:
+Specific years (e.g., "2025", "2026")
+Date ranges (e.g., "January-June 2025")
+Edition numbers or names (e.g., "39th annual", "Spring 2025 edition")
+"Next published" for lists without predictable schedules
+Payout Criterion:
+  The Payout Criterion for the Contract encompasses the Expiration Values
+ 
+where <candidate> achieves <rank> on the official version of <list> for <time period>.
+For resolution purposes:
+The ranking must be from the primary publisher's official release, not secondary
+ 
+reporting
+If <list> has multiple categories or subcategories, only the specific category named in
+ 
+the Contract title applies
+Tied rankings shall be resolved using the publisher's official tie-breaking methodology; if
+ 
+none exists, all tied entities share the highest rank among them
+If multiple candidates are tied for a given rank, then their Contracts will resolve to $1/(the
+ 
+number of candidates tied), rounded down.
+If a tie results in a ranking being skipped (e.g. two candidates tie for the #1 position, and
+ 
+the next rank listed is for #3), then a market on a given candidate being #2 will resolve
+ 
+to No.
+Examples that would resolve the market to Yes:
+Florida is ranked 5th on U.S. News & World Report's 2025 Best States Rankings and
+ 
+<candidate> is "Florida" and <rank> is "5th"
+Harvard University appears anywhere in the top 10 of Forbes' 2025 Best Colleges list and
+ 
+<candidate> is "Harvard University" and <rank> is "top 10"
+Elon Musk is ranked between 11th and 20th on Time's 2025 Time 100 and <candidate>
+ 
+is "Elon Musk" and <rank> is "11-20"
+Examples that would NOT resolve the market to Yes:
+<candidate> appears on a different list than <list> specified in the Contract
+<candidate> is ranked outside the range specified by <rank>
+The ranking is published outside <time period>
+The ranking comes from an unofficial or secondary source
+<list> is not published during <time period>
+<candidate> appears in an "honorable mention" or "ones to watch" section but not in the
+ 
+actual numbered rankings
+Minimum Tick:
+  The Minimum Tick size for the Contract shall be $0.01.
+Position Accountability Level:
+  The Position Accountability Level for the Contract shall be
+ 
+$25,000 per strike, per Member.
+Last Trading Date:
+  The Last Trading Date of the Contract will be the same as the Expiration
+ 
+Date. The Last Trading time will be the same as the Expiration time.
+Settlement Date:
+  The Settlement Date of the Contract shall be no later than the day after
+ 
+the Expiration Date, unless the Market Outcome is under review pursuant to Rule 7.1.
+Expiration Date:
+  The latest Expiration Date of the Contract shall be one year after the end of
+ 
+<time period>. If an event described in the Payout Criterion occurs, expiration will be moved
+ 
+to an earlier date and time in accordance with Rule 7.2.
+Expiration time:
+  The Expiration time of the Contract shall be 10:00 AM ET.
+Settlement Value:
+  The Settlement Value for this Contract is $1.00.
+Expiration Value:
+  The Expiration Value is the value of the Underlying as documented by the
+ 
+Source Agency on the Expiration Date at the Expiration time.
+Contingencies:
+  Before Settlement, Kalshi may, at its sole discretion, initiate the Market
+ 
+Outcome Review Process pursuant to Rule 6.3(d) of the Rulebook. If an Expiration Value
+ 
+cannot be determined on the Expiration Date, Kalshi has the right to determine payouts
+ 
+pursuant to Rule 6.3(b) in the Rulebook.

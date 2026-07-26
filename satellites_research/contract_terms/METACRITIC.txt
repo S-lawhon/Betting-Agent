@@ -1,0 +1,78 @@
+SOURCE: https://assets.kalshi.com/contract_terms/METACRITIC.pdf
+
+METACRITIC
+Scope:
+	These	rules	shall	apply	to	this	contract.
+Underlying:
+	Metacritic’s	“Metascore”	for	<media>	seven	days	after	<media>’s	release	at	10:00	AM	ET.	Revisions	to	the
+	
+Underlying	made	after	Expiration	will	not	be	accounted	for	in	determining	the	Expiration	Value.
+Instructions:	
+Metacritic	can	be	found	
+here
+.
+	These	instructions	on	how	to	access	the	Underlying	are	provided	for
+	
+convenience	only	and	are	not	part	of	the	binding	Terms	and	Conditions	of	the	Contract.	They	may	be	clarified	at	any	time.	
+Source	Agency:
+	The	Source	Agency	is	Metacritic.
+Type:
+	The	type	of	Contract	is	an	Event	Contract.
+Issuance:
+	After	the	initial	Contract,	Contract	iterations	will	be	listed	on	an	as-needed	basis	at	the	discretion	of	the	Exchange
+	
+and	corresponding	to	the	risk	management	needs	of	Members.	
+<media>:	
+<media>	refers	to	a	specific	piece	or	category	of	physical	or	digital	content,	such	as	a	book,	song,	video,	film,
+	
+episode,	podcast,	series,	game,	or	other	unit	of	consumable	media	as	specified	by	the	Exchange.	Where	relevant,	the
+	
+Exchange	may	specify	the	platform(s)	on	which	<media>	is	available	or	relative	to	which	it	should	be	adjudicated.	<media>
+	
+may	be	specified	in	the	singular,	multiple,	as	an	element	in	a	set,	by	distinguishing	characteristics,	or	take	the	forms	“any”	or
+	
+“none”.	If	no	platform	is	specified,	then	the	value	used	will	be	the	first	one	listed	on	the	Metacritic	site	on	the	page	for
+	
+<media>.
+<count>:
+	Kalshi	may	list	iterations	of	the	Contract	with	<count>	levels	that	fall	within	an	inclusive	range	between	a
+	
+maximum	value	of	<0>	and	a	minimum	value	of	<100>	at	consecutive	increments	of	<1>.	Due	to	the	potential	for	variability
+	
+in	the	Underlying,	the	Exchange	may	modify	<count>	levels	in	response	to	suggestions	by	Members.
+Payout	Criterion:
+	The	Payout	Criterion	for	the	Contract	encompasses	the	Expiration	Values	that	are
+	
+<above/below/between>	<count>.	If	the	value	of	<above/below/between>	is	“between”,	then	<count>	will	take	on	two
+	
+values.	The	Payout	Criterion	then	encompasses	any	Expiration	Value	that	is	less	than	or	equal	to	than	the	greater	of	the	two
+	
+values	and	greater	than	or	equal	to	the	lesser	of	the	two	values.
+Minimum	Tick:
+	The	Minimum	Tick	size	for	the	referred	Contract	shall	be	$0.01.
+Position	Accountability	Level:
+	The	Position	Accountability	Level	for	the	Contract	shall	be	$25,000	per	strike,	per
+	
+Member.
+Last	Trading	Date:
+	The	Last	Trading	Date	of	the	Contract	will	be	the	same	as	the	Expiration	Date.
+Settlement	Date:
+	The	Settlement	Date	of	the	Contract	shall	be	no	later	than	the	day	after	the	Expiration	Date,	unless	the
+	
+Market	Outcome	is	under	review	pursuant	to	Rule	7.1.
+Expiration	Date:
+	The	Expiration	Date	of	the	Contract	will	be	seven	days	following	the	release	of	<media>.
+Expiration	time:
+	The	Expiration	time	of	the	Contract	shall	be	10:00	AM	ET.
+Settlement	Value:
+	The	Settlement	Value	for	this	Contract	is	$1.00.
+Expiration	Value:
+	The	Expiration	Value	is	the	value	of	the	Underlying	as	documented	by	the	Source	Agency	on	the
+	
+Expiration	Date	at	the	Expiration	time.	
+Contingencies:
+	Before	Settlement,	Kalshi	may,	at	its	sole	discretion,	initiate	the	Market	Outcome	Review	Process	pursuant
+	
+to	Rule	7.1	of	the	Rulebook.	If	an	Expiration	Value	cannot	be	determined	on	the	Expiration	Date,	Kalshi	has	the	right	to
+	
+determine	payouts	pursuant	to	Rule	7.1	in	the	Rulebook.	

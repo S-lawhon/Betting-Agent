@@ -1,0 +1,113 @@
+SOURCE: https://assets.kalshi.com/contract_terms/AWARDS.pdf
+
+AWARDS
+Scope:
+	These	rules	shall	apply	to	this	contract.
+Underlying:
+	The	Underlying	for	this	Contract	is	the	winner	of	<award>	at	<awards	show>.
+	
+Revisions	to	the	Underlying	made	after	Expiration	will	not	be	accounted	for	in	determining	the
+	
+Expiration	Value.
+Source	Agency:
+	The	Source	Agencies	are	the	official	organizer	of	<awards	show>,	the	official
+	
+website	of	<awards	show>,	the	official	social	media	accounts	of	<awards	show>,	The	Hollywood
+	
+Reporter,	Variety,	Deadline,	Billboard,	Rolling	Stone,	Entertainment	Weekly,	People	Magazine,
+	
+The	New	York	Times,	the	Associated	Press,	Bloomberg	News,	Reuters,	Axios,	The	Washington
+	
+Post,	The	Wall	Street	Journal,	ABC,	CBS,	CNN,	Fox	News,	MSNBC,	NBC,	and	the	broadcast	or
+	
+streaming	network	airing	<awards	show>.
+Type:
+	The	type	of	Contract	is	an	Event	Contract.
+Issuance:
+	After	the	initial	Contract,	Contract	iterations	will	be	listed	on	an	as-needed	basis	at
+	
+the	discretion	of	the	Exchange	and	corresponding	to	the	risk	management	needs	of	Members.
+<nominee>:
+	<nominee>	refers	to	a	potential	or	announced	nominee	for	<award>	as	specified
+	
+by	the	Exchange.	This	may	refer	to	an	individual	person,	group,	work	(film,	song,	album,	etc.),	or
+	
+other	entity	eligible	for	<award>.
+<award>:
+	<award>	refers	to	a	specific	award	category	at	<awards	show>	as	specified	by	the
+	
+Exchange	(e.g.,	"Best	New	Artist,"	"Album	of	the	Year,"	"Outstanding	Drama	Series").
+<awards	show>:
+	<awards	show>	refers	to	a	specific	awards	ceremony	as	specified	by	the
+	
+Exchange,	including	the	year	or	edition	(e.g.,	"the	96th	Academy	Awards,"	"the	2025	Grammy
+	
+Awards").
+<date>:
+	<date>	refers	to	a	calendar	date	specified	by	the	Exchange.	The	Exchange	may	list
+	
+iterations	of	the	Contract	corresponding	to	variations	of	<date>.
+Payout	Criterion:
+	The	Payout	Criterion	for	the	Contract	encompasses	the	Expiration	Values	that
+	
+<nominee>	has	won	<award>	at	<awards	show>.
+The	following	conditions	apply:
+<nominee>	must	be	officially	announced	as	the	winner	of	<award>	during	or	in	connection
+	
+with	<awards	show>
+Honorary,	lifetime	achievement,	or	special	recognition	awards	do	NOT	count	unless
+	
+<award>	specifically	refers	to	such	awards
+If	<award>	is	renamed	or	combined	with	another	category,	Kalshi	will	determine	if	it
+	
+substantially	corresponds	to	the	original	<award>
+Resolution	scenarios:
+If	there	is	a	tie,	a	strike	for	a	tie	will	resolve	Yes	and	all	others	will	resolve	No.
+If	<nominee>	is	not	officially	nominated	for	<award>,	the	Contract	resolves	to	No
+	
+immediately
+If	<nominee>	withdraws	from	consideration	or	is	disqualified,	the	Contract	resolves	to	No
+	
+immediately
+If	<awards	show>	is	cancelled	entirely,	all	contracts	resolve	based	on	the	last	fair	price	as
+	
+determined	by	Kalshi
+If	<awards	show>	is	postponed,	the	Contract	remains	open	until	the	rescheduled	ceremony
+	
+or	one	year	from	the	originally	scheduled	date,	whichever	comes	first
+Minimum	Tick:
+	The	Minimum	Tick	size	for	the	Contract	shall	be	$0.01.
+Position	Accountability	Level:
+	The	Position	Accountability	Level	for	the	Contract	shall	be
+	
+$25,000	per	strike,	per	Member.
+Last	Trading	Date:
+	The	Last	Trading	Date	of	the	Contract	will	be	the	same	as	the	Expiration
+	
+Date.	The	Last	Trading	Time	will	be	the	same	as	the	Expiration	time.
+Settlement	Date:
+	The	Settlement	Date	of	the	Contract	shall	be	no	later	than	the	day	after	the
+	
+Expiration	Date,	unless	the	Market	Outcome	is	under	review	pursuant	to	Rule	7.1.
+Expiration	Date:
+	The	latest	Expiration	Date	of	the	Contract	shall	be	<date>.	If	the	winner	of
+	
+<award>	is	announced,	or	if	<nominee>	is	not	nominated	for	<award>,	expiration	will	be
+	
+moved	to	an	earlier	date	and	time	in	accordance	with	Rule	7.2.
+Expiration	time:
+	The	Expiration	time	of	the	Contract	shall	be	10:00	AM	ET.
+Settlement	Value:
+	The	Settlement	Value	for	this	Contract	is	$1.00.
+Expiration	Value:
+	The	Expiration	Value	is	the	value	of	the	Underlying	as	documented	by	the
+	
+Source	Agency	on	the	Expiration	Date	at	the	Expiration	time.
+Contingencies:
+	Before	Settlement,	Kalshi	may,	at	its	sole	discretion,	initiate	the	Market
+	
+Outcome	Review	Process	pursuant	to	Rule	6.3(d)	of	the	Rulebook.	If	an	Expiration	Value	cannot
+	
+be	determined	on	the	Expiration	Date,	Kalshi	has	the	right	to	determine	payouts	pursuant	to
+	
+Rule	6.3(b)	in	the	Rulebook.

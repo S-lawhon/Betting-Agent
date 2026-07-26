@@ -1,0 +1,95 @@
+SOURCE: https://assets.kalshi.com/contract_terms/EMMYS.pdf
+
+EMMYS
+Scope:
+	These	rules	shall	apply	to	this	contract.
+Underlying:
+	The	Underlying	for	this	Contract	is	award	winners	at	the	<number>	Primetime
+	
+Emmy	Awards	according	to	the	website	of	the	Emmys.	Revisions	to	the	Underlying	made	after
+	
+Expiration	will	not	be	accounted	for	in	determining	the	Expiration	Value.
+Instructions:	
+Nominees	and	winners	are	available	at	the	website	of	the	Emmys,	available	
+here
+.
+	
+These	instructions	on	how	to	access	the	Underlying	are	provided	for	convenience	only	and	are
+	
+not	part	of	the	binding	Terms	and	Conditions	of	the	Contract.	They	may	be	clarified	at	any	time.	
+Source	Agency:
+	The	Source	Agency	is	the	Academy	of	Television	Arts	&	Sciences.
+Type:
+	The	type	of	Contract	is	a	Binary	Contract.
+Issuance:
+	The	Contract	is	based	on	the	outcome	of	a	recurrent	data	release,	which	is	issued	on
+	
+an	annual	basis.	Thus,	Contract	iterations	will	be	issued	on	a	recurring	basis,	and	future	Contract
+	
+iterations	will	generally	correspond	to	the	next	year.
+<award>
+:	Kalshi	may	list	iterations	of	the	Contract	with	<award>	values	corresponding	to
+	
+award	categories	offered	at	the	Primetime	Emmy	Awards.	
+<nominee>
+:	Kalshi	may	list	iterations	of	the	Contract	with	<nominee>	values	corresponding	to
+	
+the	nominees	listed	by	the	Academy	of	Television	Arts	&	Sciences.	Nominations	are	announced
+	
+several	weeks	before	the	ceremony;	for	example,	in	2022,	the	nominees	were	released	in	July.	
+<number>
+:	Kalshi	may	list	iterations	of	the	Contract	with	<number>	values	corresponding	to	a
+	
+particular	Emmy	ceremony.	The	initial	Contract	will	have	a	<number>	value	of	74,
+	
+corresponding	to	the	74th	Primetime	Emmy	Awards,	which	are	expected	to	be	held	on
+	
+September	12,	2022.	
+<expo_date>
+:	<expo_date>	refers	to	a	calendar	date	specified	by	Kalshi.	
+Payout	Criterion:
+	The	Payout	Criterion	for	the	Contract	encompasses	the	Expiration	Values	that
+	
+<nominee>	won	<award>.	If	no	data	is	available	from	the	Source	Agency	on	the	Expiration
+	
+Date,	then	the	market	will	resolve	to	No.	
+Minimum	Tick:
+	The	Minimum	Tick	size	for	the	referred	Contract	shall	be	$0.01.
+Position	Limit:
+	The	Position	Limit	for	the	$1	referred	Contract	shall	be	$25,000	per	Member.
+Last	Trading	Date:
+	The	Last	Trading	Date	of	the	Contract	will	be	the	same	as	the	Expiration
+	
+Date.	The	Last	Trading	Time	will	be	the	same	as	the	Expiration	Time.	
+Settlement	Date:
+	The	Settlement	Date	of	the	Contract	shall	be	no	later	than	the	day	after	the
+	
+Expiration	Date,	unless	the	Market	Outcome	is	under	review	pursuant	to	Rule	7.1.
+Expiration	Date:
+	The	Expiration	Date	of	the	Contract	shall	be	the	sooner	of	the	date	of	the	first
+	
+10:00	AM	following	the	release	of	the	winners	for	<number>	Primetime	Emmy	Awards
+	
+ceremony,	or	<expo_date>.	
+Expiration	time:
+	The	Expiration	time	of	the	Contract	shall	be	10:00	AM	ET.
+Settlement	Value:
+	The	Settlement	Value	for	this	Contract	is	$1.00.
+Expiration	Value:
+	The	Expiration	Value	is	the	value	of	the	Underlying	as	documented	by	the
+	
+Source	Agency	on	the	Expiration	Date	at	the	Expiration	time.	
+Contingencies:
+	Before	Settlement,	Kalshi	may,	at	its	sole	discretion,	initiate	the	Market
+	
+Outcome	Review	Process	pursuant	to	Rule	6.3(c)	of	the	Rulebook.	Additionally,	as	outlined	in
+	
+Rule	7.2	of	the	Rulebook,	if	any	event	or	any	circumstance	which	may	have	a	material	impact	on
+	
+the	reliability	or	transparency	of	a	Contract’s	Source	Agency	or	the	Underlying	related	to	the
+	
+Contract	arises,	Kalshi	retains	the	authority	to	designate	a	new	Source	Agency	and	Underlying
+	
+for	that	Contract	and	to	change	any	associated	Contract	specifications	after	the	first	day	of
+	
+trading.

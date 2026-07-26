@@ -1,0 +1,80 @@
+SOURCE: https://assets.kalshi.com/contract_terms/GRAMMY.pdf
+
+GRAMMY
+Scope:
+ These rules shall apply to this contract.
+Underlying:
+ The Underlying for this Contract is award winners at the Annual Grammy Awards
+ 
+according to the website of the Grammys. Revisions to the Underlying made after Expiration
+ 
+will not be accounted for in determining the Expiration Value.
+Instructions: 
+The winners will be listed on the website of the Grammys following the
+ 
+ceremony at: 
+https://www.grammy.com/grammys/awards
+. These instructions on how to access
+ 
+the Underlying are provided for convenience only and are not part of the binding Terms and
+ 
+Conditions of the Contract. They may be clarified at any time. 
+Source Agency:
+ The Source Agency is the Recording Academy.
+Type:
+ The type of Contract is an Event Contract.
+Issuance:
+ After the initial Contract, Contract iterations will be listed on an as-needed basis at
+ 
+the discretion of the Exchange and corresponding to the risk management needs of Members. 
+<award>: 
+Kalshi may list iterations of the Contract with <award> values corresponding to
+ 
+award categories offered at the Grammys. 
+<nominee>:
+ Kalshi may list iterations of the Contract with <nominee> values corresponding
+ 
+to potential nominees for the Recording Academy awards. 
+<
+number
+>: Kalshi may list iterations of the Contract with <number> values corresponding to
+ 
+a particular Grammy Awards ceremony. 
+Payout Criterion:
+ The Payout Criterion for the Contract encompasses the Expiration Values
+ 
+that <nominee> won <award>. 
+Minimum Tick:
+ The Minimum Tick size for the referred Contract shall be $0.01.
+Position Limit:
+ The Position Limit for the $1 referred Contract shall be $25,000 per Member.
+Last Trading Date:
+ The Last Trading Date of the Contract will be the same day as the
+ 
+Expiration Date. The Last Trading Time will be the same as the Expiration time.
+Settlement Date:
+ The Settlement Date of the initial iteration of the Contract shall be no later
+ 
+than the day after the Expiration Date, unless the Market Outcome is under review pursuant to
+ 
+Rule 7.1.
+Expiration Date:
+ The Expiration Date of initial the Contract shall be the earlier of the day
+ 
+following the occurrence of the event (the award winners being posted on the website of the
+ 
+Recording Academy) or the last day of the year the ceremony is being held in.
+Expiration time:
+ The Expiration time of the Contract iteration shall be 10:00 AM ET.
+Settlement Value:
+ The Settlement Value for this Contract is $1.00.
+Expiration Value:
+ The Expiration Value is the value of the Underlying for the <number>
+ 
+Grammy Awards as documented by the Source Agency on the Expiration Date at the
+ 
+Expiration time. 
+Contingencies:
+ Before Settlement, Kalshi may, at its sole discretion, initiate the Market
+ 
+Outcome Review Process pursuant to Rule 6.3(c) of the Rulebook.

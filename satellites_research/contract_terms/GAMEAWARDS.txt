@@ -1,0 +1,75 @@
+SOURCE: https://assets.kalshi.com/contract_terms/GAMEAWARDS.pdf
+
+GAMEAWARDS
+Scope:
+	These	rules	shall	apply	to	this	contract.
+Underlying:
+	The	Underlying	for	this	Contract	is	award	winners	at	the	<year>	Game	Awards.
+	
+Revisions	to	the	Underlying	made	after	Expiration	will	not	be	accounted	for	in	determining	the
+	
+Expiration	Value.
+Instructions:	
+The	Underlying	can	be	found	
+here
+.	These	instructions	on	how	to	access	the
+	
+Underlying	are	provided	for	convenience	only	and	are	not	part	of	the	binding	Terms	and
+	
+Conditions	of	the	Contract.	They	may	be	clarified	at	any	time.	
+Source	Agency:
+	The	Source	Agency	is	the	Game	Awards.
+Type:
+	The	type	of	Contract	is	an	Event	Contract.
+Issuance:
+	The	Contract	will	be	issued	on	an	annual	basis.
+<award>
+:	Kalshi	may	list	iterations	of	the	Contract	with	<award>	values	corresponding	to
+	
+award	categories	offered	at	the	Game	Awards.	
+<nominee>
+:	Kalshi	may	list	iterations	of	the	Contract	with	<nominee>	values	corresponding	to
+	
+potential	and	announced	nominees	for	a	particular	award.	Kalshi	will	source	<nominee>	values
+	
+from	the	nominees	and	others	announced	by	the	Awards	or	from	trade	publications.
+<year>
+:	<year>	refers	to	a	calendar	year	specified	by	Kalshi.	Kalshi	may	list	iterations	of	the
+	
+Contract	corresponding	to	variations	of	<year>.
+Payout	Criterion:
+	The	Payout	Criterion	for	the	Contract	encompasses	the	Expiration	Values	that
+	
+<nominee>	has	won	<award>.
+Minimum	Tick:
+	The	Minimum	Tick	size	for	the	referred	Contract	shall	be	0.01.
+Position	Accountability	Level:
+	The	Position	Accountability	Level	for	the	$1	referred	Contract
+	
+shall	be	25,000	contracts	per	strike,	per	Member.
+Last	Trading	Date:
+	The	Last	Trading	Date	of	the	Contract	will	be	the	same	as	the	Expiration
+	
+Date.	The	Last	Trading	Time	will	be	the	same	as	the	Expiration	Time.	
+Settlement	Date:
+	The	Settlement	Date	of	the	Contract	shall	be	no	later	than	the	day	after	the
+	
+Expiration	Date,	unless	the	Market	Outcome	is	under	review	pursuant	to	Rule	7.1.
+Expiration	Date:
+	The	Expiration	Date	of	the	Contract	shall	be	the	sooner	of	the	date	of	the	first
+	
+10:00	AM	ET	following	the	release	of	winners	for	<number>	Game	Awards,	or	the	last	date	of
+	
+the	year	following	the	year	when	the	award	ceremony	is	scheduled	to	take	place.	
+Expiration	time:
+	The	Expiration	time	of	the	Contract	shall	be	10:00	AM	ET.
+Settlement	Value:
+	The	Settlement	Value	for	this	Contract	is	$1.00.
+Expiration	Value:
+	The	Expiration	Value	is	the	value	of	the	Underlying	as	documented	by	the
+	
+Source	Agency	on	the	Expiration	Date	at	the	Expiration	time.	
+Contingencies:
+	Before	Settlement,	Kalshi	may,	at	its	sole	discretion,	initiate	the	Market
+	
+Outcome	Review	Process	pursuant	to	Rule	6.3(c)	of	the	Rulebook.

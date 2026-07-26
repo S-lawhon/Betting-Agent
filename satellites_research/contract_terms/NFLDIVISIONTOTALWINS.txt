@@ -1,0 +1,288 @@
+SOURCE: https://assets.kalshi.com/contract_terms/NFLDIVISIONTOTALWINS.pdf
+
+ENTITYOUTCOME
+Scope:
+	These	rules	shall	apply	to	this	contract.
+Underlying:
+	The	Underlying	for	this	Contract	is	the	performance	of	<entity>	in	relation	to	<sporting	outcome>	<time
+	
+period>	as	reported	by	the	Source	Agency.	Revisions	to	the	Underlying	made	after	Expiration	will	not	be	accounted	for	in
+	
+determining	the	Expiration	Value.
+Source	Agency:
+	The	Source	Agencies	are,	in	hierarchical	order,	the	governing	body	or	official	organizing	committee	of	the
+	
+relevant	competition	(e.g.,	NCAA,	ATP,	WTA,	FIFA,	USTA,	PGA,	USGA,	IOC,	NBA,	NFL,	NHL,	MLB,	MLS,	FIBA,
+	
+World	Athletics,	World	Rugby,	ICC,	FIVB,	BWF),	the	official	website	or	data	feed	of	the	tournament	or	league,	ESPN,	CBS
+	
+Sports,	NBC	Sports,	Fox	Sports,	The	Athletic,	Associated	Press,	Reuters,	and	major	broadcast	networks	airing	the	event.
+Type:
+	The	type	of	Contract	is	an	Event	Contract.
+Issuance:
+	After	the	initial	Contract,	Contract	iterations	will	be	listed	on	an	as-needed	basis	at	the	discretion	of	the	Exchange
+	
+and	corresponding	to	the	risk	management	needs	of	Members.
+<entity>:
+	<entity>	refers	to	a	competitor,	participant,	or	group	of	competitors	identified	by	name,	affiliation,	nationality,
+	
+descriptive	characteristic,	or	other	distinguishing	attribute	within	a	competition	or	sporting	context,	as	specified	by	the
+	
+Exchange.	<entity>	may	include	(but	is	not	limited	to):
+A	specific	named	individual	athlete	or	competitor	(e.g.,	"Novak	Djokovic,"	"Caitlin	Clark"),	identified	by	their	legal
+	
+name	or	widely	recognized	professional	or	playing	name;
+A	specific	named	team,	club,	franchise,	or	national	side	(e.g.,	"the	Kansas	City	Chiefs,"	"the	Brazilian	national	football
+	
+team,"	"Real	Madrid");
+A	nationality	or	country-affiliated	competitor	or	team	(e.g.,	"a	United	States	athlete,"	"any	team	from	the	AFC,"	"a
+	
+European	nation");
+A	competitor	or	team	defined	by	distinguishing	characteristics,	qualitative	attributes,	or	categorical	groupings	(e.g.,
+	
+"the	defending	champion,"	"a	wild	card	entrant,"	"the	home	team,"	"a	team	seeded	outside	the	top	10,"	"an	unranked
+	
+competitor,"	"the	tournament's	youngest	competitor");
+Multiple	entities	using	AND	logic	(all	must	achieve	the	outcome)	or	OR	logic	(any	one	suffices);
+"Any"	or	"None."
+<entity>	refers	to	the	officially	recognized	identity	of	the	competitor	or	team	at	the	time	the	relevant	competition
+	
+commences	or	the	bracket,	draw,	or	schedule	is	finalized,	unless	otherwise	specified	by	the	Exchange.	If	an	<entity>	is
+	
+identified	by	a	characteristic	that	could	apply	to	multiple	competitors	(e.g.,	"the	defending	champion,"	"the	host	nation"),	the
+	
+Exchange	will	specify	in	the	Contract	listing	which	competitor	or	team	the	characteristic	refers	to	at	the	time	of	listing,	or,	if
+	
+unspecified,	resolution	will	be	based	on	the	competitor(s)	or	team(s)	that	most	unambiguously	satisfies	the	stated
+	
+characteristic	as	determined	by	the	governing	body	and	Source	Agency	at	the	applicable	time.
+If	a	named	individual	athlete	or	competitor	is	replaced	due	to	injury,	withdrawal,	or	disqualification	prior	to	the
+	
+commencement	of	competition,	the	replacement	does	not	inherit	the	original	<entity>	designation	unless	the	Exchange
+	
+explicitly	announces	otherwise.	If	a	named	team	fields	a	substitute	roster,	replacement	player,	or	otherwise	altered	lineup,	the
+	
+team	retains	its	<entity>	designation	unless	the	governing	body	treats	the	altered	entry	as	a	different	competitor	for	purposes
+	
+of	the	competition.
+If	<entity>	undergoes	a	name	change,	rebranding,	relocation,	or	other	formal	alteration	of	identity	during	<time	period>,	the
+	
+Exchange	will	determine	the	most	natural	successor	identity	and	announce	this	to	Members	if	relevant.	The	identity	of
+	
+<entity>	shall	remain	consistent	throughout	the	life	of	the	Contract	unless	otherwise	announced.
+<sporting	outcome>:
+	<sporting	outcome>	refers	to	a	specific	result,	achievement,	milestone,	performance,	or	stage	within
+	
+a	competition	as	specified	by	the	Exchange.	This	may	include	(but	is	not	limited	to):
+Winning	a	specific	match,	game,	bout,	race,	or	round	(e.g.,	"win	their	opening	match,"	"win	Game	7");
+Advancing	to	or	reaching	a	specific	stage	or	round	(e.g.,	"reach	the	quarterfinals,"	"advance	to	the	championship
+	
+game,"	"qualify	for	the	knockout	stage");
+Winning	a	tournament,	championship,	title,	or	series	(e.g.,	"win	the	UEFA	Champions	League,"	"win	the	Grand	Slam,"
+	
+"win	the	gold	medal");
+Being	eliminated	at	or	before	a	certain	stage	(e.g.,	"be	eliminated	in	the	group	stage,"	"fail	to	advance	past	the	Round
+	
+of	16");
+Finishing	within	a	specified	placement	range	(e.g.,	"finish	in	the	top	3,"	"place	on	the	podium,"	"finish	last");
+Comparative	or	conditional	outcomes	involving	other	entities	(e.g.,	"advance	further	than	<other	entity>,"	"finish
+	
+ahead	of	the	field,"	"be	the	first	team	eliminated");
+Statistical,	performance-based,	or	threshold	outcomes	(e.g.,	"win	by	10	or	more	points,"	"score	at	least	3	goals,"
+	
+"complete	the	event	in	under	two	hours,"	"record	a	top-10	finish");
+Achieving	a	qualification-based	outcome	(e.g.,	"qualify	for	the	playoffs,"	"earn	a	berth	in	the	championship");
+"Any"	or	"None."
+<sporting	outcome>	shall	be	interpreted	according	to	the	official	rules,	structure,	and	format	of	the	relevant	competition	as
+	
+determined	by	the	governing	body	and	reported	by	the	Source	Agency.	For	elimination-style	competitions,	"reaching"	a	stage
+	
+means	appearing	in	that	round's	matchup	as	an	official	competitor,	regardless	of	the	result	of	that	matchup.	For	league-based
+	
+or	round-robin	competitions,	"advancing"	means	satisfying	the	official	qualification	criteria	as	defined	by	the	governing	body
+	
+for	progression	to	the	subsequent	stage.
+<time	period>:
+	<time	period>	refers	to	a	specific	range	of	time	as	specified	by	the	Exchange.	This	may	be	defined	by	exact
+	
+dates	(e.g.,	"between	June	1,	2026,	and	July	14,	2026"),	relative	markers	(e.g.,	"before	the	quarterfinals"),	an	event	or
+	
+competition	(e.g.,	"the	2026	FIFA	World	Cup,"	"the	2026	Australian	Open,"	"the	2026	NBA	Playoffs"),	or	broader	intervals
+	
+(e.g.,	"the	2026	regular	season,"	"Q3	2026").	"Between"	is	inclusive	of	both	endpoints,	while	"before"	and	"after"	exclude	the
+	
+specified	date	unless	stated	otherwise.	<time	period>	may	also	refer	to	"Any"	or	"None,"	to	multiple	dates	(even	if	non-
+consecutive),	or	to	a	singular	and	discrete	date	or	time.
+Payout	Criterion:
+	The	Payout	Criterion	for	the	Contract	encompasses	the	Expiration	Values	that	<entity>	achieves
+	
+<sporting	outcome>	<time	period>.
+Additional	clarification(s):
+For	the	purposes	of	this	Contract,	"achieves	<sporting	outcome>"	means	that	the	competitor	or	team	designated	as
+	
+<entity>	has	officially	reached,	completed,	or	satisfied	the	specified	outcome	as	determined	by	the	governing	body	of
+	
+the	relevant	competition	and	reported	by	the	Source	Agency.
+If	<entity>	is	disqualified,	forfeits,	or	withdraws	after	achieving	<sporting	outcome>,	the	Contract	shall	still	resolve	to
+	
+"Yes"	provided	the	outcome	was	achieved	prior	to	such	disqualification,	forfeit,	or	withdrawal,	unless	the	governing
+	
+body	retroactively	vacates	or	nullifies	the	result	prior	to	the	Expiration	Date	at	the	Expiration	time.
+If	a	game,	match,	race,	or	other	contest	is	postponed	but	subsequently	completed	within	<time	period>	(or,	if	<time
+	
+period>	refers	to	an	overall	competition,	event,	or	stage	of	a	competition	or	event,	within	six	months	of	its	ordinarily
+	
+scheduled	date	of	completion	for	the	overarching	competition,	event,	or	stage),	the	result	of	the	completed	contest
+	
+shall	govern	resolution.	If	the	contest	is	cancelled	entirely	and	not	rescheduled	to	fall	within	<time	period>,	resolution
+	
+shall	be	determined	as	follows:	if	<sporting	outcome>	was	achieved	prior	to	cancellation	or	may	be	unconditionally
+	
+determined	to	be	structurally	unable	to	be	achieved,	the	Contract	shall	resolve	accordingly;	if	<sporting	outcome>	was
+	
+not	achieved	prior	to	cancellation,	the	Contract	shall	resolve	based	on	the	last	official	standings	or	results	available	at
+	
+the	time	of	cancellation;	and	if	no	official	standings	or	results	are	available	or	the	Expiration	Value	cannot	otherwise
+	
+be	unconditionally	determined,	the	Contract	shall	resolve	to	the	last	fair	price	as	determined	in	the	sole	discretion	of
+	
+the	Exchange.
+If	<entity>	is	awarded	a	victory,	advancement,	or	qualification	via	forfeit,	bye,	default,	or	opponent	withdrawal,	this
+	
+counts	as	achieving	the	relevant	<sporting	outcome>	when	that	outcome	resembles	the	form(s)	of	winning,	advancing,
+	
+or	qualifying.
+If	<sporting	outcome>	involves	a	comparative	element	(e.g.,	"advance	further	than"	another	entity,	"finish	ahead	of"	a
+	
+specified	competitor),	the	comparison	shall	be	based	on	the	official	result	or	stage	reached,	with	outcomes	reflecting
+	
+later	stages	of	elimination	or	higher	final	placements	considered	"further"	or	"ahead."	If	the	compared	entities	finish	at
+	
+the	same	stage	or	placement,	the	Contract	shall	resolve	at	a	Settlement	Value	equal	to	$1/N,	rounded	down,	where	N	is
+	
+the	number	of	entities	sharing	the	same	stage	or	placement,	unless	a	specific	tie	strike	is	listed	by	the	Exchange.
+If	<entity>	is	defined	by	a	descriptive	characteristic	that	applies	to	multiple	competitors	or	teams	(e.g.,	"any	team	from
+	
+South	America,"	"a	wild	card	entrant"),	the	Contract	resolves	to	"Yes"	if	any	competitor	satisfying	that	characteristic
+	
+achieves	<sporting	outcome>	within	<time	period>,	unless	the	Exchange	specifies	that	all	such	competitors	must
+	
+achieve	the	outcome	or	otherwise	qualifies	the	scope	of	the	characteristic	in	the	Contract	listing.
+If	<entity>	is	defined	using	AND	logic,	all	named	or	described	competitors	must	achieve	<sporting	outcome>	for	the
+	
+Contract	to	resolve	"Yes."	If	<entity>	is	defined	using	OR	logic,	the	Contract	resolves	"Yes"	if	any	one	of	the	named
+	
+or	described	competitors	achieves	<sporting	outcome>.
+Overtime,	extra	time,	extra	innings,	penalty	shootouts,	sudden	death	periods,	playoffs,	tiebreakers,	and	any	other
+	
+tiebreaking	or	extension	mechanisms	officially	recognized	by	the	governing	body	shall	be	included	in	determining	the
+	
+outcome.
+If	the	competition	format	is	altered	by	the	governing	body	(e.g.,	a	change	in	the	number	of	rounds,	bracket	structure,
+	
+or	qualification	criteria)	after	the	Contract	is	listed	but	before	<sporting	outcome>	is	determined,	the	Exchange	will
+	
+announce	the	applicable	resolution	methodology	to	Members.	In	the	absence	of	such	an	announcement,	resolution	shall
+	
+follow	the	most	natural	interpretation	of	<sporting	outcome>	under	the	revised	format	as	determined	by	the	Exchange
+	
+at	its	sole	discretion.
+If	<entity>	is	identified	by	a	ranking	or	standing	that	is	determined	dynamically	during	<time	period>	(e.g.,	"the	team
+	
+with	the	best	regular	season	record,"	"the	top-ranked	player	at	the	start	of	the	tournament"),	the	relevant	characteristic
+	
+shall	be	evaluated	as	of	the	time	the	competition	whose	outcome	the	Contract	concerns	commences,	unless	otherwise
+	
+specified	by	the	Exchange.
+The	following	ARE	encompassed	by	the	Payout	Criterion:
+<entity>	wins,	advances,	qualifies,	or	achieves	<sporting	outcome>	through	regulation,	overtime,	or	any	officially
+	
+recognized	tiebreaking	or	extension	procedure.
+<entity>	achieves	<sporting	outcome>	via	opponent	forfeit,	withdrawal,	or	disqualification.
+<entity>	achieves	<sporting	outcome>	at	the	originally	scheduled	event	or	a	rescheduled	event	completed	within	<time
+	
+period>.
+<entity>	achieves	<sporting	outcome>	as	a	result	of	a	governing	body	ruling,	replay,	or	appeal	that	officially	affirms
+	
+the	result.
+The	following	are	NOT	encompassed	by	the	Payout	Criterion:
+<entity>	withdraws,	forfeits,	or	is	disqualified	before	achieving	<sporting	outcome>.
+The	event	or	competition	is	cancelled	in	its	entirety	without	completion	and	<sporting	outcome>	was	not	achieved.
+Exhibition,	preseason,	friendly,	or	unofficial	matches,	unless	explicitly	included	in	the	scope	of	<time	period>	or
+	
+<sporting	outcome>	as	specified	by	the	Exchange.
+Results	that	are	later	vacated,	reversed,	or	nullified	by	the	governing	body	prior	to	the	Expiration	Date	at	the
+	
+Expiration	time.
+Outcomes	from	competitions	or	events	in	which	<entity>	did	not	officially	participate	as	a	registered	competitor.
+Minimum	Tick:
+	The	Minimum	Tick	size	for	the	Contract	shall	be	$0.01.
+Position	Accountability	Level:
+	The	Position	Accountability	Level	for	the	Contract	shall	be	$25,000	per	strike,	per
+	
+Member.
+Last	Trading	Date:
+	The	Last	Trading	Date	of	the	Contract	will	be	the	Expiration	Date.	The	Last	Trading	Time	will	be	the
+	
+Expiration	time.
+Settlement	Date:
+	The	Settlement	Date	of	the	Contract	shall	be	no	later	than	the	day	after	the	Expiration	Date,	unless	the
+	
+Market	Outcome	is	under	review	pursuant	to	Rule	7.1.
+Expiration	Date:
+	The	latest	Expiration	Date	of	the	Contract	shall	be:	(i)	where	<time	period>	refers	to	an	overall
+	
+competition,	event,	or	stage	of	a	competition	or	event,	six	months	and	one	day	following	its	ordinarily	scheduled	date	of
+	
+completion,	(ii)	if	an	award	for	<time	period>,	six	months	after	the	officially	scheduled	date	for	award	distribution,	or	(iii)
+	
+one	month	after	<time	period>	in	all	other	cases.		If	an	event	described	in	the	Payout	Criterion	occurs,	expiration	will	be
+	
+moved	to	an	earlier	date	and	time	in	accordance	with	Rule	7.2.
+Expiration	time:
+	The	Expiration	time	of	the	Contract	shall	be	10:00	AM	ET.
+Settlement	Value:
+	The	Settlement	Value	for	this	Contract	is	$1.00.
+Expiration	Value:
+	The	Expiration	Value	is	the	value	of	the	Underlying	as	documented	by	the	Source	Agency	on	the
+	
+Expiration	Date	at	the	Expiration	time.
+Contingencies:
+	Before	Settlement,	Kalshi	may,	at	its	sole	discretion,	initiate	the	Market	Outcome	Review	Process	pursuant
+	
+to	Rule	7.1	of	the	Rulebook.	If	an	Expiration	Value	cannot	be	determined	on	the	Expiration	Date,	Kalshi	has	the	right	to
+	
+determine	payouts	pursuant	to	Rule	7.1	in	the	Rulebook.
+APPENDIX	B	–	TRADING	PROHIBITIONS
+In	addition	to	the	general	prohibition	against	trading	on	material	nonpublic	information,	the	Exchange	will	institute	additional
+	
+prohibitions	for	trading	the	contract.	Persons	under	18	years	of	age	are	not	permitted	to	create	Kalshi	accounts.	The
+	
+following	individuals	will	be	prohibited	from	trading:
+Athletes,	coaches,	managers,	trainers,	team	staff,	and	front-office	personnel	of	any	team	or	competitor	that	could
+	
+constitute	<entity>	or	be	a	direct	competitor	of	<entity>	within	<time	period>,	including	their	immediate	family
+	
+members	and	household	members
+Owners,	executives,	board	members,	and	operations	staff	of	teams,	franchises,	or	organizations	participating	in	the
+	
+relevant	competition
+Officers,	employees,	contractors,	and	board	members	of	the	governing	body,	sanctioning	organization,	or	organizing
+	
+committee	of	the	competition	(e.g.,	NCAA,	FIFA,	IOC,	NBA,	NFL,	NHL,	MLB,	MLS,	ATP,	WTA,	PGA,	USGA,
+	
+World	Athletics,	World	Rugby,	ICC,	FIVB,	BWF),	including	referees,	umpires,	judges,	scorers,	and	other	competition
+	
+officials
+Tournament	directors,	schedulers,	bracket-setters,	and	seeding	committee	members	for	the	relevant	competition
+Medical	staff,	physical	therapists,	and	team	physicians	with	non-public	knowledge	of	competitor	health,	injury,	or
+	
+fitness	status
+Agents,	managers,	publicists,	and	personal	representatives	of	any	competitor	that	could	constitute	<entity>
+Employees	and	contractors	of	any	Source	Agency	with	access	to	non-public	results,	scoring,	or	competition	data
+Sportsbook	operators,	oddsmakers,	traders,	and	risk	managers	at	licensed	sportsbooks	or	betting	exchanges	with	non-
+public	information	regarding	line	movement,	sharp	action,	or	insider	reports	related	to	the	relevant	competition
+Persons	subject	to	a	sports	integrity	unit	investigation	or	sanctioned	by	any	governing	body	for	match-fixing,
+	
+manipulation,	or	competition	integrity	violations
+Persons	acting	on	behalf	of,	or	at	the	direction	of,	any	of	the	foregoing

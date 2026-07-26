@@ -1,0 +1,94 @@
+SOURCE: https://assets.kalshi.com/contract_terms/BILLBOARDAWARDS.pdf
+
+BILLBOARDAWARD
+Scope:
+	These	rules	shall	apply	to	this	contract.
+Underlying:
+	The	Underlying	for	this	Contract	is	the	winner	of	<award>	at	the	<number>
+	
+Billboard	Music	Awards.	Revisions	to	the	Underlying	made	after	Expiration	will	not	be	accounted
+	
+for	in	determining	the	Expiration	Value.
+Instructions:	
+The	Underlying	can	be	found	at:	
+https://www.billboardmusicawards.com/
+.	These
+	
+instructions	on	how	to	access	the	Underlying	are	provided	for	convenience	only	and	are	not	part
+	
+of	the	binding	Terms	and	Conditions	of	the	Contract.	They	may	be	clarified	at	any	time.	
+Source	Agency:
+	The	Source	Agency	is	
+Billboard
+Type:
+	The	type	of	Contract	is	an	Event	Contract.
+Issuance:
+	The	Contract	is	based	on	the	outcome	of	a	recurrent	data	release,	which	is	issued	on
+	
+an	annual	basis.	Thus,	Contract	iterations	will	be	issued	on	a	recurring	basis,	and	future	Contract
+	
+iterations	will	generally	correspond	to	the	next	year.
+<award>
+:	The	Exchange	may	list	iterations	of	the	Contract	with	<award>	values	corresponding
+	
+to	award	categories	offered	at	the	Billboard	Music	Awards.	
+<nominee>
+:	The	Exchange	may	list	iterations	of	the	Contract	with	<nominee>	values
+	
+corresponding	to	potential	and	announced	nominees	for	a	particular	award.	The	Exchange	will
+	
+source	potential	nominees	from	major	trade	publications	such	as	
+Pitchfork
+.
+<number>
+:	The	Exchange	may	list	iterations	of	the	Contract	with	<number>	values
+	
+corresponding	to	a	particular	Billboard	Music	Awards	awards	ceremony.	
+<expo_date>
+:	<expo_date>	refers	to	a	calendar	date	specified	by	the	Exchange.	
+Payout	Criterion:
+	The	Payout	Criterion	for	the	Contract	encompasses	the	Expiration	Values	that
+	
+<nominee>	has	won	<award>	at	the	<number>	Billboard	Music	Awards.	If	no	data	is	available
+	
+from	the	Source	Agency	on	the	Expiration	Date,	then	the	market	will	resolve	to	No.	If	there	is	a
+	
+tie,	the	strike	for	“tie”	will	resolve	to	Yes	and	the	strikes	for	the	shared	winners	alone	will	resolve
+	
+to	No.	
+Minimum	Tick:
+	The	Minimum	Tick	size	for	the	Contract	shall	be	$0.01.
+Position	Accountability	Level:
+	The	Position	Accountability	Level	for	the	Contract	shall	be
+	
+$25,000	per	strike,	per	Member.
+Last	Trading	Date:
+	The	Last	Trading	Date	of	the	Contract	will	be	the	same	as	the	Expiration
+	
+Date.	The	Last	Trading	Time	will	be	the	same	as	the	Expiration	time.
+Settlement	Date:
+	The	Settlement	Date	of	the	Contract	shall	be	no	later	than	the	day	after	the
+	
+Expiration	Date,	unless	the	Market	Outcome	is	under	review	pursuant	to	Rule	7.1.
+Expiration	Date:
+	The	latest	Expiration	Date	of	the	Contract	shall	be	<expo_date>.	If	the	winner
+	
+of	<award>	is	announced	(or	<nominee>	is	not	nominated),	expiration	will	be	moved	to	an
+	
+earlier	date	and	time	in	accordance	with	Rule	7.2.
+Expiration	time:
+	The	Expiration	time	of	the	Contract	shall	be	10:00	AM	ET.
+Settlement	Value:
+	The	Settlement	Value	for	this	Contract	is	$1.00.
+Expiration	Value:
+	The	Expiration	Value	is	the	value	of	the	Underlying	as	documented	by	the
+	
+Source	Agency	on	the	Expiration	Date	at	the	Expiration	time.	
+Contingencies:
+	Before	Settlement,	Kalshi	may,	at	its	sole	discretion,	initiate	the	Market
+	
+Outcome	Review	Process	pursuant	to	Rule	6.3(d)	of	the	Rulebook.	If	an	Expiration	Value	cannot
+	
+be	determined	on	the	Expiration	Date,	Kalshi	has	the	right	to	determine	payouts	pursuant	to
+	
+Rule	6.3(b)	in	the	Rulebook.	

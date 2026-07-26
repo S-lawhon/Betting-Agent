@@ -1,0 +1,68 @@
+SOURCE: https://assets.kalshi.com/contract_terms/MLBWINS.pdf
+
+WINTOTAL
+Scope: These rules shall apply to this contract.
+Underlying: The Underlying for this Contract is the number of regular season game wins by
+ 
+<team> in the <year> season. Postseason games, exhibition games, or any games outside
+ 
+the regular season do not count toward the Underlying. If the season is shortened or
+ 
+lengthened for any reason, this will not affect the value of the Underlying. Revisions to the
+ 
+Underlying made after Expiration will not be accounted for in determining the Expiration Value.
+Source Agency: The Source Agencies are 
+ESPN, The New York Times, the Associated Press,
+ 
+Bloomberg News, Reuters, Axios, Politico, Semafor, The Information, The Washington Post, The
+ 
+Wall Street Journal, ABC, CBS, CNN, Fox News, MSNBC, and NBC.
+Type: The type of Contract is an Event Contract.
+Issuance: After the initial Contract, Contract iterations will be listed on an as-needed basis at
+ 
+the discretion of the Exchange and corresponding to the risk management needs of Members. 
+<count>: The Exchange may list iterations of the Contract with <count> levels that fall within
+ 
+an inclusive range between 0 and 1,000 at consecutive increments of <1>. Due to the
+ 
+potential for variability in the Underlying, the Exchange may modify <count> levels in
+ 
+response to suggestions by Members.
+<year>: <year> refers to a calendar year (or years) specified by the Exchange. The Exchange
+ 
+may list iterations of the Contract corresponding to variations of <year>.
+<team>: <team> refers to a team or teams specified by the Exchange.
+Payout Criterion: The Payout Criterion for the Contract encompasses the Expiration Values that
+ 
+are <above/below/between/exactly/at least> <count>.
+Minimum Tick: The Minimum Tick size for the Contract shall be $0.01.
+Position Accountability Level: The Position Accountability Level for the Contract shall be
+ 
+$25,000 per strike, per Member.
+Last Trading Date: The Last Trading Date of the Contract will be the same as the Expiration
+ 
+Date. The Last Trading Time will be the same as the Expiration Time.
+Settlement Date: The Settlement Date of the Contract shall be no later than the day after the
+ 
+Expiration Date, unless the Market Outcome is under review pursuant to Rule 7.1.
+Expiration Date: The latest Expiration Date of the Contract shall be one week after the end of
+ 
+the regular season for <team> If an event described in the Payout Criterion occurs (or can no
+ 
+longer occur – e.g., if a team has won 60 games in a season, then a strike for “between 10 and
+ 
+20 wins” may resolve to No early), expiration will be moved to an earlier date and time in
+ 
+accordance with Rule 7.2.
+Expiration time: The Expiration time of the Contract shall be 10:00 AM ET.
+Settlement Value: The Settlement Value for this Contract is $1.00.
+Expiration Value: The Expiration Value is the value of the Underlying as documented by the
+ 
+Source Agency on the Expiration Date at the Expiration time. 
+Contingencies: Before Settlement, Kalshi may, at its sole discretion, initiate the Market
+ 
+Outcome Review Process pursuant to Rule 6.3(d) of the Rulebook. If an Expiration Value
+ 
+cannot be determined on the Expiration Date, Kalshi has the right to determine payouts
+ 
+pursuant to Rule 6.3(b) in the Rulebook. 

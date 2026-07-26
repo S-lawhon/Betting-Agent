@@ -1,0 +1,136 @@
+{
+  "hypothesis_id": "P-027",
+  "name": "ECONSTAT prelim-vs-final settlement flips",
+  "verdict": "KILL",
+  "verdict_date": "2026-07-26",
+  "gate": {
+    "advance_requires": "flip rate on near-boundary strikes >= 5% AND no flip discount in last-trade prices (fade edge >= 2c/ct net, release-clustered CI excluding zero)",
+    "observed_flip_rate": 0.0,
+    "result": "fails at step 3 (flip count); price test moot"
+  },
+  "bucket": "not a settlement mechanic - the mechanism does not exist. The only surviving trade is forecasting the revision, which belongs in the 0-for-6 'we have better information' bucket.",
+
+  "census": {
+    "series_swept_all_categories": 4106,
+    "econstat_template_series": 197,
+    "contract_terms_urls": ["ECONSTAT.pdf", "ECONSTATTE.pdf"],
+    "econstattte_identical_text_to_econstat": true,
+    "markets_cached": 3156,
+    "events": 302,
+    "events_with_settlement_ts": 164,
+    "fee_type_all_series": "quadratic",
+    "maker_fee_rate": 0.0,
+    "taker_fee_formula": "0.07 * P * (1 - P)"
+  },
+
+  "qualifying_set": {
+    "definition": "series whose <econ stat> is a labelled preliminary / flash / advance print",
+    "n_series": 13,
+    "series": [
+      "KXUSMICHCSP", "KXDECPIPREL", "KXFRCPIPREL", "KXITCPIPREL",
+      "KXEZCPIYOYF", "KXEZGDPYOYF", "KXEZGDPQOQF", "KXDEGDPQOQF",
+      "KXDEGDPYOYF", "KXESGDPQOQF", "KXFRGDPQOQP", "KXFRGDPYOYP",
+      "KXITGDPQOQA", "KXITGDPYOYA"
+    ],
+    "assumed_but_absent": {
+      "sp_global_flash_pmi": "NO flash PMI series exist on Kalshi. Sweep of 4106 series for 'PMI' returns KXISMPMI, KXISMSERVICES, KXUSISMSERV, KXCHNBSPMI, KXCAIVEYPMI - all single-print statistics with no preliminary."
+    },
+    "missed_by_the_title_screen_but_checked": {
+      "KXUSDURABLE": "Census ADVANCE durable goods; settles on the advance, lag 1.06h",
+      "KXUSRETAIL": "Census ADVANCE monthly retail; settles on the advance, lag 1.01h",
+      "KXUKGDPMOM": "ONS first estimate; lag 7.63h"
+    }
+  },
+
+  "flip_study": {
+    "clustering": "by release event (all strikes in one release share the revision and are perfectly correlated)",
+    "qualifying_set": {
+      "settled_release_events": 19,
+      "bracket_flips": 0,
+      "flip_rate": 0.0,
+      "upper_95_rule_of_three": 0.158
+    },
+    "family_wide": {
+      "settled_release_events": 164,
+      "bracket_flips": 0,
+      "flip_rate": 0.0,
+      "upper_95_rule_of_three": 0.0183
+    },
+    "note": "The statistical bound is secondary. The load-bearing result is structural: settlement print == the print the market closed on, by construction."
+  },
+
+  "settlement_lag_diagnostic": {
+    "field": "settlement_ts - close_time",
+    "meaning": "a prelim->final gap requires a lag of days/weeks; a same-morning lag proves the market settled on the release it closed one minute before",
+    "buckets_events": {
+      "lt_2h": 103, "h2_24": 56, "d1_3": 3, "d3_10": 1, "gt_10d": 1, "negative": 0
+    },
+    "share_within_24h": 0.969,
+    "max_lag_hours_in_qualifying_set": 7.15,
+    "events_over_24h_all_non_preliminary": [
+      "KX30YUSTW-26MAY15", "KXFISHMEAL-26JUL08", "KXAMSAVO-26JUL03",
+      "KXPRIMESPEND-26JUN27", "KXJETFUEL-26MAY27"
+    ]
+  },
+
+  "natural_experiment": {
+    "event": "KXUSMICHCSP-26JUN12",
+    "statistic": "University of Michigan Consumer Sentiment, June 2026",
+    "preliminary": {"value": 48.9, "released": "2026-06-12T14:00:00Z"},
+    "final": {"value": 49.5, "released": "2026-06-26",
+              "source": "http://www.sca.isr.umich.edu/files/tbmics.csv"},
+    "straddled_strike": 49.0,
+    "kalshi_expiration_value": "48.9",
+    "kalshi_settlement_ts": "2026-06-12T14:36:46.940636Z",
+    "kalshi_result_at_T49": "no",
+    "hypothesised_result_at_T49": "yes",
+    "pre_close_two_sided_quote": {"bid": 0.12, "ask": 0.15},
+    "pre_close_last_executed_print": 0.12,
+    "volume": 693,
+    "open_interest": 688,
+    "hypothesised_trade_pnl_gross_cents_per_contract": -15.0,
+    "taker_fee_cents_per_contract_at_0.15": 0.89,
+    "hypothesised_trade_pnl_net_cents_per_contract": -15.9
+  },
+
+  "corroborating_settlements": [
+    {"event": "KXFRCPIPREL-26MAY29", "expiration_value": "2.4%", "prelim": "2.4%", "final": "2.4%", "source": "INSEE Informations rapides 136 / 140"},
+    {"event": "KXITCPIPREL-26MAY29", "expiration_value": "3.2%", "prelim": "3.2%", "final": "3.2%", "source": "Istat, Consumer prices - May 2026 (confirms the flash estimate)"},
+    {"event": "KXDECPIPREL-26MAY29", "expiration_value": "2.6%", "prelim": "2.6%", "final": "2.6%", "source": "Destatis PE26_182_611 / PE26_199_611"}
+  ],
+
+  "liquidity": {
+    "scope": "traded settled markets in the 13 qualifying series, 1-min candles over the 6h pre-close window",
+    "markets": 264,
+    "with_genuine_two_sided_quote": 102,
+    "two_sided_share": 0.386,
+    "two_sided_rule": "bid > 0 AND ask < 1.00 AND spread <= 0.25; post-halt candle (bid 0.00 / ask 1.00) always discarded",
+    "with_executed_print": 136,
+    "spread_cents": {"median": 6.0, "p75": 10.0, "max": 25.0},
+    "per_market_lifetime_volume": {"median": 459, "max": 46896, "total": 314520},
+    "family_wide_volume_contracts": 11311013,
+    "family_wide_median_volume_per_event": 6213,
+    "family_wide_max_event": {"event": "KXECONSTATCPI-26JUN", "volume": 674394}
+  },
+
+  "reusable_api_facts": {
+    "settled_status_is_finalized_not_settled": "status == 'settled' returns ZERO rows across all 197 series; the value is 'finalized'. Silent failure mode.",
+    "expiration_value_populated": "carries the realised statistic verbatim ('48.9', '172K', '-0.1%', 'Exactly 0.5%')",
+    "settlement_ts_fractional_seconds": "variable digit count (e.g. '.21184Z'); Python 3.9 fromisoformat accepts only 3 or 6 and silently dropped 164->144 events. Normaliser in econstat_research/settle_lag_census.py::iso",
+    "candlesticks_endpoint": "GET /series/{series}/markets/{ticker}/candlesticks?start_ts&end_ts&period_interval=1 - per-minute bid/ask/volume/OI, reaches far past the ~1-month trade-history window",
+    "post_close_candle_is_a_trap": "book collapses to bid 0.00 / ask 1.00 on halt; must be dropped or it fabricates a 100c spread",
+    "econstat_absent_from_kalshi_fees_table": "src/kalshi_fees.py::_SERIES_MAKER_FEE has no ECONSTAT entry, so series_maker_charges_fee() falls through to conservative True; all 197 are actually quadratic (maker-free). Harmless for gating, wrong for sizing. NO CODE CHANGE MADE."
+  },
+
+  "reopen_condition": "Only if Kalshi lists a series whose rules_primary names an UNLABELLED statistic while close_time sits one minute before that statistic's FLASH release - i.e. settlement_ts - close_time running into days. The settlement-lag diagnostic detects this in one field.",
+
+  "constraints_observed": {
+    "paper_demo_only": true,
+    "orders_placed": 0,
+    "pod_built": false,
+    "added_to_pods_active": false,
+    "deployed": false,
+    "live_data_mutated": false,
+    "git_operations": "none - files left on disk for the orchestrating session to commit"
+  }
+}

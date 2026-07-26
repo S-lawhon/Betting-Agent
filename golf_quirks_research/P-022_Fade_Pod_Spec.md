@@ -83,3 +83,44 @@ when any cap is exhausted.
 - **No aggregate-risk-guard / trade-store integration yet.** Like P-017M, the
   engine keeps its own JSONL books; collateral caps are enforced in-process
   and reset on restart. Wire into `AggregateRiskGuard` before scaling.
+
+---
+
+## Reconciliation against the locked decision rule — 2026-07-26
+
+The rule (`P022_DECISION_RULE.md`) was locked on 2026-07-26, **three days after**
+this pod shipped, and imposes conditions the pod did not meet. Reconciled here;
+full detail in that file's §11.
+
+**The pod was live and doing nothing.** `betting-round-leader-fade.service` ran from
+2026-07-23 21:15 UTC and wrote **zero quotes and zero fills**. `_close_epoch()`
+preferred `occurrence_datetime`, which on round-leader markets is a far-future
+placeholder — 13.2 to 18.2 days later than `close_time` on 10 of 10 markets sampled
+across all five tours. `close_epoch` was therefore ~2 weeks late, the 12–24h
+placement window opened after the round had already settled, and `_mid()` returns
+`None` on a settled book. Structurally incapable of quoting.
+
+The "Open items" note below about `_close_epoch` using `occurrence_datetime` flagged
+the right line and drew the wrong conclusion — it read as a precision concern
+("round-granularity, refine before real money") when it was a total blocker.
+
+**Fixed in this reconciliation:**
+
+| | before | after |
+|---|---|---|
+| close reference | `occurrence_datetime` first | **`close_time` first**, occurrence as fallback |
+| anchor band | `(0.03, 0.10)` | **`(0.03, 0.12)`** — matches rule §1 |
+| per-name cap | 25 contracts ≈ $23.25 = **2.3%** of bankroll | **0.5% of bankroll**, sized on collateral |
+| per-tournament / aggregate | fixed $50 / $150 | **5% / 15% of bankroll**, derived |
+| aggregate risk | none | `reserve_trade` on quote, `release_reservation` on pull |
+
+Caps are now percentages, so they track the bankroll instead of being correct only
+at $1,000. Tests 10 → 21; all 11 new ones fail against the pod as it shipped.
+
+**Two open items remain, both recorded rather than closed:**
+
+1. **Cross-process aggregate risk is not achieved.** P-022 runs in its own process,
+   so its guard instance is not the engine's. The 15% aggregate cap binds against
+   P-022's own book only. Shared state would be needed for more.
+2. **Not deployed.** The service is still running the 2026-07-23 code. Deploying the
+   fix is what actually starts T counting, and that is Sam's decision.

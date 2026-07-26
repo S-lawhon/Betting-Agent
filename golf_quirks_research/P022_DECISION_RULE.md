@@ -318,3 +318,95 @@ python3 -m scripts.p022_checkpoint --json     # machine-readable
 
 That script implements §3 and §4 and nothing else. It is the only
 sanctioned reader. Reference: this file.
+
+---
+
+## 11. Correction to §9, and the pod's registration
+
+**Recorded 2026-07-26, during the reconciliation Sam approved.**
+
+### 11a. §9 was factually wrong when it was written
+
+§9 states: *"As of this locking, `src/round_leader_fade_maker.py`,
+`scripts/run_round_leader_fade.py`, the `pods.P-022` config block, and any systemd
+unit **do not exist**."*
+
+They existed. The pod was committed on **2026-07-23** (`546d601`, on branch
+`p022-p023-golf-deadheat-fade`), and `betting-round-leader-fade.service` had been
+**running live on the droplet since 2026-07-23 21:15 UTC** — three days before this
+rule was locked. The author of the rule checked the working branch, where the files
+are genuinely absent, and did not check the droplet.
+
+This is corrected rather than quietly edited because the error is instructive: a
+pre-registration document that misdescribes what is already running is not a
+pre-registration. **Check the runtime, not the branch.**
+
+### 11b. What the pod was actually doing: nothing
+
+It wrote **zero quotes and zero fills** in three days, and its books
+(`round_leader_fade_{quotes,fills}.jsonl`) were never created. The journal has four
+lines, all from startup.
+
+Root cause: `_close_epoch()` preferred `occurrence_datetime` over `close_time`. On
+round-leader markets `occurrence_datetime` is a far-future **placeholder** — measured
+2026-07-26 on one settled market per series across all five tours, it ran **13.2 to
+18.2 days later than `close_time`, on 10 of 10**. With `close_epoch` ~2 weeks late,
+the `[12h, 24h]` placement window opened long after the round had ended and settled,
+and `_mid()` returns `None` on a settled book. **The pod was structurally incapable
+of ever placing a quote.**
+
+The code comment asserted the opposite of the truth. It reasoned by analogy from the
+top-N event-timing quirk in `CLAUDE.md`, where the far-future field really is
+`close_time` — on this family the two are **reversed**.
+
+**Consequence for the gate: T = 0, and no observation was lost.** Nothing was quoted,
+so nothing needs excluding.
+
+### 11c. Registration — parameters as shipped after reconciliation
+
+Per §9, confirming the shipped parameters against §7:
+
+| §7 requirement | shipped before | shipped now |
+|---|---|---|
+| per-name ≤ 0.5% bankroll | 25 contracts ≈ **$23.25 = 2.3%** ✗ | `pct_per_name = 0.005` → $5.00 ✓ |
+| per-tournament ≤ 5% | $50 fixed ✓ (coincidentally) | `pct_per_tournament = 0.05` → $50.00 ✓ |
+| aggregate ≤ 15% | $150 fixed ✓ (coincidentally) | `pct_total = 0.15` → $150.00 ✓ |
+| sizing on collateral, not contracts | per-name was a **contract count** ✗ | collateral binds; 25-ct cap is a secondary bound ✓ |
+| quote only at H ≈ 12–24h | `fade_start_h=24`, `no_new_quote_h=12` ✓ | unchanged ✓ |
+| anchor band [0.03, 0.12] (§1) | **(0.03, 0.10)** ✗ | `(0.03, 0.12)` ✓ |
+| offset +0.02 | `quote_offset = 0.02` ✓ | unchanged ✓ |
+| 13 `*LEAD` series | ✓ | unchanged ✓ |
+| `AggregateRiskGuard` **with reservations** | **absent** ✗ | `reserve_trade` on quote, `release_reservation` on pull ✓ (see 11d) |
+
+The two fixed-dollar caps happened to match §7 at a $1,000 bankroll and would have
+silently breached it at any other. They are now derived from percentages, so the
+percentages are the single source of truth and a bankroll change moves all three
+together.
+
+**Caps are gate conditions (§7): raising any of these percentages resets T to 0 under
+a new pod ID (§8.1).**
+
+### 11d. A §7 requirement that is only partially satisfiable
+
+§7 requires wiring into `AggregateRiskGuard` with reservations. That is now
+implemented — but **P-022 runs as its own process**, so a guard instance it holds is
+*not* the 5-minute engine's. It enforces P-022's limits against P-022's own book; it
+does not see engine positions, and the engine does not see P-022's.
+
+True cross-process aggregate risk needs shared state that does not exist in this
+codebase. The reservation wiring delivers what §7 was actually worried about — a
+whole tournament's names going out in one window without the guard seeing the
+cumulative exposure — but the "aggregate ≤ 15% of bankroll" cap is enforced against
+**P-022's own collateral only**. Recorded here rather than marked satisfied.
+
+### 11e. Verification
+
+`tests/test_round_leader_fade.py`: 10 → **21 tests**. The 11 new ones cover the
+close-time defect (both directions, including the fallback), caps derived from
+bankroll, collateral binding before the contract cap, the §1 band, and the
+reservation lifecycle. **All 11 fail against the pod as it shipped.** Full suite
+1,513 passing.
+
+**Still not authorised by this document:** the fixed pod has NOT been deployed, and
+`betting-round-leader-fade.service` is still running the 2026-07-23 code that cannot
+quote. Starting T is Sam's call.

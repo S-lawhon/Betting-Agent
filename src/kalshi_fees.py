@@ -17,139 +17,123 @@ the general 0.0175 rate. P-016 relies on that fallback (it makes on KXMLBGAME,
 which does charge) and must not be perturbed while its gate sample is running.
 """
 from __future__ import annotations
+import json
 import math
+from functools import lru_cache
+from pathlib import Path
 
 TAKER_COEF = 0.07
 MAKER_COEF = 0.0175
 
-# Series family -> does it charge maker fees? True == "quadratic_with_maker_fees"
-# (0.0175 maker rate), False == "quadratic" (ZERO maker fee).
+# ── The fee table is a GENERATED FIXTURE, not a hand-maintained dict ──
 #
-# Matching is LONGEST-PREFIX-WINS, which is what makes the overlapping families
-# resolve correctly: "KXMLB" (game winner, charges) is a prefix of "KXMLBHR"
-# (home-run prop, free) which is in turn a prefix of "KXMLBHRDERBY" (charges).
-# A naive `any(startswith(...))` over two flat tuples gets all three wrong.
+# `_SERIES_MAKER_FEE` used to live here as a hand-curated prefix table. It
+# drifted FIVE times — four found in 2026-07 (round top-N, non-PGA make-cut,
+# non-PGA round leaders, the KXMLBHRDERBYR1LEAD nesting) and a fifth found on
+# 2026-07-28 by this very replacement: KXCHAMPTOUR, KXLIVTOUR and KXLPGATOUR
+# were all marked as CHARGING and none of them does.
 #
-# Verified against live /series metadata:
-#   golf 2026-07-19; MLB 2026-07-20; round-leader + stat-leader 2026-07-26 via
-#   GET /trade-api/v2/series/?category=Sports&limit=200  (per-series `fee_type`)
-# Re-verify with that call before adding entries — this table has drifted twice.
+# A wrong maker fee never looks broken. It produces a plausible number shifted
+# by a fraction of a cent, in exactly the band where these hypotheses live and
+# die, and it flows straight into every backtest's net-edge gate.
 #
-# 2026-07-26 sweep of ALL 7,665 series in EVERY category: 88 tickers contain
-# "LEAD" and not one is `quadratic_with_maker_fees`. Leader markets — round
-# leader, season stat leader — appear to be uniformly maker-free.
-_SERIES_MAKER_FEE: dict[str, bool] = {
-    # ---- Golf: winner / outright series charge makers ----
-    "KXPGA": True,            # PGA Championship winner
-    "KXPGATOUR": True,
-    "KXTHEOPEN": True,
-    "KXPGARYDER": True,
-    "KXPGASOLHEIM": True,
-    "KXLPGATOUR": True,
-    "KXLIVTOUR": True,
-    "KXCHAMPTOUR": True,
-    # ---- Golf: derivative/prop series are maker-free ----
-    "KXPGATOP": False,
-    "KXPGAMAKECUT": False,
-    "KXPGAH2H": False,
-    "KXGOLFH2H": False,
-    "KXPGA3BALL": False,
-    "KXPGA5BALL": False,
-    "KXPGAR1LEAD": False,
-    "KXPGAR2LEAD": False,
-    "KXPGAR3LEAD": False,
-    "KXPGAUNDERPAR": False,
-    "KXDPWTH2H": False,
-    "KXLIVH2H": False,
-    "KXPGACUTLINE": False,
-    # ---- Round-based top-N, and the non-PGA make-cut/top-N (added 2026-07-26) ----
-    # Found by P-023c and P-023 Phase 2. `KXPGATOP` above does NOT cover
-    # `KXPGAR1TOP5` — the shared prefix is only "KXPGA", which charges — so every
-    # round-based top-N fell through to the charging default. Likewise `KXLIVTOUR`
-    # is not a prefix of `KXLIVTOP5`, and nothing covered KXDPWORLDTOURMAKECUT.
-    # All verified `fee_type=quadratic` against GET /series?category=Sports on
-    # 2026-07-26 (3,005 series swept; every KXPGAR{1,2,3}TOP*, KXLIVTOP* and
-    # KXDPWORLDTOURMAKECUT returned quadratic, no exceptions).
-    "KXPGAR1TOP": False,
-    "KXPGAR2TOP": False,
-    "KXPGAR3TOP": False,
-    "KXLIVTOP": False,            # longer than KXLIVTOUR? No — disjoint. Both needed.
-    "KXDPWORLDTOURMAKECUT": False,
-    # ---- Round-leader series on the NON-PGA tours (added 2026-07-26) ----
-    # These used to fall through to the charging default, costing P-022 a
-    # phantom 0.0175*P*(1-P) — 0.129c/ct at P=0.08 — on the tours that supply
-    # most of its tournaments. Full tickers, NOT a short "KXLIVR"-style prefix:
-    # the PGA case proves short prefixes are unsafe, since "KXPGAR" would also
-    # swallow KXPGARYDER, the one golf series that genuinely charges.
-    "KXDPWORLDTOURR1LEAD": False,
-    "KXDPWORLDTOURR2LEAD": False,
-    "KXDPWORLDTOURR3LEAD": False,
-    "KXLIVR1LEAD": False,
-    "KXLIVR2LEAD": False,
-    "KXLIVR3LEAD": False,
-    "KXLPGAR1LEAD": False,
-    "KXLPGAR2LEAD": False,
-    "KXLPGAR3LEAD": False,
-    "KXCHAMPTOURR1LEAD": False,   # longer than KXCHAMPTOUR (True) — wins
-    # R2/R3 were NOT live on 2026-07-26 (the Champions Tour lists R1 only).
-    # Pre-registered on the verified family pattern so a mid-season launch
-    # cannot silently reintroduce the phantom fee; inert until they exist.
+# So the table is now generated from Kalshi's own `/series` — one call, 12,199
+# series, each with a `fee_type` — by `scripts/generate_fee_fixture.py`, and
+# drift against live Kalshi is detected by `scripts/check_fee_fixture.py`.
+# Nothing here is hand-editable.
+#
+# Matching is EXACT on the series ticker, which kills the prefix trap outright.
+# The trap was never intuitive: `KXPGATOP` does not cover `KXPGAR1TOP5` (their
+# shared prefix is `KXPGA`, which charges), and `KXMLB` < `KXMLBHR` <
+# `KXMLBHRDERBY` < `KXMLBHRDERBYR1LEAD` alternate charge/free/charge/free.
+# Under exact matching none of that can happen.
+_FIXTURE_PATH = Path(__file__).resolve().parent / "fixtures" / "kalshi_series_fees.json"
+
+# Series that do not exist on Kalshi yet, pre-registered on a family pattern
+# that has been verified exhaustively, so a mid-season launch cannot silently
+# reintroduce a phantom fee. This is NOT a general-purpose override table: an
+# entry is only legitimate while its ticker is absent from the fixture, and
+# `tests/test_kalshi_fees.py::test_pending_series_expire_once_kalshi_lists_them`
+# fails as soon as one appears, forcing it to be deleted rather than left to
+# rot into a second hand-maintained dict.
+#
+# 2026-07-26 sweep of all series in every category: 88 tickers contain "LEAD"
+# and not one is `quadratic_with_maker_fees`. The Champions Tour lists R1 only.
+_PENDING_SERIES: dict[str, bool] = {
     "KXCHAMPTOURR2LEAD": False,
     "KXCHAMPTOURR3LEAD": False,
-    # ---- MLB: game//league outcome series charge makers ----
-    "KXMLB": True,            # league-level (also the conservative MLB default)
-    "KXMLBGAME": True,
-    "KXMLBAL": True,
-    "KXMLBNL": True,
-    "KXMLBASGAME": True,
-    "KXMLBHRDERBY": True,     # longer than KXMLBHR, so it wins — intentional
-    "KXMLBHRDERBYR1LEAD": False,   # ...and longer still, so IT wins over the
-    # derby. Found 2026-07-26: the derby's own round-leader market is
-    # `quadratic` like every other *LEAD series, but it sat behind
-    # KXMLBHRDERBY (True) and was being charged. Four alternating levels:
-    # KXMLB(T) < KXMLBHR(F) < KXMLBHRDERBY(T) < KXMLBHRDERBYR1LEAD(F).
-    # ---- MLB: prop/derivative series are maker-free ----
-    "KXMLBHIT": False,
-    "KXMLBKS": False,
-    "KXMLBTOTAL": False,
-    "KXMLBSPREAD": False,
-    "KXMLBTEAMTOTAL": False,
-    "KXMLBTB": False,
-    "KXMLBHR": False,
-    "KXMLBHRR": False,
-    "KXMLBSB": False,
-    "KXMLBRFI": False,
-    "KXMLBF5": False,
-    # ---- Season stat-leader family, all sports (added 2026-07-26) ----
-    # KXLEADERMLBWINS, KXLEADERNBAPTS, KXLEADERNFLSACKS, KXLEADERUCLGOALS...
-    # 39 live series on 2026-07-26, every one `quadratic`. Safe as a single
-    # family prefix: no entry above is a prefix of "KXLEADER" and "KXLEADER"
-    # is a prefix of none of them, so it neither shadows nor is shadowed.
-    # Relevant to P-026.
-    "KXLEADER": False,
 }
+
+@lru_cache(maxsize=1)
+def _fixture() -> tuple[frozenset, frozenset]:
+    """(all known series tickers, tickers charging maker fees).
+
+    Loaded once. A missing or unreadable fixture yields empty sets, which
+    makes every series 'unknown' and therefore CHARGED — the conservative
+    direction, since over-charging only makes the net-edge gate stricter.
+    """
+    try:
+        data = json.loads(_FIXTURE_PATH.read_text())
+    except (OSError, ValueError):
+        return frozenset(), frozenset()
+    return (frozenset(data.get("all_series") or ()),
+            frozenset(data.get("maker_fee_series") or ()))
+
+
+def fixture_metadata() -> dict:
+    """Provenance of the committed fee fixture (for reports and the CI check)."""
+    try:
+        data = json.loads(_FIXTURE_PATH.read_text())
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in data.items()
+            if k not in ("all_series", "maker_fee_series",
+                         "zero_fee_multiplier_series")}
 
 
 def series_maker_charges_fee(series_ticker: str) -> bool:
     """True if this series charges maker fees (quadratic_with_maker_fees).
 
-    Prop/derivative series (golf top-N, make-cut, H2H; MLB hits, K's, totals,
-    total bases, HR, HRR, SB, RFI, F5, spreads) return False → maker fee is
-    zero. Game-winner and league-outcome series return True.
+    Matching is EXACT on the series ticker, tried in two steps:
 
-    Series tickers are matched by LONGEST prefix, so a market's full series
-    ticker ("KXPGATOP20", "KXMLBHRR") resolves to its family. An unrecognised
-    series returns True — conservative, since over-charging a fee only makes
-    the net-edge gate stricter.
+      1. the string as given — because **148 series tickers contain a hyphen**
+         (`KXMLBWINS-MIL`, `KXNFLWINS-SF`, `KXWO-GOLD`). Splitting first would
+         truncate those to a segment that is a different series, or to nothing
+         at all;
+      2. failing that, the leading hyphen segment — because callers routinely
+         pass a full market ticker ("KXPGATOP20-ROC26-TMOO").
+
+    Step 2 is only safe because the two can never disagree: 86 hyphenated
+    series have a leading segment that is also a series, and **zero of the 86
+    differ on fee type**. `tests/test_fee_fixture_current.py` asserts that
+    against the whole live inventory, so if Kalshi ever creates such a pair the
+    suite fails rather than the fee silently going wrong.
+
+    Three outcomes:
+      * in the fixture's maker-fee list   -> True  (charges)
+      * in the fixture but not that list  -> False (quadratic, maker-free)
+      * not in the fixture at all         -> True  (conservative)
+
+    The third case matters: a series listed AFTER the fixture was generated is
+    unknown, and treating an unknown series as free would understate cost.
+    Over-charging only makes the gate stricter. `scripts/check_fee_fixture.py`
+    is what stops the unknown set from quietly growing.
     """
-    s = (series_ticker or "").upper()
-    if not s:
-        return True  # unknown → conservative (charge)
-    best: tuple[int, bool] | None = None
-    for prefix, charges in _SERIES_MAKER_FEE.items():
-        if s.startswith(prefix) and (best is None or len(prefix) > best[0]):
-            best = (len(prefix), charges)
-    return best[1] if best is not None else True
+    raw = (series_ticker or "").upper()
+    if not raw:
+        return True                                   # unknown -> conservative
+    known, charging = _fixture()
+    for s in (raw, raw.split("-")[0]):
+        if not s:
+            continue
+        if s in charging:
+            return True
+        if s in known:
+            return False
+        pending = _PENDING_SERIES.get(s)
+        if pending is not None:
+            return pending
+    return True
 
 
 def _roundup_cent(x: float) -> float:

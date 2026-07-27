@@ -13,8 +13,8 @@ series (top-N, make-cut, H2H, 3-ball, round leaders) are fee_type
 2026-07-19. Using the general maker rate on a prop maker strategy would
 understate net edge by ~0.4c/contract at 20c — enough to matter.
 
-These functions are intended to be promoted into src/kalshi_fees.py
-(series_maker_charges_fee) once the backtest validates the strategy.
+The series-aware fee lookup HAS been promoted into src/kalshi_fees.py and is
+imported from there; only the de-vig helpers remain local.
 """
 from __future__ import annotations
 
@@ -24,25 +24,15 @@ from typing import List, Sequence
 TAKER_COEF = 0.07
 MAKER_COEF_GENERAL = 0.0175  # matches src/kalshi_fees.MAKER_COEF
 
-# Prop/derivative series: fee_type == "quadratic" → makers pay 0.
-# Winner series: fee_type == "quadratic_with_maker_fees" → makers pay.
-# Series prefixes verified against live /series metadata (2026-07-19).
-_MAKER_FEE_SERIES_PREFIXES = (
-    "KXPGATOUR", "KXTHEOPEN", "KXPGA-", "KXPGARYDER", "KXPGASOLHEIM",
-    "KXLPGATOUR", "KXLIVTOUR", "KXCHAMPTOUR",
-)
-
-
-def series_maker_charges_fee(series_ticker: str) -> bool:
-    """True if this series charges maker fees (quadratic_with_maker_fees).
-
-    Golf prop series (top-N, make-cut, H2H, 3-ball, round leaders) return
-    False → maker fee is zero. Winner/outright series return True.
-    """
-    s = (series_ticker or "").upper()
-    # KXPGA (PGA Championship winner) needs the trailing '-' to avoid
-    # matching KXPGATOP*, KXPGAMAKECUT, etc.
-    return any(s == p.rstrip("-") or s.startswith(p) for p in _MAKER_FEE_SERIES_PREFIXES)
+# The local prefix table that used to live here is GONE. It was a third
+# hand-maintained copy of the fee schedule and it carried the same fifth drift
+# as the engine's: KXLPGATOUR, KXLIVTOUR and KXCHAMPTOUR were all listed as
+# charging maker fees and none of them does. Fee classification now comes from
+# the single generated fixture (src/fixtures/kalshi_series_fees.json), so a
+# backtest and the live engine can no longer disagree about what a trade cost.
+#
+# See research/REPORT_Fee_Audit_2026-07-27.md.
+from src.kalshi_fees import series_maker_charges_fee   # noqa: F401,E402
 
 
 def _roundup_cent(x: float) -> float:

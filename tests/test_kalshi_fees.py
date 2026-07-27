@@ -1,7 +1,7 @@
 import pytest
 from src.kalshi_fees import (fee_per_contract, fee_total, fee_fraction_of_stake,
                              net_edge, should_bet, series_maker_charges_fee,
-                             _SERIES_MAKER_FEE)
+                             _PENDING_SERIES, _fixture, fixture_metadata)
 
 def test_fee_peaks_at_50c():
     # per-contract fee is maximised at P=0.5
@@ -201,12 +201,14 @@ def test_no_phantom_maker_fee_at_p022_working_price():
 
 
 def test_round_leader_series_survive_longest_prefix_shadowing():
-    """Each new entry sits under a SHORTER, charging entry and must win.
+    """The prefix trap, now dead by construction.
 
-    KXCHAMPTOUR (True) < KXCHAMPTOURR1LEAD (False)
-    KXMLBHRDERBY (True) < KXMLBHRDERBYR1LEAD (False)
+    Under the old longest-prefix rule each of these sat under a SHORTER,
+    charging entry and had to win by being longer. Exact matching removes the
+    question entirely — but the assertions stay, because they are the cases
+    that were actually wrong in production.
     """
-    assert series_maker_charges_fee("KXCHAMPTOUR") is True
+    assert series_maker_charges_fee("KXCHAMPTOUR") is False   # was hand-marked True
     assert series_maker_charges_fee("KXCHAMPTOURR1LEAD") is False
     # the derby chain now alternates FOUR times
     assert series_maker_charges_fee("KXMLB") is True
@@ -226,9 +228,13 @@ def test_new_entries_do_not_shadow_the_one_charging_golf_neighbour():
     assert series_maker_charges_fee("KXPGARYDER-25") is True
     # ...while the leader markets around it stay free
     assert series_maker_charges_fee("KXPGAR1LEAD") is False
-    # unrelated families are unchanged
-    assert series_maker_charges_fee("KXLIVTOUR") is True
-    assert series_maker_charges_fee("KXLPGATOUR") is True
+    # KXLIVTOUR / KXLPGATOUR / KXCHAMPTOUR were hand-marked as CHARGING and
+    # none of them does. That was the FIFTH drift, found 2026-07-28 when the
+    # hand table was replaced by the generated fixture — and it ran the other
+    # way from the previous four: the table OVER-charged.
+    assert series_maker_charges_fee("KXLIVTOUR") is False
+    assert series_maker_charges_fee("KXLPGATOUR") is False
+    assert series_maker_charges_fee("KXCHAMPTOUR") is False
 
 
 def test_leader_markets_resolve_from_full_market_tickers():
@@ -247,9 +253,9 @@ def test_every_lead_entry_in_the_table_is_maker_free():
     future edit adds a charging *LEAD entry, either Kalshi changed its fee
     schedule (re-verify and update this test) or the entry is a mistake.
     """
-    charging = {k: v for k, v in _SERIES_MAKER_FEE.items()
-                if "LEAD" in k and v is True}
-    assert charging == {}, f"*LEAD series marked as charging makers: {charging}"
+    _known, charging = _fixture()
+    bad = sorted(t for t in charging if "LEAD" in t)
+    assert bad == [], f"*LEAD series charging maker fees in the fixture: {bad}"
 
 
 def test_checkpoint_script_assertion_set_is_covered():
@@ -287,12 +293,12 @@ def test_round_topn_and_nonpga_makecut_are_maker_free(series):
 
 
 def test_round_topn_entries_do_not_shadow_the_charging_golf_neighbours():
-    """The regression that makes short prefixes dangerous here.
+    """The regression that made short prefixes dangerous.
 
-    "KXPGAR" would swallow KXPGARYDER, which genuinely charges. The entries use
-    "KXPGAR1TOP"/"KXPGAR2TOP"/"KXPGAR3TOP", so the Ryder Cup is untouched.
+    "KXPGAR" would swallow KXPGARYDER, which genuinely charges. Exact matching
+    cannot make that mistake, and the neighbours stay right.
     """
     assert series_maker_charges_fee("KXPGARYDER") is True
     assert series_maker_charges_fee("KXPGA") is True
     assert series_maker_charges_fee("KXPGATOUR") is True
-    assert series_maker_charges_fee("KXLIVTOUR") is True
+    assert series_maker_charges_fee("KXPGARYDERTOP3") is False

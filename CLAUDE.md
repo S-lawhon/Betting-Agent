@@ -85,32 +85,42 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
   for historical prices. Freshly-settled events leave `result` unpopulated ~1 day.
 - **Fees are series-aware** (`src/kalshi_fees.py`): taker = 0.07·P·(1−P) always;
   maker = 0 for `quadratic` series and 0.0175·P·(1−P) for
-  `quadratic_with_maker_fees`. The split is props-vs-outcomes, NOT per-sport:
-  derivative series are maker-free (golf top-N, make-cut, H2H, 3-ball, round
-  leaders; MLB hits, K's, totals, team totals, TB, HR, HRR, SB, RFI, F5,
-  spreads), game-winner/league series charge (KXPGA, KXMLBGAME, KXMLB, KXMLBAL/NL,
-  KXMLBASGAME, KXMLBHRDERBY). Pass `series_ticker` to `fee_per_contract`. No arg
-  → general maker rate (backward-compatible for P-016).
-  `_SERIES_MAKER_FEE` matches by LONGEST prefix — required because KXMLB (charges)
-  ⊂ KXMLBHR (free) ⊂ KXMLBHRDERBY (charges) ⊂ KXMLBHRDERBYR1LEAD (free). Verify
-  new entries against
-  `GET /trade-api/v2/series/?category=Sports&limit=200` (`fee_type` field); this
-  table has now drifted **four** times, and the 2026-07-26 run queue found three
-  separate missing slices in one day. **The durable fix is a fixture generated
-  from `/series` plus a CI check, not a fifth hand patch.**
-- **Prefix nesting is the trap, and it is not intuitive.** `KXPGATOP` does NOT
-  cover `KXPGAR1TOP5` — their shared prefix is only `KXPGA`, which charges — so
-  every round-based top-N series was silently billed a maker fee on markets
-  Kalshi bills at zero. Same shape for `KXLIVTOUR` vs `KXLIVTOP5` (disjoint, not
-  nested). When adding an entry, check what its *actual* longest match resolves
-  to; do not assume a similar-looking entry covers it.
+  `quadratic_with_maker_fees`. The split is props-vs-outcomes, NOT per-sport.
+  Pass `series_ticker` to `fee_per_contract`; no arg → general maker rate
+  (backward-compatible for P-016, which makes on KXMLBGAME and does charge).
+  **The table is now a GENERATED FIXTURE, not a hand-maintained dict** —
+  `src/fixtures/kalshi_series_fees.json`, built from one `GET /series` call by
+  `scripts/generate_fee_fixture.py` (12,199 series, 130 charging). Matching is
+  **EXACT on the series ticker**, so the longest-prefix trap below is dead by
+  construction. Do NOT hand-patch it; regenerate and commit. Drift against live
+  Kalshi: `python3 -m scripts.check_fee_fixture` (exit 1), also available as an
+  opt-in test via `KALSHI_FEE_CHECK=1`. It alarms on a classification change or
+  a new CHARGING series, and stays quiet for new maker-free series — Kalshi
+  lists those constantly. `research/REPORT_Fee_Audit_2026-07-27.md`.
+  Two things exact matching still needs care with: **148 series tickers contain
+  a hyphen** (`KXMLBWINS-MIL`), so resolution tries the full string before the
+  leading segment; and `_PENDING_SERIES` holds the only hand-written fee data
+  left — series that do not exist yet — with a test that fails once Kalshi
+  lists one, forcing deletion.
+- **Prefix nesting WAS the trap — this is now history, keep it that way.**
+  Under the old longest-prefix rule `KXPGATOP` did NOT cover `KXPGAR1TOP5`
+  (shared prefix only `KXPGA`, which charges), `KXLIVTOUR` and `KXLIVTOP5` were
+  disjoint rather than nested, and `KXMLB` ⊂ `KXMLBHR` ⊂ `KXMLBHRDERBY` ⊂
+  `KXMLBHRDERBYR1LEAD` alternated charge/free/charge/free. Four of the five
+  drifts came from this. Exact matching killed it — **do not reintroduce
+  prefix logic anywhere in the fee path.**
 - **Leader markets are maker-free — all of them.** Swept 2026-07-26 across all
-  7,665 series in every category: 88 tickers contain `LEAD` and not one is
-  `quadratic_with_maker_fees`. Round leaders on every tour
-  (KXPGA/KXDPWORLDTOUR/KXLIV/KXLPGA/KXCHAMPTOUR `R{1,2,3}LEAD`) and the season
-  stat-leader family (`KXLEADER*`, 39 series) are all `quadratic`. Add round
-  leaders as FULL tickers, never a per-tour round prefix: `KXPGAR` would also
-  swallow KXPGARYDER, the one golf series that genuinely charges.
+  series in every category: 88 tickers contain `LEAD` and not one is
+  `quadratic_with_maker_fees`. Round leaders on every tour and the season
+  stat-leader family (`KXLEADER*`) are all `quadratic`. Asserted against the
+  fixture by `tests/test_kalshi_fees.py`, so a regression fails the suite
+  rather than being caught by a later reader.
+- **The fee table drifted FIVE times and every one was found by accident**,
+  downstream of a verdict already written. The audit found no committed
+  verdict changed sign — but only because every maker study distrusted the
+  code and hard-coded a fee it verified live against `/series` itself. P-023c's
+  +0.2¢ executable KILL sat well inside the 0.44¢ phantom-fee band and was
+  safe only for that reason. `research/REPORT_Fee_Audit_2026-07-27.md`.
 
 ## Aggregate risk — reservations (added 2026-07-20)
 

@@ -26,7 +26,7 @@
 |---|---|---|---|
 | **1** | P-022 close-time resolution | **FIXED + DEPLOYED** | resolver error **one-sided early on 72 of 72** settled events; min +0.16h, median +1.58h |
 | **2** | Gate throughput audit | **KILL** (hypothesis refuted) | 432 P-001 settlements in 28 days → **0** gate-countable rows; 4 of 5 gates are not measuring |
-| **3** | P-028 golf template sweep | **NOT REACHED** | — |
+| **3** | P-028 golf template sweep | **KILL** (both leads) | H2H ties pay **0.50/0.50**, not $0 — pair sums to $1.00 exactly; category-leader has **2 tournament-clusters** |
 | **4** | R5 follow-ups | **NOT REACHED** | — |
 | **5** | P-022 widen the backtest | **PARTIAL** | pre-declaration committed before any pull; **13/13 series** have history back to **2026-05-22** — "~1 month" refuted |
 | **6** | Corrections + droplet hygiene | **NOT REACHED** | — |
@@ -34,6 +34,7 @@
 | **8** | Data-readiness audit | **MIXED** | P-018 **ahead**; MLB props **on time to the day**; weather **dead, 139 of 139 runs failing** |
 
 **Reports:** [P-022 close time](REPORT_P022_Close_Time_2026-07.md) ·
+[P-028 golf sweep](../golf_quirks_research/REPORT_P028_Template_Sweep_2026-07.md) ·
 [gate throughput](REPORT_Gate_Throughput_2026-07.md) ·
 [fee audit](REPORT_Fee_Audit_2026-07-27.md) ·
 [data readiness](REPORT_Data_Readiness_2026-07-27.md) ·
@@ -153,6 +154,22 @@ MLB season. The registry's "late Aug – early Sept 2026" is unachievable.
   slept": **139 of 139 cron runs failed** with `Operation not permitted` — macOS
   TCC denying cron read access under `~/Desktop`. It fails awake too.
   `cron_archive.log` does not exist at all.
+
+### Task 3 — golf template sweep · **KILL, both leads**
+
+**The brief's own lead was killed by following the brief's own instruction** to
+read every rule verbatim from the PDF. `GOLFH2H.pdf` does not say a tie pays
+YES `$0`; it says **$0.50 to YES and $0.50 to NO**, with a worked example. So
+`fair(A) + fair(B) = $1.00 exactly` and the 9.4% tie mass (51 of 541 settled
+events) is symmetric and fully paid — no mechanic at all. Settlement confirms:
+**102 of 102 scalar legs at `0.5000`**. `KXPGAH2H` has the best cadence in golf
+(59 events/week vs P-022's 1.3), wasted on a non-mechanic.
+
+The category-leader `$1/N` mechanic *is* real and verified, but three of its
+four series have **never settled a market** and the fourth has **8 events from 2
+tournaments, both majors** — n = 2 clustered, ~4 clusters/year, T = 14 in ~3.5
+years. Every other untested family is under the fee bar or has ≤ 68 settled
+rows. Phase 2 was not run because nothing cleared the ≥5¢ gate.
 
 ### Task 5 — widening · **PARTIAL, discipline intact**
 

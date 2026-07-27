@@ -24,7 +24,7 @@
 
 | # | Task | Verdict | Headline number |
 |---|---|---|---|
-| **1** | P-022 close-time resolution | **FIXED** (needs deploy) | resolver error **one-sided early on 72 of 72** settled events; min +0.16h, median +1.58h |
+| **1** | P-022 close-time resolution | **FIXED + DEPLOYED** | resolver error **one-sided early on 72 of 72** settled events; min +0.16h, median +1.58h |
 | **2** | Gate throughput audit | **KILL** (hypothesis refuted) | 432 P-001 settlements in 28 days → **0** gate-countable rows; 4 of 5 gates are not measuring |
 | **3** | P-028 golf template sweep | **NOT REACHED** | — |
 | **4** | R5 follow-ups | **NOT REACHED** | — |
@@ -59,7 +59,7 @@ is broken four separate ways:
 | P-014 | 54 | **unreadable** | gate declares no sanctioned reader at all |
 | P-015 | 5 | **0, but 5 exist** | reader reads `data/pods/P-015.jsonl`, **which does not exist** |
 | P-017 | 38 | 1 / 8 | working correctly — the control |
-| P-022 | 0 | 0 / 14 | could not compute its window (fixed today) |
+| P-022 | 0 | 0 / 14 | could not compute its window (fixed and deployed today) |
 
 > **The scarce resource is not observations and not hypotheses. It is correctly
 > instrumented observations.** A 33rd candidate is worth less than an hour spent
@@ -74,7 +74,7 @@ judgement call, not a fact: the queue ranked 3 above 5–8, and I did not.**
 
 ## What changed, by task
 
-### Task 1 — P-022 close-time resolution · **FIXED, awaiting deploy**
+### Task 1 — P-022 close-time resolution · **FIXED and DEPLOYED**
 
 `src/golf_schedule.py` resolves `(competition, round) → round-end UTC` from
 ESPN's free public golf API for all five tours, keyed on Kalshi's

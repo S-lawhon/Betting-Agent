@@ -202,7 +202,10 @@ jobs:
       max_stale_hours: 3
     severity: warn
     note: >
-      NOT YET DEPLOYED or crontabbed as of 2026-07-27 — deploys are Sam's call.
+      DEPLOYED 2026-07-27 16:00 UTC and verified on the droplet, but NOT YET
+      CRONTABBED — it only runs when invoked by hand, so this job will read
+      stale until the schedule above is actually installed. Adding it is a
+      one-line crontab change and is Sam's call.
       Currently ALARMING (state CLOSE_REF_PLACEHOLDER) on every run: 346 markets
       across 3 events are listed, and all five Kalshi time fields collapse to
       one ~20-day fallback, so the pod's [12h, 24h] window opens roughly a
@@ -781,7 +784,10 @@ workstreams:
         cannot accrue tournaments. NOT a parameter problem — do not tune the
         window; the round end is not a quantity Kalshi publishes in advance.
       - >
-        FIXED 2026-07-27, AWAITING DEPLOY. The §7 precondition "wired into
+        FIXED and DEPLOYED 2026-07-27 16:00 UTC (unit restarted onto the new
+        code; verified in place that from_config yields a real
+        AggregateRiskGuard with reserve_trade/release_reservation, and that
+        band/offset/window/caps are byte-identical). The §7 precondition "wired into
         AggregateRiskGuard with reservations" was never satisfied in the running
         process: the mechanism existed in the engine, but neither
         run_round_leader_fade.py nor from_config ever constructed a guard, so
@@ -793,8 +799,7 @@ workstreams:
         mute the pod, which is worse than no guard. Behaviour-neutral: P-022's
         own 15% aggregate cap is tighter than the guard's 25% per-pod. The
         daily-loss halt is deliberately NOT wired (close_position -> record_pnl
-        would halt permanently, since check_pre_cycle never runs here). Until
-        deployed, the live process still has risk_guard=None.
+        would halt permanently, since check_pre_cycle never runs here).
       - >
         Books are not persisted across restarts (self.books = {} on init, and
         nothing reads the fills log back). A restart mid-tournament re-arms all

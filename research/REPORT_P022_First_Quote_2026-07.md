@@ -10,7 +10,8 @@ behind it, either of which would independently hold T at 0.
 > reported, not tuned — it is a design decision and it is Sam's. Defects 2 and
 > 3 were fixed on request: neither depends on the Defect 1 decision, neither
 > touches a §7 parameter, and neither changes the quoted population. Defect 2
-> is read-side only; **Defect 3 needs a deploy to take effect.**
+> is read-side only; Defect 3 was **deployed 2026-07-27 16:00 UTC** and
+> verified in place.
 
 ---
 
@@ -34,7 +35,7 @@ Three independent breaks, each sufficient on its own to hold **T = 0 forever**:
 |---|---|---|
 | **1** | Close reference on an OPEN market is a ~20-day fallback placeholder → the [12h, 24h] window opens ~2.5 weeks after the round settles | **blocks quoting** |
 | **2** | `p022_checkpoint.py` reads four log paths, none of which the pod writes; its rows also lack the `outcome` and `contracts` fields the reader requires | ~~blocks the gate reading~~ **FIXED** |
-| **3** | §7's `AggregateRiskGuard` precondition is unsatisfied in the running process — `risk_guard` is `None` live | ~~precondition recorded as met, isn't~~ **FIXED, needs deploy** |
+| **3** | §7's `AggregateRiskGuard` precondition is unsatisfied in the running process — `risk_guard` is `None` live | ~~precondition recorded as met, isn't~~ **FIXED + DEPLOYED** |
 
 ---
 
@@ -346,9 +347,13 @@ the starvation regression, which quotes a full tournament, settles it, and
 asserts a second tournament still quotes the same number of names on the same
 guard. Suite 1,541 green.
 
-> **Committed but NOT deployed.** `betting-round-leader-fade` is still running
-> the old code, so `risk_guard` is `None` in the live process until a deploy.
-> Nothing is lost by waiting — the pod cannot quote anyway (Defect 1).
+> **Deployed 2026-07-27 16:00 UTC.** `betting-round-leader-fade` restarted onto
+> the new code and verified in place: `from_config` yields a real
+> `AggregateRiskGuard` with `reserve_trade` / `release_reservation`, the sweep
+> is present, and band / offset / window / caps / series read back
+> byte-identical (`(0.03, 0.12)`, `+0.02`, `[12h, 24h]`, `$5 / $50 / $150`, 13
+> series). 49 P-022 tests pass on the droplet. Main engine redeployed and
+> healthy in the same pass.
 
 ### Cap-breach exclusion — not implemented, and there is a live breach path
 
@@ -427,8 +432,11 @@ Nothing here was fixed, per the guardrails. In priority order:
    amended to say the wiring was absent until now.
 4. **Restart-safe books** (§5). Rebuild open fills from the fills log on
    startup, or record a breach when a restart is detected mid-tournament.
-5. **Deploy the detector** so it runs on the droplet — it is registered but
-   not deployed or crontabbed, so right now it only alarms when run by hand.
+5. **Crontab the detector.** Deployed and verified on the droplet 2026-07-27,
+   and it alarms correctly there — but it is **not scheduled**, so it only
+   runs when invoked by hand and the registry job will read stale. One line:
+   `*/30 * * * * cd /opt/betting-pod-shop && ./venv/bin/python -m scripts.p022_window_check`
+   as `bettingbot`.
 
 ### On T
 

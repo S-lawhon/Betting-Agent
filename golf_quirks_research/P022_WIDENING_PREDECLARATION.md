@@ -125,11 +125,13 @@ changed and the run is void.
 **Sections 1–7 are the commitment. No extended data has been pulled at the time
 of this commit.**
 
-One approval is outstanding and is noted here rather than assumed:
-`STATUS_REASSESSMENT_2026-07-27.md` §5.1 lists *"approve the P-022 backtest
-widening — specifically, that extending the sample backwards does not constitute
-re-fitting a locked rule"* as a decision that is **Sam's**, and no record of that
-approval exists. My reading matches the reassessment's: it does not constitute
-re-fitting, because the rule governs the *forward* test and the parameters are
-frozen. But the point of §5.1 was that this be written down before the numbers
-exist, and this document is that record — not a substitute for the decision.
+**APPROVED by Sam, 2026-07-28**, after this document was written and before any
+extended data was pulled. `STATUS_REASSESSMENT_2026-07-27.md` §5.1 listed
+*"approve the P-022 backtest widening — specifically, that extending the sample
+backwards does not constitute re-fitting a locked rule"* as Sam's decision; that
+approval is now on the record, in the correct order relative to the numbers.
+
+The reasoning both of us gave: it does **not** constitute re-fitting, because
+`P022_DECISION_RULE.md` governs the *forward* test — which stays locked at
+T = 14 and reads T = 0 — and every parameter is frozen. A wider backtest changes
+the **prior**, not the gate.

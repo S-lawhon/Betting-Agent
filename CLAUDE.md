@@ -49,6 +49,25 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
   conservative default; only a few markets per event carry the real end date.
   Resolve ONE event-level close = the MIN occurrence/close across the event's
   markets and apply to all (see `GolfTopNPod._resolve_event_closes`).
+- **On an OPEN market there is NO field carrying the real close.** This is the
+  generalisation of the point above and it has now cost P-022 two separate
+  fixes. `close_time`, `occurrence_datetime`, `expiration_time`,
+  `expected_expiration_time` and `latest_expiration_time` all collapse to one
+  conservative fallback while the market is open; `close_time` is REWRITTEN to
+  the true value only at the moment the market closes (these markets carry
+  `can_close_early: true` / "will close and expire after a winner is
+  declared"). Measured 2026-07-27: three round-leader events on three
+  different tours, 346 markets, every field `2026-08-16T00:00:00Z`, listed
+  `+19.99d` earlier. Exchange-wide, not a golf quirk — `KXMLBGAME` markets sit
+  open with `close_time` three days past their own first pitch (the real game
+  time is in the TICKER, not a field). **Corollary: never measure a time field
+  on a SETTLED market and infer how it behaves on an open one** — settled is
+  the only state in which `close_time` has been corrected, which is exactly how
+  the 2026-07-26 P-022 reconciliation concluded the opposite of the truth. Any
+  strategy whose window is defined relative to the determining event needs an
+  EXTERNAL schedule; Kalshi does not publish it. See
+  `research/REPORT_P022_First_Quote_2026-07.md` and
+  `scripts/p022_window_check.py`.
 - **Orderbook**: `/markets/{t}/orderbook` returns `orderbook_fp` in DOLLARS with
   sub-penny ticks; best YES ask = 1 − best NO bid (see `KalshiPublic.orderbook`).
 - **Settled-market LIST endpoints null out** volume/price/last — use candlesticks

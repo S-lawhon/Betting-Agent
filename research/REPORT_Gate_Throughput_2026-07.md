@@ -13,6 +13,10 @@ because markets are slow.
 > supply. It is that four of the five gates are not measuring anything, for
 > four unrelated defect reasons — and every one of them looks identical to
 > patience from the outside.**
+>
+> *Two of the four were fixed and deployed the same day (P-022, P-015). The
+> table below records the state the audit found; the §2 subsections carry the
+> current state.*
 
 The fund settles plenty. In the last 28 days the live logs recorded **432
 P-001 settlements, 54 P-014, 38 P-017 and 5 P-015**. Raw observation supply is
@@ -23,9 +27,9 @@ not the problem. What is missing is the path from a settlement to a
 |---|---:|---|---|
 | **P-001** | **432** | 0 / 200 | the pod still prices one day's game and bets another, so ~0% of rows are admissible |
 | **P-014** | 54 | **unreadable** | the gate declares no sanctioned reader; progress cannot be derived at all |
-| **P-015** | 5 | **0, but 5 exist** | the reader reads `data/pods/P-015.jsonl`, **which does not exist**; the pod writes to `trade_log.jsonl` |
+| **P-015** | 5 | ~~0, but 5 exist~~ → **5** | the reader read `data/pods/P-015.jsonl`, **which does not exist**; the pod writes `trade_log.jsonl`. **FIXED + deployed 07-27 18:43Z** |
 | **P-017** | 38 | **1 / 8** | genuinely accumulating — the one gate working as designed |
-| **P-022** | 0 | 0 / 14 | could not compute its placement window (fixed today, not deployed) |
+| **P-022** | 0 | 0 / 14 | could not compute its placement window — **fixed + deployed 07-27 17:53Z**; first window 07-29T15:30Z |
 
 Only **P-017** is a gate whose zero is honest arithmetic. Its first settled
 tournament also arrived during this audit, and it is **−10.08¢/ct on 2,276
@@ -43,9 +47,9 @@ event calendar would allow; "realised" is what the logs contain.
 |---|---|---:|---|---|---|---|---|
 | **P-001** | admissible CLV rows (scenario D) | 200 | **0** | **0 admissible/week** (14.3% all-time; **0 of 5** post-fix) | **never** at the realised rate; ~31 weeks (≈ Mar 2027) even at the 14.3% historical rate | **pod defect** — matcher still off by exactly 24h | **NO** |
 | **P-014** | settled trades | 500 | **unreadable** | 13.5 positions/week | ~11.5 weeks (≈ mid-Oct 2026) *if* progress is the 345 in the log | **counting rule** — no sanctioned reader exists | likely yes, unverifiable |
-| **P-015** | settled trades (locked) | 120 | **0 reported / 5 actual** | 5 trades in 2 days, then nothing; registry assumes ~20/month | ~25 weeks (≈ Jan 2027) at the registry's own assumption | **reader defect** + genuine event cadence | probably, unverified |
+| **P-015** | settled trades (locked) | 120 | **5** (was 0) | 5 trades in 2 days, then nothing; registry assumes ~20/month | ~25 weeks (≈ Jan 2027) at the registry's own assumption | ~~reader defect~~ **fixed**; now genuine event cadence | probably, unverified |
 | **P-017** | settled tournaments | 8 | **1** | ~1 tournament/week available | ~Q4 2026 | **event cadence** (irreducible) + the two-wave counting rule | **yes** |
-| **P-022** | settled tournaments | 14 | 0 | 0 — never quoted | ~5.4 weeks after deploy (≈ early Sept 2026) | **pod defect** (fixed today, awaiting deploy) | **yes, once deployed** |
+| **P-022** | settled tournaments | 14 | 0 | 0 — never quoted | ~5.4 weeks from the first window (≈ early Sept 2026) | ~~pod defect~~ **fixed + deployed**; awaiting the 07-29T15:30Z window | **yes** |
 
 ---
 

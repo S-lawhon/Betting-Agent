@@ -56,7 +56,7 @@ is broken four separate ways:
 | pod | 28d settled | gate reads | why |
 |---|---:|---|---|
 | P-001 | **432** | 0 / 200 | still prices one day's game and bets another → ~0% admissible |
-| P-014 | 54 | **unreadable** | gate declares no sanctioned reader at all |
+| P-014 | 54 | ~~unreadable~~ **331 / 500** | no sanctioned reader existed — **FIXED + deployed**; resolves ~2026-10-23 |
 | P-015 | 5 | ~~0, but 5 exist~~ **now 5** | reader read `data/pods/P-015.jsonl`, which does not exist — **FIXED + deployed** |
 | P-017 | 38 | 1 / 8 | working correctly — the control |
 | P-022 | 0 | 0 / 14 | could not compute its window (fixed and deployed today) |
@@ -209,29 +209,35 @@ Verified on the droplet after restart:
    thresholds, statistic and VOID exclusion are asserted unchanged by test. A
    second latent bug went with it: a `or 0.9` fallback that fabricated a
    breakeven for any row missing a price.
-3. **P-001's matcher.** The fix is deployed and the defect is still in the
+3. ~~**P-014's missing reader**~~ **FIXED and DEPLOYED 2026-07-27 18:55 UTC.**
+   Reads **331 of 500**, projects **2026-10-23** — the first gate in the fund's
+   history with a real projected resolution date. **But it has no
+   pre-registered decision rule**, so the reader counts and refuses to judge.
+   **Write `P014_DECISION_RULE.md` before n reaches 500 — blind, without
+   running `--unblind`** — or it is a rule fitted to results. ~12.5 weeks.
+4. **P-001's matcher.** The fix is deployed and the defect is still in the
    output (four of five placements exactly 24.00h off). The gate is inert until
-   this lands. Reported, not fixed.
-4. **`t_start_utc` for P-022** — currently records a period in which the pod
+   this lands. Reported, not fixed. **Now the only unreadable gate left.**
+5. **`t_start_utc` for P-022** — currently records a period in which the pod
    could not trade. My read is unchanged: reset it to the first demonstrated
    quote and record why.
-5. **Weather-suspended tournaments in T.** The resolver's error runs to +52h on
+6. **Weather-suspended tournaments in T.** The resolver's error runs to +52h on
    them; quotes are still placed pre-round, so I would keep them. This is a rule
    question and should be written down *before* any of them settle.
-6. **Posting above H = 24h.** The conservative calibration puts the first quote
+7. **Posting above H = 24h.** The conservative calibration puts the first quote
    at a true H of ~25.6h (tee times) or ~29.6h (day offset). I did **not** tune
    it away — narrowing the pod's band to compensate is a §8.1 change that resets
    T to 0.
-7. **P-018's code is orphaned** on `p018-inplay-fade-core` (1,688 lines, 29
+8. **P-018's code is orphaned** on `p018-inplay-fade-core` (1,688 lines, 29
    tests, absent from HEAD, the droplet and the suite) while its data gate opens
    **2026-07-30**. **Cherry-pick `4ff5bea`, do not merge** — that branch's tip
    also removes the Legacy Kalshi Arb Project that P-001's live scanner imports.
-8. **EV-Map hosting.** Move to the droplet (recommended) or grant cron Full Disk
+9. **EV-Map hosting.** Move to the droplet (recommended) or grant cron Full Disk
    Access. The 30-day clock has not started; earliest completion ~2026-08-27.
-9. **`blocked_on: time` is dishonest** for P-001, P-014 and P-015 — they are
-   blocked on a defect, a missing reader and a wrong path. `registry.yaml`
-   untouched.
-10. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
+10. **`blocked_on: time` is now honest only for P-017 and P-022.** P-014 and
+    P-015 are fixed and genuinely waiting on volume; **P-001 is still blocked on
+    a defect, not calendar**, and its label should say so.
+11. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
     pre-declaration is committed; the decision is still open.
 
 ---

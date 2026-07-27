@@ -36,10 +36,33 @@ earlier "stub / pod does not exist" note was wrong even when written --
 betting-round-leader-fade.service had been running since 2026-07-23, but
 it could never quote (see rule §11b), so T was genuinely 0.
 
-Historical note: this script is
-expected to print "NO DECISION — no settled trades".  It reads the row
-shape the pod will write; if the pod ships a different shape, fix the
-LOADER here rather than the RULE.
+LOADER FIX, 2026-07-27
+──────────────────────
+The claim that once stood here — "it reads the row shape the pod will
+write" — was false.  This script was written before the pod existed and
+was never reconciled against it, so the sanctioned reader of P-022's
+results **could not see P-022's results**:
+
+  * it read `data/pods/P-022.jsonl` and three other paths; the pod writes
+    `data/trade_logs/round_leader_fade_fills.jsonl`, which matched none of
+    them (`data/pods/` does not exist on the droplet at all), and
+  * it kept only rows whose `outcome` is WIN/LOSS and sized them by
+    `contracts`; the pod's SETTLE row has neither field — it writes
+    `result`, `payout`, `pnl_usd` and `qty`.
+
+Pointed directly at a file holding two genuinely settled P-022 rows it
+reported `0 tournaments`.  Had the close-time defect not existed, the pod
+would have quoted, filled and settled correctly and the registry's
+*derived* gate progress would still have read 0 — a number derived from a
+reader that cannot see the data is not better than a hand-typed one.
+(Same family as the tennis and golf settlers, which both read `data/pods/`
+and both found it empty.)
+
+Fixed by normalising the pod's row into the canonical shape at load time,
+so `tournament_key` and `per_contract_cents` — which implement §2 and §3 of
+the rule — are untouched.  **The RULE is unchanged; only the LOADER moved**,
+which is exactly what the note it replaces prescribed.
+See research/REPORT_P022_First_Quote_2026-07.md §3.
 """
 
 import argparse
@@ -49,7 +72,7 @@ import math
 import statistics
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 POD_ID = "P-022"
 MIN_T_DECISION = 14          # 90% power vs the measured +3.4c effect
@@ -58,16 +81,81 @@ PASS_Z = 2.0
 HARD_KILL_Z = -2.0
 
 DEFAULT_LOGS = [
-    "data/pods/P-022.jsonl",
-    "data/round_leader_fade/*.jsonl",
+    # What the pod ACTUALLY writes (src/round_leader_fade_maker.py:173).
+    # The glob catches any rotated sibling; duplicates are deduped below.
+    "data/trade_logs/round_leader_fade_fills*.jsonl",
+    "data/trade_logs/archive/round_leader_fade_fills*.jsonl",
+    # Kept: a settler-written P-022 row would land in the shared trade log.
     "data/trade_logs/trade_log.jsonl",
     "data/trade_logs/archive/*.jsonl",
+    # Kept for completeness; nothing writes these today.
+    "data/pods/P-022.jsonl",
+    "data/round_leader_fade/*.jsonl",
 ]
 
 SETTLED = ("WIN", "LOSS")    # VOIDs excluded — no risk taken
 
 
 # ── loading ──────────────────────────────────────────────────────────
+
+def normalise_fade_settle(rec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Convert one engine SETTLE row into the canonical record shape.
+
+    The pod writes, per FILL (src/round_leader_fade_maker.py:534):
+
+        {"type": "SETTLE", "fill_id": ..., "pod_id": "P-022",
+         "ticker": ..., "event": "ROC26", "result": "yes|no|scalar",
+         "payout": 0.5, "fill_price": 0.06, "qty": 5,
+         "maker_fee_per_contract": 0.0, "pnl_usd": -2.2}
+
+    Returns None for QUOTE / PULL / FILL / MARKOUT rows.
+
+    `pnl_usd` is already NET of the maker fee, which is what §3 requires,
+    so `per_contract_cents` needs no fee handling.
+
+    **Every SETTLE row counts, including `result="scalar"`.** Rule §3 and
+    §8.3: scalar is a partial payout at its realised value, not a void, and
+    excluding it (or booking it at $0) deletes the entire mechanism under
+    test.  The engine never emits a void — it only settles on a populated
+    yes/no/scalar result — so there is nothing here to exclude.
+
+    `outcome` is filled in for display, but is deliberately NOT what makes
+    the row countable (`_fade_settled` is).  A settlement worth exactly $0
+    is a real observation of taken risk; routing it through a WIN/LOSS sign
+    test would silently drop it.  It cannot arise under the locked
+    parameters — fills are <= ~0.14 and every non-zero payout exceeds that
+    — but the reader should not depend on that staying true.
+    """
+    if rec.get("type") != "SETTLE":
+        return None
+    ticker = rec.get("ticker") or ""
+    try:
+        contracts = float(rec.get("qty") or 0)
+        pnl = float(rec.get("pnl_usd") or 0)
+    except (TypeError, ValueError):
+        return None
+    if contracts <= 0:
+        return None
+    return {
+        "pod_id": rec.get("pod_id"),
+        "market_id": ticker,
+        "contracts": contracts,
+        "pnl_usd": pnl,
+        "outcome": "WIN" if pnl > 0 else "LOSS",
+        "_fade_settled": True,
+        # `event` is the event CODE ("ROC26"), which already pools R1/R2/R3
+        # of one golf event into one observation as §2 requires.
+        "extra": {"event_code": rec.get("event") or None,
+                  "contracts": contracts},
+        # fill_id is unique per fill; pair it with the ticker so a rotated
+        # or double-globbed log cannot double-weight a tournament.
+        "fingerprint": f"{rec.get('fill_id')}|{ticker}",
+        "result": rec.get("result"),
+        "payout": rec.get("payout"),
+        "fill_price": rec.get("fill_price"),
+        "settled_at_utc": rec.get("iso"),
+    }
+
 
 def load_settled(patterns: List[str], pod_id: str = POD_ID) -> List[Dict[str, Any]]:
     """Settled P-022 rows, deduplicated on fingerprint.
@@ -92,7 +180,14 @@ def load_settled(patterns: List[str], pod_id: str = POD_ID) -> List[Dict[str, An
                         continue
                     if rec.get("pod_id") != pod_id:
                         continue
-                    if (rec.get("outcome") or "").upper() not in SETTLED:
+                    # The engine's own log shape comes through the
+                    # normaliser; anything else must carry a settled
+                    # outcome the way trade_store writes it.
+                    if rec.get("type") is not None:
+                        rec = normalise_fade_settle(rec)
+                        if rec is None:
+                            continue
+                    elif (rec.get("outcome") or "").upper() not in SETTLED:
                         continue
                     key = (rec.get("fingerprint")
                            or f"{rec.get('market_id')}|{rec.get('settled_at_utc')}")

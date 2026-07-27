@@ -6,8 +6,10 @@
 still structurally incapable of quoting. Two further defects were found
 behind it, either of which would independently hold T at 0.
 
-> **No parameter was changed and nothing was deployed.** All three findings
-> are reported, not tuned. Fixing any of them is Sam's call.
+> **No P-022 parameter was changed and nothing was deployed.** Defects 1 and 3
+> are reported, not tuned — fixing them is Sam's call. Defect 2 was fixed on
+> request (§3): it is a read-side loader change that touches neither the rule
+> nor the running pod, and does not depend on the Defect 1 decision.
 
 ---
 
@@ -30,7 +32,7 @@ Three independent breaks, each sufficient on its own to hold **T = 0 forever**:
 | # | Defect | Status |
 |---|---|---|
 | **1** | Close reference on an OPEN market is a ~20-day fallback placeholder → the [12h, 24h] window opens ~2.5 weeks after the round settles | **blocks quoting** |
-| **2** | `p022_checkpoint.py` reads four log paths, none of which the pod writes; its rows also lack the `outcome` and `contracts` fields the reader requires | **blocks the gate reading** |
+| **2** | `p022_checkpoint.py` reads four log paths, none of which the pod writes; its rows also lack the `outcome` and `contracts` fields the reader requires | ~~blocks the gate reading~~ **FIXED** |
 | **3** | §7's `AggregateRiskGuard` precondition is unsatisfied in the running process — `risk_guard` is `None` live | **precondition recorded as met, isn't** |
 
 ---
@@ -153,7 +155,7 @@ is optimistic.
 
 ---
 
-## 3. Defect 2 — the gate reader cannot see the pod's output
+## 3. Defect 2 — the gate reader cannot see the pod's output — **FIXED 2026-07-27**
 
 Found while verifying §4. Independent of Defect 1, and it survives fixing it.
 
@@ -194,8 +196,52 @@ faithfully reporting it. Deriving a number from a reader that cannot see the
 data is not better than typing it; it is the same failure with more
 credibility.
 
-Fixing this is a **loader change, not a rule change** (§3 of the rule is
-unaffected), which the docstring already sanctions.
+### The fix
+
+Fixed as a **loader change, not a rule change** — which the docstring already
+sanctioned — because it does not depend on the close-time decision and should
+land either way.
+
+`normalise_fade_settle()` converts an engine `SETTLE` row into the canonical
+record shape at load time, so `tournament_key()` and `per_contract_cents()`
+— which are the actual implementation of §2 and §3 — are **untouched**.
+`DEFAULT_LOGS` now points at `data/trade_logs/round_leader_fade_fills*.jsonl`
+(plus an archive glob); the four old patterns are kept, since a settler-written
+P-022 row would still land in the shared trade log.
+
+Three details worth recording, each of which could have quietly distorted the
+verdict:
+
+- **`event` is the event CODE** (`ROC26`), not the event ticker, so R1/R2/R3
+  of one tournament already pool into one observation exactly as §2 requires.
+- **Countability does not run through `outcome`.** A settlement worth exactly
+  $0 is a real observation of taken risk, and a WIN/LOSS sign test would drop
+  it. It cannot arise under the locked parameters — fills are ≤ ~0.14¢ and
+  every non-zero payout exceeds that — but the reader should not depend on
+  that staying true. `outcome` is still populated for display.
+- **Dedup is on `fill_id|ticker`**, one row per fill, so a rotated log or the
+  two overlapping globs cannot double-weight a tournament.
+
+Verified by re-running the exact demonstration that failed above — the reader
+pointed at a file of two genuinely settled rows:
+
+```
+$ python3 -m scripts.p022_checkpoint --log <that file>
+  tournaments (T): 2   contracts: 10
+  edge           : -44.00 c/contract      paper P&L: $-4.40
+  VERDICT: NO DECISION — T=2 < 14 tournaments; underpowered
+```
+
+Against live data it still correctly reports `T = 0` (nothing has settled).
+`tests/test_p022_checkpoint.py`, 11 tests: the regression itself, round
+pooling, contract-weighting within a tournament against equal-weighting
+across, scalar counted at realised value (including a three-way tie),
+non-`SETTLE` rows ignored, other pods' rows ignored, dedup, and the legacy
+`trade_store` shape with `VOID` still excluded. Full suite 1,534 green.
+
+**Not fixed here:** the §7 cap-breach exclusion is still absent from the
+reader (§5). That one needs a breach to be *recorded* before it can be read,
+so it is a pod change as well, and it is listed as owed.
 
 ---
 
@@ -322,10 +368,8 @@ Nothing here was fixed, per the guardrails. In priority order:
 1. **Defect 1 is a decision, not a patch** (§2). Until it is made, T accrues
    calendar and cannot accrue tournaments. Option 2 resets T to 0 under a new
    pod ID; options 1 and 3 have their own costs. This one is blocking.
-2. **Defect 2 is a small, unambiguous loader fix** (§3) — the rule explicitly
-   sanctions it, and it should land regardless of what happens to Defect 1.
-   Add `data/trade_logs/round_leader_fade_*.jsonl` to the reader and teach it
-   the pod's row shape (or have the pod emit `outcome`/`contracts`).
+2. ~~**Defect 2**~~ — **done 2026-07-27** (§3). Loader-side only, no deploy
+   needed, no rule change. The reader now sees the pod's rows.
 3. **Defect 3** (§5): construct an `AggregateRiskGuard` in the runner, or
    amend §11c/§11d to say the wiring is absent. Either is fine; claiming ✓ for
    code that does not run is not.

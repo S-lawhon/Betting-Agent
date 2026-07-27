@@ -27,7 +27,7 @@
 | **1** | P-022 close-time resolution | **FIXED + DEPLOYED** | resolver error **one-sided early on 72 of 72** settled events; min +0.16h, median +1.58h |
 | **2** | Gate throughput audit | **KILL** (hypothesis refuted) | 432 P-001 settlements in 28 days → **0** gate-countable rows; 4 of 5 gates are not measuring |
 | **3** | P-028 golf template sweep | **KILL** (both leads) | H2H ties pay **0.50/0.50**, not $0 — pair sums to $1.00 exactly; category-leader has **2 tournament-clusters** |
-| **4** | R5 follow-ups | **NOT REACHED** | — |
+| **4** | R5 follow-ups | **ANSWERED / KILL / BUILT** | tick size: **0 sub-cent levels in P-022's band**, no verdict moves · partitions: **0 of 15 executable** · NCAAF poller built |
 | **5** | P-022 widen the backtest | **PARTIAL** | pre-declaration committed before any pull; **13/13 series** have history back to **2026-05-22** — "~1 month" refuted |
 | **6** | Corrections + droplet hygiene | **NOT REACHED** | — |
 | **7** | Fee-table fixture + CI | **FIXED** | **fifth drift found**; blast radius **zero verdicts changed** |
@@ -35,6 +35,7 @@
 
 **Reports:** [P-022 close time](REPORT_P022_Close_Time_2026-07.md) ·
 [P-028 golf sweep](../golf_quirks_research/REPORT_P028_Template_Sweep_2026-07.md) ·
+[R5 follow-ups](REPORT_R5_Followups_2026-07.md) ·
 [gate throughput](REPORT_Gate_Throughput_2026-07.md) ·
 [fee audit](REPORT_Fee_Audit_2026-07-27.md) ·
 [data readiness](REPORT_Data_Readiness_2026-07-27.md) ·
@@ -171,6 +172,30 @@ tournaments, both majors** — n = 2 clustered, ~4 clusters/year, T = 14 in ~3.5
 years. Every other untested family is under the fee bar or has ≤ 68 settled
 rows. Phase 2 was not run because nothing cleared the ≥5¢ gate.
 
+### Task 4 — R5 follow-ups · **ANSWERED · KILL · BUILT**
+
+**Tick size — no past verdict moves.** The field Hunt E reported does not
+exist (`tick_size` absent from `/markets` in both forms; the regime strings
+absent from all 12,199 `/series` rows). Measured empirically instead: sub-cent
+quoting **is** real and deep — 25,107 contracts rest at **$0.0010** in
+`KXPGAR1LEAD` — but it is confined to that one family and to the extreme tails.
+**Zero sub-cent levels in P-022's 0.03–0.12 band**, and P-026's kill families
+quote strictly 1¢ across 1,851 levels, so a finer tick could not have lifted its
+99.0¢ bid-sum over the 100¢ ceiling.
+
+**Skewed partitions — KILL.** The brief's correction to Hunt E's flipped
+inequality was real and *changed the result*: 0 positive-net families before,
+**38** now, over a wider base (2,488 fully two-sided vs 2,069). But the +93¢
+headliners were all the exhaustiveness trap — `mutually_exclusive` means *at
+most* one leg wins, and every large gross had `Σask < 0.50`. Restricted to
+genuine partitions, the cheap-fee skew bucket tops out at **+0.29¢**, below one
+tick, and the best nets sit in the *expensive*-fee buckets — opposite to the
+hypothesis. **0 of 15 candidates executable**; best thin leg $25.
+
+**NCAAF poller — built, tested (baseline 30 confirmed), NOT scheduled.** All
+thresholds pre-registered in code, including KILL at drift < 3.5¢ regardless of
+significance. **Must be scheduled before 2026-08-01** — see the decisions list.
+
 ### Task 5 — widening · **PARTIAL, discipline intact**
 
 Pre-declaration committed in its own earlier commit, before any extended data
@@ -260,7 +285,11 @@ Verified on the droplet after restart:
 10. **`blocked_on: time` is now honest only for P-017 and P-022.** P-014 and
     P-015 are fixed and genuinely waiting on volume; **P-001 is still blocked on
     a defect, not calendar**, and its label should say so.
-11. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
+11. **Schedule the NCAAF poller before 2026-08-01** (5 days). Committed but not
+    installed — this task forbade deploys, and the Mac's cron is TCC-blocked. I
+    recommend the 3-hourly form: a daily poll can miss the registered 6-hour
+    anchor window by up to 18h, and the snapshot cannot be rebuilt afterwards.
+12. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
     pre-declaration is committed; the decision is still open.
 
 ---

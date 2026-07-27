@@ -24,53 +24,139 @@ Rule summary
 """
 
 import argparse
+import glob
+import gzip
 import json
 import math
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
+POD_ID = "P-015"
 MIN_N_DECISION = 120
 MIN_N_PROMOTE = 240
 PROMOTE_Z = 2.0
 HARD_KILL_Z = -2.0
 
 
+# Where P-015 results actually live.
+#
+# This script previously defaulted to `data/pods/P-015.jsonl` — a path that
+# HAS NEVER EXISTED on the droplet. `load_settled` returned [] for the missing
+# file, so the reader reported `n = 0, NO DECISION` while five genuinely
+# settled trades (4W/1L, 2026-07-25/26) sat in `trade_log.jsonl`, and
+# `manager/collect.py` faithfully relayed the zero because delegating to the
+# sanctioned reader is the correct house pattern. Found 2026-07-28 by the gate
+# throughput audit; `research/REPORT_Gate_Throughput_2026-07.md`.
+#
+# The locked rule (`tennis_research/P015_DECISION_RULE.md`) names THIS SCRIPT
+# as the only sanctioned reader. It does not name a log path, and it does not
+# define an observation by which file the row is in. Pointing the reader at the
+# file the pod actually writes is therefore a defect fix, not a rule change:
+# the test statistic, the thresholds and the VOID exclusion are untouched.
+#
+# Archives are globbed because rotation TRUNCATES the live file — a reader that
+# opens only `trade_log.jsonl` under-reports by however much has rotated, which
+# is the same shape as the incident that hid 177 open positions.
+DEFAULT_LOGS = [
+    "data/trade_logs/trade_log*.jsonl",
+    "data/trade_logs/trade_log*.jsonl.gz",
+    "data/trade_logs/archive/*.jsonl",
+    "data/trade_logs/archive/*.jsonl.gz",
+    # Retained so that anything which ever did write here is still seen.
+    # Harmless while absent; duplicates cannot survive the fingerprint dedupe.
+    "data/pods/P-015.jsonl",
+]
+
+
 def taker_fee(price: float, rate: float = 0.07) -> float:
     return math.ceil(rate * price * (1.0 - price) * 100.0) / 100.0
 
 
-def load_settled(log_path: Path, pod_id: str = "P-015") -> List[Dict[str, Any]]:
-    """Settled (WIN/LOSS) trades. VOIDs are excluded — no risk was taken."""
-    if not log_path.exists():
-        return []
-    out = []
-    for raw in log_path.read_text(encoding="utf-8").splitlines():
-        raw = raw.strip()
-        if not raw:
-            continue
+def _open_any(path: str):
+    return (gzip.open(path, "rt", encoding="utf-8", errors="replace")
+            if path.endswith(".gz")
+            else open(path, "r", encoding="utf-8", errors="replace"))
+
+
+def load_settled(patterns, pod_id: str = POD_ID) -> List[Dict[str, Any]]:
+    """Settled (WIN/LOSS) trades. VOIDs are excluded — no risk was taken.
+
+    Deduplicated on `fingerprint`: a rotated log can carry the same settlement
+    twice and would otherwise inflate n against a pre-registered threshold.
+    """
+    if isinstance(patterns, (str, Path)):
+        patterns = [str(patterns)]
+    files: List[str] = []
+    for pat in patterns:
+        files.extend(sorted(glob.glob(str(pat))))
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for path in sorted(set(files)):
         try:
-            rec = json.loads(raw)
-        except json.JSONDecodeError:
+            with _open_any(path) as fh:
+                for raw in fh:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        rec = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if rec.get("pod_id") != pod_id:
+                        continue
+                    if (rec.get("outcome") or "").upper() not in ("WIN", "LOSS"):
+                        continue
+                    key = (rec.get("fingerprint")
+                           or f"{rec.get('market_id')}|{rec.get('settled_at_utc')}")
+                    out[key] = rec
+        except OSError:
             continue
-        if rec.get("pod_id") != pod_id:
-            continue
-        if (rec.get("outcome") or "").upper() in ("WIN", "LOSS"):
-            out.append(rec)
-    return out
+    return list(out.values())
+
+
+def entry_price(rec: Dict[str, Any]):
+    """The rule's `fill_price`, or None.
+
+    Deliberately NOT defaulted. The previous implementation read
+    `fill_price or venue_prob or 0.9`, so a row missing both prices was
+    silently assigned a 0.9 breakeven — a fabricated number feeding a
+    pre-registered statistic. A row we cannot price is reported, not invented.
+    """
+    for field in ("fill_price", "venue_prob"):
+        v = rec.get(field)
+        if v is not None:
+            try:
+                p = float(v)
+            except (TypeError, ValueError):
+                continue
+            if 0.0 < p < 1.0:
+                return p
+    return None
 
 
 def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
     n = len(trades)
     if n == 0:
-        return {"n": 0, "verdict": "NO DECISION", "reason": "no settled trades yet"}
+        return {"n": 0, "verdict": "NO DECISION", "unpriced": 0,
+                "reason": "no settled trades yet"}
+
+    priced, unpriced = [], 0
+    for t in trades:
+        if entry_price(t) is None:
+            unpriced += 1
+        else:
+            priced.append(t)
+    if not priced:
+        return {"n": 0, "verdict": "NO DECISION", "unpriced": unpriced,
+                "reason": f"{unpriced} settled row(s) carry no usable fill "
+                          "price; refusing to invent a breakeven"}
+    trades = priced
+    n = len(trades)
 
     wins = sum(1 for t in trades if (t.get("outcome") or "").upper() == "WIN")
     hit = wins / n
-    breakevens = []
-    for t in trades:
-        price = float(t.get("fill_price") or t.get("venue_prob") or 0.9)
-        breakevens.append(price + taker_fee(price))
+    breakevens = [entry_price(t) + taker_fee(entry_price(t)) for t in trades]
     be = sum(breakevens) / n
     edge = hit - be
     se = math.sqrt(max(hit * (1 - hit), 1e-9) / n)
@@ -97,16 +183,18 @@ def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
                   f"{'need z>=2.0' if n >= MIN_N_PROMOTE else f'{need} more trades to promotion checkpoint'}")
 
     return {"n": n, "wins": wins, "hit": hit, "breakeven": be, "edge": edge,
-            "z": z, "pnl": pnl, "verdict": verdict, "reason": reason}
+            "z": z, "pnl": pnl, "verdict": verdict, "reason": reason,
+            "unpriced": unpriced}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="P-015 pre-registered checkpoint")
-    ap.add_argument("--log", default="data/pods/P-015.jsonl")
+    ap.add_argument("--log", action="append", default=[],
+                    help="log path or glob (repeatable); overrides the defaults")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     args = ap.parse_args()
 
-    trades = load_settled(Path(args.log))
+    trades = load_settled(args.log or DEFAULT_LOGS)
     r = evaluate(trades)
 
     if args.json:
@@ -119,6 +207,9 @@ def main() -> int:
         print(f"  settled trades: 0\n  VERDICT: {r['verdict']} — {r['reason']}")
         return 0
     print(f"  settled trades : {r['n']}  (wins {r['wins']})")
+    if r.get("unpriced"):
+        print(f"  UNPRICED       : {r['unpriced']} settled row(s) excluded — "
+              "no usable fill price, and a breakeven is never invented")
     print(f"  realized hit   : {r['hit']*100:.1f}%")
     print(f"  breakeven hit  : {r['breakeven']*100:.1f}%  (mean fill + fee)")
     print(f"  realized edge  : {r['edge']*100:+.2f}pp   z = {r['z']:+.2f}")

@@ -1,7 +1,7 @@
 # P-022 — Resolving the Real Round Close Time
 
 **Task:** `research/prompts/PROMPT_P022_Close_Time_Resolution.md`
-**Run:** 2026-07-27/28 · **Verdict: FIXED — pending deploy and a live quote**
+**Run:** 2026-07-27/28 · **Verdict: FIXED and DEPLOYED 2026-07-27 17:53 UTC — pending a live quote**
 **No P-022 parameter changed.** Band `(0.03, 0.12)`, offset `+0.02`, window
 `[12h, 24h]`, caps `0.5% / 5% / 15%`, 13 series — all verified byte-identical
 after the change.
@@ -296,10 +296,33 @@ genuinely settles; settlement polling is throttled to once per 300s per book so
 
 ---
 
-## 8. Deploy list — recommended, Sam's call
+## 8. Deploy — **DONE 2026-07-27 17:53 UTC**
 
-Everything below is committed, tested (**1,571 tests pass**, 55 of them P-022's)
-and exercised against real payloads. Nothing has been deployed.
+> **Deployed and verified in place.** `deploy.sh` restarts only
+> `betting-pod-shop`; **P-022 runs as a separate unit** and was restarted
+> explicitly — without that the fix would have shipped to disk while the running
+> process kept the old code, which is precisely the failure mode this workstream
+> has been fighting.
+>
+> Verified on the droplet after restart:
+>
+> | check | result |
+> |---|---|
+> | droplet test suite | **1,593 pass, 1 skipped** |
+> | `schedule` / `risk_guard` in the running config | `GolfScheduleResolver` / `AggregateRiskGuard` with `reserve_trade` |
+> | band · offset · window · caps · series | `(0.03, 0.12)` · `+0.02` · `[12, 24]` · `0.5/5/15%` ($5/$50/$150) · 13 — **all byte-identical** |
+> | markets discovered | **351, 0 unresolved** |
+> | detector | `WAITING`, **exit 0** (was `CLOSE_REF_PLACEHOLDER`, exit 1) |
+> | gate reader | `T=0, NO DECISION` — correct |
+> | fee drift check | fixture matches live Kalshi |
+>
+> The instrument caught its own state change: `status.jsonl` reads
+> `17:00 CLOSE_REF_PLACEHOLDER alarm=True` → `17:30 CLOSE_REF_PLACEHOLDER
+> alarm=True` → **`17:54 WAITING alarm=False, resolved=3, unresolved=0`**.
+>
+> **Still no live quote.** The first window opens **2026-07-29T15:30Z**.
+
+What shipped, all committed and tested:
 
 1. `src/golf_schedule.py` (new) — the resolver.
 2. `src/round_leader_fade_maker.py` — schedule-driven discovery, mandatory
@@ -308,16 +331,12 @@ and exercised against real payloads. Nothing has been deployed.
 4. `scripts/p022_window_check.py` — resolved close + `SCHEDULE_UNRESOLVED`.
 5. `scripts/p022_checkpoint.py` — §7 cap-breach exclusion.
 
-**Recommendation: deploy before 2026-07-29T15:30Z.** That is when the first
-window opens; a deploy after it costs the AIG Women's Open R1 observation and
-the next one is ROC26 three hours later. Standard path:
+Done with ~46h of margin against the 2026-07-29T15:30Z window.
 
 ```bash
 bash scripts/deploy.sh 129.212.176.202 restart
+systemctl restart betting-round-leader-fade      # NOT covered by deploy.sh
 ```
-
-Post-deploy the detector should read `WAITING` with three resolved events and
-`tour_day_offset` sources, and exit 0.
 
 ### Decisions that are yours
 

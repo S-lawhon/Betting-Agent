@@ -4,15 +4,19 @@
 >
 > **No — but for the first time that is a calendar fact rather than a defect.**
 >
-> The blocker is closed. P-022 now resolves a real round close for all three
+> The blocker is closed **and DEPLOYED — 2026-07-27 17:53 UTC**, with ~46h of
+> margin against the window. P-022 now resolves a real round close for all three
 > listed tournaments (ROC26 `07-30T18:30Z`, AIGWO26 `07-30T15:30Z`, POI26
 > `07-31T16:00Z`) instead of one shared `2026-08-16` placeholder, and all 351
-> markets are in its book. **The first placement window opens
-> 2026-07-29T15:30Z.** It had not opened when this run ended, so no live quote
-> has been observed — and the fix is **not deployed**.
+> markets are in its book with **0 unresolved**.
 >
-> **The single most time-critical thing in this summary: deploy before
-> 2026-07-29T15:30Z or the AIG Women's Open R1 observation is lost.**
+> **The first placement window opens 2026-07-29T15:30Z.** It has not opened, so
+> no live quote has been observed. That remains the only thing that counts:
+> two previous fixes were "verified" and failed live.
+>
+> The instrument caught its own state change — `status.jsonl` goes
+> `17:00 CLOSE_REF_PLACEHOLDER alarm=True` → `17:30 CLOSE_REF_PLACEHOLDER
+> alarm=True` → **`17:54 WAITING alarm=False, resolved=3, unresolved=0`**.
 
 ---
 
@@ -160,34 +164,44 @@ advance. Horizon measured: **13/13 series reachable, overall earliest print
 
 ---
 
-## Consolidated deploy list
+## Deploy — **DONE 2026-07-27 17:53 UTC**
 
-Nothing was deployed. All of it is committed and tested (**1,593 tests pass, 1
-skipped**).
+All three blocks shipped in one pass: the P-022 resolver, the fee fixture, and
+the throughput instrument.
 
-| # | what | urgency |
-|---|---|---|
-| **1** | `src/golf_schedule.py` (new) + `src/round_leader_fade_maker.py` + `scripts/run_round_leader_fade.py` + `scripts/p022_window_check.py` + `scripts/p022_checkpoint.py` | **before 2026-07-29T15:30Z** |
-| 2 | `src/kalshi_fees.py` + `src/fixtures/kalshi_series_fees.json` + the two fee scripts | with the above; behaviour-neutral for live pods |
-| 3 | `manager/throughput.py` + `manager/checks.py` + `manager/collect.py` | next convenient pass |
+> **`deploy.sh` restarts only `betting-pod-shop`. P-022 runs as a separate
+> unit** (`betting-round-leader-fade`) and had to be restarted explicitly —
+> without that the fix ships to disk while the running process keeps the old
+> code, which is exactly the failure mode this workstream has been fighting.
 
 ```bash
 bash scripts/deploy.sh 129.212.176.202 restart
+systemctl restart betting-round-leader-fade      # NOT covered by deploy.sh
 ```
 
-Post-deploy the detector should read `WAITING` with three resolved events and
-`tour_day_offset` sources, exit 0.
+Verified on the droplet after restart:
 
-**Already done on the droplet (not a deploy):** the P-022 window detector is now
-crontabbed `*/30` as `bettingbot`; previous crontab backed up to
-`/root/crontab.bak.2026-07-28`.
+| check | result |
+|---|---|
+| droplet test suite | **1,593 pass, 1 skipped** |
+| main engine health check | PASSED |
+| units active | `betting-pod-shop`, `betting-round-leader-fade`, `betting-book-capture`, `betting-inplay-basis` (`betting-live-maker` inactive — P-016 v1, retired 2026-07-21) |
+| `schedule` / `risk_guard` live | `GolfScheduleResolver` / `AggregateRiskGuard` with `reserve_trade` |
+| band · offset · window · caps · series | `(0.03, 0.12)` · `+0.02` · `[12, 24]` · `0.5/5/15%` ($5/$50/$150) · 13 — **byte-identical** |
+| markets discovered | **351, 0 unresolved** |
+| detector | `WAITING`, **exit 0** (was `CLOSE_REF_PLACEHOLDER`, exit 1) |
+| gate reader | `T=0, NO DECISION` — correct |
+| fee drift check | fixture matches live Kalshi (+4 new free series, correctly not alarming) |
+
+**Also on the droplet:** the window detector is crontabbed `*/30` as
+`bettingbot`; previous crontab backed up to `/root/crontab.bak.2026-07-28`.
 
 ---
 
 ## Decisions needed from Sam — explicitly
 
-1. **Deploy P-022 before 2026-07-29T15:30Z.** Everything else on this page can
-   wait a day; this cannot.
+1. ~~**Deploy P-022 before 2026-07-29T15:30Z.**~~ **DONE 2026-07-27 17:53 UTC.**
+   The remaining question is only whether it quotes when the window opens.
 2. **P-015's gate reader** points at `data/pods/P-015.jsonl`, which does not
    exist, while five real settled trades sit in `trade_log.jsonl`. Repointing it
    does not change what counts as an observation — but the rule is **locked** and

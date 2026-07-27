@@ -25,7 +25,7 @@ not the problem. What is missing is the path from a settlement to a
 
 | pod | 28d settled positions | gate progress | why it is zero |
 |---|---:|---|---|
-| **P-001** | **432** | 0 / 200 | the pod still prices one day's game and bets another, so ~0% of rows are admissible |
+| **P-001** | **432** | 0 / 200 | ~~still prices one day's game and bets another~~ **see the §2.1 CORRECTION — the matcher is fine**; the gate is empty because CLV rows lag settlement and the clean sample starts 2026-07-26 |
 | **P-014** | 54 | **unreadable** | the gate declares no sanctioned reader; progress cannot be derived at all |
 | **P-015** | 5 | ~~0, but 5 exist~~ → **5** | the reader read `data/pods/P-015.jsonl`, **which does not exist**; the pod writes `trade_log.jsonl`. **FIXED + deployed 07-27 18:43Z** |
 | **P-017** | 38 | **1 / 8** | genuinely accumulating — the one gate working as designed |
@@ -45,7 +45,7 @@ event calendar would allow; "realised" is what the logs contain.
 
 | pod | gate | threshold | progress | realised rate | projected resolution | limiting cause | resolvable ≤12m |
 |---|---|---:|---|---|---|---|---|
-| **P-001** | admissible CLV rows (scenario D) | 200 | **0** | **0 admissible/week** (14.3% all-time; **0 of 5** post-fix) | **never** at the realised rate; ~31 weeks (≈ Mar 2027) even at the 14.3% historical rate | **pod defect** — matcher still off by exactly 24h | **NO** |
+| **P-001** | admissible CLV rows (scenario D) | 200 | **0** | 14.3% all-time; **1 of 1** on the fixed matcher (§2.1) | 31 weeks (≈ Mar 2027) at 14.3%; **4–5 weeks** if the post-fix rate holds | ~~matcher~~ **unknown — the post-fix rate is n=1** | **undetermined** |
 | **P-014** | settled trades | 500 | **unreadable** | 13.5 positions/week | ~11.5 weeks (≈ mid-Oct 2026) *if* progress is the 345 in the log | **counting rule** — no sanctioned reader exists | likely yes, unverifiable |
 | **P-015** | settled trades (locked) | 120 | **5** (was 0) | 5 trades in 2 days, then nothing; registry assumes ~20/month | ~25 weeks (≈ Jan 2027) at the registry's own assumption | ~~reader defect~~ **fixed**; now genuine event cadence | probably, unverified |
 | **P-017** | settled tournaments | 8 | **1** | ~1 tournament/week available | ~Q4 2026 | **event cadence** (irreducible) + the two-wave counting rule | **yes** |
@@ -55,7 +55,7 @@ event calendar would allow; "realised" is what the logs contain.
 
 ## 2. The findings, in order of how much they cost
 
-### 2.1 P-001's gate is inert, and the matcher fix did not take
+### 2.1 P-001's gate is inert — but **the matcher claim below was WRONG**
 
 The scenario-D gate counts CLV rows where the ticker-encoded start is within 3h
 of the game the pod actually priced. Using the sanctioned reader's own
@@ -82,16 +82,62 @@ module the live engine imports — and the deployed file does contain the
 time-based tie-break, yet the placements it produced after deploying are still
 a clean 24h out.
 
-> **This is a finding, not a fix, and I have not touched the matcher.** The
-> honest statement is that the fix is deployed and the defect it targeted is
-> still present in the output. Five placements is a small sample, but a sample
-> of five in which four are *exactly* 24.00h off is not noise.
+> ## CORRECTION — 2026-07-27 19:30 UTC. **The matcher is fine; the claim above
+> ## is wrong.**
+>
+> I wrote "the fix is deployed and the defect it targeted is still present in
+> the output." That is false, and it was about to send someone debugging code
+> that works.
+>
+> **Reproduced against the deployed matcher, on the real failing ticker.** It
+> picks the right day in every candidate order, and rejects a wrong-day-only
+> candidate set outright:
+>
+> ```
+> wrong-day FIRST -> MATCHED RIGHT  2026-07-28 22:40Z  delta=0.00h
+> right-day FIRST -> MATCHED RIGHT  2026-07-28 22:40Z  delta=0.00h
+> ONLY wrong day  -> REJECTED  reason=TIME_WINDOW_EXCEEDED delta_minutes=1440.0
+> ```
+>
+> A 24h error is 1440 min against a 720-min ticker window. **It cannot pass.**
+>
+> **Where my error came from.** The five placements I treated as post-fix were
+> made at **21:21:56 and 21:26:45 on 2026-07-26 — within five minutes of the
+> 21:21:25 restart** that first loaded the new matcher, and they are provably
+> inconsistent with the code that restart started. I read "after the file was
+> written" as "produced by the new code" and never checked the restart time
+> against the placement times. That is the same mistake in kind as the one this
+> whole report is about: assuming the deployed artefact is the running one.
+>
+> **The evidence that does exist points the other way.** Bucketed by matcher
+> generation:
+>
+> | placements | admissible | rate |
+> |---|---:|---:|
+> | before the new `matcher.py` existed | 106 / 734 | 14.4% |
+> | within 5 min of the restart (ambiguous) | 0 / 5 | — |
+> | **unambiguously on the new matcher** | **1 / 1** | **delta 0.02h** |
+>
+> `KXMLBGAME-26JUL282140COLSD-COL`, placed 2026-07-27T18:02:45, matched to
+> within **one minute**. **n = 1 is not proof and I am not claiming it is** —
+> it is simply the only clean evidence, and it contradicts what I published.
+>
+> **What was actually missing was the measurement.** A wrong-day trade looks
+> perfectly plausible, which is why this ran for months unnoticed. Two things
+> now exist: `tests/test_matcher_wrong_day.py` (11 tests locking the tie-break,
+> the sub-24h window, doubleheader resolution, and the fact that the
+> `close_time` fallback path has *no* day-level protection), and
+> placement-level admissibility in `p001_checkpoint.py` as a leading indicator
+> — the gate counts CLV rows, which lag by settlement, whereas placements
+> appear in minutes.
 
-The arithmetic that makes it urgent: at the historical 14.3% admissibility and
-the measured ~45 MLB placements/week, 200 admissible rows needs ~1,400
-placements ≈ **31 weeks ≈ March 2027** — well past the end of the 2026 MLB
-season, so it cannot complete in this season at all. The registry's "late Aug –
-early Sept 2026" is not achievable under any measured rate.
+**The gate is still the slowest thing in the fund, and that part stands.** At
+the historical 14.3% admissibility and ~45 MLB placements/week, 200 admissible
+rows needs ~1,400 placements ≈ **31 weeks ≈ March 2027**. *If* the post-fix rate
+holds near 100%, it needs ~200 placements ≈ **4–5 weeks** instead — which is the
+difference between inert and the fastest gate in the fund, and it turns entirely
+on a rate now measured at n=1. The `since_matcher_fix` figure answers it within
+days; until then, neither "inert" nor "on track" is a supported claim.
 
 ### 2.2 P-015's gate reader points at a file that does not exist — **FIXED 2026-07-27 18:43 UTC**
 

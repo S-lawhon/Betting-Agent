@@ -55,7 +55,7 @@ is broken four separate ways:
 
 | pod | 28d settled | gate reads | why |
 |---|---:|---|---|
-| P-001 | **432** | 0 / 200 | still prices one day's game and bets another → ~0% admissible |
+| P-001 | **432** | 0 / 200 | **CORRECTED** — the matcher is fine (see report §2.1); CLV rows lag settlement |
 | P-014 | 54 | ~~unreadable~~ **331 / 500** | no sanctioned reader existed — **FIXED + deployed**; resolves ~2026-10-23 |
 | P-015 | 5 | ~~0, but 5 exist~~ **now 5** | reader read `data/pods/P-015.jsonl`, which does not exist — **FIXED + deployed** |
 | P-017 | 38 | 1 / 8 | working correctly — the control |
@@ -215,9 +215,15 @@ Verified on the droplet after restart:
    pre-registered decision rule**, so the reader counts and refuses to judge.
    **Write `P014_DECISION_RULE.md` before n reaches 500 — blind, without
    running `--unblind`** — or it is a rule fitted to results. ~12.5 weeks.
-4. **P-001's matcher.** The fix is deployed and the defect is still in the
-   output (four of five placements exactly 24.00h off). The gate is inert until
-   this lands. Reported, not fixed. **Now the only unreadable gate left.**
+4. ~~**P-001's matcher.**~~ **CORRECTION: it was already fixed.** I reported it
+   still broken on the strength of five placements made *within five minutes of
+   the restart that loaded the fix* — provably not its output. Reproduced
+   against the deployed matcher: it picks the right day in every order and
+   rejects a wrong-day-only set at 1440 min vs a 720-min window. The one
+   unambiguously post-fix MLB placement is admissible to **within one minute**.
+   Nothing to fix; 11 regression tests and a placement-level leading indicator
+   added instead. **The open question is now the post-fix admissibility rate,
+   measured at n=1** — it decides whether P-001 resolves in ~4–5 weeks or ~31.
 5. **`t_start_utc` for P-022** — currently records a period in which the pod
    could not trade. My read is unchanged: reset it to the first demonstrated
    quote and record why.

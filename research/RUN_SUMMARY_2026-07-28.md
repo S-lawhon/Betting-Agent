@@ -29,7 +29,7 @@
 | **3** | P-028 golf template sweep | **KILL** (both leads) | H2H ties pay **0.50/0.50**, not $0 — pair sums to $1.00 exactly; category-leader has **2 tournament-clusters** |
 | **4** | R5 follow-ups | **ANSWERED / KILL / SCHEDULED** | tick size: **0 sub-cent levels in P-022's band**, no verdict moves · partitions: **0 of 15 executable** · NCAAF poller built |
 | **5** | P-022 widen the backtest | **PARTIAL** | pre-declaration committed before any pull; **13/13 series** have history back to **2026-05-22** — "~1 month" refuted |
-| **6** | Corrections + droplet hygiene | **DONE** | JDAY re-book moved P-017 to **−9.89¢/ct**; droplet 20MB→28KB; phantom exposure **$4,642**, not $1,311 |
+| **6** | Corrections + droplet hygiene | **DONE** | JDAY re-book moved P-017 to **−9.89¢/ct**; droplet 20MB→28KB; phantom exposure **$4,642 → $0.00** (voided) |
 | **7** | Fee-table fixture + CI | **FIXED** | **fifth drift found**; blast radius **zero verdicts changed** |
 | **8** | Data-readiness audit | **MIXED** | P-018 **ahead**; MLB props **on time to the day**; weather **dead, 139 of 139 runs failing** |
 
@@ -217,10 +217,11 @@ independent 2026-07-26 audit that had already found today's fifth fee drift.
 Preserved as a patch rather than destroyed.
 
 **Remnant C was already deployed** (verified by content hash). **Phantom
-exposure is $4,642.06 across 282 positions — 3.5× the cited $1,311 — and it does
+exposure was $4,642.06 across 282 positions — 3.5× the cited $1,311 — and it did
 NOT reach `AggregateRiskGuard`**, which skips pods without a settler by design.
-It distorts log-derived views only, consumes no risk limit, and cannot block a
-trade.
+It distorted log-derived views only. **Voided on Sam's decision 2026-07-27
+20:58 UTC**: 282 terminal rows appended, no existing line modified, exposure now
+$0.00, all five gates unchanged.
 
 ### Task 5 — widening · **PARTIAL, discipline intact**
 
@@ -315,9 +316,9 @@ Verified on the droplet after restart:
     because a daily poll can miss the registered 6h anchor window by up to 18h.
     It now polls from today rather than 2026-08-01; that only extends the
     baseline and cannot affect the drift statistic.
-12. **P-002/P-006 phantom exposure: void or retire?** $4,642.06 across 282
-    positions, quantified and untouched. Two options with a labelled
-    recommendation are in the corrections report.
+12. ~~**P-002/P-006 phantom exposure: void or retire?**~~ **VOIDED 2026-07-27
+    20:58 UTC** on your call — 282 rows appended, $4,642.06 → $0.00, no existing
+    line modified, all five gates unchanged.
 13. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
     pre-declaration is committed; the decision is still open.
 

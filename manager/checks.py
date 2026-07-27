@@ -656,6 +656,53 @@ def check_workstreams(snap: Dict[str, Any]) -> List[Finding]:
     return out
 
 
+def check_throughput(snap: Dict[str, Any]) -> List[Finding]:
+    """A gate producing NOTHING must not look like a gate patiently waiting.
+
+    This is the generalisation of the P-022 silence problem. P-022 sat dead for
+    four days and nothing noticed, because silence is also its correct
+    behaviour between tournaments. The same shape held for P-001 (still
+    pricing one day's game and betting another, so admissible rows accrue at
+    zero) and P-015 (5 real settled trades that its gate reader cannot see).
+
+    A stall is raised only once the gap exceeds what that gate's own event
+    cadence can explain — `manager.throughput.STALL_DAYS`. Those tolerances
+    gate nothing and change no rule; they only decide when to speak.
+    """
+    out: List[Finding] = []
+    block = snap.get("throughput") or {}
+    if not block.get("available"):
+        return out
+    for rec in block.get("records") or []:
+        pod = rec.get("id")
+        if rec.get("stalled"):
+            out.append(Finding(
+                key="throughput.{}.stalled".format(pod),
+                severity="warn",
+                title="{} gate has stalled".format(pod),
+                detail=("no settled observation for {} days (cadence tolerates "
+                        "{}). Last: {}. This is the P-022 failure mode — a gate "
+                        "producing nothing looks identical to a gate waiting."
+                        .format(rec.get("days_since_last_settlement"),
+                                rec.get("stall_days_tolerated"),
+                                rec.get("last_settlement_utc"))),
+                workstream=pod))
+        if rec.get("resolvable_within_12m") is False:
+            out.append(Finding(
+                key="throughput.{}.inert".format(pod),
+                severity="warn",
+                title="{} cannot resolve within 12 months".format(pod),
+                detail=("at the realised rate of {}/week it needs {} more weeks "
+                        "(projected {}). A gate that cannot resolve is not "
+                        "conservative — it is inert, and it consumes attention "
+                        "while producing nothing."
+                        .format(rec.get("rate_per_week"),
+                                rec.get("weeks_to_threshold"),
+                                rec.get("projected_resolution_utc"))),
+                workstream=pod))
+    return out
+
+
 def check_faults(snap: Dict[str, Any]) -> List[Finding]:
     """The collector failing to measure something is itself a finding.
 
@@ -729,6 +776,7 @@ def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
     findings += check_gates(snap, registry)
     findings += check_registry_reconciliation(snap, registry)
     findings += check_errors(snap)
+    findings += check_throughput(snap)
     findings += check_faults(snap)
     findings += check_workstreams(snap)
     findings.sort(key=lambda f: (SEVERITY_ORDER.get(f.severity, 9), f.key))

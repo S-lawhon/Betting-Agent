@@ -1032,6 +1032,23 @@ class Collector:
         result["available"] = True
         return result
 
+    # ---- observation throughput ------------------------------------------
+    @safe("throughput")
+    def throughput(self, snapshot_so_far: Dict[str, Any]) -> Dict[str, Any]:
+        """Realised observations-per-week per gate, and the resulting projection.
+
+        Takes the partially-built snapshot because progress must come from the
+        sanctioned checkpoint readers already collected above — re-deriving it
+        here would create a second, subtly different gate number, which is the
+        exact bug that made P-017 report `1` for a tournament it had merely
+        entered.
+        """
+        from manager.throughput import gate_throughput, summarize
+        recs = gate_throughput(self.root, snapshot_so_far, self.registry)
+        out = summarize(recs)
+        out["available"] = True
+        return out
+
     # ---- orchestration ---------------------------------------------------
     def run(self) -> Dict[str, Any]:
         trade = self.trade_activity() or {}
@@ -1054,6 +1071,9 @@ class Collector:
             "work_today": self.work_today() or {},
             "faults": self.faults,
         }
+        # Last, and fed the snapshot: throughput reads the gate readers'
+        # answers rather than recomputing them.
+        snapshot["throughput"] = self.throughput(snapshot) or {}
         return snapshot
 
 

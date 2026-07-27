@@ -1032,6 +1032,42 @@ class Collector:
         result["available"] = True
         return result
 
+    # ---- P-014 gate (delegates to the sanctioned reader) -----------------
+    @safe("p014_gate")
+    def p014_gate(self) -> Dict[str, Any]:
+        """P-014 progress comes ONLY from scripts/p014_checkpoint.py.
+
+        Same contract as p015_gate: shell out, report what the checkpoint says
+        or report that it could not run, never compute a fallback. Note that
+        this reader deliberately returns NO DECISION at every n — P-014 has no
+        pre-registered rule, and inventing one in the collector would be worse
+        than inventing it in the reader.
+        """
+        script = self.root / "scripts/p014_checkpoint.py"
+        out: Dict[str, Any] = {"id": "P-014", "reader": str(script)}
+        if not script.exists():
+            out["available"] = False
+            return out
+        py = self.root / "venv/bin/python"
+        exe = str(py) if py.exists() else sys.executable
+        try:
+            res = subprocess.run([exe, str(script), "--json"],
+                                 capture_output=True, text=True, timeout=120,
+                                 cwd=str(self.root))
+            raw = (res.stdout or "").strip()
+            if raw:
+                try:
+                    out.update({"available": True, "checkpoint": json.loads(raw)})
+                    return out
+                except json.JSONDecodeError:
+                    out.update({"available": True, "raw": raw[-2000:]})
+                    return out
+            out.update({"available": False,
+                        "error": (res.stderr or "no output")[-500:]})
+        except (subprocess.SubprocessError, OSError) as exc:
+            out.update({"available": False, "error": str(exc)})
+        return out
+
     # ---- observation throughput ------------------------------------------
     @safe("throughput")
     def throughput(self, snapshot_so_far: Dict[str, Any]) -> Dict[str, Any]:
@@ -1065,6 +1101,7 @@ class Collector:
             "p017": self.p017_gate() or {},
             "p001": self.p001_gate() or {},
             "p022": self.p022_gate() or {},
+            "p014": self.p014_gate() or {},
             "invariants": self.invariants() or {},
             "errors": self.recent_errors() or {},
             "workstreams": self.workstreams(trade) or [],

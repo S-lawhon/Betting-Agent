@@ -422,9 +422,16 @@ workstreams:
     gate:
       question: Does the calibration edge become statistically significant with more n?
       metric: settled_trades
-      source: trade_log
+      source: p014_checkpoint
+      reader: scripts/p014_checkpoint.py
       threshold: 500
       current_key: pods.P-014.settled
+      # NO PRE-REGISTERED DECISION RULE EXISTS. There is no P014_DECISION_RULE.md,
+      # so this gate has a threshold but no kill line, no promotion condition and
+      # no hard-kill z. The reader counts progress and deliberately returns
+      # NO DECISION at every n; writing the rule after reading the economics is
+      # the P-013 failure mode. Write it blind, before n reaches 500.
+      rule_status: MISSING — must be written before n reaches 500
 
   - id: P-015
     name: Tennis Qualifier Favorite

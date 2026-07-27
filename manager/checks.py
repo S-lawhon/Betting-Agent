@@ -423,7 +423,8 @@ def _gate_progress(snap: Dict[str, Any], pod_id: str,
         return val if isinstance(val, (int, float)) else None
 
     key = {"p017_checkpoint": "p017", "p001_checkpoint": "p001",
-           "p015_checkpoint": "p015", "p022_checkpoint": "p022"}.get(source)
+           "p015_checkpoint": "p015", "p022_checkpoint": "p022",
+           "p014_checkpoint": "p014"}.get(source)
     if not key:
         return None
     block = snap.get(key) or {}

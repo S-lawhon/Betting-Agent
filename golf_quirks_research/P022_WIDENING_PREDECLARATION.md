@@ -135,3 +135,60 @@ The reasoning both of us gave: it does **not** constitute re-fitting, because
 `P022_DECISION_RULE.md` governs the *forward* test — which stays locked at
 T = 14 and reads T = 0 — and every parameter is frozen. A wider backtest changes
 the **prior**, not the gate.
+
+---
+
+## 9. AMENDMENT — 2026-07-28, written BEFORE any effect number was computed
+
+**The declared backward window is empty at the source, so §2 cannot be executed
+as written.** This amendment restates what will be run instead. It is committed
+before the replay, and at the time of writing I have seen **only event counts,
+close dates and volumes** — no fill counts, no ¢/ct, no CI.
+
+### What §2 assumed, and why it is wrong
+
+§2 defined the window as `[measured per-series horizon, original study start)`
+on the belief that "Kalshi history reaches back to at least 2026-05-20, not the
+~1 month we assumed."
+
+Measured: **Kalshi lists 78 settled round-leader events and ZERO of them close
+before the study's own start.** The constraint was never the *trade-history*
+horizon — it is the **listing** horizon. Round-leader markets did not exist
+before mid-May 2026. There is nothing behind the study to widen into.
+
+A second measurement, which matters for data handling rather than scope: tick
+history is **already rolling off inside the existing sample.** Probing the
+oldest cached tournaments, several now return no prints at all
+(`KXPGAR1LEAD-THCCBN26` 0/6, `KXPGAR3LEAD-THCCBN26` 0/6,
+`KXDPWORLDTOURR1LEAD-AUAOPBKT26` 0/6). The committed cache is now the **only**
+copy of part of the Phase-2 sample.
+
+### What will be run instead
+
+Two groups, both under the **unchanged** inclusion rules and the unchanged
+frozen parameters of §1:
+
+**(a) Within-window gaps — 4 tournaments the original pull simply missed.**
+`SOO26` (2026-05-24), `DOWC26` (06-11), `MEILCFSG26` (06-18), `USSOC26`
+(07-02). These sit *inside* the study's own date span. Adding them applies the
+same rules more completely to the same period; it is a completeness fix rather
+than a change of window, and it is the least discretionary of anything
+available.
+
+**(b) Forward extension — 4 tournaments that settled after the cache ends.**
+`3MO26` (07-21), `KIN26` (07-23), `ISPHWSO26` (07-23), `ISHSO26` (07-23). These
+are a genuine extension of the period. **They are still backtest, not forward
+evidence**: the live pod has never quoted, so no row here can be confused with
+gate progress, and `T` remains 0 regardless of the outcome.
+
+### Everything else in this document stands unchanged
+
+The frozen parameters (§1), inclusion rules (§3), the >6h anchor-staleness drop
+(§4), old-vs-new separation before pooling (§5), the refutation conditions (§6)
+and the data handling (§7) all apply exactly as written. In particular
+**WEAKENED is still: added block ≤ 0, or pooled below +2.1¢/ct**, and a
+WEAKENED result still licenses nothing.
+
+Groups (a) and (b) will additionally be reported **separately from each other**,
+because a within-window gap and a forward extension are different kinds of
+evidence and pooling them would hide that.

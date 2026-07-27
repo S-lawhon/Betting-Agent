@@ -1,0 +1,90 @@
+{
+ "n_events": 78,
+ "older_than_study": [],
+ "retrievability": [
+  {
+   "event": "KXPGAR1LEAD-THCCBN26",
+   "close": "2026-05-22",
+   "markets_probed": 6,
+   "with_prints": 0
+  },
+  {
+   "event": "KXPGAR2LEAD-THCCBN26",
+   "close": "2026-05-22",
+   "markets_probed": 6,
+   "with_prints": 2
+  },
+  {
+   "event": "KXPGAR3LEAD-THCCBN26",
+   "close": "2026-05-22",
+   "markets_probed": 6,
+   "with_prints": 0
+  },
+  {
+   "event": "KXDPWORLDTOURR2LEAD-SOO26",
+   "close": "2026-05-24",
+   "markets_probed": 6,
+   "with_prints": 1
+  },
+  {
+   "event": "KXLIVR1LEAD-LIGK26",
+   "close": "2026-05-26",
+   "markets_probed": 6,
+   "with_prints": 3
+  },
+  {
+   "event": "KXPGAR1LEAD-CHSC26",
+   "close": "2026-05-26",
+   "markets_probed": 6,
+   "with_prints": 6
+  },
+  {
+   "event": "KXPGAR2LEAD-CHSC26",
+   "close": "2026-05-26",
+   "markets_probed": 6,
+   "with_prints": 0
+  },
+  {
+   "event": "KXPGAR3LEAD-CHSC26",
+   "close": "2026-05-26",
+   "markets_probed": 6,
+   "with_prints": 1
+  },
+  {
+   "event": "KXDPWORLDTOURR1LEAD-AUAOPBKT26",
+   "close": "2026-05-28",
+   "markets_probed": 6,
+   "with_prints": 0
+  },
+  {
+   "event": "KXDPWORLDTOURR2LEAD-AUAOPBKT26",
+   "close": "2026-05-28",
+   "markets_probed": 6,
+   "with_prints": 1
+  },
+  {
+   "event": "KXDPWORLDTOURR3LEAD-AUAOPBKT26",
+   "close": "2026-05-28",
+   "markets_probed": 6,
+   "with_prints": 0
+  },
+  {
+   "event": "KXLIVR2LEAD-LIGK26",
+   "close": "2026-05-28",
+   "markets_probed": 6,
+   "with_prints": 6
+  },
+  {
+   "event": "KXLIVR3LEAD-LIGK26",
+   "close": "2026-05-28",
+   "markets_probed": 6,
+   "with_prints": 0
+  },
+  {
+   "event": "KXPGAR1LEAD-THMTPBW26",
+   "close": "2026-06-04",
+   "markets_probed": 6,
+   "with_prints": 6
+  }
+ ]
+}

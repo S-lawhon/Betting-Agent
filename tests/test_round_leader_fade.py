@@ -442,3 +442,154 @@ def test_pod_block_overrides_win_over_the_global_bankroll():
     eng = P.from_config({"risk": {"initial_bankroll": 4000.0},
                          "pods": {"P-022": {"risk": {"bankroll": 250.0}}}})
     assert abs(eng.bankroll - 250.0) < 1e-9
+
+
+# ── §7's guard precondition, actually wired (2026-07-27) ─────────────
+#
+# The mechanism above was implemented and tested from day one, but NOTHING
+# EVER CONSTRUCTED A GUARD: the runner calls from_config, from_config never
+# passed one, so `risk_guard` was None in the live process and _reserve()
+# returned an unconditional True. Rule §11c recorded §7 as satisfied.
+#
+# The second half of the fix matters more than the first: a standalone loop
+# has no update_post_cycle to drain reservations, so a naive wiring would
+# ratchet exposure until the guard refused everything — muting the pod
+# permanently, which is worse than not wiring it at all.
+
+def test_from_config_wires_a_real_aggregate_risk_guard():
+    """The regression. `risk_guard` was None in the live process."""
+    from src.aggregate_risk import AggregateRiskGuard
+    from src.round_leader_fade_maker import RoundLeaderFadeMakerPod as P
+    eng = P.from_config({"risk": {"initial_bankroll": 1000.0}})
+    assert isinstance(eng.risk_guard, AggregateRiskGuard)
+    assert callable(getattr(eng.risk_guard, "reserve_trade", None))
+
+
+def test_from_config_honours_an_explicit_risk_guard_override():
+    from src.round_leader_fade_maker import RoundLeaderFadeMakerPod as P
+    spy = SpyGuard()
+    assert P.from_config({}, risk_guard=spy).risk_guard is spy
+    assert P.from_config({}, risk_guard=None).risk_guard is None
+
+
+def test_settlement_releases_the_reservation(tmp_path):
+    """A settled market owes nothing further. If its collateral stayed
+    reserved, P-022 would starve one tournament at a time."""
+    guard = SpyGuard()
+    eng, clock = _fill_one(tmp_path, bankroll=1000.0, risk_guard=guard)
+    assert TICKER in guard.reserved
+    _settle_result(eng, clock, {"result": "no"})
+    assert TICKER not in guard.reserved
+    assert TICKER in guard.released
+    assert TICKER not in eng._reserved_ids
+
+
+def test_reservation_covers_filled_contracts_too(tmp_path):
+    """Reservations are idempotent by market_id, so re-quoting with only the
+    NEW quote's collateral would replace — and so erase — the exposure of
+    everything already filled on that name."""
+    guard = SpyGuard()
+    eng, clock = _fill_one(tmp_path, bankroll=1000.0, risk_guard=guard)
+    book = eng.books[TICKER]
+    assert book.collateral > 0                      # something is filled
+    eng.cycle()                                     # re-quote the remainder
+    held = guard.reserved[TICKER]["usd"]
+    assert held >= book.collateral - 1e-9
+
+
+def test_sweep_releases_a_reservation_whose_book_is_gone(tmp_path):
+    """Backstop: nothing may hold exposure for a market the pod no longer
+    tracks — the standalone loop has no update_post_cycle to sweep for it."""
+    guard = SpyGuard()
+    eng = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE - 18 * 3600),
+                      bankroll=1000.0, risk_guard=guard)
+    eng.discover()
+    eng.cycle()
+    assert TICKER in guard.reserved
+    eng.books.clear()
+    eng.cycle()
+    assert TICKER not in guard.reserved
+    assert not eng._reserved_ids
+
+
+class FakeMultiKalshi(FakeKalshi):
+    """Many distinct names in one event.
+
+    A single-ticker double cannot exercise this: reservations are keyed by
+    market_id, so re-quoting one ticker replaces rather than accumulates, and
+    exposure never builds up.
+    """
+
+    def __init__(self, tickers, **kw):
+        super().__init__(**kw)
+        self.tickers = list(tickers)
+
+    def open_markets(self, series):
+        return [{"ticker": t, "event_ticker": EVENT,
+                 "occurrence_datetime": CLOSE_ISO} for t in self.tickers]
+
+
+def test_reservations_drain_so_the_pod_can_still_quote_later(tmp_path):
+    """THE starvation regression, against a REAL AggregateRiskGuard.
+
+    Quote a full tournament, settle it, then quote another. Each tournament
+    reserves up to P-022's own 15%-of-bankroll aggregate ($150); the guard's
+    per-pod cap is 25% ($250). So round 2 fits ONLY if round 1's collateral
+    was released on settlement. If it were not, the guard would refuse
+    everything from then on and the pod would go silent forever — the exact
+    failure this whole workstream exists to detect, reintroduced by the fix
+    meant to satisfy §7.
+    """
+    from src.aggregate_risk import AggregateRiskGuard
+    guard = AggregateRiskGuard(bankroll=1000.0, max_open_positions=200)
+    clock = Clock(CLOSE - 18 * 3600)
+    r1 = [f"{EVENT}-N{i}" for i in range(40)]
+    eng = make_engine(tmp_path, FakeMultiKalshi(r1), clock,
+                      bankroll=1000.0, risk_guard=guard)
+    eng.discover()
+    eng.cycle()
+    quoted_1 = [t for t in r1 if eng.books[t].ask_quote is not None]
+    reserved_1 = sum(guard._reservations[t]["usd"] for t in eng._reserved_ids)
+    assert len(quoted_1) > 10
+    assert reserved_1 > 125.0        # ~15% of bankroll; 2x this exceeds $250
+
+    # settle the whole tournament
+    clock.t = CLOSE + 3600
+    eng.kalshi._settle = {"result": "no"}
+    eng.cycle()
+    assert not eng._reserved_ids, "settled tournament still holds collateral"
+
+    # a second tournament must be quotable on the same guard
+    clock.t = CLOSE - 18 * 3600
+    eng.kalshi.tickers = [f"{EVENT}-M{i}" for i in range(40)]
+    eng.discover()
+    eng.cycle()
+    quoted_2 = [t for t in eng.kalshi.tickers
+                if eng.books[t].ask_quote is not None]
+    assert len(quoted_2) == len(quoted_1), (
+        f"guard starved the pod after one settled tournament: "
+        f"{len(quoted_2)} names quoted vs {len(quoted_1)}")
+
+
+def test_live_guard_does_not_bind_before_the_section_7_caps(tmp_path):
+    """Behaviour-neutrality: wiring the guard must not change which names get
+    quoted, or it would alter the population under test mid-gate. P-022's own
+    caps (aggregate 15% of bankroll) are strictly tighter than the guard's
+    (25% per pod, 30% per venue, 50% total)."""
+    from src.aggregate_risk import AggregateRiskGuard
+    cfg = {"risk": {"initial_bankroll": 1000.0},
+           "aggregate_risk": {"max_total_exposure_pct": 0.50,
+                              "max_venue_exposure_pct": 0.30,
+                              "max_pod_exposure_pct": 0.25,
+                              "max_open_positions": 200}}
+    clock_a, clock_b = Clock(CLOSE - 18 * 3600), Clock(CLOSE - 18 * 3600)
+    unguarded = make_engine(tmp_path, FakeKalshi(), clock_a, bankroll=1000.0)
+    guarded = make_engine(tmp_path, FakeKalshi(), clock_b, bankroll=1000.0,
+                          risk_guard=AggregateRiskGuard.from_config(cfg))
+    for eng in (unguarded, guarded):
+        eng.discover()
+        eng.cycle()
+    qa, qb = unguarded.books[TICKER].ask_quote, guarded.books[TICKER].ask_quote
+    assert qa is not None and qb is not None
+    assert abs(qa.price - qb.price) < 1e-9
+    assert abs(qa.qty - qb.qty) < 1e-9

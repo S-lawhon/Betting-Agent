@@ -51,6 +51,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.aggregate_risk import AggregateRiskGuard
 from src.kalshi_fees import fee_per_contract
 from src.kalshi_public import KalshiPublic, fnum
 from src.pod_registry import register_pod
@@ -190,6 +191,10 @@ class RoundLeaderFadeMakerEngine:
         self._now = _now_fn or time.time
         self.books: Dict[str, MarketBook] = {}
         self._fill_seq = 0
+        # Tickers this engine currently holds a guard reservation on. Tracked
+        # here rather than read off the guard so the sweep never reaches into
+        # another pod's reservations or the guard's private state.
+        self._reserved_ids: set = set()
 
     # ── Logging ──────────────────────────────────────────────────────
 
@@ -293,6 +298,7 @@ class RoundLeaderFadeMakerEngine:
                 self._cycle_book(book, killed, now)
             except Exception:
                 logger.exception("P-022: cycle failed for %s", book.ticker)
+        self._sweep_reservations()
 
     def _mid(self, ticker: str) -> Optional[float]:
         ob = self.kalshi.orderbook(ticker)
@@ -379,8 +385,11 @@ class RoundLeaderFadeMakerEngine:
             # that makes the guard see a whole tournament's names as they go out
             # in one window, rather than checking each against a stale snapshot.
             # Reserve the worst-case collateral (the quote is a commitment to
-            # take it if lifted), not the premium.
-            if not self._reserve(book, size * per_ct_coll):
+            # take it if lifted), not the premium — and include what this
+            # market already owes on filled contracts, since reservations are
+            # idempotent-by-market_id and a bare quote figure would replace,
+            # and so erase, the exposure of everything already filled here.
+            if not self._reserve(book, book.collateral + size * per_ct_coll):
                 self._pull(book, "aggregate_risk")
                 return
             book.ask_quote = MakerQuote(quote_px, size, now, mid)
@@ -403,26 +412,54 @@ class RoundLeaderFadeMakerEngine:
             return True
         reserve = getattr(guard, "reserve_trade", None)
         if callable(reserve):
-            return bool(reserve("P-022", "kalshi", book.ticker, collateral_usd))
+            ok = bool(reserve("P-022", "kalshi", book.ticker, collateral_usd))
+            if ok:
+                self._reserved_ids.add(book.ticker)
+            return ok
         check = getattr(guard, "check_trade", None)
         if callable(check):
             return bool(check("P-022", "kalshi", collateral_usd))
         return True
 
-    def _release(self, book: MarketBook) -> None:
+    def _release(self, ticker: str) -> None:
+        self._reserved_ids.discard(ticker)
         guard = self.risk_guard
         if guard is None:
             return
         release = getattr(guard, "release_reservation", None)
         if callable(release):
-            release(book.ticker)
+            release(ticker)
+
+    def _sweep_reservations(self) -> None:
+        """Drop reservations on markets that no longer owe anything.
+
+        The 5-minute engine drains reservations in ``update_post_cycle``;
+        a standalone loop has no such callback. Without this sweep a settled
+        tournament's collateral would sit in the guard forever and P-022
+        would starve itself one event at a time — a wiring that mutes the pod
+        is worse than no wiring, and muting is the exact failure this whole
+        workstream exists to stop.
+
+        Release-only by construction: it never asks the guard to approve
+        anything, so it cannot itself be refused.
+        """
+        if not self._reserved_ids:
+            return
+        for ticker in list(self._reserved_ids):
+            book = self.books.get(ticker)
+            if (book is None or book.done
+                    or (book.ask_quote is None and book.collateral <= 0)):
+                self._release(ticker)
 
     def _pull(self, book: MarketBook, reason: str) -> None:
         if book.ask_quote is not None:
             book.ask_quote = None
             # An abandoned quote must not keep holding exposure, or the pod
-            # starves itself one name at a time.
-            self._release(book)
+            # starves itself one name at a time. Filled contracts still owe
+            # their collateral, so only a book with nothing outstanding is
+            # fully released; the sweep handles the rest.
+            if book.collateral <= 0:
+                self._release(book.ticker)
             self._write(self.quotes_log, {
                 "type": "PULL", "pod_id": "P-022", "ticker": book.ticker,
                 "reason": reason,
@@ -539,6 +576,10 @@ class RoundLeaderFadeMakerEngine:
             })
         book.done = True
         book.ask_quote = None
+        # Settled: this market owes nothing further. Release rather than
+        # ``close_position`` — see the note on the daily-loss halt in
+        # ``from_config``.
+        self._release(book.ticker)
         if book.fills:
             logger.info("P-022 SETTLED %s result=%s payout=%.2f fills=%d "
                         "pnl=$%.2f", book.ticker, res, payout,
@@ -575,7 +616,47 @@ class RoundLeaderFadeMakerPod:
             or _cap.get("bankroll")
             or 1000.0
         )
+        # ── §7's precondition, actually wired ──
+        # "Before P-022 can quote, it must be wired into AggregateRiskGuard
+        # with reservations." The mechanism existed and was unit-tested, but
+        # NOTHING EVER CONSTRUCTED A GUARD: the runner calls from_config, and
+        # from_config never passed one, so `risk_guard` was None in the live
+        # process and _reserve() was an unconditional True. §11c recorded the
+        # requirement as satisfied. Built here rather than in the runner so
+        # the pod is wired wherever it is constructed — "implemented in one
+        # path, absent from the one that runs" is the failure this pod has
+        # now produced three times. Pass risk_guard=None explicitly to opt out.
+        #
+        # Behaviour-neutral by arithmetic, verified against the merged config
+        # on the droplet (2026-07-27): P-022's own §7 caps are strictly tighter
+        # than every guard exposure limit — aggregate 15% of bankroll vs the
+        # guard's 25% per pod, 30% per venue, 50% total — so the §7 caps still
+        # bind first and the quoted population is unchanged. The one guard
+        # limit that could bind first is max_open_positions (200 live); P-022
+        # holds at most ~30 reservations, since the per-name cap is 0.5% of a
+        # 15% aggregate.
+        #
+        # DELIBERATELY NOT WIRED: settled P&L is released with
+        # release_reservation, not close_position. close_position calls
+        # record_pnl, which halts the guard at a 5% daily loss — and the
+        # cooldown that clears a halt is applied in check_pre_cycle, which a
+        # standalone loop never calls. A halt would therefore be PERMANENT
+        # until restart, and would silently exclude tournaments from T. A
+        # daily-loss halt for P-022 is a gate-affecting behaviour that the
+        # locked rule does not register; §7 asks for reservations and that is
+        # what this provides. Raising it is a separate decision.
+        if "risk_guard" in overrides:
+            guard = overrides.pop("risk_guard")
+        else:
+            try:
+                guard = AggregateRiskGuard.from_config(config)
+            except Exception:                      # noqa: BLE001
+                logger.exception(
+                    "P-022: could not build AggregateRiskGuard — running with "
+                    "the in-process collateral caps only")
+                guard = None
         return RoundLeaderFadeMakerEngine(
+            risk_guard=guard,
             series=tuple(q.get("series", DEFAULT_SERIES)),
             mid_band=tuple(q.get("mid_band", (0.03, 0.12))),
             quote_offset=float(q.get("quote_offset", 0.02)),

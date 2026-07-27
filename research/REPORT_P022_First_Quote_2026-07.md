@@ -6,10 +6,11 @@
 still structurally incapable of quoting. Two further defects were found
 behind it, either of which would independently hold T at 0.
 
-> **No P-022 parameter was changed and nothing was deployed.** Defects 1 and 3
-> are reported, not tuned — fixing them is Sam's call. Defect 2 was fixed on
-> request (§3): it is a read-side loader change that touches neither the rule
-> nor the running pod, and does not depend on the Defect 1 decision.
+> **No P-022 parameter was changed and nothing was deployed.** Defect 1 is
+> reported, not tuned — it is a design decision and it is Sam's. Defects 2 and
+> 3 were fixed on request: neither depends on the Defect 1 decision, neither
+> touches a §7 parameter, and neither changes the quoted population. Defect 2
+> is read-side only; **Defect 3 needs a deploy to take effect.**
 
 ---
 
@@ -33,7 +34,7 @@ Three independent breaks, each sufficient on its own to hold **T = 0 forever**:
 |---|---|---|
 | **1** | Close reference on an OPEN market is a ~20-day fallback placeholder → the [12h, 24h] window opens ~2.5 weeks after the round settles | **blocks quoting** |
 | **2** | `p022_checkpoint.py` reads four log paths, none of which the pod writes; its rows also lack the `outcome` and `contracts` fields the reader requires | ~~blocks the gate reading~~ **FIXED** |
-| **3** | §7's `AggregateRiskGuard` precondition is unsatisfied in the running process — `risk_guard` is `None` live | **precondition recorded as met, isn't** |
+| **3** | §7's `AggregateRiskGuard` precondition is unsatisfied in the running process — `risk_guard` is `None` live | ~~precondition recorded as met, isn't~~ **FIXED, needs deploy** |
 
 ---
 
@@ -277,7 +278,7 @@ MIN-close logic behaves. The half of the fix that could be verified, is.
 
 ## 5. Defect 3 and the cap questions (task steps 3 and 5)
 
-### `AggregateRiskGuard` — §7 precondition is not met in the running process
+### `AggregateRiskGuard` — §7 precondition was not met in the running process — **FIXED 2026-07-27 (needs deploy)**
 
 §7: *"Before P-022 can quote, it must be wired into `AggregateRiskGuard` with
 reservations."* §11c records this as ✓ and §11d discusses its cross-process
@@ -297,6 +298,57 @@ Worst-case-collateral sizing itself is correct where it is computed:
 `per_ct_coll = 1 - quote_px` and the quote is sized to
 `min(room_name_ct, room_name_coll/c, room_event/c, room_total/c)` — collateral,
 not premium, and it binds before the 25-contract secondary bound.
+
+### The fix, and the trap inside it
+
+`from_config` now builds `AggregateRiskGuard.from_config(config)` unless a
+caller passes `risk_guard=` explicitly. Built in `from_config` rather than in
+the runner deliberately: "implemented in one path, absent from the one that
+runs" is the failure this pod has now produced three times.
+
+**The second half matters more than the first.** A standalone loop has no
+`update_post_cycle`, which is what drains reservations in the 5-minute engine.
+Wiring a guard without a lifecycle would ratchet reserved collateral upward
+forever until the guard refused everything — **muting the pod permanently,
+which is strictly worse than not wiring it at all**, and reintroducing the
+exact failure this workstream exists to detect. So the fix also adds:
+
+- release on settlement (a settled market owes nothing further);
+- `_sweep_reservations()` at the end of every cycle, release-only by
+  construction so it can never itself be refused, covering books that are
+  done, gone, or holding neither a quote nor an open fill;
+- reservations that cover **already-filled** collateral, not just the new
+  quote — reservations are idempotent by `market_id`, so re-quoting with only
+  the quote's figure would replace, and so erase, everything already filled
+  on that name.
+
+**Behaviour-neutral, verified by arithmetic against the merged droplet
+config:** P-022's own §7 caps (aggregate 15% of bankroll = $150) are strictly
+tighter than every guard exposure limit (pod 25% = $250, venue 30%, total
+50%), so the §7 caps still bind first and the quoted population is unchanged.
+The one guard limit that could bind first is `max_open_positions` — live value
+200, against at most ~30 P-022 reservations, since a 0.5% per-name cap inside
+a 15% aggregate admits ~30 names. A regression test asserts the guarded and
+unguarded engines quote at the same price and size.
+
+**Deliberately NOT wired: the daily-loss halt.** Settled markets are released
+with `release_reservation`, not `close_position` — `close_position` calls
+`record_pnl`, which halts the guard at a 5% daily loss, and the cooldown that
+clears a halt is applied in `check_pre_cycle`, which a standalone loop never
+calls. A halt would therefore be **permanent until restart** and would
+silently exclude tournaments from T. That is a gate-affecting behaviour the
+locked rule does not register; §7 asks for reservations, and that is what this
+provides. Adding a halt is a separate decision.
+
+Tests: 7 new in `tests/test_round_leader_fade.py` (23 → 30). Mutation-checked
+— disabling the settle-release and the sweep fails three of them, including
+the starvation regression, which quotes a full tournament, settles it, and
+asserts a second tournament still quotes the same number of names on the same
+guard. Suite 1,541 green.
+
+> **Committed but NOT deployed.** `betting-round-leader-fade` is still running
+> the old code, so `risk_guard` is `None` in the live process until a deploy.
+> Nothing is lost by waiting — the pod cannot quote anyway (Defect 1).
 
 ### Cap-breach exclusion — not implemented, and there is a live breach path
 
@@ -370,9 +422,9 @@ Nothing here was fixed, per the guardrails. In priority order:
    pod ID; options 1 and 3 have their own costs. This one is blocking.
 2. ~~**Defect 2**~~ — **done 2026-07-27** (§3). Loader-side only, no deploy
    needed, no rule change. The reader now sees the pod's rows.
-3. **Defect 3** (§5): construct an `AggregateRiskGuard` in the runner, or
-   amend §11c/§11d to say the wiring is absent. Either is fine; claiming ✓ for
-   code that does not run is not.
+3. ~~**Defect 3**~~ — **done 2026-07-27** (§5), with the reservation lifecycle
+   a standalone loop needs. **On the deploy list**, and §11c/§11d should be
+   amended to say the wiring was absent until now.
 4. **Restart-safe books** (§5). Rebuild open fills from the fills log on
    startup, or record a breach when a restart is detected mid-tournament.
 5. **Deploy the detector** so it runs on the droplet — it is registered but

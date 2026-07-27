@@ -781,12 +781,20 @@ workstreams:
         cannot accrue tournaments. NOT a parameter problem — do not tune the
         window; the round end is not a quantity Kalshi publishes in advance.
       - >
-        The §7 precondition "wired into AggregateRiskGuard with reservations" is
-        NOT satisfied in the running process. The reservation mechanism exists in
-        the engine, but neither run_round_leader_fade.py nor from_config ever
-        constructs a guard, so risk_guard is None live and _reserve() is a no-op.
-        The in-process collateral caps still bind, so this is not an open
-        exposure hole — but §11d records this as satisfied and it is not.
+        FIXED 2026-07-27, AWAITING DEPLOY. The §7 precondition "wired into
+        AggregateRiskGuard with reservations" was never satisfied in the running
+        process: the mechanism existed in the engine, but neither
+        run_round_leader_fade.py nor from_config ever constructed a guard, so
+        risk_guard was None live and _reserve() was a no-op while §11c recorded
+        it as met. from_config now builds one. The lifecycle matters more than
+        the wiring — a standalone loop has no update_post_cycle to drain
+        reservations, so the fix also releases on settlement and sweeps every
+        cycle; without that the guard would ratchet to a permanent refusal and
+        mute the pod, which is worse than no guard. Behaviour-neutral: P-022's
+        own 15% aggregate cap is tighter than the guard's 25% per-pod. The
+        daily-loss halt is deliberately NOT wired (close_position -> record_pnl
+        would halt permanently, since check_pre_cycle never runs here). Until
+        deployed, the live process still has risk_guard=None.
       - >
         Books are not persisted across restarts (self.books = {} on init, and
         nothing reads the fills log back). A restart mid-tournament re-arms all

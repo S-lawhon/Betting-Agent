@@ -57,7 +57,7 @@ is broken four separate ways:
 |---|---:|---|---|
 | P-001 | **432** | 0 / 200 | still prices one day's game and bets another → ~0% admissible |
 | P-014 | 54 | **unreadable** | gate declares no sanctioned reader at all |
-| P-015 | 5 | **0, but 5 exist** | reader reads `data/pods/P-015.jsonl`, **which does not exist** |
+| P-015 | 5 | ~~0, but 5 exist~~ **now 5** | reader read `data/pods/P-015.jsonl`, which does not exist — **FIXED + deployed** |
 | P-017 | 38 | 1 / 8 | working correctly — the control |
 | P-022 | 0 | 0 / 14 | could not compute its window (fixed and deployed today) |
 
@@ -202,11 +202,13 @@ Verified on the droplet after restart:
 
 1. ~~**Deploy P-022 before 2026-07-29T15:30Z.**~~ **DONE 2026-07-27 17:53 UTC.**
    The remaining question is only whether it quotes when the window opens.
-2. **P-015's gate reader** points at `data/pods/P-015.jsonl`, which does not
-   exist, while five real settled trades sit in `trade_log.jsonl`. Repointing it
-   does not change what counts as an observation — but the rule is **locked** and
-   names that reader, so I did not touch it. **Highest value-per-minute item in
-   the fund.**
+2. ~~**P-015's gate reader**~~ **FIXED and DEPLOYED 2026-07-27 18:43 UTC**, on
+   your instruction. Reads **n = 5, 4 wins, edge −11.20pp, z = −0.63**; verdict
+   unmoved at NO DECISION (n ≪ 120, z well above the −2.0 hard kill). Not a rule
+   change — the locked document names the *script*, not a log path, and the
+   thresholds, statistic and VOID exclusion are asserted unchanged by test. A
+   second latent bug went with it: a `or 0.9` fallback that fabricated a
+   breakeven for any row missing a price.
 3. **P-001's matcher.** The fix is deployed and the defect is still in the
    output (four of five placements exactly 24.00h off). The gate is inert until
    this lands. Reported, not fixed.

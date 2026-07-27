@@ -89,7 +89,7 @@ placements ≈ **31 weeks ≈ March 2027** — well past the end of the 2026 MLB
 season, so it cannot complete in this season at all. The registry's "late Aug –
 early Sept 2026" is not achievable under any measured rate.
 
-### 2.2 P-015's gate reader points at a file that does not exist
+### 2.2 P-015's gate reader points at a file that does not exist — **FIXED 2026-07-27 18:43 UTC**
 
 `scripts/p015_checkpoint.py` defaults to `--log data/pods/P-015.jsonl`.
 On the droplet:
@@ -118,9 +118,30 @@ named — *a filter or a path asserted in one place and wrong in the path that
 runs* — after the generic settler's pod scoping, `_close_epoch`'s field
 preference, and P-022's own checkpoint reading four paths the pod never wrote.
 
-**I have not changed the reader.** P-015's rule is locked and its reader is
-named in the locked document; repointing it is a change to what counts as an
-observation, which is Sam's call, not mine. It is item 1 in §4.
+> **FIXED and DEPLOYED 2026-07-27 18:43 UTC**, on Sam's instruction. The reader
+> now globs the trade log plus archives (`.gz` included), deduplicated on
+> `fingerprint`. Against live data it reads **n = 5, 4 wins, hit 80.0% vs 91.2%
+> breakeven, edge −11.20pp, z = −0.63, paper P&L −$9.83**, and the manager
+> collector relays that number end to end.
+>
+> **Not a rule change, and the tests say so independently.** The locked
+> document names *this script* as the sanctioned reader; it names no log path
+> and does not define an observation by which file a row sits in. Thresholds
+> (120/240), the test statistic and the VOID exclusion are byte-identical, each
+> asserted by its own test. The verdict is unmoved: n = 5 ≪ 120 is still
+> **NO DECISION**, and z = −0.63 is nowhere near the −2.0 hard kill.
+>
+> **A second bug was found in the same reader** and fixed with it: entry price
+> was read as `fill_price or venue_prob or 0.9`, so a row carrying neither
+> price was silently assigned a **fabricated 0.9 breakeven** feeding a
+> pre-registered statistic. Such rows are now excluded and counted, never
+> invented. Currently 0 of 5, so it is behaviour-neutral today — it was a
+> loaded gun, not a smoking one.
+>
+> **Read the −11.20pp with care.** At n = 5 it is noise, and the rule
+> explicitly forbids acting on it. But it is the second gate today whose first
+> forward evidence is negative (P-017's first settled tournament came in at
+> −10.08¢/ct), and the pattern is worth watching rather than filing.
 
 ### 2.3 P-014 has no sanctioned reader at all
 

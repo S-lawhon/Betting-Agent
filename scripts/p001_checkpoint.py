@@ -159,6 +159,65 @@ def _boot_ci(by_day: Dict[str, List[float]], n: int = 5000,
     return means[int(0.025 * len(means))], means[int(0.975 * len(means))]
 
 
+# First moment the wrong-day matcher fix was unambiguously running: the file
+# landed 2026-07-26 19:31:58Z and the service restarted 21:21:25Z. Placements
+# inside the first five minutes of that restart are excluded as ambiguous —
+# five of them are 24-42h out, which the current matcher provably rejects, so
+# they cannot have come from it. Rolling windows are reported too, but they mix
+# generations and will read low until the pre-fix rows age out; THIS is the
+# number to judge the matcher by.
+MATCHER_FIX_EPOCH = datetime(2026, 7, 26, 21, 30, 0, tzinfo=timezone.utc)
+
+
+def placement_admissibility(placements: Dict[str, Dict[str, Any]],
+                            windows=(1, 7, 28)) -> Dict[str, Any]:
+    """Admissible fraction of recent MLB placements, per lookback window.
+
+    Admissible means the ticker's own encoded start is within
+    ``ADMISSIBLE_HOURS`` of the game the pod actually priced — i.e. the pod
+    traded the market for the game it valued, not a different day's.
+    """
+    now = datetime.now(timezone.utc)
+    rows = []
+    for p in placements.values():
+        mid, gt, placed = p.get("market_id"), p.get("game_time"), p.get("placed_at")
+        if not mid or not str(mid).startswith("KXMLBGAME") or gt is None:
+            continue
+        if placed is None:
+            continue
+        start = ticker_start(mid)
+        if start is None:
+            continue
+        delta_h = abs((start - gt).total_seconds()) / 3600.0
+        rows.append((placed, delta_h <= ADMISSIBLE_HOURS, delta_h))
+
+    out: Dict[str, Any] = {"rule_hours": ADMISSIBLE_HOURS}
+    for days in windows:
+        cut = now - timedelta(days=days)
+        sel = [r for r in rows if r[0] >= cut]
+        n = len(sel)
+        ok = sum(1 for r in sel if r[1])
+        out[f"last_{days}d"] = {
+            "n": n, "admissible": ok,
+            "rate": (ok / n) if n else None,
+            # Worst offender, so a regression is diagnosable from the number
+            # alone rather than needing a forensic dig.
+            "max_delta_h": round(max((r[2] for r in sel), default=0.0), 2),
+        }
+    out["all_time"] = {"n": len(rows),
+                       "admissible": sum(1 for r in rows if r[1])}
+    post = [r for r in rows if r[0] >= MATCHER_FIX_EPOCH]
+    n_post = len(post)
+    ok_post = sum(1 for r in post if r[1])
+    out["since_matcher_fix"] = {
+        "epoch_utc": MATCHER_FIX_EPOCH.isoformat(),
+        "n": n_post, "admissible": ok_post,
+        "rate": (ok_post / n_post) if n_post else None,
+        "max_delta_h": round(max((r[2] for r in post), default=0.0), 2),
+    }
+    return out
+
+
 def evaluate(trade_log: Path = DEFAULT_TRADE_LOG,
              clv_log: Path = DEFAULT_CLV_LOG) -> Dict[str, Any]:
     placements = load_placements(trade_log)
@@ -230,6 +289,15 @@ def evaluate(trade_log: Path = DEFAULT_TRADE_LOG,
 
     return {
         "pod": POD,
+        # LEADING INDICATOR — placement-level admissibility.
+        #
+        # The gate counts CLV rows, which lag by settlement plus close capture,
+        # so a matcher regression would take days to show up in `progress`. The
+        # wrong-day defect went unnoticed for MONTHS because nothing measured
+        # it at all: a mismatched trade is perfectly plausible on its face.
+        # This measures the same admissibility rule against PLACEMENTS, which
+        # appear within minutes.
+        "placements": placement_admissibility(placements),
         "metric": "admissible_clv_forward_rows",
         "scenario": "D (clean forward sample, post-fix only)",
         "epoch_utc": EPOCH.isoformat(),

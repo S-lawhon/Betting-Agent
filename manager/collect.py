@@ -38,6 +38,17 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# This file is invoked as a SCRIPT (`python manager/collect.py`), so sys.path[0]
+# is `manager/`, not the repo root, and `import manager.x` raises
+# ModuleNotFoundError. That is not hypothetical: the throughput probe shipped
+# 2026-07-27 importing `manager.throughput`, failed on every collector run, and
+# was swallowed by @safe into a fault nobody was reading — the instrument built
+# to make silent failure visible was itself silently failing. Put the repo root
+# on the path before any first-party import.
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 try:
     import yaml
 except ImportError:  # pragma: no cover

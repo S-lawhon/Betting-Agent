@@ -198,3 +198,42 @@ def test_summarize_counts_the_things_worth_alarming_on(tmp_path):
                            _registry("P-022", "settled_tournaments", 14), now=NOW)
     s = summarize(recs)
     assert s["n_gates"] == 1 and s["n_stalled"] == 1 and s["n_zero_28d"] == 1
+
+
+# ── the probe must work in the way it is actually INVOKED ────────────
+
+def test_collector_throughput_probe_works_when_run_as_a_script(tmp_path):
+    """The regression that shipped to production on 2026-07-27.
+
+    `manager/collect.py` is invoked as a SCRIPT (`python manager/collect.py`),
+    so `sys.path[0]` is `manager/` and `import manager.throughput` raises
+    ModuleNotFoundError. Under pytest the repo root IS on sys.path, so importing
+    `manager.throughput` directly — which every test above does — passes while
+    the real invocation path fails.
+
+    `@safe` then swallowed it into a fault, and `check_throughput` guards on
+    `available`, so the instrument built to make silent failure visible was
+    itself silently failing on every collector run.
+
+    This test runs the collector the way cron runs it, in a subprocess, and
+    asserts the probe actually produced records.
+    """
+    import subprocess
+    import sys as _sys
+
+    root = Path(__file__).resolve().parent.parent
+    _write(tmp_path, "trade_log.jsonl", [
+        _settle("P-017", "2026-07-25", "A"), _settle("P-017", "2026-07-26", "B")])
+    state = tmp_path / "state"
+    res = subprocess.run(
+        [_sys.executable, str(root / "manager" / "collect.py"),
+         "--root", str(tmp_path), "--state-dir", str(state)],
+        capture_output=True, text=True, cwd=str(tmp_path), timeout=300)
+    assert res.returncode == 0, res.stderr[-2000:]
+
+    snap = json.loads((state / "status.json").read_text())
+    faults = {f.get("probe") for f in (snap.get("faults") or [])}
+    assert "throughput" not in faults, (
+        "the throughput probe faulted in the real invocation path: "
+        f"{snap.get('faults')}")
+    assert (snap.get("throughput") or {}).get("available") is True

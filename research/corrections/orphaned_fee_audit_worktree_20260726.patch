@@ -1,0 +1,287 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index b01e661..251124e 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -62,9 +62,18 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
+   KXMLBASGAME, KXMLBHRDERBY). Pass `series_ticker` to `fee_per_contract`. No arg
+   → general maker rate (backward-compatible for P-016).
+   `_SERIES_MAKER_FEE` matches by LONGEST prefix — required because KXMLB (charges)
+-  ⊂ KXMLBHR (free) ⊂ KXMLBHRDERBY (charges). Verify new entries against
+-  `GET /trade-api/v2/series/?category=Sports&limit=200` (`fee_type` field); this
+-  table has drifted twice.
++  ⊂ KXMLBHR (free) ⊂ KXMLBHRDERBY (charges), and in golf because KXPGATOUR
++  (charges) ⊂ KXPGATOURCHAMP (free) and KXPGARYDER (charges) ⊂ its free day/
++  matchup children. Verify new entries against
++  `GET /trade-api/v2/series?category=Sports&limit=200` (`fee_type` field); this
++  table has drifted three times.
++  **Charging is rare — 108 of 3005 Sports series.** In golf ONLY six charge:
++  KXPGA, KXPGATOUR, KXTHEOPEN, KXUSOPEN, KXPGARYDER, KXPGASOLHEIM. Every other
++  golf series is maker-free, including all of DP World, LIV, LPGA, Champions
++  Tour and the Masters — do NOT assume a "…TOUR" series prices like KXPGATOUR
++  (the 2026-07-26 audit found KXLPGATOUR/KXLIVTOUR/KXCHAMPTOUR wrongly marked
++  as charging). Unknown series default to "charges", so a gap costs edge but
++  never under-prices a fee.
+ 
+ ## Aggregate risk — reservations (added 2026-07-20)
+ 
+diff --git a/src/kalshi_fees.py b/src/kalshi_fees.py
+index 66fb4c8..d528b84 100644
+--- a/src/kalshi_fees.py
++++ b/src/kalshi_fees.py
+@@ -15,6 +15,14 @@ Pass `series_ticker` to fee_per_contract / fee_total to get the correct maker
+ treatment. Backward compatible: with NO series_ticker, maker fees fall back to
+ the general 0.0175 rate. P-016 relies on that fallback (it makes on KXMLBGAME,
+ which does charge) and must not be perturbed while its gate sample is running.
++
++Charging is the EXCEPTION, not the rule: of 3005 live Sports series only 108
++are `quadratic_with_maker_fees`. Within golf exactly six charge — KXPGA,
++KXPGATOUR, KXTHEOPEN, KXUSOPEN, KXPGARYDER, KXPGASOLHEIM — and every other
++golf series (all of DP World, LIV, LPGA, Champions Tour, Masters, and every
++PGA derivative) is maker-free. An unrecognised series still resolves to
++"charges", which is deliberately conservative, so a missing entry costs edge
++but never under-prices a fee.
+ """
+ from __future__ import annotations
+ import math
+@@ -29,35 +37,81 @@ MAKER_COEF = 0.0175
+ # resolve correctly: "KXMLB" (game winner, charges) is a prefix of "KXMLBHR"
+ # (home-run prop, free) which is in turn a prefix of "KXMLBHRDERBY" (charges).
+ # A naive `any(startswith(...))` over two flat tuples gets all three wrong.
++# Golf has the same shape twice over: "KXPGATOUR" (charges) is a prefix of
++# "KXPGATOURCHAMP" (free), and "KXPGARYDER" (charges) is a prefix of the free
++# Ryder day-winner / matchup / top-scorer derivatives. Every entry below that
++# sits under a longer-or-shorter sibling is load-bearing, not decoration.
+ #
+ # Verified against live /series metadata:
+-#   golf 2026-07-19; MLB 2026-07-20 via
+-#   GET /trade-api/v2/series/?category=Sports&limit=200  (per-series `fee_type`)
+-# Re-verify with that call before adding entries — this table has drifted twice.
++#   golf 2026-07-19; MLB 2026-07-20; FULL-TABLE re-audit 2026-07-26 via
++#   GET /trade-api/v2/series?category=Sports&limit=200  (per-series `fee_type`)
++# Re-verify with that call before adding entries — this table has drifted three
++# times. The 2026-07-26 audit found three wrong entries: KXLPGATOUR, KXLIVTOUR
++# and KXCHAMPTOUR were marked as charging but Kalshi runs all three as
++# `quadratic` (maker-free) — the LPGA / LIV / Champions tours are NOT priced
++# like the PGA Tour, despite the parallel naming.
+ _SERIES_MAKER_FEE: dict[str, bool] = {
+-    # ---- Golf: winner / outright series charge makers ----
++    # ---- Golf: the only six series that charge makers ----
+     "KXPGA": True,            # PGA Championship winner
+-    "KXPGATOUR": True,
+-    "KXTHEOPEN": True,
+-    "KXPGARYDER": True,
+-    "KXPGASOLHEIM": True,
+-    "KXLPGATOUR": True,
+-    "KXLIVTOUR": True,
+-    "KXCHAMPTOUR": True,
+-    # ---- Golf: derivative/prop series are maker-free ----
+-    "KXPGATOP": False,
++    "KXPGATOUR": True,        # weekly PGA Tour tournament winner
++    "KXTHEOPEN": True,        # The Open Championship
++    "KXUSOPEN": True,         # US Open — tags=['Golf'] (KXUSOPENCUP is soccer)
++    "KXPGARYDER": True,       # Ryder Cup outright
++    "KXPGASOLHEIM": True,     # Solheim Cup outright
++    # ---- Golf: PGA derivative/prop series are maker-free ----
++    "KXPGATOP": False,        # covers KXPGATOP5/10/20/40
++    "KXPGAR1TOP": False,      # round-level top-N — covers R1TOP5/10/20
++    "KXPGAR2TOP": False,
++    "KXPGAR3TOP": False,
++    "KXPGAMAJORTOP": False,   # top-10 across all four majors
+     "KXPGAMAKECUT": False,
++    "KXPGACUTLINE": False,
+     "KXPGAH2H": False,
+-    "KXGOLFH2H": False,
+     "KXPGA3BALL": False,
+     "KXPGA5BALL": False,
+     "KXPGAR1LEAD": False,
+     "KXPGAR2LEAD": False,
+     "KXPGAR3LEAD": False,
+     "KXPGAUNDERPAR": False,
++    "KXGOLFH2H": False,
++    "KXGOLFTOURN": False,     # generic "Golf Tournament Winner"
++    # Longest-prefix carve-outs from the charging PGA entries above:
++    "KXPGATOURCHAMP": False,  # Tour Championship participation — under KXPGATOUR
++    "KXPGARYDERCUP": False,   # covers Ryder day-1/2/3 winners — under KXPGARYDER
++    "KXPGARYDERMATCH": False,
++    "KXPGARYDERTOP": False,   # covers KXPGARYDERTOP3
++    # ---- Golf: the non-PGA tours are maker-free end to end ----
++    "KXDPWORLDTOUR": False,   # DP World winner — free, UNLIKE KXPGATOUR
++    "KXDPWORLDTOURMAKECUT": False,
++    "KXDPWORLDTOURR1LEAD": False,
++    "KXDPWORLDTOURR2LEAD": False,
++    "KXDPWORLDTOURR3LEAD": False,
+     "KXDPWTH2H": False,
++    "KXLIVTOUR": False,       # was wrongly True until 2026-07-26
++    "KXLIVTOP5": False,
++    "KXLIVTOP10": False,
++    "KXLIVMAKECUT": False,
+     "KXLIVH2H": False,
+-    "KXPGACUTLINE": False,
++    "KXLIVR1LEAD": False,
++    "KXLIVR2LEAD": False,
++    "KXLIVR3LEAD": False,
++    "KXLIVCOMPETE": False,
++    "KXLIVOCCUR": False,
++    "KXLPGATOUR": False,      # was wrongly True until 2026-07-26
++    "KXLPGAR1LEAD": False,
++    "KXLPGAR2LEAD": False,
++    "KXLPGAR3LEAD": False,
++    "KXCHAMPTOUR": False,     # was wrongly True until 2026-07-26; covers R1LEAD
++    "KXMASTERS": False,       # Masters winner is maker-free, unlike the other majors
++    "KXMASTERSCUT": False,
++    "KXRYDERCUP": False,      # distinct root from KXPGARYDER; covers ...CAPTAIN
++    # NOTE: "KXPGA" above doubles as the conservative PGA family default (the
++    # same role "KXMLB" plays for MLB). ~45 novelty/participation PGA series
++    # (KXPGABIRDIES, KXPGAHOLEINONE, KXPGACOMPETE, KXPGAWIN*, KXGOLFMAJOR*, ...)
++    # are live-verified maker-FREE but resolve to "charges" under that root.
++    # That over-charges by ≤0.44c/ct on markets no pod trades — safe, and left
++    # deliberately rather than enumerated. Add an explicit False entry if a pod
++    # ever quotes one.
+     # ---- MLB: game//league outcome series charge makers ----
+     "KXMLB": True,            # league-level (also the conservative MLB default)
+     "KXMLBGAME": True,
+@@ -85,12 +139,15 @@ def series_maker_charges_fee(series_ticker: str) -> bool:
+ 
+     Prop/derivative series (golf top-N, make-cut, H2H; MLB hits, K's, totals,
+     total bases, HR, HRR, SB, RFI, F5, spreads) return False → maker fee is
+-    zero. Game-winner and league-outcome series return True.
++    zero, as does every non-PGA golf tour (DP World, LIV, LPGA, Champions) and
++    the Masters. Game-winner and league-outcome series return True.
+ 
+     Series tickers are matched by LONGEST prefix, so a market's full series
+-    ticker ("KXPGATOP20", "KXMLBHRR") resolves to its family. An unrecognised
+-    series returns True — conservative, since over-charging a fee only makes
+-    the net-edge gate stricter.
++    ticker ("KXPGATOP20", "KXMLBHRR", "KXDPWORLDTOURMAKECUT") resolves to its
++    family, and a free child under a charging parent ("KXPGATOURCHAMP" under
++    "KXPGATOUR") wins on length. An unrecognised series returns True —
++    conservative, since over-charging a fee only makes the net-edge gate
++    stricter.
+     """
+     s = (series_ticker or "").upper()
+     if not s:
+diff --git a/tests/test_kalshi_fees.py b/tests/test_kalshi_fees.py
+index 44d2a27..67ca120 100644
+--- a/tests/test_kalshi_fees.py
++++ b/tests/test_kalshi_fees.py
+@@ -131,3 +131,120 @@ def test_fee_fraction_and_net_edge_honour_zero_maker_series():
+         == pytest.approx(0.03)
+     assert net_edge(0.53, 0.50, maker=True, series_ticker="KXMLBGAME") \
+         == pytest.approx(0.03 - 0.0175 * 0.25)
++
++
++# ---------------------------------------------------------------------------
++# Golf. Ground truth re-read live on 2026-07-26 from
++#   GET https://api.elections.kalshi.com/trade-api/v2/series?category=Sports
++# Of 3005 Sports series only 108 charge makers; within golf it is exactly the
++# six below. Everything else in golf is `quadratic` => zero maker fee.
++# ---------------------------------------------------------------------------
++
++# fee_type == "quadratic_with_maker_fees"
++GOLF_MAKER_FEE_SERIES = [
++    "KXPGA", "KXPGATOUR", "KXTHEOPEN", "KXUSOPEN", "KXPGARYDER", "KXPGASOLHEIM",
++]
++# fee_type == "quadratic"  (ZERO maker fee)
++GOLF_ZERO_MAKER_SERIES = [
++    # PGA derivatives
++    "KXPGATOP", "KXPGATOP5", "KXPGATOP10", "KXPGATOP20", "KXPGATOP40",
++    "KXPGAMAKECUT", "KXPGACUTLINE", "KXPGAH2H", "KXPGA3BALL", "KXPGA5BALL",
++    "KXPGAR1LEAD", "KXPGAR2LEAD", "KXPGAR3LEAD", "KXPGAUNDERPAR",
++    "KXPGAR1TOP5", "KXPGAR1TOP20", "KXPGAR2TOP10", "KXPGAR3TOP5",
++    "KXPGAMAJORTOP10", "KXGOLFH2H", "KXGOLFTOURN",
++    # DP World Tour — the family that was missing entirely before 2026-07-26
++    "KXDPWORLDTOUR", "KXDPWORLDTOURMAKECUT", "KXDPWORLDTOURR1LEAD",
++    "KXDPWORLDTOURR2LEAD", "KXDPWORLDTOURR3LEAD", "KXDPWTH2H",
++    # LIV
++    "KXLIVTOUR", "KXLIVTOP5", "KXLIVTOP10", "KXLIVMAKECUT", "KXLIVH2H",
++    "KXLIVR1LEAD", "KXLIVR2LEAD", "KXLIVR3LEAD", "KXLIVCOMPETE", "KXLIVOCCUR",
++    # LPGA / Champions / Masters / Ryder-standalone
++    "KXLPGATOUR", "KXLPGAR1LEAD", "KXLPGAR2LEAD", "KXLPGAR3LEAD",
++    "KXCHAMPTOUR", "KXCHAMPTOURR1LEAD", "KXMASTERS", "KXMASTERSCUT",
++    "KXRYDERCUP", "KXRYDERCUPCAPTAIN",
++]
++
++
++@pytest.mark.parametrize("series", GOLF_MAKER_FEE_SERIES)
++def test_golf_outright_series_charge_maker_fees(series):
++    assert series_maker_charges_fee(series) is True
++    assert fee_per_contract(0.5, maker=True, series_ticker=series) \
++        == pytest.approx(0.0175 * 0.25)
++
++
++@pytest.mark.parametrize("series", GOLF_ZERO_MAKER_SERIES)
++def test_golf_derivative_series_are_maker_free(series):
++    assert series_maker_charges_fee(series) is False
++    assert fee_per_contract(0.5, maker=True, series_ticker=series) == 0.0
++    # taker side is unaffected — 0.07*P*(1-P) regardless of series
++    assert fee_per_contract(0.5, maker=False, series_ticker=series) \
++        == pytest.approx(0.0175)
++
++
++def test_makecut_and_topn_families_across_all_tours():
++    """The 2026-07-26 gap: make-cut and top-N were only mapped for the PGA.
++
++    DP World make-cut and LIV top-5/top-10 fell through to the general 0.0175
++    maker rate (~0.44c at 50c) on series Kalshi charges nothing for.
++    """
++    for s in ("KXPGAMAKECUT", "KXDPWORLDTOURMAKECUT", "KXLIVMAKECUT",
++              "KXMASTERSCUT"):
++        assert series_maker_charges_fee(s) is False, s
++    for s in ("KXPGATOP5", "KXPGATOP10", "KXLIVTOP5", "KXLIVTOP10"):
++        assert series_maker_charges_fee(s) is False, s
++
++
++def test_non_pga_tours_do_not_inherit_pga_tour_pricing():
++    """Regression guard: LPGA/LIV/Champions were wrongly marked as charging.
++
++    The naming parallels KXPGATOUR (which does charge), but Kalshi runs all
++    three as `quadratic`. The old table over-charged every maker quote on them.
++    """
++    assert series_maker_charges_fee("KXPGATOUR") is True
++    for s in ("KXLPGATOUR", "KXLIVTOUR", "KXCHAMPTOUR"):
++        assert series_maker_charges_fee(s) is False, s
++        assert fee_per_contract(0.5, maker=True, series_ticker=s) == 0.0
++
++
++def test_golf_prefix_collisions_resolve_by_longest_match():
++    """Golf repeats the KXMLB/KXMLBHR/KXMLBHRDERBY shape twice.
++
++    A charging root sits directly above free children in both cases, so these
++    only resolve correctly under longest-prefix matching.
++    """
++    # KXPGATOUR (charges) < KXPGATOURCHAMP (free participation market)
++    assert series_maker_charges_fee("KXPGATOUR") is True
++    assert series_maker_charges_fee("KXPGATOURCHAMP") is False
++    # KXPGARYDER (charges) < its free day-winner / matchup / top-scorer children
++    assert series_maker_charges_fee("KXPGARYDER") is True
++    assert series_maker_charges_fee("KXPGARYDERCUPD1") is False
++    assert series_maker_charges_fee("KXPGARYDERMATCH") is False
++    assert series_maker_charges_fee("KXPGARYDERTOP3") is False
++    # KXPGA (charges) < KXPGATOP/KXPGAMAKECUT (free) — the original golf case
++    assert series_maker_charges_fee("KXPGA") is True
++    assert series_maker_charges_fee("KXPGATOP20") is False
++    # KXRYDERCUP is a distinct root from KXPGARYDER and is free throughout
++    assert series_maker_charges_fee("KXRYDERCUP") is False
++    # KXUSOPEN (golf major, charges) must not drag down the LIV/DPW families
++    assert series_maker_charges_fee("KXUSOPEN") is True
++    assert series_maker_charges_fee("KXDPWORLDTOUR") is False
++
++
++def test_golf_full_market_tickers_resolve_to_their_family():
++    # real tickers carry an event/competitor suffix
++    assert series_maker_charges_fee("KXDPWORLDTOURMAKECUT-26JUL-RMCI") is False
++    assert series_maker_charges_fee("KXLIVTOP10-26AUG-RAHM") is False
++    assert series_maker_charges_fee("KXLIVTOP5-26AUG-RAHM") is False
++    assert series_maker_charges_fee("KXPGATOUR-26JUL") is True
++
++
++def test_golf_zero_maker_series_change_the_net_edge_gate():
++    """The whole point of the table: a maker quote that clears on DP World."""
++    # 0.44c/ct at 50c is the difference between passing and failing this gate
++    assert net_edge(0.514, 0.50, maker=True,
++                    series_ticker="KXDPWORLDTOURMAKECUT") \
++        == pytest.approx(0.014)
++    assert net_edge(0.514, 0.50, maker=True, series_ticker="KXPGATOUR") \
++        == pytest.approx(0.014 - 0.0175 * 0.25)
++    assert fee_fraction_of_stake(0.5, maker=True, series_ticker="KXLIVTOP10") \
++        == 0.0

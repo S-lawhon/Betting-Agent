@@ -5,6 +5,21 @@
 
 ## VERDICT: **KILL**
 
+> **CORRECTION 2026-07-28 — the split is CONDITIONAL and this report states it
+> unconditionally.** `LEAGUELEADER.pdf` reads: *"In the event of a tie where multiple participants have exactly the same <statistic> total, **and <league> does not declare a single winner through official tiebreaker procedures**, the markets for all tied <participant>s will resolve so "Yes" holders receive $1/[the number of tied <participant>s] rounded down to the nearest cent and "No" holders receive $1
+> minus the Yes payout."* **The emphasised clause is missing from every
+> statement of the rule in this document.** The split fires only when the league
+> does not resolve the tie itself, and most leagues publish official
+> tiebreakers — so `E[1/n | tie] = 0.43` used below is an **upper bound on the
+> haircut**, not its expectation, and the free-money arithmetic in §"prices
+> *none* of the split" is correspondingly overstated. The KILL verdict is
+> unaffected (it was decided at the $0 pre-trade gate), but the effect size is.
+>
+> Also corrected: the split has **never been observed in the wild**.
+> `KXWCGOALLEADER` (54 markets) and `KXLEADERUCLGOALS` (6) have already settled
+> and **both resolved outright at $1.0000**. The claim elsewhere that "~Oct 15
+> is the first-ever KXLEADER settlement" is wrong.
+
 The $1/n dead-heat rule is real and was re-verified verbatim from the certified terms. The
 *fade* it is supposed to fund is not there. Two independent reasons, either sufficient:
 

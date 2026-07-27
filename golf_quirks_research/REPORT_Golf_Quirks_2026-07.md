@@ -280,6 +280,30 @@ mechanic is confirmed. **But the count only proves the price *could* be wrong
 
 ### 4.2 The gate — buy boundary YES (maker, fee 0), edge = realized − anchor price
 
+> ## ⚠ CORRECTION 2026-07-28 — two anchor errors in this section
+>
+> Found by exact replication of the cells below. **Both were uncorrected until
+> now, and P-023c's conclusions were drawn against them.**
+>
+> 1. **The round-based top-N cells are anchored at H = 12h, not 48h.** The four
+>    `round-topn R1TOP5 / R1TOP10 / R2TOP10 / R3TOP10` rows in the table below
+>    were computed at a 12-hour anchor. The "48h" in this paragraph describes
+>    the full-tournament and make-cut rows only.
+> 2. **The full-tournament "48h, before R1" anchor is NOT pre-event for most of
+>    the sample.** Replication puts it **after R1 for 58–71% of the control
+>    cohort.** It is a mid-tournament price for the majority of rows, not a
+>    pre-tournament one — the description in this paragraph is wrong about what
+>    the number measures.
+>
+> **Any figure derived from these cells inherits the error**, including the
+> −3.2¢ control reading quoted immediately below and every comparison drawn
+> against it. The direction and size of the bias are *not* established here;
+> the make-cut precedent is that a stale anchor is simply **wrong**, not
+> conservatively wrong (a median-68h-old anchor manufactured +9.5¢/ct with a
+> CI excluding zero), and P-023c later found the bias runs the opposite way on
+> its own cohort. Do not attempt to correct these numbers by subtracting an
+> offset — they need re-running at a stated, verified anchor.
+
 Pre-tournament anchor (48h, before R1 — the make-cut anchors land at 57–64h,
 genuinely pre-cut). Bands: top-N 8–45¢; make-cut 40–60¢. CIs clustered by
 tournament.

@@ -118,6 +118,23 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
   (P-028, 2026-07-28). A 2026-07 task brief quoted this same clause as "$0" and
   built a whole hypothesis on it: **read the PDF yourself even when the rule is
   quoted to you.** `golf_quirks_research/REPORT_P028_Template_Sweep_2026-07.md`.
+- **The `KXLEADER*` $1/n split is CONDITIONAL, and every prior write-up stated it
+  unconditionally.** `LEAGUELEADER.pdf` (governs the whole `KXLEADER*` stat-leader
+  family) says verbatim: *"In the event of a tie where multiple participants have exactly the same <statistic> total, **and <league> does not declare a single winner through official tiebreaker procedures**, the markets for all tied <participant>s will resolve so "Yes" holders receive $1/[the number of tied <participant>s] rounded down to the nearest cent and "No" holders receive $1 minus the Yes payout."*
+  **The split only fires when the league does NOT resolve the tie itself** — and
+  most leagues publish official tiebreakers, so the clause may almost never
+  apply. Any model that prices the full `E[1/n]` haircut unconditionally
+  overstates it. Distinct from the golf `KX*R{1,2,3}LEAD` round-leader split
+  (P-022), which has no such carve-out.
+  **The split has never been observed in the wild.** Two `KXLEADER*`-family
+  series have settled — `KXWCGOALLEADER` (54 markets) and `KXLEADERUCLGOALS`
+  (6) — and **both resolved outright at $1.0000**, no scalar. The claim that
+  "~Oct 15 is the first-ever KXLEADER settlement" is wrong.
+- **`GOLDENGLOBESNOM.pdf` is a RANKLIST template, NOT an award template**, and
+  the two carry OPPOSITE dead-heat regimes: RANKLIST ties pay **pro-rata $1/n**,
+  award ties pay the tied winner **ZERO**. Two opposite regimes sit one PDF apart
+  under similar-looking tickers, so a census that groups by ticker name will
+  conflate them. Read the `contract_terms_url` per series, never the name.
 - **Leader markets are maker-free — all of them.** Swept 2026-07-26 across all
   series in every category: 88 tickers contain `LEAD` and not one is
   `quadratic_with_maker_fees`. Round leaders on every tour and the season

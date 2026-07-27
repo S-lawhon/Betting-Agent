@@ -11,7 +11,19 @@ Scanned 5,185 multi-leg open events and 2,401 threshold ladders against executab
 - **Conclusion:** the static structure book is clean. Whoever is doing structural arb on Kalshi (and the book shapes say someone is — dime-wide two-sided quotes across whole bracket sets) has it covered at rest. What is NOT tested here: **transient** violations in the seconds after news. That requires the websocket feed, and is folded into H8.
 - Counterparty if you find one anyway: nobody — that's the point. It's a machine's queue you'd be joining.
 
-### H2 [(a) RV] Kalshi vs Polymarket cross-venue basis — **TESTED: fee-bounded, no free money in the liquid head**
+### H2 [(a) RV] Kalshi vs Polymarket cross-venue basis — **TESTED: fee-bounded IN THE LIQUID SPORTS HEAD; false outside it**
+
+> **Re-scoped 2026-07-28 after P-020.** This hypothesis was stated
+> unconditionally ("fee-bounded"). It holds **only in the liquid sports head**,
+> which is where the four rows below were measured. Outside that head, P-020
+> found the basis is not a fee-bounded corridor at all — and, more damaging to
+> the "free fair-value oracle" implication below, the **Brier-minimising weight
+> on Polymarket was 0.0 on a monotone sweep**: Kalshi is both the *deeper* and
+> the *sharper* venue there, so quoting around a Polymarket mid imports noise
+> rather than information. See
+> [`crossvenue_research/REPORT_CrossVenue_2026-07.md`](../crossvenue_research/REPORT_CrossVenue_2026-07.md).
+> **The oracle implication in the third bullet is therefore scoped to the
+> liquid head and unsupported outside it.**
 Synchronized live comparison (WC final winner legs, Trump-attends, pre-game MLB):
 
 | Market | Kalshi | Polymarket | Basis (mid) | Kalshi taker fee | Verdict |

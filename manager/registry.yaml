@@ -181,6 +181,33 @@ jobs:
     severity: info
     note: Added 2026-07-20; had not fired yet as of first inventory.
 
+  # Registered 2026-07-27. NOT a heartbeat — see the services comment on
+  # betting-round-leader-fade: P-022's silence is legitimate between
+  # tournaments, so a stale-file check on its quote log would page nightly for
+  # correct behaviour. This job instead answers the question a heartbeat
+  # cannot: is silence CORRECT right now? It alarms on two conditions only —
+  # a quotable window open with zero quotes, and (the live 2026-07-27 state) a
+  # close reference that is a fallback placeholder, which means no window can
+  # open while the markets are tradeable.
+  #
+  # Deliberately does NOT reuse the pod's window arithmetic. A detector that
+  # decides "is a window open?" the way the pod does agrees with the pod when
+  # the pod is wrong, and would have sat silent through all three dead days.
+  - id: p022_window_check
+    host: droplet
+    schedule: "*/30 * * * *"
+    description: P-022 quotable-window detector — makes the pod's silence observable
+    output:
+      file: data/p022_window_check/status.jsonl
+      max_stale_hours: 3
+    severity: warn
+    note: >
+      NOT YET DEPLOYED or crontabbed as of 2026-07-27 — deploys are Sam's call.
+      Currently ALARMING (state CLOSE_REF_PLACEHOLDER) on every run: 346 markets
+      across 3 events are listed, and all five Kalshi time fields collapse to
+      one ~20-day fallback, so the pod's [12h, 24h] window opens roughly a
+      fortnight after the round has settled. Exit 1 = alarm, 0 = fine.
+
   # --- Mac-hosted (kalshi-ev-map weather pipeline) -------------------------
   # These run under the LOCAL crontab and silently skip whenever the Mac is
   # asleep. The roadmap says "every week you don't archive is calibration data
@@ -740,11 +767,33 @@ workstreams:
         proposal — never live money.
     watch:
       - >
-        First quotes. There were no open round-leader markets at the 2026-07-26
-        restart (tournaments concluded, next week unlisted), so the fix is
-        verified by test and against real settled payloads but NOT yet by a live
-        quote. If no quote appears once golf markets relist, investigate before
-        assuming the window logic is right.
+        STILL CANNOT QUOTE — found 2026-07-27, the first time markets relisted.
+        The 2026-07-26 reconciliation fixed the wrong half of the bug. Its
+        evidence (occurrence_datetime running 13-18d past close_time on 10 of
+        10) was measured on SETTLED markets, where Kalshi has already rewritten
+        close_time to the real early-close stamp. On an OPEN market — the only
+        state the pod ever sees when deciding to quote — all five time fields
+        collapse to one ~20-day fallback, so preferring close_time over
+        occurrence_datetime changes nothing. Confirmed live: at 00:22:20 UTC the
+        runner discovered 346 markets across 3 events, every close reference
+        2026-08-16T00:00Z (~479h out), and quoted nothing. See
+        research/REPORT_P022_First_Quote_2026-07.md. T is accruing calendar but
+        cannot accrue tournaments. NOT a parameter problem — do not tune the
+        window; the round end is not a quantity Kalshi publishes in advance.
+      - >
+        The §7 precondition "wired into AggregateRiskGuard with reservations" is
+        NOT satisfied in the running process. The reservation mechanism exists in
+        the engine, but neither run_round_leader_fade.py nor from_config ever
+        constructs a guard, so risk_guard is None live and _reserve() is a no-op.
+        The in-process collateral caps still bind, so this is not an open
+        exposure hole — but §11d records this as satisfied and it is not.
+      - >
+        Books are not persisted across restarts (self.books = {} on init, and
+        nothing reads the fills log back). A restart mid-tournament re-arms all
+        three collateral caps from zero while the paper exposure persists, which
+        is a genuine cap-breach path under §7 — and p022_checkpoint.py implements
+        no cap-breach exclusion, so a breached tournament would still count
+        toward T.
       - >
         Aggregate risk is enforced against P-022's OWN book only — it is a
         separate process from the 5-minute engine, so the 15% cap does not span

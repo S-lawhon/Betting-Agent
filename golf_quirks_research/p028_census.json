@@ -1,0 +1,322 @@
+{
+ "KXGOLFCAT": {
+  "family": "category_leader_1overN",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGACAT": {
+  "family": "category_leader_1overN",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGAPLAYERCAT": {
+  "family": "category_leader_1overN",
+  "n_settled": 314,
+  "n_events": 8,
+  "results": {
+   "no": 305,
+   "yes": 7,
+   "scalar": 2
+  },
+  "n_scalar": 2,
+  "first_close": "2026-06-21",
+  "last_close": "2026-07-19"
+ },
+ "KXPGAWINNERWITHOUT": {
+  "family": "category_leader_1overN",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGAH2H": {
+  "family": "head_to_head_tie_zero",
+  "n_settled": 1082,
+  "n_events": 541,
+  "results": {
+   "yes": 490,
+   "no": 490,
+   "scalar": 102
+  },
+  "n_scalar": 102,
+  "first_close": "2026-05-23",
+  "last_close": "2026-07-26"
+ },
+ "KXLIVH2H": {
+  "family": "head_to_head_tie_zero",
+  "n_settled": 4,
+  "n_events": 2,
+  "results": {
+   "no": 2,
+   "yes": 2
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-07",
+  "last_close": "2026-06-07"
+ },
+ "KXDPWTH2H": {
+  "family": "head_to_head_tie_zero",
+  "n_settled": 2,
+  "n_events": 1,
+  "results": {
+   "yes": 1,
+   "no": 1
+  },
+  "n_scalar": 0,
+  "first_close": "2026-07-05",
+  "last_close": "2026-07-05"
+ },
+ "KXGOLFH2H": {
+  "family": "head_to_head_tie_zero",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGAWINMARGIN": {
+  "family": "margin",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGASTROKEMARGIN": {
+  "family": "margin",
+  "n_settled": 14,
+  "n_events": 2,
+  "results": {
+   "no": 12,
+   "yes": 2
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-21",
+  "last_close": "2026-07-19"
+ },
+ "KXPGAROUNDBIRDIES": {
+  "family": "round_stat_threshold",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGAROUNDSCORE": {
+  "family": "round_stat_threshold",
+  "n_settled": 1213,
+  "n_events": 27,
+  "results": {
+   "yes": 656,
+   "no": 551,
+   "scalar": 6
+  },
+  "n_scalar": 6,
+  "first_close": "2026-05-22",
+  "last_close": "2026-07-26"
+ },
+ "KXPGAGOLFERSCORE": {
+  "family": "round_stat_threshold",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGALOWSCORE": {
+  "family": "round_stat_threshold",
+  "n_settled": 21,
+  "n_events": 3,
+  "results": {
+   "no": 6,
+   "yes": 15
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-19",
+  "last_close": "2026-07-19"
+ },
+ "KXPGAROUNDLOW": {
+  "family": "round_stat_threshold",
+  "n_settled": 68,
+  "n_events": 10,
+  "results": {
+   "yes": 46,
+   "no": 22
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-18",
+  "last_close": "2026-07-19"
+ },
+ "KXPGABIRDIES": {
+  "family": "round_stat_threshold",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGAREGION": {
+  "family": "region_country",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGAWINNERREGION": {
+  "family": "region_country",
+  "n_settled": 8,
+  "n_events": 2,
+  "results": {
+   "no": 6,
+   "yes": 2
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-21",
+  "last_close": "2026-07-19"
+ },
+ "KXPGARETURN": {
+  "family": "misc_untested",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXGOLFNEXTWIN": {
+  "family": "misc_untested",
+  "n_settled": 9,
+  "n_events": 1,
+  "results": {
+   "no": 9
+  },
+  "n_scalar": 0,
+  "first_close": "2026-05-25",
+  "last_close": "2026-07-26"
+ },
+ "KXPGAUNDERPAR": {
+  "family": "misc_untested",
+  "n_settled": 6,
+  "n_events": 1,
+  "results": {
+   "no": 4,
+   "yes": 2
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-21",
+  "last_close": "2026-06-21"
+ },
+ "KXPGAWINNINGSCORE": {
+  "family": "misc_untested",
+  "n_settled": 11,
+  "n_events": 2,
+  "results": {
+   "no": 9,
+   "yes": 2
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-21",
+  "last_close": "2026-07-19"
+ },
+ "KXPGACUTLINE": {
+  "family": "misc_untested",
+  "n_settled": 9,
+  "n_events": 1,
+  "results": {
+   "no": 8,
+   "yes": 1
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-20",
+  "last_close": "2026-06-20"
+ },
+ "KXPGAPLAYOFF": {
+  "family": "misc_untested",
+  "n_settled": 12,
+  "n_events": 12,
+  "results": {
+   "no": 8,
+   "yes": 4
+  },
+  "n_scalar": 0,
+  "first_close": "2026-05-24",
+  "last_close": "2026-07-26"
+ },
+ "KXPGA1STTIMEWIN": {
+  "family": "misc_untested",
+  "n_settled": 2,
+  "n_events": 2,
+  "results": {
+   "yes": 1,
+   "no": 1
+  },
+  "n_scalar": 0,
+  "first_close": "2026-06-21",
+  "last_close": "2026-07-19"
+ },
+ "KXPGAAGECUT": {
+  "family": "misc_untested",
+  "n_settled": 0,
+  "n_events": 0,
+  "results": {},
+  "n_scalar": 0,
+  "first_close": null,
+  "last_close": null
+ },
+ "KXPGAR1LEAD": {
+  "family": "CONTROL_tested",
+  "n_settled": 1660,
+  "n_events": 12,
+  "results": {
+   "no": 1626,
+   "yes": 5,
+   "scalar": 29
+  },
+  "n_scalar": 29,
+  "first_close": "2026-05-22",
+  "last_close": "2026-07-24"
+ },
+ "KXPGATOP10": {
+  "family": "CONTROL_tested",
+  "n_settled": 1660,
+  "n_events": 12,
+  "results": {
+   "no": 1477,
+   "yes": 137,
+   "scalar": 46
+  },
+  "n_scalar": 46,
+  "first_close": "2026-05-23",
+  "last_close": "2026-07-27"
+ },
+ "KXPGAMAKECUT": {
+  "family": "CONTROL_tested",
+  "n_settled": 1588,
+  "n_events": 11,
+  "results": {
+   "no": 754,
+   "yes": 788,
+   "scalar": 46
+  },
+  "n_scalar": 46,
+  "first_close": "2026-05-23",
+  "last_close": "2026-07-25"
+ }
+}

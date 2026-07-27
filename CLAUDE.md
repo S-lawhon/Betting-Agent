@@ -109,6 +109,15 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
   `KXMLBHRDERBYR1LEAD` alternated charge/free/charge/free. Four of the five
   drifts came from this. Exact matching killed it — **do not reintroduce
   prefix logic anywhere in the fee path.**
+- **Golf H2H ties pay 0.50/0.50 — NOT $0.** `GOLFH2H.pdf` (governs `KXPGAH2H`,
+  `KXLIVH2H`, `KXDPWTH2H`, `KXGOLFH2H`) resolves an identical-stroke tie by
+  paying **both** YES and NO $0.50, so `fair(A) + fair(B) = $1.00 exactly` and
+  the tie mass — 9.4% of matchups, 51 of 541 settled events — is symmetric and
+  fully paid. There is no structural edge. Verified verbatim in the PDF and on
+  102/102 settled scalar legs, all `settlement_value_dollars = 0.5000`
+  (P-028, 2026-07-28). A 2026-07 task brief quoted this same clause as "$0" and
+  built a whole hypothesis on it: **read the PDF yourself even when the rule is
+  quoted to you.** `golf_quirks_research/REPORT_P028_Template_Sweep_2026-07.md`.
 - **Leader markets are maker-free — all of them.** Swept 2026-07-26 across all
   series in every category: 88 tickers contain `LEAD` and not one is
   `quadratic_with_maker_fees`. Round leaders on every tour and the season

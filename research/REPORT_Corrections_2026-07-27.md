@@ -16,7 +16,7 @@
 | 5 | Re-scope H2 | **DONE** |
 | 6 | Droplet hygiene | **DONE** — 20 MB → 28 KB; 3 local worktrees pruned |
 | 7 | Deploy remnant C | **ALREADY DEPLOYED** — verified by content hash, nothing owed |
-| 8 | P-002/P-006 phantom exposure | **QUANTIFIED — $4,642.06, not ~$1,311.** No action taken |
+| 8 | P-002/P-006 phantom exposure | **VOIDED 2026-07-27 20:58 UTC** on Sam's decision — 282 rows, $4,642.06 → **$0.00** |
 
 Two findings emerged that the brief did not anticipate, and both change what is
 owed: **the phantom exposure is 3.5× the cited figure but does NOT reach the
@@ -203,7 +203,43 @@ assumes "no terminal outcome" means "still live"). **It does not consume risk
 limits and cannot block a trade.** That materially lowers the urgency from what
 the brief assumed, and it is the honest correction to make.
 
-### Two options — **Sam's decision, no action taken**
+### RESOLVED — option 1 (explicit void), applied 2026-07-27 20:58 UTC
+
+Sam chose the explicit void. Applied with `scripts/void_unsettleable_positions.py`,
+engine stopped, backup taken.
+
+**It APPENDS terminal rows; no existing line was modified.** That is how
+settlement normally works (a settler appends a terminal row after the PLACED
+row) and it is the least destructive option — the original history is
+byte-identical and the change is undone by deleting the appended block.
+
+```
+open (PLACED, no terminal row) across ('P-002', 'P-006'):
+  P-002:  204 positions   $  1,135.36
+  P-006:   78 positions   $  3,506.70
+  TOTAL: 282 positions  $4,642.06
+backup   : trade_log.jsonl.bak_void_unsettleable_20260727T205807Z
+appended : 282 VOID rows (no existing line was modified)
+```
+
+| check | result |
+|---|---|
+| row count | 55,405 → **55,687** (exactly +282) |
+| phantom exposure re-measured | **0 positions, $0.00** |
+| re-run | **idempotent no-op** — "nothing open — already voided" |
+| all five gates | **unchanged** (P-001 0, P-014 331, P-015 5, P-017 1, P-022 0) |
+| services | `betting-pod-shop` and `betting-round-leader-fade` active |
+
+Each row carries `resolution_source: bookkeeping_void_unsettleable` and a
+`void_reason` naming the cause, so a future reader can tell it from a real
+settlement. VOID is set on **both** `action` and `outcome` — setting one and not
+the other is exactly how the JDAY correction silently failed its first pass, and
+`tests/test_void_unsettleable.py` asserts it.
+
+P&L is unaffected: a void books $0.00, and every gate statistic in the repo
+already excludes VOIDs as "no risk taken".
+
+### The options as they stood before the decision
 
 1. **Explicit void.** Write `VOID` terminal rows for all 282 positions with a
    `resolution_source` naming the reason (no execution venue, never resolvable).
@@ -217,17 +253,16 @@ the brief assumed, and it is the honest correction to make.
    which is precisely the class of thing this repo has repeatedly failed to do
    in one call path or another.
 
-My read, clearly labelled as opinion: **option 2 is safer in principle and
+My read at the time, labelled as opinion: **option 2 is safer in principle and
 option 1 is safer in practice for this codebase**, because "teach every reader
 to honour a flag" is the exact pattern that produced the settler-scoping bug,
-`_close_epoch`, the P-015 reader path and the P-014 missing reader. But it is a
-bookkeeping decision about the fund's own records and it is yours.
+`_close_epoch`, the P-015 reader path and the P-014 missing reader. Sam chose
+option 1.
 
 ---
 
 ## Still owed
 
-* **Item 8 decision** — void vs retire (above).
 * The §4.2 cells (item 2) are **flagged, not re-run.** Re-deriving them at a
   stated, verified anchor is a separate piece of work, and P-023c's conclusions
   stay provisional until it happens.

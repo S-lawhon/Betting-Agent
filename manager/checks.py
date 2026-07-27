@@ -693,13 +693,18 @@ def check_throughput(snap: Dict[str, Any]) -> List[Finding]:
                 key="throughput.{}.inert".format(pod),
                 severity="warn",
                 title="{} cannot resolve within 12 months".format(pod),
-                detail=("at the realised rate of {}/week it needs {} more weeks "
-                        "(projected {}). A gate that cannot resolve is not "
-                        "conservative — it is inert, and it consumes attention "
-                        "while producing nothing."
+                detail=("at the realised rate of {}/week it needs {} more "
+                        "weeks (projected {}). A gate that cannot resolve is "
+                        "not conservative — it is inert, and it consumes "
+                        "attention while producing nothing. NOTE the rate is "
+                        "measured from {} observation(s) in the last 28d; a "
+                        "thin or lumpy sample can move this projection by a "
+                        "lot, so read it as 'not on track at the CURRENT "
+                        "rate', not as a date."
                         .format(rec.get("rate_per_week"),
                                 rec.get("weeks_to_threshold"),
-                                rec.get("projected_resolution_utc"))),
+                                rec.get("projected_resolution_utc"),
+                                rec.get("settled_positions_28d"))),
                 workstream=pod))
     return out
 

@@ -29,13 +29,14 @@
 | **3** | P-028 golf template sweep | **KILL** (both leads) | H2H ties pay **0.50/0.50**, not $0 — pair sums to $1.00 exactly; category-leader has **2 tournament-clusters** |
 | **4** | R5 follow-ups | **ANSWERED / KILL / SCHEDULED** | tick size: **0 sub-cent levels in P-022's band**, no verdict moves · partitions: **0 of 15 executable** · NCAAF poller built |
 | **5** | P-022 widen the backtest | **PARTIAL** | pre-declaration committed before any pull; **13/13 series** have history back to **2026-05-22** — "~1 month" refuted |
-| **6** | Corrections + droplet hygiene | **NOT REACHED** | — |
+| **6** | Corrections + droplet hygiene | **DONE** | JDAY re-book moved P-017 to **−9.89¢/ct**; droplet 20MB→28KB; phantom exposure **$4,642**, not $1,311 |
 | **7** | Fee-table fixture + CI | **FIXED** | **fifth drift found**; blast radius **zero verdicts changed** |
 | **8** | Data-readiness audit | **MIXED** | P-018 **ahead**; MLB props **on time to the day**; weather **dead, 139 of 139 runs failing** |
 
 **Reports:** [P-022 close time](REPORT_P022_Close_Time_2026-07.md) ·
 [P-028 golf sweep](../golf_quirks_research/REPORT_P028_Template_Sweep_2026-07.md) ·
 [R5 follow-ups](REPORT_R5_Followups_2026-07.md) ·
+[corrections](REPORT_Corrections_2026-07-27.md) ·
 [gate throughput](REPORT_Gate_Throughput_2026-07.md) ·
 [fee audit](REPORT_Fee_Audit_2026-07-27.md) ·
 [data readiness](REPORT_Data_Readiness_2026-07-27.md) ·
@@ -196,6 +197,31 @@ hypothesis. **0 of 15 candidates executable**; best thin leg $25.
 on the droplet). All thresholds pre-registered in code, including KILL at drift
 < 3.5¢ regardless of significance. Baseline of 30 captured.
 
+### Task 6 — corrections backlog · **DONE (6 applied, 1 verified, 1 quantified)**
+
+The **JDAY re-book landed** and moved P-017's only settled tournament from
+−10.08 to **−9.89 ¢/ct** (voids 1→0, positions 37→38). It took two passes: the
+first set `outcome` only and the gate did not move, because
+`p017_checkpoint` keys off **`action`**. I reproduced the repo's signature
+failure while fixing an instance of it, and caught it only by checking the gate
+instead of assuming.
+
+Three wrong facts are out of the documents: the §4.2 anchors (12h not 48h; the
+"pre-R1" anchor is post-R1 for 58–71%), the **conditional** `KXLEADER` split
+(the clause "where the league does not declare a single winner" was missing
+everywhere, making P-026's `E[1/n]` an upper bound not an expectation), and the
+RANKLIST-vs-award regimes. H2 re-scoped to the liquid head.
+
+Droplet 20 MB → 28 KB. **One local worktree held uncommitted work** — an
+independent 2026-07-26 audit that had already found today's fifth fee drift.
+Preserved as a patch rather than destroyed.
+
+**Remnant C was already deployed** (verified by content hash). **Phantom
+exposure is $4,642.06 across 282 positions — 3.5× the cited $1,311 — and it does
+NOT reach `AggregateRiskGuard`**, which skips pods without a settler by design.
+It distorts log-derived views only, consumes no risk limit, and cannot block a
+trade.
+
 ### Task 5 — widening · **PARTIAL, discipline intact**
 
 Pre-declaration committed in its own earlier commit, before any extended data
@@ -289,7 +315,10 @@ Verified on the droplet after restart:
     because a daily poll can miss the registered 6h anchor window by up to 18h.
     It now polls from today rather than 2026-08-01; that only extends the
     baseline and cannot affect the drift statistic.
-12. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
+12. **P-002/P-006 phantom exposure: void or retire?** $4,642.06 across 282
+    positions, quantified and untouched. Two options with a labelled
+    recommendation are in the corrections report.
+13. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
     pre-declaration is committed; the decision is still open.
 
 ---

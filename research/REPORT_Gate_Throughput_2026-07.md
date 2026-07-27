@@ -147,7 +147,7 @@ preference, and P-022's own checkpoint reading four paths the pod never wrote.
 > forward evidence is negative (P-017's first settled tournament came in at
 > −10.08¢/ct), and the pattern is worth watching rather than filing.
 
-### 2.3 P-014 has no sanctioned reader at all
+### 2.3 P-014 has no sanctioned reader at all — **FIXED 2026-07-27 18:55 UTC**
 
 Its gate declares `metric: settled_trades`, `source: trade_log`,
 `current_key: pods.P-014.settled` — but no `reader:`. `_gate_progress` returns
@@ -155,6 +155,30 @@ Its gate declares `metric: settled_trades`, `source: trade_log`,
 **unreadable by construction**. The trade log holds 345 settled P-014 rows and
 the threshold is 500, so it is plausibly ~11 weeks from resolving, and nobody
 can state that from a sanctioned number.
+
+> **FIXED and DEPLOYED 2026-07-27 18:55 UTC.** `scripts/p014_checkpoint.py`
+> reads **331 of 500** (170W/161L, VOIDs excluded; 345 including the 14 voids),
+> span 2026-03-29 → 2026-07-26 over 41 active days. Wired into
+> `_gate_progress`, `collect.py` and the registry.
+>
+> **The reader deliberately emits no verdict, at any n.** P-014 has *no
+> pre-registered decision rule* — there is no `P014_DECISION_RULE.md`, so the
+> gate has a threshold but no kill line, no promotion condition and no
+> hard-kill z. P-015 and P-022 both have locked documents written before
+> results existed, and both say why: P-013 lost $2,094 while its criteria were
+> still being decided after the fact. A reader that invents an edge statistic
+> and prints it beside a threshold is how criteria get decided after the fact.
+>
+> So it counts and declines to judge: verdict fixed at `NO DECISION`, and the
+> economics behind `--unblind` with a banner, so they cannot leak into the
+> daily brief before a rule is written. That is a speed bump, not a lock — the
+> rows are in the trade log and anyone may compute anything from them. The
+> point is that the *sanctioned* reader stays silent on a question no rule
+> covers. `registry.yaml` now records `rule_status: MISSING`.
+>
+> **The real deliverable here is not the reader — it is that P-014 needs a
+> written rule before n reaches 500**, and at 13.5/week that is ~12.5 weeks
+> away (projected **2026-10-23**). There is time to write it blind.
 
 ### 2.4 P-022 — fixed today, not yet deployed
 
@@ -227,21 +251,50 @@ exists because of a specific past failure:
   reading only `trade_log.jsonl` under-reports by whatever has rotated — the
   same shape as the incident that hid 177 open positions.
 
-Live output, run against the droplet during this audit:
+Live output during the audit, and again after the day's fixes:
 
 ```
-n_gates=5  stalled=0  zero_28d=1  unprojectable=5
-  P-001  thr=200  prog=0     7d=45  28d=432  last=2026-07-26  rate/wk=None
-  P-014  thr=500  prog=None  7d=30  28d=54   last=2026-07-26  rate/wk=13.5
-  P-015  thr=None prog=None  7d=5   28d=5    last=2026-07-26  rate/wk=1.25
-  P-017  thr=8    prog=1     7d=38  28d=38   last=2026-07-27  rate/wk=None
-  P-022  thr=14   prog=0     7d=0   28d=0    last=None        rate/wk=None
+DURING THE AUDIT          n_gates=5  stalled=0  unprojectable=5
+  P-001  thr=200  prog=0     28d=432  rate/wk=None
+  P-014  thr=500  prog=None  28d=54   rate/wk=13.5
+  P-015  thr=None prog=None  28d=5    rate/wk=1.25
+  P-017  thr=8    prog=1     28d=38   rate/wk=None
+  P-022  thr=14   prog=0     28d=0    rate/wk=None
+
+AFTER THE FIXES           n_gates=5  stalled=0  unprojectable=3
+  P-001  prog=0    thr=200  rate/wk=None  resolves=None
+  P-014  prog=331  thr=500  rate/wk=13.5  resolves=2026-10-23  <=12m=True
+  P-015  prog=5    thr=120  rate/wk=1.25  resolves=2028-05-01  <=12m=False
+  P-017  prog=1    thr=8    rate/wk=None  resolves=None
+  P-022  prog=0    thr=14   rate/wk=None  resolves=None
 ```
 
-**Read that line honestly: `stalled=0` and `unprojectable=5`.** Nothing has
-stalled by the cadence test, and almost nothing can be projected — which is
-precisely the finding. The instrument is not yet able to say when four of five
-gates resolve, because four of five gates are not measuring.
+**All five gates now read a real progress number for the first time.** The three
+remaining `unprojectable` rows are correct by design, not broken: P-001 counts
+*admissible CLV rows* and P-017/P-022 count *tournaments*, so a projection off
+settled positions would be counting the easy thing instead of the gate's thing.
+
+The instrument immediately earned itself by producing a finding nobody had:
+**P-015 is not on track at its current rate** — 92 more weeks, projected
+2028-05-01. That is measured off **5 observations in 2 active days**, against
+the registry's own ~20/month assumption which would land it ~Jan 2027, and the
+US Open qualifying spike (Aug 17–21) should move it materially. The warning
+carries its own sample size for exactly that reason, and says to read it as
+*"not on track at the current rate"* rather than as a date.
+
+### One caveat about this instrument, found the hard way
+
+It shipped **broken and silent**. `collect.py` runs as a script, so
+`import manager.throughput` raised `ModuleNotFoundError` on every collector run
+for an hour; `@safe` swallowed it into a fault and `check_throughput` guards on
+`available`, so it produced no findings and no visible error — *the instrument
+built to make silent failure visible was itself silently failing.* Every test
+passed throughout, because under pytest the repo root is on `sys.path`.
+
+Fixed, with a regression test that runs the collector **in a subprocess the way
+cron does** and asserts the probe did not fault — verified to fail with the fix
+reverted. The general lesson is the one this repo keeps relearning: **test the
+path that actually runs, not the one that is convenient to import.**
 
 ---
 

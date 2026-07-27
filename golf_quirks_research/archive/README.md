@@ -14,6 +14,7 @@ exactly how the 2026-07-25 loss happened: the working caches were invisible to
 | `livtopn_trades.tar.gz` | `data/livtopn_trades/` — 57 LIV top-N markets, 236 prints | Yes, ~1 min. P-023 MARGINAL cohort. |
 | `candles.tar.gz` | `data/candles/` — 11,349 settled golf markets, 1m candlesticks | Yes, but ~95 min of the shared 2 req/s Kalshi budget. |
 | `settled_meta.jsonl.gz` | `data/settled_meta.jsonl` — settled-market metadata incl. `settlement_value_dollars` | Yes, cheaply. |
+| `schedule_probe_caches.tar.gz` | `data/espn_schedule.json`, `espn_teetimes.json`, `leader_event_meta.json`, `leader_event_close_repair.json` — the P-022 close-time resolver's validation inputs (2026-07-28) | ESPN legs yes, cheaply. The Kalshi `/events` product_metadata leg is 72 calls and is the join key between a Kalshi event ticker and a tournament NAME, which nothing else carries. |
 | `pull_logs.tar.gz` | `data/trades_pull.log`, `data/candle_pull.log` | n/a — provenance record of how the pulls were made. |
 
 ## Correction (2026-07-26) — the "~1 month" roll-off

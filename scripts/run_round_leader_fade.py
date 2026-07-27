@@ -45,6 +45,12 @@ def main() -> None:
     except Exception:
         config = {}
     engine = RoundLeaderFadeMakerPod.from_config(config)
+    # §7's caps are gate conditions and they used to re-arm from zero on every
+    # restart while the paper exposure persisted. Restore first, discover
+    # second, so the first cycle sizes against real exposure.
+    restored = engine.rebuild_from_log()
+    if restored:
+        logger.info("P-022: restored %d unsettled fill(s) from the log", restored)
 
     logger.info("P-022 round-leader fade-maker starting (paper). Ctrl-C to stop.")
     last_discover = 0.0

@@ -13,13 +13,16 @@ and that would silently corrupt the paper validation if wrong:
     the exact outcome the pod trades. This is the flagged Phase-2 fix.
   * Collateral caps: per-strike and per-tournament limits actually bind.
 """
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.round_leader_fade_maker import RoundLeaderFadeMakerEngine
+from src.golf_schedule import RoundClose
+from src.round_leader_fade_maker import (MakerFill,
+                                        RoundLeaderFadeMakerEngine)
 
 
 def _epoch(iso: str) -> float:
@@ -53,8 +56,42 @@ class FakeKalshi:
             "occurrence_datetime": CLOSE_ISO,
         }] if series == "KXPGAR1LEAD" else []
 
-    def get(self, path):
+    def get(self, path, params=None):
+        if path.startswith("/events/"):
+            return {"event": {"product_metadata": {
+                "competition": "Genesis Scottish Open",
+                "competition_scope": "Round 1 Leader"}}}
         return {"market": self._settle} if self._settle else None
+
+
+class FakeSchedule:
+    """Stands in for GolfScheduleResolver.
+
+    The engine has NO fallback to a Kalshi time field — every one of them is a
+    ~20-day placeholder while the market is open — so a resolver is mandatory
+    and every test supplies one.
+    """
+
+    _DEFAULT = object()
+
+    def __init__(self, close_epoch=_DEFAULT, source="tee_times"):
+        # `close_epoch=None` means "resolves to nothing" (the fail-closed
+        # path); omitting it means "the real round end". Distinguishing the
+        # two is the point — conflating them is how a fail-closed test can
+        # pass while asserting nothing.
+        self.close_epoch = (CLOSE if close_epoch is FakeSchedule._DEFAULT
+                            else close_epoch)
+        self.source = source
+        self.calls = []
+
+    def resolve(self, competition, series_ticker, scope=None, near=None):
+        self.calls.append((competition, series_ticker, scope))
+        if self.close_epoch is None:
+            return None
+        return RoundClose(
+            close_epoch=self.close_epoch, source=self.source,
+            competition=competition, tour="KXPGA", round_number=1,
+            espn_event_id="1", espn_name=competition, lag_h=4.0)
 
 
 class Clock:
@@ -74,6 +111,7 @@ UNCAPPED_BANKROLL = 1_000_000.0
 
 def make_engine(tmp_path, kalshi, clock, **kw):
     kw.setdefault("bankroll", UNCAPPED_BANKROLL)
+    kw.setdefault("schedule", FakeSchedule())
     return RoundLeaderFadeMakerEngine(
         kalshi=kalshi, series=("KXPGAR1LEAD",), log_dir=tmp_path,
         kill_file=tmp_path / "KILL", _now_fn=clock, **kw)
@@ -248,48 +286,79 @@ class FieldKalshi(FakeKalshi):
         return [m]
 
 
-def test_close_time_wins_over_the_occurrence_placeholder(tmp_path):
-    """The bug that made P-022 structurally incapable of quoting.
+def test_kalshi_time_fields_are_ignored_entirely(tmp_path):
+    """The defect that made P-022 structurally incapable of quoting, twice.
 
-    ``occurrence_datetime`` is a far-future PLACEHOLDER on round-leader markets,
-    not the round end. Measured 2026-07-26 on one settled market per series
-    across all five tours, it ran 13.2-18.2 days LATER than ``close_time``, 10
-    of 10. The pod preferred it, so close_epoch sat ~2 weeks past the real round
-    end: the [12h, 24h] placement window opened long after the round had settled,
-    and _mid() returns None on a settled book. It ran live 2026-07-23 -> 07-26
-    and wrote zero quotes and zero fills.
+    2026-07-26 changed `_close_epoch` to prefer `close_time` over
+    `occurrence_datetime` on the strength of a 10-of-10 measurement — taken on
+    SETTLED markets, the only state in which Kalshi has rewritten `close_time`
+    to the truth. The pod only ever reads OPEN markets, where all six time
+    fields collapse to the same ~20-day fallback. Measured 2026-07-27 across
+    346 open markets on three tours: every field read 2026-08-16T00:00:00Z.
+    Swapping one placeholder for the identical placeholder fixed nothing, and
+    the pod went a further two days without a quote.
+
+    So the close is now resolved EXTERNALLY and the Kalshi fields are not read
+    at all. This test feeds the engine a `close_time` two weeks out — the real
+    live payload — and asserts the pod quotes anyway.
     """
-    placeholder = datetime.fromtimestamp(CLOSE + 16 * 86400, tz=timezone.utc)
-    k = FieldKalshi({"close_time": CLOSE_ISO,
-                     "occurrence_datetime": placeholder.isoformat()})
-    clock = Clock(CLOSE - 18 * 3600)            # 18h before the REAL close
-    eng = make_engine(tmp_path, k, clock)
-    eng.discover()
-    assert abs(eng.books[TICKER].close_epoch - CLOSE) < 1.0, \
-        "close_epoch must track close_time, not the occurrence placeholder"
-    eng.cycle()
-    assert eng.books[TICKER].ask_quote is not None, \
-        "with the placeholder preferred, this window never opens and P-022 never quotes"
-
-
-def test_occurrence_is_still_used_when_close_time_is_absent(tmp_path):
-    """Fallback preserved — some markets carry only occurrence_datetime."""
-    k = FieldKalshi({"occurrence_datetime": CLOSE_ISO})
+    placeholder = datetime.fromtimestamp(CLOSE + 20 * 86400, tz=timezone.utc)
+    k = FieldKalshi({"close_time": placeholder.isoformat(),
+                     "occurrence_datetime": placeholder.isoformat(),
+                     "expiration_time": placeholder.isoformat()})
     eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600))
     eng.discover()
+    assert abs(eng.books[TICKER].close_epoch - CLOSE) < 1.0, \
+        "close_epoch must come from the schedule resolver, not any Kalshi field"
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is not None, \
+        "with a Kalshi field as the reference this window never opens"
+
+
+def test_unresolvable_event_is_never_quoted(tmp_path):
+    """Fail closed. A wrong round time is worse than no quote: it produces
+    fills outside the validated window, and §7 excludes those tournaments
+    from T anyway."""
+    k = FieldKalshi({"close_time": CLOSE_ISO})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600),
+                      schedule=FakeSchedule(close_epoch=None))
+    assert eng.discover() == 0
+    assert eng.books == {}
+    assert EVENT in eng.unresolved_events
+    eng.cycle()
+    assert eng.books == {}
+
+
+def test_close_is_re_resolved_as_better_timing_arrives(tmp_path):
+    """ESPN publishes no tee times three days out — checked 2026-07-27 against
+    all three listed tournaments, all returned zero competitors. A market
+    discovered at listing therefore gets the coarse per-tour day offset and
+    must be UPGRADED to the precise tee-time close once ESPN publishes it. A
+    close resolved once at discovery would freeze the coarse answer."""
+    sched = FakeSchedule(close_epoch=CLOSE + 5 * 3600,
+                         source="tour_day_offset")
+    k = FieldKalshi({"close_time": CLOSE_ISO})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600), schedule=sched)
+    eng.discover()
+    assert eng.books[TICKER].close_source == "tour_day_offset"
+    sched.close_epoch, sched.source = CLOSE, "tee_times"
+    eng.discover()
     assert abs(eng.books[TICKER].close_epoch - CLOSE) < 1.0
+    assert eng.books[TICKER].close_source == "tee_times"
 
 
 # ── §7 caps are GATE CONDITIONS, expressed as % of bankroll ──────────
 
 def test_caps_are_derived_from_bankroll_percentages():
     """§7: per-name <=0.5%, per-tournament <=5%, aggregate <=15%."""
-    eng = RoundLeaderFadeMakerEngine(kalshi=FakeKalshi(), bankroll=1000.0)
+    eng = RoundLeaderFadeMakerEngine(kalshi=FakeKalshi(), bankroll=1000.0,
+                                     schedule=FakeSchedule())
     assert abs(eng.max_collateral_per_name - 5.0) < 1e-9
     assert abs(eng.max_collateral_per_tournament - 50.0) < 1e-9
     assert abs(eng.max_total_collateral - 150.0) < 1e-9
     # and they track the bankroll rather than being pinned to dollars
-    eng2 = RoundLeaderFadeMakerEngine(kalshi=FakeKalshi(), bankroll=4000.0)
+    eng2 = RoundLeaderFadeMakerEngine(kalshi=FakeKalshi(), bankroll=4000.0,
+                                      schedule=FakeSchedule())
     assert abs(eng2.max_collateral_per_name - 20.0) < 1e-9
 
 
@@ -317,7 +386,7 @@ def test_per_name_collateral_cap_binds_before_the_contract_cap(tmp_path):
 
 def test_band_matches_the_locked_decision_rule():
     """§1 names [0.03, 0.12]. The pod shipped (0.03, 0.10)."""
-    eng = RoundLeaderFadeMakerEngine(kalshi=FakeKalshi())
+    eng = RoundLeaderFadeMakerEngine(kalshi=FakeKalshi(), schedule=FakeSchedule())
     assert eng.mid_band == (0.03, 0.12)
 
 
@@ -593,3 +662,145 @@ def test_live_guard_does_not_bind_before_the_section_7_caps(tmp_path):
     assert qa is not None and qb is not None
     assert abs(qa.price - qb.price) < 1e-9
     assert abs(qa.qty - qb.qty) < 1e-9
+
+
+# ── §7 hole (a): books must survive a restart ────────────────────────
+
+def test_restart_restores_unsettled_fills_so_caps_do_not_re_arm(tmp_path):
+    """The live §7 breach path.
+
+    `self.books = {}` on init and nothing ever read the fills log back, so
+    after any restart — deploy, reboot, crash — `book.collateral` was 0 for
+    names the pod was still short and all three collateral caps re-armed from
+    zero while the paper exposure persisted. A restart mid-tournament could
+    silently double the per-name and per-tournament collateral. The service
+    was restarted twice in the week this was found, and under §7 a breach
+    EXCLUDES the tournament from T.
+    """
+    t0 = CLOSE - 18 * 3600
+    trades = [{"epoch": t0 + 60, "yes_price": 0.09, "count": 100,
+               "taker_side": "yes"}]
+    eng = make_engine(tmp_path, FakeKalshi(trades=trades), Clock(t0),
+                      bankroll=1000.0)
+    eng.discover()
+    eng.cycle()
+    eng.cycle()
+    sold = eng.books[TICKER].sold
+    collateral = eng.books[TICKER].collateral
+    assert sold > 0
+
+    # a fresh process over the same logs
+    eng2 = make_engine(tmp_path, FakeKalshi(), Clock(t0 + 120),
+                       bankroll=1000.0)
+    assert eng2.rebuild_from_log() == len(eng.books[TICKER].fills)
+    assert eng2.books[TICKER].sold == sold
+    assert abs(eng2.books[TICKER].collateral - collateral) < 1e-9
+    assert eng2.books[TICKER].inventory == -sold
+
+
+def test_restart_does_not_restore_settled_fills(tmp_path):
+    t0 = CLOSE - 18 * 3600
+    trades = [{"epoch": t0 + 60, "yes_price": 0.09, "count": 100,
+               "taker_side": "yes"}]
+    k = FakeKalshi(trades=trades, settle={"result": "no"})
+    eng = make_engine(tmp_path, k, Clock(t0), bankroll=1000.0)
+    eng.discover()
+    eng.cycle()
+    eng.cycle()
+    eng._now = Clock(CLOSE + 60)
+    eng.cycle()
+    assert eng.books[TICKER].done
+
+    eng2 = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE + 120),
+                       bankroll=1000.0)
+    assert eng2.rebuild_from_log() == 0
+
+
+def test_a_restored_book_is_never_treated_as_quotable_without_a_schedule(tmp_path):
+    """A restored book whose market is gone has no schedule anchor. It must
+    default to 'past close' (settle), never to a quotable window."""
+    (tmp_path / "round_leader_fade_fills.jsonl").write_text(
+        json.dumps({"type": "FILL", "fill_id": "X1", "pod_id": "P-022",
+                    "ticker": TICKER, "event": "GESO26", "price": 0.07,
+                    "qty": 3, "ts": CLOSE - 3600}) + "\n")
+    eng = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE - 18 * 3600))
+    assert eng.rebuild_from_log() == 1
+    assert eng.books[TICKER].close_epoch == 0.0
+    assert eng.books[TICKER].close_source == "restored"
+
+
+# ── §7 hole (b): a cap breach must be RECORDED when it happens ───────
+
+def test_cap_breach_is_recorded_to_the_log(tmp_path):
+    """§7: 'a tournament run with any cap breached is EXCLUDED from T'.
+    That requires the breach to be recorded when it happens — a gate
+    condition only checkable retrospectively is not a gate condition."""
+    eng = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE - 18 * 3600),
+                      bankroll=1000.0)
+    eng.discover()
+    book = eng.books[TICKER]
+    # simulate exposure that a restart-blind process could have accumulated
+    book.fills.append(MakerFill(fill_id="X1", ticker=TICKER, price=0.05,
+                                qty=40, epoch=CLOSE - 3600, mid_at_fill=0.05))
+    eng.check_caps()
+    assert ("GESO26", "per_name") in eng._breaches
+    rows = [json.loads(l) for l in
+            (tmp_path / "round_leader_fade_fills.jsonl").read_text().splitlines()]
+    breaches = [r for r in rows if r["type"] == "CAP_BREACH"]
+    assert breaches and breaches[0]["event"] == "GESO26"
+    assert breaches[0]["kind"] == "per_name"
+    # recorded once, not once per cycle
+    eng.check_caps()
+    eng.check_caps()
+    rows = [json.loads(l) for l in
+            (tmp_path / "round_leader_fade_fills.jsonl").read_text().splitlines()]
+    assert sum(1 for r in rows
+               if r["type"] == "CAP_BREACH" and r["kind"] == "per_name") == 1
+
+
+def test_recorded_breaches_survive_a_restart(tmp_path):
+    (tmp_path / "round_leader_fade_fills.jsonl").write_text(
+        json.dumps({"type": "CAP_BREACH", "pod_id": "P-022",
+                    "event": "GESO26", "kind": "per_tournament",
+                    "observed": 90.0, "limit": 50.0}) + "\n")
+    eng = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE))
+    eng.rebuild_from_log()
+    assert "GESO26" in eng.breached_events
+
+
+def test_no_breach_recorded_when_caps_hold(tmp_path):
+    t0 = CLOSE - 18 * 3600
+    trades = [{"epoch": t0 + 60, "yes_price": 0.09, "count": 100,
+               "taker_side": "yes"}]
+    eng = make_engine(tmp_path, FakeKalshi(trades=trades), Clock(t0),
+                      bankroll=1000.0)
+    eng.discover()
+    eng.cycle()
+    eng.cycle()
+    assert eng._breaches == set()
+
+
+# ── a conservative close must not stop the book working ──────────────
+
+def test_passing_the_resolved_close_does_not_stop_processing_fills(tmp_path):
+    """The resolved close is deliberately EARLY (median +1.6h on tee times,
+    +5.6h on the day offset, up to +52h on a weather suspension). The old code
+    returned as soon as `now >= close_epoch`, which would have stopped
+    processing fills for the rest of the round on a quote that is supposed to
+    REST through it — and that is where Phase 2's fills, and its edge, come
+    from."""
+    t0 = CLOSE - 18 * 3600
+    late = CLOSE + 1800                      # after the CONSERVATIVE close
+    trades = [{"epoch": late, "yes_price": 0.09, "count": 4,
+               "taker_side": "yes"}]
+    k = FakeKalshi(trades=trades)            # get() -> no settlement yet
+    eng = make_engine(tmp_path, k, Clock(t0), bankroll=1000.0)
+    eng.discover()
+    eng.cycle()                              # rest a quote inside the window
+    assert eng.books[TICKER].ask_quote is not None
+    eng._now = Clock(late + 60)
+    eng.cycle()
+    book = eng.books[TICKER]
+    assert not book.done
+    assert book.sold > 0, "a resting quote must keep filling past the " \
+                          "conservative close until the market really settles"

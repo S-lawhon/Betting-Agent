@@ -67,7 +67,18 @@ Disabled/legacy: P-004, P-009, P-010, P-012, P-013.
   strategy whose window is defined relative to the determining event needs an
   EXTERNAL schedule; Kalshi does not publish it. See
   `research/REPORT_P022_First_Quote_2026-07.md` and
-  `scripts/p022_window_check.py`.
+  `scripts/p022_window_check.py`. **That external schedule now exists**:
+  `src/golf_schedule.py` resolves `(competition, round) → round-end UTC` from
+  ESPN's free public golf API for all five tours, keyed on Kalshi's
+  `product_metadata.competition` (the only handle Kalshi gives on WHICH
+  tournament a listed event is). It is calibrated to err EARLY on purpose —
+  validated one-sided on 72 of 72 settled events, min +0.16h — because
+  predicting a close LATE puts orders into a live round, and the measured
+  round span means the 12h window edge already sits at the first tee. It
+  fails CLOSED: a wrong round time is worse than no quote. ESPN publishes no
+  tee times ~3 days out, so the coarse per-tour day offset is the path that
+  runs at listing time and books must be RE-RESOLVED, not timed once at
+  discovery. `research/REPORT_P022_Close_Time_2026-07.md`.
 - **Orderbook**: `/markets/{t}/orderbook` returns `orderbook_fp` in DOLLARS with
   sub-penny ticks; best YES ask = 1 − best NO bid (see `KalshiPublic.orderbook`).
 - **Settled-market LIST endpoints null out** volume/price/last — use candlesticks

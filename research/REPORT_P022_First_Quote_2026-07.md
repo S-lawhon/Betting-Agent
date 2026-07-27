@@ -6,6 +6,31 @@
 still structurally incapable of quoting. Two further defects were found
 behind it, either of which would independently hold T at 0.
 
+> ## UPDATE 2026-07-28 — Defect 1 is FIXED; still no live quote, for a
+> ## calendar reason rather than a structural one
+>
+> `src/golf_schedule.py` resolves the round close from ESPN's public golf API
+> for all five tours, validated against 72 settled round-leader events with a
+> **one-sided-early error on 72 of 72** (min +0.16h, median +1.58h). The three
+> listed events now carry real close references — ROC26 `07-30T18:30Z`,
+> AIGWO26 `07-30T15:30Z`, POI26 `07-31T16:00Z` — instead of one shared
+> `2026-08-16T00:00:00Z` placeholder, and all 351 markets are in the book.
+>
+> **A live quote has still NOT been observed, and the window has not yet
+> opened.** The earliest opens **2026-07-29T15:30Z** (AIG Women's Open R1),
+> ~47h after the fix. That is the honest statement the guardrail asks for: the
+> fix is verified by tests (1,571 pass) and against real live payloads, and it
+> is **not** verified by a fill.
+>
+> §5's two remaining holes are also closed — books now survive a restart
+> (`rebuild_from_log()`) and cap breaches are recorded at the moment they
+> happen and excluded from T by `p022_checkpoint.py`. The detector is
+> crontabbed on the droplet (`*/30`).
+>
+> **Nothing is deployed.** See `research/REPORT_P022_Close_Time_2026-07.md`
+> §8 for the deploy list and the recommendation to ship before
+> 2026-07-29T15:30Z.
+
 > **No P-022 parameter was changed and nothing was deployed.** Defect 1 is
 > reported, not tuned — it is a design decision and it is Sam's. Defects 2 and
 > 3 were fixed on request: neither depends on the Defect 1 decision, neither
@@ -33,7 +58,7 @@ Three independent breaks, each sufficient on its own to hold **T = 0 forever**:
 
 | # | Defect | Status |
 |---|---|---|
-| **1** | Close reference on an OPEN market is a ~20-day fallback placeholder → the [12h, 24h] window opens ~2.5 weeks after the round settles | **blocks quoting** |
+| **1** | Close reference on an OPEN market is a ~20-day fallback placeholder → the [12h, 24h] window opens ~2.5 weeks after the round settles | ~~blocks quoting~~ **FIXED 2026-07-28 (needs deploy)** |
 | **2** | `p022_checkpoint.py` reads four log paths, none of which the pod writes; its rows also lack the `outcome` and `contracts` fields the reader requires | ~~blocks the gate reading~~ **FIXED** |
 | **3** | §7's `AggregateRiskGuard` precondition is unsatisfied in the running process — `risk_guard` is `None` live | ~~precondition recorded as met, isn't~~ **FIXED + DEPLOYED** |
 
@@ -422,19 +447,23 @@ Tests: `tests/test_p022_window_check.py`, 8 new. Full suite green.
 
 Nothing here was fixed, per the guardrails. In priority order:
 
-1. **Defect 1 is a decision, not a patch** (§2). Until it is made, T accrues
-   calendar and cannot accrue tournaments. Option 2 resets T to 0 under a new
-   pod ID; options 1 and 3 have their own costs. This one is blocking.
+1. ~~**Defect 1 is a decision, not a patch**~~ — **decided and built
+   2026-07-28**: option 1 (external schedule), via ESPN rather than DataGolf,
+   which needs no key and covers all five tours. The locked window is
+   preserved exactly and T is not reset by the fix itself.
+   See `research/REPORT_P022_Close_Time_2026-07.md`.
 2. ~~**Defect 2**~~ — **done 2026-07-27** (§3). Loader-side only, no deploy
    needed, no rule change. The reader now sees the pod's rows.
 3. ~~**Defect 3**~~ — **done 2026-07-27** (§5), with the reservation lifecycle
    a standalone loop needs. **On the deploy list**, and §11c/§11d should be
    amended to say the wiring was absent until now.
-4. **Restart-safe books** (§5). Rebuild open fills from the fills log on
-   startup, or record a breach when a restart is detected mid-tournament.
-5. **Crontab the detector.** Deployed and verified on the droplet 2026-07-27,
-   and it alarms correctly there — but it is **not scheduled**, so it only
-   runs when invoked by hand and the registry job will read stale. One line:
+4. ~~**Restart-safe books**~~ — **done 2026-07-28** (§5).
+   `rebuild_from_log()` restores unsettled fills before the first cycle, and
+   `check_caps()` records a `CAP_BREACH` row that `p022_checkpoint.py` now
+   honours as a §7 exclusion.
+5. ~~**Crontab the detector.**~~ — **done 2026-07-28**, installed in root's
+   crontab (previous crontab backed up to `/root/crontab.bak.2026-07-28`) and
+   confirmed appending to the status log as `bettingbot`. The line:
    `*/30 * * * * cd /opt/betting-pod-shop && ./venv/bin/python -m scripts.p022_window_check`
    as `bettingbot`.
 

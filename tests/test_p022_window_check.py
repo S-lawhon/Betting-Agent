@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.golf_schedule import RoundClose
 from src.round_leader_fade_maker import RoundLeaderFadeMakerEngine
 
 _SPEC = importlib.util.spec_from_file_location(
@@ -56,6 +57,33 @@ class FakeKalshi:
             return None
         return {"yes_bid": self._mid - 0.01, "yes_ask": self._mid + 0.01}
 
+    def get(self, path, params=None):
+        if path.startswith("/events/"):
+            return {"event": {"product_metadata": {
+                "competition": "Rocket Classic",
+                "competition_scope": "Round 1 Leader"}}}
+        return None
+
+
+class FakeSchedule:
+    """Stands in for GolfScheduleResolver.
+
+    `resolve_it=None` simulates the fail-closed path (ESPN has no confident
+    match), which is now its own alarm state rather than silence.
+    """
+
+    def __init__(self, close_epoch, source="tee_times"):
+        self.close_epoch = close_epoch
+        self.source = source
+
+    def resolve(self, competition, series_ticker, scope=None, near=None):
+        if self.close_epoch is None:
+            return None
+        return RoundClose(
+            close_epoch=self.close_epoch, source=self.source,
+            competition=competition, tour="KXPGA", round_number=1,
+            espn_event_id="1", espn_name=competition, lag_h=4.0)
+
 
 def _market(close_epoch: float, open_epoch: float, n: int = 1):
     return [{
@@ -67,11 +95,22 @@ def _market(close_epoch: float, open_epoch: float, n: int = 1):
     } for i in range(n)]
 
 
-def _engine(markets, mid=0.06):
+def _engine(markets, mid=0.06, resolved_close="from_market"):
+    """`resolved_close` is what the external schedule returns.
+
+    Default mirrors the market payload so the existing cases read unchanged;
+    pass None to exercise the fail-closed path.
+    """
+    if resolved_close == "from_market":
+        resolved_close = (
+            datetime.fromisoformat(
+                markets[0]["close_time"].replace("Z", "+00:00")).timestamp()
+            if markets else None)
     return RoundLeaderFadeMakerEngine(
         kalshi=FakeKalshi(markets, mid),
         series=("KXPGAR1LEAD",),
         log_dir=Path("/tmp"),
+        schedule=FakeSchedule(resolved_close),
         _now_fn=lambda: NOW,
     )
 
@@ -151,8 +190,8 @@ def test_window_open_but_nothing_in_band_is_silent():
 # ── the detector must track the POD, not a private copy ──────────────
 
 def test_uses_the_pods_own_close_reference():
-    """If _close_epoch changes, the detector must change with it — otherwise
-    it measures a pod that does not exist."""
+    """If the pod's close resolution changes, the detector must change with
+    it — otherwise it measures a pod that does not exist."""
     close = NOW + 20 * 86400
     listed = NOW - 0.01 * 86400
     eng = _engine(_market(close, listed))
@@ -173,3 +212,24 @@ def test_per_event_close_reference_is_recorded_for_drift_analysis():
     assert ev["event"] == EVENT
     assert ev["close_ref_iso"].startswith("2026-08-16")
     assert ev["listing_span_days"] > 19.0
+
+
+# ── fail-closed must never be silent ─────────────────────────────────
+
+def test_unresolved_schedule_alarms_rather_than_looking_healthy():
+    """The pod refusing to quote because it cannot time the round is correct
+    behaviour AND indistinguishable from health. It must page.
+
+    A wrong round time is worse than no quote — it produces fills outside the
+    validated window, and §7 would exclude those tournaments from T anyway —
+    so failing closed is the right call. But five days of silence is exactly
+    how T stayed at 0 without anyone noticing, which is why this is an alarm
+    state rather than WAITING.
+    """
+    listed = NOW - 0.5 * 86400
+    r = _assess(_engine(_market(NOW + 3 * 86400, listed, n=4),
+                        resolved_close=None))
+    assert r["state"] == "SCHEDULE_UNRESOLVED"
+    assert r["alarm"] is True
+    assert r["n_unresolved_events"] == 1
+    assert r["n_resolved_events"] == 0

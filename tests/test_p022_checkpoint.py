@@ -192,3 +192,59 @@ def test_trade_store_shaped_rows_still_load_and_voids_still_excluded(tmp_path):
 def test_default_logs_cover_the_path_the_pod_actually_writes():
     """The defect in one line: the reader must point at the engine's log."""
     assert any("round_leader_fade_fills" in p for p in cp.DEFAULT_LOGS)
+
+
+# ── §7: a tournament with a breached cap is EXCLUDED from T ──────────
+
+def _breach(event, kind="per_name", observed=23.75, limit=5.0):
+    return {"type": "CAP_BREACH", "pod_id": "P-022", "event": event,
+            "kind": kind, "observed": observed, "limit": limit,
+            "ts": 1.0e9, "iso": "2026-07-27T00:00:00+00:00"}
+
+
+def test_breached_tournament_is_excluded_from_T(tmp_path):
+    """§7 says so, and until 2026-07-28 the reader had no breach concept at
+    all — no exclusion, no field read, nothing. A breach recorded nowhere and
+    checked nowhere is not a gate condition."""
+    path = _write(tmp_path, [
+        _settle("f1", "KXPGAR1LEAD-COPC26-TCLE", "COPC26", "no", 0.0, 0.06, 5),
+        _settle("f2", "KXLPGAR1LEAD-ISPH26-LAU", "ISPH26", "no", 0.0, 0.06, 5),
+        _breach("ISPH26"),
+    ])
+    r = cp.evaluate(cp.load_settled([path]), cp.load_breached_events([path]))
+    assert r["T"] == 1
+    assert list(r["tournaments"]) == ["COPC26"]
+    assert r["excluded"] == {"ISPH26": ["per_name"]}
+
+
+def test_breach_excludes_every_round_of_that_tournament(tmp_path):
+    """Rounds pool into one observation, so the exclusion must too."""
+    path = _write(tmp_path, [
+        _settle("f1", "KXPGAR1LEAD-ROC26-A", "ROC26", "no", 0.0, 0.06, 5),
+        _settle("f2", "KXPGAR2LEAD-ROC26-B", "ROC26", "yes", 1.0, 0.06, 5),
+        _settle("f3", "KXPGAR1LEAD-COPC26-C", "COPC26", "no", 0.0, 0.06, 5),
+        _breach("ROC26", kind="per_tournament", observed=90.0, limit=50.0),
+    ])
+    r = cp.evaluate(cp.load_settled([path]), cp.load_breached_events([path]))
+    assert r["T"] == 1 and "ROC26" not in r["tournaments"]
+    assert r["n_contracts"] == 5, "excluded rows must not inflate the count"
+
+
+def test_all_tournaments_breached_gives_no_decision(tmp_path):
+    path = _write(tmp_path, [
+        _settle("f1", "KXPGAR1LEAD-ROC26-A", "ROC26", "no", 0.0, 0.06, 5),
+        _breach("ROC26"),
+    ])
+    r = cp.evaluate(cp.load_settled([path]), cp.load_breached_events([path]))
+    assert r["T"] == 0 and r["verdict"] == "NO DECISION"
+    assert "cap breach" in r["reason"]
+
+
+def test_no_breaches_leaves_the_verdict_untouched(tmp_path):
+    path = _write(tmp_path, [
+        _settle("f1", "KXPGAR1LEAD-ROC26-A", "ROC26", "no", 0.0, 0.06, 5),
+        _settle("f2", "KXPGAR1LEAD-COPC26-C", "COPC26", "no", 0.0, 0.06, 5),
+    ])
+    rows = cp.load_settled([path])
+    assert cp.load_breached_events([path]) == {}
+    assert cp.evaluate(rows)["T"] == cp.evaluate(rows, {})["T"] == 2

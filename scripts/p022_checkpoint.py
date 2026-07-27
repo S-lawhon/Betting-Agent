@@ -197,6 +197,46 @@ def load_settled(patterns: List[str], pod_id: str = POD_ID) -> List[Dict[str, An
     return list(out.values())
 
 
+def load_breached_events(patterns: List[str],
+                         pod_id: str = POD_ID) -> Dict[str, List[str]]:
+    """Tournaments with a recorded §7 cap breach -> the caps they breached.
+
+    §7: *"A tournament run with any cap breached is EXCLUDED from T."* Until
+    2026-07-28 this checkpoint had no breach concept at all — no exclusion, no
+    field read, nothing — so the clause was unenforceable, and a gate
+    condition that can only be checked retrospectively is not a gate
+    condition. The engine now writes a `CAP_BREACH` row into the fills log at
+    the moment it observes one, and this reads them back.
+    """
+    out: Dict[str, List[str]] = {}
+    files: List[str] = []
+    for pat in patterns:
+        files.extend(sorted(glob.glob(pat)))
+    for path in files:
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                for raw in fh:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        rec = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if (rec.get("type") != "CAP_BREACH"
+                            or rec.get("pod_id") != pod_id):
+                        continue
+                    ev = str(rec.get("event") or "").strip()
+                    if not ev:
+                        continue
+                    kind = str(rec.get("kind") or "unknown")
+                    if kind not in out.setdefault(ev, []):
+                        out[ev].append(kind)
+        except OSError:
+            continue
+    return out
+
+
 def tournament_key(rec: Dict[str, Any]) -> str:
     """One golf EVENT = one observation, pooling its rounds.
 
@@ -233,20 +273,37 @@ def per_contract_cents(rec: Dict[str, Any]) -> float:
     return 100.0 * float(rec.get("pnl_usd") or 0) / contracts
 
 
-def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
+def evaluate(trades: List[Dict[str, Any]],
+             breached: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
+    breached = breached or {}
     if not trades:
         return {"T": 0, "progress": 0, "threshold": MIN_T_DECISION,
                 "n_contracts": 0, "verdict": "NO DECISION",
                 "reason": "no settled P-022 trades yet",
-                "tournaments": {}}
+                "tournaments": {}, "excluded": {}}
 
     # within-tournament: contract-weighted mean ¢/ct
     buckets: Dict[str, List] = {}
+    excluded: Dict[str, List[str]] = {}
     for rec in trades:
+        key = tournament_key(rec)
+        # §7 exclusion, applied BEFORE any statistic is computed. A tournament
+        # run with a breached cap is not a valid observation of the strategy
+        # the rule governs, so it cannot contribute to T or to the edge.
+        if key in breached:
+            excluded[key] = breached[key]
+            continue
         extra = rec.get("extra") or {}
         cts = float(extra.get("contracts") or rec.get("contracts") or 0) or 1.0
-        buckets.setdefault(tournament_key(rec), []).append(
-            (per_contract_cents(rec), cts))
+        buckets.setdefault(key, []).append((per_contract_cents(rec), cts))
+
+    if not buckets:
+        return {"T": 0, "progress": 0, "threshold": MIN_T_DECISION,
+                "n_contracts": 0, "verdict": "NO DECISION",
+                "reason": (f"every settled tournament ({len(excluded)}) is "
+                           "excluded under §7 for a cap breach"),
+                "tournaments": {}, "excluded": excluded}
+    trades = [r for r in trades if tournament_key(r) not in breached]
 
     per_t = {}
     for key, rows in buckets.items():
@@ -295,7 +352,8 @@ def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
             "n_contracts": n_contracts, "edge_cents": edge,
             "sd_cents": sd, "se_cents": se, "z": z, "pnl_usd": pnl,
             "tournaments_positive": positive,
-            "tournaments": per_t, "verdict": verdict, "reason": reason}
+            "tournaments": per_t, "verdict": verdict, "reason": reason,
+            "excluded": excluded}
 
 
 def main() -> int:
@@ -321,8 +379,9 @@ def main() -> int:
         if bad:
             return 3
 
-    trades = load_settled(args.log or DEFAULT_LOGS)
-    r = evaluate(trades)
+    logs = args.log or DEFAULT_LOGS
+    trades = load_settled(logs)
+    r = evaluate(trades, load_breached_events(logs))
 
     if args.json:
         print(json.dumps(r, indent=1, default=str))
@@ -338,6 +397,11 @@ def main() -> int:
         print("  Rule: golf_quirks_research/P022_DECISION_RULE.md")
         return 0
 
+    if r.get("excluded"):
+        print(f"  EXCLUDED (§7)  : {len(r['excluded'])} tournament(s) with a "
+              "breached cap")
+        for ev, kinds in sorted(r["excluded"].items()):
+            print(f"                   {ev}: {', '.join(kinds)}")
     print(f"  tournaments (T): {r['T']}   contracts: {r['n_contracts']:,}")
     print(f"  tournaments +ve: {r['tournaments_positive']}/{r['T']}")
     print(f"  edge           : {r['edge_cents']:+.2f} c/contract "

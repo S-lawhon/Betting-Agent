@@ -52,6 +52,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.aggregate_risk import AggregateRiskGuard
+from src.golf_schedule import GolfScheduleResolver, RoundClose
 from src.kalshi_fees import fee_per_contract
 from src.kalshi_public import KalshiPublic, fnum
 from src.pod_registry import register_pod
@@ -59,6 +60,12 @@ from src.pod_registry import register_pod
 logger = logging.getLogger(__name__)
 
 MARKOUT_HORIZONS = (300.0, 900.0, 3600.0)   # seconds after fill
+
+# Settlement is polled per-ticker, and the resolved close is deliberately
+# EARLY (see src/golf_schedule.py), so polling starts before the real close and
+# would otherwise hammer /markets/{t} once per cycle per book — ~350 books at a
+# 20s cycle. Poll no more often than this per book.
+SETTLE_POLL_INTERVAL_S = 300.0
 
 # All 13 round-leader series (fee_type=quadratic -> zero maker fee).
 DEFAULT_SERIES = (
@@ -100,10 +107,16 @@ class MarketBook:
     ticker: str
     event_code: str
     close_epoch: float
+    # Which golf_schedule source produced close_epoch (tee_times /
+    # r1_tee_anchor / tour_day_offset). Logged on every quote so a fill can be
+    # attributed to the timing source that placed it.
+    close_source: str = "unknown"
+    event_ticker: str = ""
     ask_quote: Optional[MakerQuote] = None
     fills: List[MakerFill] = field(default_factory=list)
     inventory: float = 0.0        # net YES (negative = short from selling)
     last_trade_epoch: float = 0.0
+    last_settle_poll: float = 0.0
     done: bool = False
 
     @property
@@ -164,8 +177,25 @@ class RoundLeaderFadeMakerEngine:
         # every call site, per the CLAUDE.md convention, so a test double
         # implementing only check_trade still works.
         risk_guard: Optional[Any] = None,
+        # ── the close-time resolver: MANDATORY, no silent fallback ──
+        # Kalshi publishes NO field carrying the real close while a market is
+        # open (all six collapse to a ~20-day placeholder), so the placement
+        # window can only be computed against an external schedule. There is
+        # deliberately no "use the Kalshi field if the resolver is missing"
+        # path: that fallback is exactly what held T at 0 for five days, and a
+        # wrong round time is worse than no quote — it produces fills outside
+        # the validated window, and §7 would exclude those tournaments from T
+        # anyway. Constructing the engine without a schedule raises.
+        schedule: Optional[GolfScheduleResolver] = None,
         _now_fn=None,
     ):
+        if schedule is None:
+            raise ValueError(
+                "RoundLeaderFadeMakerEngine requires a schedule resolver — "
+                "Kalshi does not publish the real close of an open "
+                "round-leader market. Pass GolfScheduleResolver() (or a "
+                "double exposing .resolve()).")
+        self.schedule = schedule
         self.kalshi = kalshi or KalshiPublic()
         self.series = tuple(series)
         self.log_dir = Path(log_dir)
@@ -195,6 +225,15 @@ class RoundLeaderFadeMakerEngine:
         # here rather than read off the guard so the sweep never reaches into
         # another pod's reservations or the guard's private state.
         self._reserved_ids: set = set()
+        # event_ticker -> Kalshi /events product_metadata (competition name,
+        # competition_scope). Immutable for a listed event, so cached forever.
+        self._event_meta: Dict[str, Dict[str, Any]] = {}
+        # event_ticker -> reason it could not be resolved. Surfaced by the
+        # window detector so "fail-closed and silent" is still observable.
+        self.unresolved_events: Dict[str, str] = {}
+        # (event_code, cap_kind) already recorded, so a breach is written once
+        # rather than every cycle. Repopulated from the log on restart.
+        self._breaches: set = set()
 
     # ── Logging ──────────────────────────────────────────────────────
 
@@ -216,39 +255,155 @@ class RoundLeaderFadeMakerEngine:
     def total_collateral(self) -> float:
         return sum(b.collateral for b in self.books.values())
 
-    # ── Discovery ────────────────────────────────────────────────────
+    # ── §7 cap-breach recording ──────────────────────────────────────
+    #
+    # P022_DECISION_RULE.md §7: "A tournament run with any cap breached is
+    # EXCLUDED from T." That was unimplementable, because a breach was
+    # recorded nowhere: `p022_checkpoint.py` had no breach concept at all, and
+    # a gate condition only checkable retrospectively is not a gate condition.
+    # Breaches are now written to the fills log — the same file the checkpoint
+    # already reads — at the moment they are observed.
 
-    @staticmethod
-    def _close_epoch(m: Dict[str, Any]) -> Optional[float]:
-        # ``close_time`` is the real round end. ``occurrence_datetime`` is a
-        # far-future PLACEHOLDER on this family and must never be preferred.
-        #
-        # The original comment here asserted the opposite, and it made the pod
-        # structurally incapable of ever quoting. Measured 2026-07-26 on one
-        # settled market per series, all five tours:
-        #
-        #   KXPGAR1LEAD  +18.2d   KXPGAR2LEAD  +15.0d   KXPGAR3LEAD  +13.9d
-        #   KXLIVR1LEAD  +16.5d   KXLPGAR1LEAD +16.0d   KXLPGAR2LEAD +15.3d
-        #   KXLPGAR3LEAD +13.2d   KXDPWORLDTOURR1/2/3LEAD +16.2/+15.2/+14.3d
-        #
-        # occurrence_datetime ran 13-18 days LATER than close_time on 10 of 10.
-        # With close_epoch two weeks late, the [12h, 24h] placement window opens
-        # long after the round has ended and settled, and _mid() returns None on
-        # a settled book — so the engine placed nothing, ever. It ran live from
-        # 2026-07-23 to 2026-07-26 and wrote zero quotes and zero fills.
-        #
-        # This is the same family of trap as the top-N event-timing quirk in
-        # CLAUDE.md, but with the fields REVERSED, which is why reasoning by
-        # analogy from top-N produced exactly the wrong preference order.
-        raw = (m.get("close_time") or m.get("occurrence_datetime")
-               or m.get("expected_expiration_time"))
-        if not raw:
-            return None
+    def _record_breach(self, event_code: str, kind: str,
+                       observed: float, limit: float) -> None:
+        key = (event_code, kind)
+        if key in self._breaches:
+            return                      # once per tournament per cap kind
+        self._breaches.add(key)
+        logger.error("P-022 CAP BREACH %s %s: %.4f > %.4f — tournament %s is "
+                     "EXCLUDED from T (§7)", event_code, kind, observed, limit,
+                     event_code)
+        self._write(self.fills_log, {
+            "type": "CAP_BREACH", "pod_id": "P-022", "event": event_code,
+            "kind": kind, "observed": round(observed, 4),
+            "limit": round(limit, 4),
+        })
+
+    def check_caps(self) -> None:
+        """Observe every §7 cap and record any breach.
+
+        Run every cycle, not only at quote time, because the breach path that
+        actually exists is a RESTART: books used to be rebuilt from nothing,
+        so all three caps re-armed from zero while the paper exposure
+        persisted, and a restart mid-tournament could silently double the
+        per-name and per-tournament collateral. `rebuild_from_log()` closes
+        that hole; this records it if anything else opens one.
+        """
+        per_event: Dict[str, float] = {}
+        total = 0.0
+        for b in self.books.values():
+            coll = b.collateral
+            if coll <= 0:
+                continue
+            total += coll
+            per_event[b.event_code] = per_event.get(b.event_code, 0.0) + coll
+            if coll > self.max_collateral_per_name + 1e-9:
+                self._record_breach(b.event_code, "per_name", coll,
+                                    self.max_collateral_per_name)
+        for ev, coll in per_event.items():
+            if coll > self.max_collateral_per_tournament + 1e-9:
+                self._record_breach(ev, "per_tournament", coll,
+                                    self.max_collateral_per_tournament)
+        if total > self.max_total_collateral + 1e-9:
+            # An aggregate breach is not attributable to one tournament, so it
+            # excludes every tournament with live exposure at the time.
+            for ev in per_event:
+                self._record_breach(ev, "aggregate", total,
+                                    self.max_total_collateral)
+
+    @property
+    def breached_events(self) -> set:
+        return {ev for ev, _ in self._breaches}
+
+    # ── Restart safety ───────────────────────────────────────────────
+
+    def rebuild_from_log(self) -> int:
+        """Restore unsettled fills so the caps do not re-arm from zero.
+
+        §7's three collateral caps are GATE CONDITIONS. `self.books = {}` on
+        init and nothing ever read the fills log back, so after any restart —
+        deploy, reboot, crash — `book.collateral` was 0 for names the pod was
+        still short. The service was restarted twice in the week this was
+        found. Under §7 that excludes the tournament from T, and nothing
+        detected it.
+
+        The close reference is taken from the last QUOTE row for the ticker
+        when one exists, and 0.0 otherwise, which means "already past close —
+        poll settlement". That is the safe default: a restored book with no
+        schedule anchor must never be treated as quotable. `discover()`
+        re-resolves it against the external schedule if the market is still
+        open.
+        """
+        close_ref: Dict[str, float] = {}
         try:
-            return datetime.fromisoformat(
-                str(raw).replace("Z", "+00:00")).timestamp()
-        except ValueError:
-            return None
+            with open(self.quotes_log, "r", encoding="utf-8") as fh:
+                for raw in fh:
+                    try:
+                        rec = json.loads(raw)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if rec.get("type") == "QUOTE" and rec.get("close_ref"):
+                        close_ref[rec.get("ticker")] = float(rec["close_ref"])
+        except OSError:
+            pass
+
+        settled: set = set()
+        fills: Dict[str, Dict[str, Any]] = {}
+        events: Dict[str, str] = {}
+        try:
+            with open(self.fills_log, "r", encoding="utf-8") as fh:
+                for raw in fh:
+                    try:
+                        rec = json.loads(raw)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    typ, fid = rec.get("type"), rec.get("fill_id")
+                    if typ == "CAP_BREACH" and rec.get("event"):
+                        self._breaches.add((rec["event"],
+                                            rec.get("kind") or "unknown"))
+                        continue
+                    if not fid:
+                        continue
+                    if typ == "SETTLE":
+                        settled.add(fid)
+                    elif typ == "FILL":
+                        fills[fid] = rec            # last write wins
+                        if rec.get("ticker"):
+                            events[rec["ticker"]] = rec.get("event") or ""
+        except OSError:
+            return 0
+
+        n = 0
+        for fid, rec in fills.items():
+            if fid in settled:
+                continue
+            tk = rec.get("ticker")
+            if not tk:
+                continue
+            book = self.books.get(tk)
+            if book is None:
+                book = MarketBook(
+                    ticker=tk, event_code=events.get(tk, ""),
+                    close_epoch=close_ref.get(tk, 0.0),
+                    close_source="restored")
+                self.books[tk] = book
+            if any(f.fill_id == fid for f in book.fills):
+                continue
+            qty = float(rec.get("qty") or 0)
+            book.fills.append(MakerFill(
+                fill_id=fid, ticker=tk, price=float(rec.get("price") or 0),
+                qty=qty, epoch=float(rec.get("ts") or 0),
+                mid_at_fill=rec.get("mid_at_fill")))
+            book.inventory -= qty
+            n += 1
+        if n:
+            logger.info("P-022: restored %d unsettled fill(s) across %d book(s) "
+                        "— §7 caps re-arm from real exposure, not zero",
+                        n, len(self.books))
+        self.check_caps()
+        return n
+
+    # ── Discovery ────────────────────────────────────────────────────
 
     @staticmethod
     def _event_code(m: Dict[str, Any]) -> str:
@@ -256,7 +411,74 @@ class RoundLeaderFadeMakerEngine:
         parts = ev.split("-")
         return parts[1] if len(parts) >= 2 else ev
 
+    @staticmethod
+    def _series_of(event_ticker: str) -> str:
+        return (event_ticker or "").split("-")[0]
+
+    def _product_metadata(self, event_ticker: str) -> Dict[str, Any]:
+        """`/events/{ticker}` product_metadata, cached.
+
+        Carries the only handle Kalshi gives on WHICH tournament and round a
+        listed event is:
+            {"competition": "Rocket Classic",
+             "competition_scope": "Round 1 Leader"}
+        """
+        hit = self._event_meta.get(event_ticker)
+        if hit is not None:
+            return hit
+        data = self.kalshi.get(f"/events/{event_ticker}")
+        ev = (data or {}).get("event", {}) or {}
+        pm = ev.get("product_metadata") or {}
+        meta = {"competition": pm.get("competition"),
+                "competition_scope": pm.get("competition_scope")}
+        # Only cache a usable answer; a transient failure must be retried.
+        if meta["competition"]:
+            self._event_meta[event_ticker] = meta
+        return meta
+
+    def resolve_event_close(self, event_ticker: str) -> Optional[RoundClose]:
+        """The real round end for a listed event, or None (= do not quote).
+
+        Public because ``scripts/p022_window_check.py`` imports it rather than
+        reimplementing it — the detector must track whatever the pod actually
+        does, and then ask an INDEPENDENT question about the answer.
+        """
+        meta = self._product_metadata(event_ticker)
+        comp = meta.get("competition")
+        if not comp:
+            self.unresolved_events[event_ticker] = "no product_metadata.competition"
+            return None
+        try:
+            rc = self.schedule.resolve(
+                comp, self._series_of(event_ticker),
+                scope=meta.get("competition_scope"))
+        except Exception:                          # noqa: BLE001
+            logger.exception("P-022: schedule resolve failed for %s", event_ticker)
+            self.unresolved_events[event_ticker] = "resolver raised"
+            return None
+        if rc is None:
+            self.unresolved_events[event_ticker] = f"no schedule match for {comp!r}"
+            return None
+        self.unresolved_events.pop(event_ticker, None)
+        return rc
+
     def discover(self) -> int:
+        """List open markets and attach an EXTERNALLY resolved round close.
+
+        Two things this does that the pre-2026-07-28 version did not:
+
+        * The close comes from ``src/golf_schedule``, never from a Kalshi
+          field. Every Kalshi time field on an open round-leader market is the
+          same ~20-day placeholder, so the old event-level MIN was a MIN over
+          identical placeholders and the window opened ~2.5 weeks after the
+          round had settled.
+        * Existing books are RE-RESOLVED on every pass. ESPN publishes no tee
+          times three days out (checked against all three listed tournaments
+          on 2026-07-27: zero competitors), so a market discovered at listing
+          gets the coarse per-tour day offset and must be upgraded to the
+          precise tee-time close as soon as ESPN publishes it. A close
+          resolved once at discovery would freeze the coarse answer.
+        """
         n_new = 0
         all_markets: List[Dict[str, Any]] = []
         for s in self.series:
@@ -264,26 +486,45 @@ class RoundLeaderFadeMakerEngine:
                 all_markets.extend(self.kalshi.open_markets(s))
             except Exception as exc:
                 logger.error("P-022: discovery failed %s: %s", s, exc)
-        # event_ticker -> earliest occurrence/close (event-level close, as
-        # GolfTopNPod does — per-market timing is unreliable on Kalshi).
-        event_close: Dict[str, float] = {}
-        for m in all_markets:
-            ev = m.get("event_ticker") or ""
-            ep = self._close_epoch(m)
-            if ep is None:
+
+        event_close: Dict[str, RoundClose] = {}
+        for ev in {m.get("event_ticker") or "" for m in all_markets}:
+            if not ev:
                 continue
-            if ev not in event_close or ep < event_close[ev]:
-                event_close[ev] = ep
+            rc = self.resolve_event_close(ev)
+            if rc is not None:
+                event_close[ev] = rc
+
         for m in all_markets:
             tk = m.get("ticker", "")
-            if not tk or tk in self.books:
+            ev = m.get("event_ticker") or ""
+            if not tk:
                 continue
-            close = event_close.get(m.get("event_ticker") or "")
-            if close is None:
+            rc = event_close.get(ev)
+            book = self.books.get(tk)
+            if book is not None:
+                if rc is not None and (
+                        abs(book.close_epoch - rc.close_epoch) > 1.0
+                        or book.close_source != rc.source):
+                    logger.info(
+                        "P-022: %s close re-resolved %s -> %s (%s -> %s)",
+                        ev, datetime.fromtimestamp(book.close_epoch,
+                                                   timezone.utc).isoformat(),
+                        rc.close_iso, book.close_source, rc.source)
+                    book.close_epoch = rc.close_epoch
+                    book.close_source = rc.source
+                continue
+            if rc is None:
                 continue
             self.books[tk] = MarketBook(
-                ticker=tk, event_code=self._event_code(m), close_epoch=close)
+                ticker=tk, event_code=self._event_code(m),
+                close_epoch=rc.close_epoch, close_source=rc.source,
+                event_ticker=ev)
             n_new += 1
+        if self.unresolved_events:
+            logger.warning("P-022: %d event(s) UNRESOLVED, not quoting: %s",
+                           len(self.unresolved_events),
+                           dict(list(self.unresolved_events.items())[:5]))
         return n_new
 
     # ── Cycle ────────────────────────────────────────────────────────
@@ -298,6 +539,7 @@ class RoundLeaderFadeMakerEngine:
                 self._cycle_book(book, killed, now)
             except Exception:
                 logger.exception("P-022: cycle failed for %s", book.ticker)
+        self.check_caps()
         self._sweep_reservations()
 
     def _mid(self, ticker: str) -> Optional[float]:
@@ -315,10 +557,23 @@ class RoundLeaderFadeMakerEngine:
         return (b + a) / 2.0
 
     def _cycle_book(self, book: MarketBook, killed: bool, now: float) -> None:
-        # settle if past close (poll market result)
+        # Past the resolved close: try to settle, but DO NOT stop working the
+        # book if settlement has not happened yet.
+        #
+        # The resolved close is deliberately conservative — biased early, by a
+        # measured median of +1.6h on tee times and +5.6h on the day offset,
+        # and by up to +52h when a round is suspended for weather. The old
+        # code `return`ed here, which would have stopped processing fills for
+        # the whole remainder of the round on a quote that is supposed to REST
+        # through it. That is where Phase 2's fills — and its edge — come
+        # from, so throwing them away would have quietly changed the strategy
+        # being validated.
         if now >= book.close_epoch:
-            self._maybe_settle(book)
-            return
+            if now - book.last_settle_poll >= SETTLE_POLL_INTERVAL_S:
+                book.last_settle_poll = now
+                self._maybe_settle(book)
+            if book.done:
+                return
 
         hours_to_close = (book.close_epoch - now) / 3600.0
         mid = self._mid(book.ticker)
@@ -398,6 +653,12 @@ class RoundLeaderFadeMakerEngine:
                 "event": book.event_code, "ask": quote_px, "mid": mid,
                 "size": size, "inventory": book.inventory,
                 "hours_to_close": round(hours_to_close, 2),
+                # Which schedule source timed this quote, so a fill can be
+                # attributed to it later. tour_day_offset is the coarse path
+                # (median +5.6h conservative); tee_times is the precise one
+                # (median +1.6h).
+                "close_source": book.close_source,
+                "close_ref": book.close_epoch,
             })
 
     def _reserve(self, book: MarketBook, collateral_usd: float) -> bool:
@@ -655,8 +916,12 @@ class RoundLeaderFadeMakerPod:
                     "P-022: could not build AggregateRiskGuard — running with "
                     "the in-process collateral caps only")
                 guard = None
+        # The external round-close resolver. Mandatory (see the engine's
+        # docstring); overridable for tests, never absent in production.
+        schedule = overrides.pop("schedule", None) or GolfScheduleResolver()
         return RoundLeaderFadeMakerEngine(
             risk_guard=guard,
+            schedule=schedule,
             series=tuple(q.get("series", DEFAULT_SERIES)),
             mid_band=tuple(q.get("mid_band", (0.03, 0.12))),
             quote_offset=float(q.get("quote_offset", 0.02)),

@@ -17,6 +17,8 @@ for t in leader_trades candles pull_logs; do
   echo "==> $t"
   tar xzf "$ARCHIVE_DIR/$t.tar.gz" -C "$DATA_DIR"
 done
+echo "==> schedule_probe_caches"
+tar xzf "$ARCHIVE_DIR/schedule_probe_caches.tar.gz" -C "$DATA_DIR"
 echo "==> settled_meta.jsonl"
 gunzip -c "$ARCHIVE_DIR/settled_meta.jsonl.gz" > "$DATA_DIR/settled_meta.jsonl"
 

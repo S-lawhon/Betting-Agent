@@ -20,8 +20,17 @@ WHY THIS DOES NOT JUST CALL THE POD
 A detector that decides "is a window open?" the same way the pod does agrees
 with the pod by construction, including when the pod is wrong — it would have
 sat silent through all three dead days.  So this script takes the pod's own
-close reference (`_close_epoch`, imported, not reimplemented) and then asks an
-INDEPENDENT question about it: *is that reference even a real timestamp?*
+close reference (`resolve_event_close`, imported, not reimplemented) and then
+asks INDEPENDENT questions about the answer:
+
+  1. Did the reference resolve at all?  Since 2026-07-28 the close comes from
+     an external schedule (`src/golf_schedule.py`) and the pod fails CLOSED
+     when it does not resolve.  Failing closed is correct and it is also
+     indistinguishable from health, so `SCHEDULE_UNRESOLVED` alarms on it.
+  2. Is the reference a real timestamp, or a fallback placeholder?  (The
+     listing-span discriminator below.  It now also catches a regression to
+     reading Kalshi's own fields.)
+  3. Are names actually priced in band with no quotes being written?
 
 THE PLACEHOLDER PROBLEM (measured 2026-07-27, see the report)
 ─────────────────────────────────────────────────────────────
@@ -97,7 +106,8 @@ QUOTES_LOG = Path("data/trade_logs/round_leader_fade_quotes.jsonl")
 MAX_BOOK_PULLS = 60
 
 OK_STATES = ("NO_MARKETS", "WAITING", "WINDOW_OPEN_QUOTING")
-ALARM_STATES = ("CLOSE_REF_PLACEHOLDER", "WINDOW_OPEN_NO_QUOTES")
+ALARM_STATES = ("CLOSE_REF_PLACEHOLDER", "WINDOW_OPEN_NO_QUOTES",
+                "SCHEDULE_UNRESOLVED")
 
 
 def _iso(epoch: Optional[float]) -> Optional[str]:
@@ -161,25 +171,44 @@ def assess(engine: RoundLeaderFadeMakerEngine,
         except Exception as exc:                       # noqa: BLE001
             print(f"  WARN: discovery failed for {s}: {exc}", file=sys.stderr)
 
+    # The pod's close reference now comes from the EXTERNAL schedule
+    # (src/golf_schedule.py), not from any Kalshi field. Resolve it exactly
+    # the way the pod does — imported, never reimplemented — and then keep
+    # asking the independent questions below about the answer.
+    resolved: Dict[str, Any] = {}
+    unresolved: Dict[str, str] = {}
+    for ev in sorted({m.get("event_ticker") or "" for m in markets} - {""}):
+        try:
+            rc = engine.resolve_event_close(ev)
+        except Exception as exc:                       # noqa: BLE001
+            rc, exc_s = None, str(exc)
+            unresolved[ev] = f"resolver raised: {exc_s}"
+        if rc is None:
+            unresolved.setdefault(
+                ev, engine.unresolved_events.get(ev, "unresolved"))
+        else:
+            resolved[ev] = rc
+
     events: Dict[str, Dict[str, Any]] = {}
     for m in markets:
         ev = m.get("event_ticker") or ""
-        close_ref = engine._close_epoch(m)             # what the POD will use
-        if close_ref is None:
+        rc = resolved.get(ev)
+        if rc is None:
             continue
         open_ep = _epoch(m.get("open_time"))
-        span_d = ((close_ref - open_ep) / 86400.0) if open_ep else None
+        span_d = ((rc.close_epoch - open_ep) / 86400.0) if open_ep else None
         e = events.setdefault(ev, {
-            "event": ev, "n_markets": 0, "close_ref": close_ref,
+            "event": ev, "n_markets": 0, "close_ref": rc.close_epoch,
+            "close_source": rc.source, "competition": rc.competition,
             "open_time": m.get("open_time"),
+            # Kept alongside the resolved close on purpose: this is Kalshi's
+            # own placeholder, and logging both every run is what will answer
+            # "does Kalshi ever correct close_time BEFORE the round?"
+            "kalshi_close_time": m.get("close_time"),
             "expiration_time": m.get("expiration_time"),
             "listing_span_days": span_d, "tickers": [],
         })
         e["n_markets"] += 1
-        # discover() takes the MIN close across the event; mirror that.
-        if close_ref < e["close_ref"]:
-            e["close_ref"] = close_ref
-            e["listing_span_days"] = span_d
         if len(e["tickers"]) < max_book_pulls:
             e["tickers"].append(m.get("ticker"))
 
@@ -211,11 +240,22 @@ def assess(engine: RoundLeaderFadeMakerEngine,
     quotes = recent_quotes(QUOTES_LOG, now - quote_lookback_s)
 
     n_placeholder = sum(1 for e in events.values() if e["placeholder"])
-    if not events:
+    n_listed_events = len(events) + len(unresolved)
+    if not markets:
         state = "NO_MARKETS"
         detail = ("no open round-leader markets in any of the "
                   f"{len(engine.series)} configured series — silence is "
                   "correct between tournaments")
+    elif not events:
+        # Fail-closed is working as designed, and the pod is still mute. That
+        # is a legitimate outcome (a wrong round time is worse than no quote)
+        # but it must never be silent, because it looks identical to health.
+        state = "SCHEDULE_UNRESOLVED"
+        detail = (
+            f"{len(unresolved)} event(s) LISTED but the external round "
+            "schedule resolved NONE of them, so the pod is failing closed and "
+            "will not quote. Reasons: "
+            + "; ".join(f"{k}: {v}" for k, v in list(unresolved.items())[:4]))
     elif n_placeholder == len(events):
         state = "CLOSE_REF_PLACEHOLDER"
         detail = (
@@ -250,7 +290,10 @@ def assess(engine: RoundLeaderFadeMakerEngine,
         "alarm": state in ALARM_STATES,
         "detail": detail,
         "n_events": len(events),
-        "n_markets": sum(e["n_markets"] for e in events.values()),
+        "n_markets": len(markets),
+        "n_resolved_events": len(events),
+        "n_unresolved_events": len(unresolved),
+        "unresolved": unresolved,
         "n_placeholder_events": n_placeholder,
         "n_in_window_events": len(in_window),
         "n_in_band": n_in_band,
@@ -313,8 +356,10 @@ def main() -> int:
 
     print("P-022 quotable-window check")
     print("=" * 62)
-    print(f"  events listed  : {result['n_events']} "
-          f"({result['n_markets']} markets)")
+    print(f"  events resolved: {result['n_resolved_events']} "
+          f"({result['n_markets']} markets listed)")
+    print(f"  UNRESOLVED     : {result['n_unresolved_events']} event(s) "
+          "— the pod fails closed on these")
     print(f"  placeholder    : {result['n_placeholder_events']} of "
           f"{result['n_events']} events")
     print(f"  in pod window  : {result['n_in_window_events']} events, "
@@ -323,11 +368,13 @@ def main() -> int:
     print(f"  quotes         : {q['n_recent']} recent / {q['total']} ever"
           + ("" if q["exists"] else "   (no quote log has ever been written)"))
     for e in result["events"][:8]:
-        flag = "PLACEHOLDER" if e["placeholder"] else "real"
+        flag = "PLACEHOLDER" if e["placeholder"] else e.get("close_source", "real")
         print(f"    {e['event']:30s} close_ref={e['close_ref_iso']} "
               f"h={e['hours_to_close_ref']:8.1f} span="
               f"{e['listing_span_days'] if e['listing_span_days'] is None else round(e['listing_span_days'], 2)}d "
               f"[{flag}]")
+    for ev, why in list(result["unresolved"].items())[:6]:
+        print(f"    {ev:30s} UNRESOLVED — {why}")
     print()
     if result["alarm"]:
         print(f"  *** ALARM: {result['state']} ***")

@@ -1,0 +1,1708 @@
+{
+ "per_series": {
+  "KXPGAR1LEAD": {
+   "books_read": 40,
+   "books_with_subcent_level": 38,
+   "levels_by_decimals": {
+    "1": 116,
+    "2": 1120,
+    "3": 268
+   }
+  },
+  "KXMLBGAME": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 210,
+    "2": 1934
+   }
+  },
+  "KXNFLGAME": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 238,
+    "2": 2547
+   }
+  },
+  "KXATPMATCH": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 257,
+    "2": 2234
+   }
+  },
+  "KXWTAMATCH": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 258,
+    "2": 2182
+   }
+  },
+  "KXMLBTOTAL": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 115,
+    "2": 1438
+   }
+  },
+  "KXBTCD": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 240,
+    "2": 511
+   }
+  },
+  "KXETHD": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 18,
+    "2": 270
+   }
+  },
+  "KXFED": {
+   "books_read": 40,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 98,
+    "2": 971
+   }
+  },
+  "KXCPI": {
+   "books_read": 38,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 11,
+    "2": 198
+   }
+  },
+  "KXHIGHNY": {
+   "books_read": 12,
+   "books_with_subcent_level": 0,
+   "levels_by_decimals": {
+    "1": 85,
+    "2": 615
+   }
+  }
+ },
+ "subcent": [
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-JLOW",
+   "price": "0.9620",
+   "size": "500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-JLOW",
+   "price": "0.9630",
+   "size": "10384.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-BKOH",
+   "price": "0.0010",
+   "size": "2.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-BKOH",
+   "price": "0.0010",
+   "size": "25107.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-BKOH",
+   "price": "0.9140",
+   "size": "152.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-BKOH",
+   "price": "0.9850",
+   "size": "10256.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-BKOH",
+   "price": "0.9860",
+   "size": "123.25"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-BKOH",
+   "price": "0.9870",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-BKOH",
+   "price": "0.9880",
+   "size": "195.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9610",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9710",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9810",
+   "size": "10250.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9840",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9850",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9870",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9880",
+   "size": "12533.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZDOU",
+   "price": "0.9890",
+   "size": "630.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9430",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9530",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9630",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9640",
+   "size": "129.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9650",
+   "size": "48.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9870",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9880",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-ZBAU",
+   "price": "0.9910",
+   "size": "2630.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.0110",
+   "size": "5.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.9250",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.9350",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.9450",
+   "size": "13279.16"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.9660",
+   "size": "500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.9670",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.9680",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-XSCH",
+   "price": "0.9690",
+   "size": "10419.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WSIM",
+   "price": "0.9630",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WSIM",
+   "price": "0.9730",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WSIM",
+   "price": "0.9830",
+   "size": "9877.19"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WSIM",
+   "price": "0.9910",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WSIM",
+   "price": "0.9920",
+   "size": "250.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WSIM",
+   "price": "0.9930",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WSIM",
+   "price": "0.9940",
+   "size": "12872.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WMOU",
+   "price": "0.9420",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WMOU",
+   "price": "0.9520",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WMOU",
+   "price": "0.9620",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WMOU",
+   "price": "0.9850",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WMOU",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WMOU",
+   "price": "0.9880",
+   "size": "10221.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WMOU",
+   "price": "0.9890",
+   "size": "2662.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9280",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9380",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9480",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9620",
+   "size": "5301.20"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9680",
+   "size": "120.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9710",
+   "size": "10298.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9720",
+   "size": "99.10"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9730",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9740",
+   "size": "644.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WKIM",
+   "price": "0.9750",
+   "size": "400.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WJEN",
+   "price": "0.9630",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WJEN",
+   "price": "0.9730",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WJEN",
+   "price": "0.9830",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WJEN",
+   "price": "0.9880",
+   "size": "10121.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WJEN",
+   "price": "0.9910",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WJEN",
+   "price": "0.9930",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WJEN",
+   "price": "0.9940",
+   "size": "2812.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.0010",
+   "size": "768.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.0080",
+   "size": "1250.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.0090",
+   "size": "1111.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.0110",
+   "size": "909.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.0120",
+   "size": "833.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.0190",
+   "size": "500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.0240",
+   "size": "7599.90"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9280",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9380",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9480",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9610",
+   "size": "1127.96"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9620",
+   "size": "1454.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9710",
+   "size": "500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9720",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9730",
+   "size": "350.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9740",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-WCLA",
+   "price": "0.9750",
+   "size": "1407.62"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-VWHA",
+   "price": "0.9620",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-VWHA",
+   "price": "0.9720",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-VWHA",
+   "price": "0.9820",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-VWHA",
+   "price": "0.9910",
+   "size": "10190.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-VWHA",
+   "price": "0.9920",
+   "size": "250.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-VWHA",
+   "price": "0.9930",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-VWHA",
+   "price": "0.9940",
+   "size": "2812.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TPEN",
+   "price": "0.9430",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TPEN",
+   "price": "0.9530",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TPEN",
+   "price": "0.9630",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TPEN",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TPEN",
+   "price": "0.9870",
+   "size": "10231.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TPEN",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TOLE",
+   "price": "0.9610",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TOLE",
+   "price": "0.9710",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TOLE",
+   "price": "0.9810",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TOLE",
+   "price": "0.9880",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TOLE",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TOLE",
+   "price": "0.9910",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TOLE",
+   "price": "0.9920",
+   "size": "2812.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9420",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9520",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9620",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9850",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9870",
+   "size": "10131.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9880",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TMOO",
+   "price": "0.9890",
+   "size": "2662.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TKAN",
+   "price": "0.9630",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TKAN",
+   "price": "0.9730",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TKAN",
+   "price": "0.9830",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TKAN",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TKAN",
+   "price": "0.9910",
+   "size": "10090.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TKAN",
+   "price": "0.9920",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TKAN",
+   "price": "0.9930",
+   "size": "3062.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-THOG",
+   "price": "0.9610",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-THOG",
+   "price": "0.9710",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-THOG",
+   "price": "0.9810",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-THOG",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-THOG",
+   "price": "0.9910",
+   "size": "10090.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-THOG",
+   "price": "0.9920",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-THOG",
+   "price": "0.9930",
+   "size": "2812.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TFIN",
+   "price": "0.9840",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TFIN",
+   "price": "0.9850",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TFIN",
+   "price": "0.9870",
+   "size": "10231.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TFIN",
+   "price": "0.9880",
+   "size": "2265.04"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TFIN",
+   "price": "0.9890",
+   "size": "411.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TCRO",
+   "price": "0.9620",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TCRO",
+   "price": "0.9720",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TCRO",
+   "price": "0.9820",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TCRO",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TCRO",
+   "price": "0.9920",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-TCRO",
+   "price": "0.9930",
+   "size": "12882.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SYEL",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SYEL",
+   "price": "0.9870",
+   "size": "10231.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SYEL",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SSTE",
+   "price": "0.9810",
+   "size": "144.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SSTE",
+   "price": "0.9850",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SSTE",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SSTE",
+   "price": "0.9880",
+   "size": "10221.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SSTE",
+   "price": "0.9890",
+   "size": "2662.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.0010",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9410",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9510",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9610",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9630",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9860",
+   "size": "10141.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9880",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9890",
+   "size": "600.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9910",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SPOW",
+   "price": "0.9920",
+   "size": "2640.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SMAZ",
+   "price": "0.9620",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SMAZ",
+   "price": "0.9720",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SMAZ",
+   "price": "0.9820",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SMAZ",
+   "price": "0.9910",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SMAZ",
+   "price": "0.9930",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SMAZ",
+   "price": "0.9940",
+   "size": "12872.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SJAE",
+   "price": "0.9870",
+   "size": "10231.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SJAE",
+   "price": "0.9880",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SJAE",
+   "price": "0.9910",
+   "size": "2812.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9430",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9530",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9630",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9640",
+   "size": "139.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9810",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9820",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9840",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9850",
+   "size": "2655.26"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SIM",
+   "price": "0.9890",
+   "size": "448.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SFIS",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SFIS",
+   "price": "0.9870",
+   "size": "10231.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-SFIS",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RRUF",
+   "price": "0.9640",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RRUF",
+   "price": "0.9740",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RRUF",
+   "price": "0.9840",
+   "size": "9796.50"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RRUF",
+   "price": "0.9920",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RRUF",
+   "price": "0.9930",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RRUF",
+   "price": "0.9950",
+   "size": "10150.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RRUF",
+   "price": "0.9960",
+   "size": "2812.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9430",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9530",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9630",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9830",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9840",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9870",
+   "size": "12793.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RNEE",
+   "price": "0.9890",
+   "size": "459.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHOJ",
+   "price": "0.9870",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHOJ",
+   "price": "0.9880",
+   "size": "10221.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHOJ",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHOE",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHOE",
+   "price": "0.9870",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHOE",
+   "price": "0.9880",
+   "size": "10121.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHOE",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9610",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9710",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9810",
+   "size": "8523.95"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9830",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9840",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9850",
+   "size": "10152.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9870",
+   "size": "2304.79"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9880",
+   "size": "779.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHIS",
+   "price": "0.9890",
+   "size": "630.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9310",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9410",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9510",
+   "size": "9959.64"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9710",
+   "size": "10298.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9760",
+   "size": "33.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9780",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9790",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9810",
+   "size": "1752.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9820",
+   "size": "519.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RHEN",
+   "price": "0.9830",
+   "size": "49.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RGER",
+   "price": "0.9390",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RGER",
+   "price": "0.9490",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RGER",
+   "price": "0.9590",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RGER",
+   "price": "0.9770",
+   "size": "10335.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RGER",
+   "price": "0.9780",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RGER",
+   "price": "0.9790",
+   "size": "310.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RGER",
+   "price": "0.9810",
+   "size": "727.14"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.0040",
+   "size": "500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.0090",
+   "size": "5000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9390",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9490",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9590",
+   "size": "9697.95"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9630",
+   "size": "5711.31"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9790",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9810",
+   "size": "10193.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9820",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9830",
+   "size": "2036.37"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RFOW",
+   "price": "0.9840",
+   "size": "91.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAS",
+   "price": "0.9610",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAS",
+   "price": "0.9710",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAS",
+   "price": "0.9810",
+   "size": "9136.87"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAS",
+   "price": "0.9860",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAS",
+   "price": "0.9870",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAS",
+   "price": "0.9880",
+   "size": "10121.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAS",
+   "price": "0.9890",
+   "size": "350.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9630",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9730",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9830",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9910",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9920",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9930",
+   "size": "250.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9940",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-RCAM",
+   "price": "0.9950",
+   "size": "12862.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PWIL",
+   "price": "0.9640",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PWIL",
+   "price": "0.9740",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PWIL",
+   "price": "0.9840",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PWIL",
+   "price": "0.9950",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PWIL",
+   "price": "0.9960",
+   "size": "10140.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PWIL",
+   "price": "0.9980",
+   "size": "250.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PWIL",
+   "price": "0.9990",
+   "size": "2412.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PROD",
+   "price": "0.9620",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PROD",
+   "price": "0.9720",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PROD",
+   "price": "0.9820",
+   "size": "9764.50"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PROD",
+   "price": "0.9880",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PROD",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PROD",
+   "price": "0.9910",
+   "size": "10190.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PROD",
+   "price": "0.9920",
+   "size": "3062.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PNYH",
+   "price": "0.9610",
+   "size": "22500.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PNYH",
+   "price": "0.9710",
+   "size": "15000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PNYH",
+   "price": "0.9810",
+   "size": "10000.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PNYH",
+   "price": "0.9890",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PNYH",
+   "price": "0.9920",
+   "size": "100.00"
+  },
+  {
+   "series": "KXPGAR1LEAD",
+   "ticker": "KXPGAR1LEAD-ROC26-PNYH",
+   "price": "0.9930",
+   "size": "12882.00"
+  }
+ ],
+ "bands": {
+  ">0.90": 255,
+  "<=0.02": 12,
+  "0.02-0.05": 1
+ }
+}

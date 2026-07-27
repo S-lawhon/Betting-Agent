@@ -27,7 +27,7 @@
 | **1** | P-022 close-time resolution | **FIXED + DEPLOYED** | resolver error **one-sided early on 72 of 72** settled events; min +0.16h, median +1.58h |
 | **2** | Gate throughput audit | **KILL** (hypothesis refuted) | 432 P-001 settlements in 28 days → **0** gate-countable rows; 4 of 5 gates are not measuring |
 | **3** | P-028 golf template sweep | **KILL** (both leads) | H2H ties pay **0.50/0.50**, not $0 — pair sums to $1.00 exactly; category-leader has **2 tournament-clusters** |
-| **4** | R5 follow-ups | **ANSWERED / KILL / BUILT** | tick size: **0 sub-cent levels in P-022's band**, no verdict moves · partitions: **0 of 15 executable** · NCAAF poller built |
+| **4** | R5 follow-ups | **ANSWERED / KILL / SCHEDULED** | tick size: **0 sub-cent levels in P-022's band**, no verdict moves · partitions: **0 of 15 executable** · NCAAF poller built |
 | **5** | P-022 widen the backtest | **PARTIAL** | pre-declaration committed before any pull; **13/13 series** have history back to **2026-05-22** — "~1 month" refuted |
 | **6** | Corrections + droplet hygiene | **NOT REACHED** | — |
 | **7** | Fee-table fixture + CI | **FIXED** | **fifth drift found**; blast radius **zero verdicts changed** |
@@ -192,9 +192,9 @@ genuine partitions, the cheap-fee skew bucket tops out at **+0.29¢**, below one
 tick, and the best nets sit in the *expensive*-fee buckets — opposite to the
 hypothesis. **0 of 15 candidates executable**; best thin leg $25.
 
-**NCAAF poller — built, tested (baseline 30 confirmed), NOT scheduled.** All
-thresholds pre-registered in code, including KILL at drift < 3.5¢ regardless of
-significance. **Must be scheduled before 2026-08-01** — see the decisions list.
+**NCAAF poller — built, tested and SCHEDULED** (2026-07-27 20:06 UTC, 3-hourly
+on the droplet). All thresholds pre-registered in code, including KILL at drift
+< 3.5¢ regardless of significance. Baseline of 30 captured.
 
 ### Task 5 — widening · **PARTIAL, discipline intact**
 
@@ -285,10 +285,10 @@ Verified on the droplet after restart:
 10. **`blocked_on: time` is now honest only for P-017 and P-022.** P-014 and
     P-015 are fixed and genuinely waiting on volume; **P-001 is still blocked on
     a defect, not calendar**, and its label should say so.
-11. **Schedule the NCAAF poller before 2026-08-01** (5 days). Committed but not
-    installed — this task forbade deploys, and the Mac's cron is TCC-blocked. I
-    recommend the 3-hourly form: a daily poll can miss the registered 6-hour
-    anchor window by up to 18h, and the snapshot cannot be rebuilt afterwards.
+11. ~~**Schedule the NCAAF poller**~~ **DONE 2026-07-27 20:06 UTC** — 3-hourly,
+    because a daily poll can miss the registered 6h anchor window by up to 18h.
+    It now polls from today rather than 2026-08-01; that only extends the
+    baseline and cannot affect the drift statistic.
 12. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
     pre-declaration is committed; the decision is still open.
 

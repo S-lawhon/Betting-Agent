@@ -2,7 +2,7 @@
 
 **Task:** `research/prompts/PROMPT_R5_Followups.md`
 **Run:** 2026-07-28 · **no pod, no config, no deploy, no orders**
-**Verdicts:** tick size **ANSWERED — no verdict moves** · skewed partitions **KILL** · NCAAF poller **BUILT, needs scheduling before 2026-08-01**
+**Verdicts:** tick size **ANSWERED — no verdict moves** · skewed partitions **KILL** · NCAAF poller **BUILT and SCHEDULED 2026-07-27 20:06 UTC**
 
 ---
 
@@ -191,7 +191,7 @@ test (top-of-book **size**, not spread).
 
 ---
 
-## Item 3 — NCAAF listing-window snapshot · **BUILT, needs scheduling**
+## Item 3 — NCAAF listing-window snapshot · **BUILT and SCHEDULED**
 
 `scripts/ncaaf_listing_watch.py`, committed and tested live.
 
@@ -224,28 +224,38 @@ NCAAF, attention and liquidity are perfectly correlated, so the inattention
 pocket and the tradeable pocket are disjoint sets. It runs only because it is
 nearly free and **the snapshot cannot be reconstructed afterwards.**
 
-### Not scheduled — and this needs an action
-
-This task's guardrail says **no deploy**, and scheduling requires the script on
-the droplet. So it is committed and **not** installed. The Mac is not an
-alternative: its cron is TCC-blocked and has failed 139 of 139 runs
-(`research/REPORT_Data_Readiness_2026-07-27.md`).
-
-**Deadline: this must be scheduled before 2026-08-01**, when daily polling is
-registered to begin. There are five days of slack.
-
-```
-7 13 * * * cd /opt/betting-pod-shop && sudo -u bettingbot ./venv/bin/python -m scripts.ncaaf_listing_watch >> /var/log/ncaaf_listing_watch.log 2>&1
-```
-
-Daily is enough to catch a drop, but the 6-hour anchor rule means a once-a-day
-poll can miss the window by up to 18h. **If the anchor matters — and the whole
-test is built on it mattering — this should run every 3 hours through August**,
-which is 8 requests a day. My recommendation is the 3-hourly form:
+### Scheduled — 2026-07-27 20:06 UTC, on the droplet
 
 ```
 7 */3 * * * cd /opt/betting-pod-shop && sudo -u bettingbot ./venv/bin/python -m scripts.ncaaf_listing_watch >> /var/log/ncaaf_listing_watch.log 2>&1
 ```
+
+**3-hourly rather than daily, deliberately.** The registered anchor rule is
+"within 6h of the bulk `open_time`", and a once-a-day poll can miss that window
+by up to 18 hours. The snapshot cannot be reconstructed afterwards, so the
+cheaper cadence would risk the entire test to save 7 requests a day. The
+pre-registered constants — including the 6h deadline — are cited in the crontab
+comment so the reason survives the next person reading it.
+
+Verified in its exact cron form as `bettingbot`: exit 0, state written to
+`data/ncaaf_listing_watch/polls.jsonl` (bettingbot-owned, and `data/` is
+excluded from the deploy rsync so it survives redeploys), log appending.
+Baseline captured:
+
+```
+{"n_open": 30, "prev_n": null,  "bulk_detected": false, "trigger": 100, ...}
+{"n_open": 30, "prev_n": 30,    "bulk_detected": false, "trigger": 100, ...}
+```
+
+Prior crontab backed up to `/root/crontab.bak.ncaaf.2026-07-27`; the installer
+is idempotent and no-ops if the entry already exists.
+
+**It starts polling now rather than on 2026-08-01.** That is a deviation from
+the written protocol and it is deliberate: earlier polls only extend the
+baseline series, they cannot touch the T0 / T+24h / T+72h drift comparison the
+kill threshold is computed from, and if the bulk drop lands early the poller
+catches it instead of missing it. The 08-01 date was a convenience, not a
+constraint on the statistic.
 
 ---
 

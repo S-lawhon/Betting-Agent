@@ -138,7 +138,8 @@ def entry_price(rec: Dict[str, Any]):
 def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
     n = len(trades)
     if n == 0:
-        return {"n": 0, "verdict": "NO DECISION", "unpriced": 0,
+        return {"n": 0, "progress": 0, "threshold": MIN_N_DECISION,
+                "verdict": "NO DECISION", "unpriced": 0,
                 "reason": "no settled trades yet"}
 
     priced, unpriced = [], 0
@@ -148,7 +149,8 @@ def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
         else:
             priced.append(t)
     if not priced:
-        return {"n": 0, "verdict": "NO DECISION", "unpriced": unpriced,
+        return {"n": 0, "progress": 0, "threshold": MIN_N_DECISION,
+                "verdict": "NO DECISION", "unpriced": unpriced,
                 "reason": f"{unpriced} settled row(s) carry no usable fill "
                           "price; refusing to invent a breakeven"}
     trades = priced
@@ -182,7 +184,12 @@ def evaluate(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
         reason = (f"edge {edge*100:+.2f}pp (z={z:.2f}); "
                   f"{'need z>=2.0' if n >= MIN_N_PROMOTE else f'{need} more trades to promotion checkpoint'}")
 
-    return {"n": n, "wins": wins, "hit": hit, "breakeven": be, "edge": edge,
+    # `progress` / `threshold` are what manager.checks._gate_progress reads.
+    # Emitting only `n` left the gate unreadable by the manager even after the
+    # reader itself was fixed — the reader found the trades and the gate
+    # machinery still saw None.
+    return {"n": n, "progress": n, "threshold": MIN_N_DECISION,
+            "wins": wins, "hit": hit, "breakeven": be, "edge": edge,
             "z": z, "pnl": pnl, "verdict": verdict, "reason": reason,
             "unpriced": unpriced}
 

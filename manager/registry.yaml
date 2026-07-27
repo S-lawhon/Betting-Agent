@@ -452,6 +452,10 @@ workstreams:
       reader: scripts/p015_checkpoint.py   # the ONLY sanctioned way to read results
       metric: settled_trades
       source: p015_checkpoint
+      # Transcription of the locked rule's own n<120 line, not a new threshold —
+      # it already appears in `rules` below. Declared here so the gate and the
+      # throughput projection can read it without parsing prose.
+      threshold: 120
       current_key: pods.P-015.settled
       rules:
         - if: "z <= -2.0"

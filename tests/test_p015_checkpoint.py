@@ -176,3 +176,16 @@ def test_out_of_range_prices_are_not_used():
     assert cp.entry_price({"fill_price": 1.0}) is None
     assert cp.entry_price({"fill_price": None, "venue_prob": 0.9}) == 0.9
     assert cp.entry_price({"fill_price": "nonsense"}) is None
+
+
+def test_output_carries_the_keys_the_manager_reads():
+    """`manager.checks._gate_progress` reads `progress`, not `n`.
+
+    Emitting only `n` left the gate unreadable by the manager even after the
+    reader itself was fixed: the reader found the trades and the gate machinery
+    still saw None. Fixing the reader is not the same as fixing the gate.
+    """
+    for trades in ([], [_trade("a", "WIN", 0.92)]):
+        r = cp.evaluate(trades)
+        assert r["progress"] == r["n"]
+        assert r["threshold"] == cp.MIN_N_DECISION == 120

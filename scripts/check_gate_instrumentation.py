@@ -72,7 +72,17 @@ BLOCKED_ON_VOCAB = {
     "data":          "waiting on a data pull that is already running",
     "external":      "waiting on a third party",
     "nothing":       "running normally",
+    # Added 2026-07-28. A killed/retired pod is blocked on nothing in the
+    # literal sense, and `nothing` on a terminal pod reads as "ready to go" —
+    # which is how P-016 sat for six days labelled as if it were healthy.
+    "retired":       "terminal; the gate has resolved and there is nothing left to do",
 }
+
+# A gate may declare itself CLOSED, but only with all three of these present.
+# The exemption is deliberately expensive to claim: without `resolved_on` and
+# `verdict` it would be a way to silence any inconvenient live gate, which is
+# the opposite of what this checker is for.
+TERMINAL_STAGES = {"killed", "retired", "shelved"}
 
 import re
 
@@ -186,11 +196,52 @@ def _run_reader(root: Path, reader: Path, extra: Optional[List[str]] = None
 
 # ── the eight checks ─────────────────────────────────────────────────
 
+def _closed_gate_problems(ws: Dict[str, Any]) -> List[str]:
+    """Why this gate's CLOSED claim is not admissible, or [] if it is."""
+    gate = ws.get("gate") or {}
+    bad: List[str] = []
+    if not gate.get("resolved_on"):
+        bad.append("no `resolved_on` date")
+    if not gate.get("verdict"):
+        bad.append("no `verdict`")
+    stage = str(ws.get("stage") or "").lower()
+    if stage not in TERMINAL_STAGES:
+        bad.append(f"stage={stage!r} is not terminal {sorted(TERMINAL_STAGES)}")
+    return bad
+
+
 def check_pod(root: Path, ws: Dict[str, Any]) -> List[Result]:
     pod = ws.get("id") or "?"
     gate = ws.get("gate") or {}
     out: List[Result] = []
     R = lambda c, ok, d, partial=False: out.append(Result(pod, c, ok, d, partial))  # noqa: E731
+
+    # ── 0. A CLOSED gate is not a pending gate ──────────────────────────
+    # Added 2026-07-28, after the standard's first run flagged P-016 for having
+    # no reader and an unresolvable source. Both were true. But P-016's gate had
+    # already RESOLVED — it reached 814 fills against a threshold of 500 and
+    # returned KILL — and a resolved gate needs no live reader. The standard had
+    # no way to say that, so it demanded live instrumentation for a question
+    # answered in 2026-07.
+    #
+    # This is NOT a special case for P-016: the gate must claim `status: CLOSED`
+    # and back it with a date, a verdict, and a terminal stage. A gate that
+    # claims closure without all three FAILS, loudly, rather than being skipped —
+    # otherwise this exemption becomes the escape hatch the checker exists to
+    # prevent.
+    if str(gate.get("status") or "").upper() == "CLOSED":
+        bad = _closed_gate_problems(ws)
+        if bad:
+            R("0_closed_gate_is_substantiated", False,
+              "gate claims status: CLOSED but " + "; ".join(bad)
+              + " — a closure without all three is indistinguishable from "
+                "silencing an inconvenient gate")
+            return out
+        R("0_closed_gate_is_substantiated", True,
+          "CLOSED {} verdict={} stage={} — resolved gate, live instrumentation "
+          "checks do not apply".format(gate.get("resolved_on"),
+                                       gate.get("verdict"), ws.get("stage")))
+        return out
 
     # 1. A sanctioned reader exists and is named.
     #    P-014 declared `metric`, `source: trade_log` and `threshold: 500` with
@@ -420,11 +471,28 @@ def run(root: Path, only: Optional[List[str]] = None) -> List[Result]:
     out: List[Result] = []
     for ws in reg.get("workstreams", []) or []:
         pod = ws.get("id") or ""
-        if not ws.get("gate"):
-            continue
         if not str(pod).startswith("P-"):
             continue
         if only and pod not in only:
+            continue
+        if not ws.get("gate"):
+            # Reported, not skipped. Found 2026-07-28 while auditing P-018,
+            # which is registered `stage: build` / `blocked_on: backtest` with
+            # no gate block at all — and therefore did not appear in this
+            # checker's output in any form. A pod with no gate passed BY
+            # ABSENCE, which is the same failure mode as a reader that returns
+            # 0 when it cannot read.
+            #
+            # Not a FAIL: a pod legitimately has no gate before its validation
+            # study exists, and P-018's entry says so on purpose so throughput
+            # cannot project a date for a decision nobody has defined. It is an
+            # unknown, and it is now visible.
+            out.append(Result(pod, "0_has_a_gate", None,
+                              "no `gate` block — nothing to enforce. Correct "
+                              "while the pod is pre-validation; becomes a "
+                              "finding the moment it starts accruing "
+                              "observations (stage={!r}, blocked_on={!r})"
+                              .format(ws.get("stage"), ws.get("blocked_on"))))
             continue
         out.extend(check_pod(root, ws))
     return out

@@ -270,3 +270,66 @@ def test_the_standard_document_exists_and_names_every_check():
     doc = (ROOT / "docs" / "GATE_INSTRUMENTATION_STANDARD.md").read_text()
     for n in range(1, 10):
         assert f"### {n}." in doc, n
+
+
+# ── a CLOSED gate is not a pending gate — and the exemption must be expensive ──
+#
+# Added 2026-07-28. The standard's first run flagged P-016 for having no reader
+# and an unresolvable `source: maker_fills`. Both true — but P-016's gate had
+# already RESOLVED (814 fills against a threshold of 500, verdict KILL) and a
+# resolved gate needs no live reader. The risk of the fix is obvious: a
+# `status: CLOSED` field is a way to silence any inconvenient gate. These tests
+# pin the price of claiming it.
+
+import scripts.check_gate_instrumentation as CGI
+
+
+def _ws(**over):
+    ws = {"id": "P-999", "stage": "killed", "blocked_on": "retired",
+          "gate": {"status": "CLOSED", "resolved_on": "2026-07-21",
+                   "verdict": "KILL", "threshold": 500,
+                   "source": "maker_fills"}}
+    ws["gate"].update(over.pop("gate", {}))
+    ws.update(over)
+    return ws
+
+
+def test_closed_gate_with_all_three_is_exempt(tmp_path):
+    res = CGI.check_pod(tmp_path, _ws())
+    assert [r.check for r in res] == ["0_closed_gate_is_substantiated"]
+    assert res[0].ok is True
+
+
+def test_closed_gate_without_a_verdict_fails(tmp_path):
+    ws = _ws()
+    del ws["gate"]["verdict"]
+    res = CGI.check_pod(tmp_path, ws)
+    assert res[0].ok is False and "verdict" in res[0].detail
+
+
+def test_closed_gate_without_a_date_fails(tmp_path):
+    ws = _ws()
+    del ws["gate"]["resolved_on"]
+    res = CGI.check_pod(tmp_path, ws)
+    assert res[0].ok is False and "resolved_on" in res[0].detail
+
+
+def test_a_live_pod_cannot_close_its_own_gate(tmp_path):
+    """THE abuse case: a running pod declaring CLOSED to dodge the checks."""
+    res = CGI.check_pod(tmp_path, _ws(stage="paper", blocked_on="time"))
+    assert res[0].ok is False
+    assert "not terminal" in res[0].detail
+
+
+def test_an_open_gate_is_still_fully_checked(tmp_path):
+    ws = _ws()
+    del ws["gate"]["status"]
+    ws["stage"] = "paper"
+    res = CGI.check_pod(tmp_path, ws)
+    checks = {r.check for r in res}
+    assert "0_closed_gate_is_substantiated" not in checks
+    assert "1_sanctioned_reader" in checks
+
+
+def test_retired_is_in_the_blocked_on_vocabulary():
+    assert "retired" in CGI.BLOCKED_ON_VOCAB

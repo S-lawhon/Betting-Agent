@@ -587,8 +587,18 @@ workstreams:
     name: Live In-Play Maker
     stage: killed
     tier: none
-    service: betting-live-maker    # unit still runs, but KILL_MAKER pulls all quotes
-    blocked_on: nothing
+    # CORRECTED 2026-07-28. This comment said "unit still runs"; measured on the
+    # droplet the unit is `inactive` AND `disabled`, with no ExecMainStartTimestamp
+    # at all — it has not run since the retirement. data/KILL_MAKER is present
+    # (touched 2026-07-22 01:22) and data/trade_logs/maker_fills.jsonl has not been
+    # written since 2026-07-22 03:44. (data/shadow_maker/quotes.jsonl IS being
+    # written today, but that is scripts/shadow_maker.py — a different, separately
+    # registered job — not P-016.)
+    service: betting-live-maker    # inactive AND disabled since the retirement
+    # `nothing` was true of a LIVE pod waiting on no input; on a killed pod it
+    # read as "ready to go". A retired pod is blocked on nothing because there is
+    # nothing left to do.
+    blocked_on: retired
     retired:
       decided: 2026-07-21
       decided_by: Sam
@@ -638,10 +648,32 @@ workstreams:
       markout). Kalshi MLB in-game home-YES market making, innings 1-8,
       settle-don't-trade-out. See retired: block and the post-mortem.
     gate:
+      # CLOSED 2026-07-28. This gate is not pending — it RESOLVED, and killing
+      # P-016 is what it did. It sat here with `source: maker_fills` and no
+      # reader, which the 2026-07-29 instrumentation standard correctly flagged
+      # as P-014's exact defect. The defect was real but the diagnosis was
+      # inverted: P-014's gate was unreadable and STILL COUNTING; this one had
+      # already returned its verdict and nobody marked it done.
+      #
+      # `status: CLOSED` requires `resolved_on` + `verdict` + a terminal
+      # `stage`, all three, so it can never be used to silence a live gate.
+      status: CLOSED
+      resolved_on: 2026-07-21
+      verdict: KILL
+      resolved_by: >
+        The gate's own threshold, reached and failed: 814 fills against 500,
+        +5m markout -1.29c/contract fee-net. See the `retired:` block above and
+        research/POSTMORTEM_P016_2026-07-21.md.
       question: Positive fee-adjusted +5m markout across a real sample?
       metric: fills
+      # Kept as written, deliberately. `maker_fills` never resolved through
+      # manager/checks.py::_gate_progress, and the file it names
+      # (data/trade_logs/maker_fills.jsonl, 3,700 rows, 814 FILL) is frozen. A
+      # closed gate needs no live reader; rewiring one now would be inventing a
+      # measurement path for a question already answered.
       source: maker_fills
       threshold: 500
+      final_progress: 814
       current_key: pods.P-016.fills_clean
       decision: >
         PRE-REGISTERED: >=500 fills AND positive fee-adjusted +5m markout AND

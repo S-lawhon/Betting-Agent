@@ -13,8 +13,25 @@ F5) are `quadratic` → zero maker fee, while game-winner and league-outcome
 series (KXPGA, KXMLBGAME, KXMLB, ...) are `quadratic_with_maker_fees`.
 Pass `series_ticker` to fee_per_contract / fee_total to get the correct maker
 treatment. Backward compatible: with NO series_ticker, maker fees fall back to
-the general 0.0175 rate. P-016 relies on that fallback (it makes on KXMLBGAME,
-which does charge) and must not be perturbed while its gate sample is running.
+the general 0.0175 rate.
+
+WHO DEPENDS ON THAT FALLBACK — corrected 2026-07-28.
+This note used to name P-016 as the reason the fallback must not be perturbed.
+**P-016's gate is CLOSED** (resolved 2026-07-21, verdict KILL; the unit is
+inactive and disabled and has written no fill since 2026-07-22), so that
+particular reason is dead — and reading it today would suggest the fallback is
+now free to change. **It is not.** The fallback is still load-bearing for a
+gate that IS running:
+
+  * `scripts/clv_settlement.py` and `scripts/clv_backfill.py` compute
+    `clv_net_maker` with no series_ticker, and that field is what
+    `data/trade_logs/clv_log.jsonl` carries into **P-001's live CLV gate**.
+  * `src/maker_challenger.py` and `scripts/maker_{report,diagnostics}.py` also
+    call it bare.
+
+So the rule survives its original justification: **do not perturb the general
+maker fallback while P-001's CLV sample is accruing.** The owner changed; the
+constraint did not.
 """
 from __future__ import annotations
 import json

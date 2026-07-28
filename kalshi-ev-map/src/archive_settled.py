@@ -137,7 +137,7 @@ def main():
     rows, seen, skipped, written = [], 0, 0, 0
     writer = None
     if keep_raw:
-        written = pq.ParquetFile(raw).metadata.num_rows
+        written = pq.ParquetFile(raw, pre_buffer=False).metadata.num_rows
         print(f"[archive] --from-raw: reusing {raw.name} with {written} rows, "
               f"skipping pass A", flush=True)
     try:
@@ -205,9 +205,33 @@ def main():
     # `drop_duplicates` never removed anything. It is gone — but the assumption
     # is now CHECKED rather than assumed, at ~30 MB (uint64 hashes) instead of
     # ~400 MB (strings), so if Kalshi ever starts repeating we find out.
+    # ── The reader that does NOT leak ──────────────────────────────────────
+    #
+    # MEASURED 2026-07-28, after pass B was OOM-killed three times and the
+    # first two diagnoses (the ticker set, then the pandas column read) were
+    # both wrong. Reading `settled_archive.parquet` (3.68 M rows, 185 row
+    # groups) with the OBVIOUS code grows without bound:
+    #
+    #   pq.ParquetFile(p).iter_batches(...)              -> 509 MB, arrow 304 MB
+    #   ...same, use_threads=False                       -> 507 MB, arrow 360 MB
+    #   ds.dataset(p).to_batches(...)                    -> 826 MB
+    #   pq.ParquetFile(p, pre_buffer=False).iter_batches -> 177 MB, arrow  22 MB  <-
+    #
+    # `pre_buffer=True` is the DEFAULT and it is the leak: the reader caches
+    # every column chunk it touches and never releases it, so
+    # `pool.bytes_allocated()` climbs monotonically with the file. It is not
+    # allocator retention — `release_unused()` does not help, because the bytes
+    # are still allocated, not merely unreturned.
+    #
+    # This is why the archiver died at ~700 MB anon-rss on a TWO-DAY window:
+    # the size of the pull never mattered, only the size of the archive being
+    # read back.
+    def _open(path):
+        return pq.ParquetFile(path, pre_buffer=False, memory_map=False)
+
     def _ticker_hashes(path):
         """uint64 hash per row, in file order. ~8 B/row instead of ~110 B."""
-        pf_ = pq.ParquetFile(path)
+        pf_ = _open(path)
         out = np.empty(pf_.metadata.num_rows, dtype=np.uint64)
         i = 0
         for b in pf_.iter_batches(batch_size=200000, columns=["ticker"]):
@@ -253,7 +277,7 @@ def main():
             for src in (raw, OUT):
                 if src is raw and not written:
                     continue
-                for batch in pq.ParquetFile(src).iter_batches(batch_size=CHUNK):
+                for batch in _open(src).iter_batches(batch_size=CHUNK):
                     tbl = pa.Table.from_batches([batch])
                     if src is OUT and len(new_h):
                         bh = np.array(
@@ -289,7 +313,7 @@ def main():
             leftover.unlink()
 
     json.dump({"last_run_ts": int(time.time())}, open(STATE, "w"))
-    total = pq.ParquetFile(OUT).metadata.num_rows
+    total = _open(OUT).metadata.num_rows
     print(f"[done] archive now {total} rows -> {OUT}", flush=True)
 
 

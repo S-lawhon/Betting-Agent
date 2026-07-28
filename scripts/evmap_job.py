@@ -130,8 +130,17 @@ def _rows(spec: Dict[str, Any], since: Optional[float] = None) -> Optional[int]:
         return 0
     try:
         if path.suffix == ".parquet":
-            import pandas as pd                    # noqa: PLC0415
-            return int(len(pd.read_parquet(path)))
+            # Read the FOOTER, not the data. `pd.read_parquet(path)` loaded the
+            # whole file just to call len() on it — and on 2026-07-28, the run
+            # that first built `settled_archive.parquet` made that fatal: 340 MB
+            # / 3.68 M rows expands past 700 MB in pandas, so this probe was
+            # OOM-KILLED IN 1.4 SECONDS, before the archiver it wraps had done
+            # anything at all. **The mechanism built to detect silent failure
+            # became the failure**, and it would have done so every Sunday.
+            # Parquet stores the row count in its metadata; this is O(1) and
+            # reads no column data.
+            import pyarrow.parquet as pq            # noqa: PLC0415
+            return int(pq.ParquetFile(path).metadata.num_rows)
         if path.suffix == ".csv":
             with open(path, "r", encoding="utf-8", errors="replace") as fh:
                 return max(0, sum(1 for _ in fh) - 1)   # minus the header

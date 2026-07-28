@@ -806,6 +806,102 @@ def check_p022_window(snap: Dict[str, Any]) -> List[Finding]:
     return out
 
 
+# How stale a job's last run may be before it is treated as not running, and
+# how many quote intents the paper maker must produce in a day. Both are
+# generous: the point is to catch a DEAD collector, not to page on jitter.
+EVMAP_MAX_AGE_MIN = {
+    "weather_sheet": 60 * 30,     # daily 06:53 local
+    "weather_depth": 60 * 30,     # 09:23 and 12:23 local
+    "paper_maker": 60 * 20,       # every 30 min inside a 13h local window
+    "paper_eval": 60 * 30,        # daily 07:37 local
+    "archive_settled": 60 * 24 * 9,   # weekly, plus two days of slack
+}
+# A day in which the maker collected nothing is a dead day, whatever the exit
+# codes said. Set well below the ~1,200/day the Mac used to produce.
+EVMAP_MIN_ROWS_TODAY = {"paper_maker": 1}
+
+
+def check_evmap(snap: Dict[str, Any]) -> List[Finding]:
+    """EV-Map collectors: alarm on failure, on silence, AND on empty success.
+
+    The Mac ran these 139 times and failed 139 times unnoticed — macOS TCC
+    denying cron read access under ~/Desktop, so they failed awake as well as
+    asleep. Six days of point-in-time weather paper quotes (~1,200/day) are
+    permanently gone: the public horizon is 90 days and the quotes cannot be
+    re-pulled.
+
+    Three distinct conditions, because in that failure all three were
+    indistinguishable from health:
+
+      1. the job FAILED (nonzero exit, or exit 0 having written nothing it
+         was contracted to write);
+      2. the job has not RUN inside its own cadence;
+      3. the job ran and the DAY collected nothing.
+    """
+    ev = snap.get("evmap") or {}
+    if not ev:
+        return []
+    if not ev.get("available"):
+        return [Finding(
+            key="evmap.unavailable",
+            severity="warn",
+            title="EV-Map collectors are not reporting",
+            detail="{}\n\nWhile this is unavailable the weather Build-2 clock "
+                   "is UNMEASURED, and every unmeasured day is a day of "
+                   "point-in-time quotes that cannot be recovered."
+                   .format(ev.get("error") or "no detail"),
+            workstream="EV-Map",
+            fix="ssh root@129.212.176.202 'systemctl list-timers evmap-*'")]
+
+    out: List[Finding] = []
+    for job, rec in sorted((ev.get("jobs") or {}).items()):
+        fails = int(rec.get("consecutive_failures") or 0)
+        if not rec.get("ok"):
+            out.append(Finding(
+                key="evmap.{}.failing".format(job),
+                # One failure is a warn (alert.py needs two consecutive runs
+                # to page); two in a row is the pattern that ran to 139.
+                severity="critical" if fails >= 2 else "warn",
+                title="EV-Map {} failed ({} consecutive)".format(job, fails),
+                detail="exit={} rows_added={} {}\n{}".format(
+                    rec.get("exit_code"), rec.get("rows_added"),
+                    rec.get("empty_reason") or "",
+                    "\n".join("    " + s for s in rec.get("stderr_tail") or [])),
+                workstream="EV-Map",
+                fix="ssh root@129.212.176.202 'journalctl -u evmap-* -n 50'",
+                value=fails))
+            continue
+
+        age = rec.get("age_min")
+        limit = EVMAP_MAX_AGE_MIN.get(job)
+        if isinstance(age, (int, float)) and limit and age > limit:
+            out.append(Finding(
+                key="evmap.{}.stale".format(job),
+                severity="critical",
+                title="EV-Map {} has not run in {:.0f}h".format(job, age / 60),
+                detail="Its timer should have fired inside {:.0f}h. A "
+                       "collector that stops running looks exactly like one "
+                       "with nothing to collect — that is how 139 runs were "
+                       "lost.".format(limit / 60),
+                workstream="EV-Map",
+                fix="ssh root@129.212.176.202 'systemctl list-timers evmap-*'",
+                value=round(age, 1)))
+            continue
+
+        need = EVMAP_MIN_ROWS_TODAY.get(job)
+        if need and int(rec.get("rows_today") or 0) < need:
+            out.append(Finding(
+                key="evmap.{}.empty_day".format(job),
+                severity="warn",
+                title="EV-Map {} collected 0 rows today".format(job),
+                detail="Every run exited 0 and the day produced nothing. That "
+                       "is the same outcome as not running at all, and it is "
+                       "the half of the failure an exit code cannot see.",
+                workstream="EV-Map",
+                value=0))
+    return out
+
+
 def check_faults(snap: Dict[str, Any]) -> List[Finding]:
     """The collector failing to measure something is itself a finding.
 
@@ -881,6 +977,7 @@ def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
     findings += check_errors(snap)
     findings += check_throughput(snap)
     findings += check_p022_window(snap)
+    findings += check_evmap(snap)
     findings += check_faults(snap)
     findings += check_workstreams(snap)
     findings.sort(key=lambda f: (SEVERITY_ORDER.get(f.severity, 9), f.key))

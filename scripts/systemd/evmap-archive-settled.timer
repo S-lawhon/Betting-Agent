@@ -1,0 +1,25 @@
+# EV-Map weekly settled-market archive
+#
+# Times are AMERICA/CHICAGO on purpose: they reproduce the Mac crontab's local
+# schedule exactly, and the weather jobs are keyed to US local calendar days
+# (weather_paper_maker only quotes a day's market before 10:00 local).  The
+# droplet runs UTC, so writing these in UTC would silently shift the schedule
+# by an hour at every DST change.
+#
+# Persistent=true is the direct fix for the other half of the Mac failure:
+# cron does not run jobs missed while the machine is asleep.  A droplet does
+# not sleep, but a reboot or a maintenance window would otherwise drop a run
+# with no trace.
+[Unit]
+Description=Betting Pod Shop — EV-Map weekly settled-market archive (timer)
+
+[Timer]
+OnCalendar=Sun *-*-* 03:17:00 America/Chicago
+Persistent=true
+# The paper maker fires 26x/day across five stations; a fixed second would put
+# every unit on the same instant after a reboot.
+RandomizedDelaySec=45
+Unit=evmap-archive-settled.service
+
+[Install]
+WantedBy=timers.target

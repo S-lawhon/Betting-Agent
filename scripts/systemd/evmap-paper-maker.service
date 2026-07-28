@@ -1,0 +1,27 @@
+# EV-Map weather paper maker (quote intents)
+#
+# Moved off the Mac 2026-07-29.  On the Mac these ran under cron and failed
+# 139 of 139 times with `Operation not permitted` -- macOS TCC denying cron
+# read access under ~/Desktop.  They failed AWAKE, not only asleep, and six
+# days of point-in-time weather quotes were lost because nothing distinguished
+# a failing collector from an idle one.
+#
+# Type=oneshot driven by evmap-paper-maker.timer.  scripts/evmap_job.py records the
+# outcome AND the rows actually written to kalshi-ev-map/data/job_status.jsonl,
+# which manager/collect.py reads and manager/checks.py alarms on.  Exit 0 with
+# zero rows is treated as a failure -- that is the whole lesson.
+[Unit]
+Description=Betting Pod Shop — EV-Map weather paper maker (quote intents)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.evmap_job paper_maker
+# These are read-only public API pulls; a hung request must not wedge the timer.
+TimeoutStartSec=900
+Nice=10

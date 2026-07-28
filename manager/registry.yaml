@@ -217,30 +217,99 @@ jobs:
       one ~20-day fallback, so the pod's [12h, 24h] window opens roughly a
       fortnight after the round has settled. Exit 1 = alarm, 0 = fine.
 
-  # --- Mac-hosted (kalshi-ev-map weather pipeline) -------------------------
-  # These run under the LOCAL crontab and silently skip whenever the Mac is
-  # asleep. The roadmap says "every week you don't archive is calibration data
-  # lost forever", so gaps here are real data loss, not just a late report.
-  - id: weather_paper_maker
-    host: mac
-    schedule: "13,43 7-19 * * *"
-    description: Weather paper maker quotes (Build 2 evidence accumulation)
+  # --- kalshi-ev-map weather pipeline — MOVED TO THE DROPLET 2026-07-29 -----
+  #
+  # These ran under the Mac's crontab and FAILED 139 OF 139 RUNS with
+  # "Operation not permitted": macOS TCC denies `cron` read access under
+  # ~/Desktop, so python could not open the script. They failed AWAKE, not
+  # only asleep, and the previous note here ("sleep-gap prone") named the
+  # wrong cause. Six days of point-in-time weather paper quotes (~1,200/day)
+  # are permanently gone — the public horizon is 90 days.
+  #
+  # The weekly archiver failed a DIFFERENT way: data/cron_archive.log never
+  # existed, so that line never executed at all — Sunday 03:17 local, and cron
+  # does not run jobs missed while the Mac is asleep. Two failure modes, one
+  # fix.
+  #
+  # Now systemd timers, scheduled in America/Chicago so the local-day
+  # semantics of the weather markets are unchanged. Every run goes through
+  # scripts/evmap_job.py, which records the rows actually WRITTEN, not just an
+  # exit code — `manager/checks.py::check_evmap` treats exit 0 with zero rows
+  # as a failure, because that is the half of the 139 that an exit code could
+  # never have seen.
+  - id: evmap_weather_sheet
+    host: droplet
+    schedule: "*-*-* 06:53 America/Chicago (evmap-weather-sheet.timer)"
+    description: Weather fair-value sheet (ensemble -> bracket probabilities)
+    output:
+      file: kalshi-ev-map/data/job_status.jsonl
+      max_stale_hours: 30
+    severity: warn
+
+  - id: evmap_weather_depth
+    host: droplet
+    schedule: "*-*-* 09,12:23 America/Chicago (evmap-weather-depth.timer)"
+    description: Weather book-depth snapshot
+    output:
+      file: kalshi-ev-map/data/weather_depth.parquet
+      max_stale_hours: 30
+    severity: warn
+
+  - id: evmap_paper_maker
+    host: droplet
+    schedule: "*-*-* 07..19:13,43 America/Chicago (evmap-paper-maker.timer)"
+    description: Weather paper maker quote intents — Build 2's 30-day evidence clock
     output:
       file: kalshi-ev-map/data/paper_quotes.parquet
-      max_stale_hours: 4
-      root: local
+      max_stale_hours: 20
     severity: warn
-    note: Sleep-gap prone. launchd blocked by root-owned ~/Library/LaunchAgents.
+    note: >
+      This is the job the 30-day clock counts. First droplet run 2026-07-28
+      03:11 UTC, +114 quote intents verified by row count.
 
-  - id: weather_archiver
-    host: mac
-    schedule: "17 3 * * 0"
+  - id: evmap_paper_eval
+    host: droplet
+    schedule: "*-*-* 07:37 America/Chicago (evmap-paper-eval.timer)"
+    description: Previous day's paper-quote evaluation against the public tape
+    output:
+      file: kalshi-ev-map/data/job_status.jsonl
+      max_stale_hours: 30
+    severity: warn
+
+  - id: evmap_archive_settled
+    host: droplet
+    schedule: "Sun *-*-* 03:17 America/Chicago (evmap-archive-settled.timer)"
     description: Weekly settled-market archiver — 90-day API horizon means gaps are permanent
     output:
-      file: kalshi-ev-map/data/
-      max_stale_hours: 240   # weekly + generous grace
-      root: local
+      file: kalshi-ev-map/data/settled_archive.parquet
+      max_stale_hours: 216   # weekly + a day of slack
     severity: warn
+    enabled: false
+    note: >
+      TIMER DISABLED 2026-07-29 — this job is BLOCKED, and deliberately so.
+
+      It has NEVER SUCCEEDED ANYWHERE: settled_archive.parquet and
+      archive_state.json have never existed on the Mac, and cron_archive.log
+      does not exist either, so the Mac line never even executed (Sunday 03:17
+      local; cron does not run jobs missed while asleep — a different failure
+      mode from the other four, which were TCC).
+
+      On the droplet the first run was OOM-killed at 433s, 1.66GB RSS on a 2GB
+      box, because the script accumulated every settled market of the window
+      before filtering. Chunked accumulation (row-wise equivalent; no
+      methodology change) got it further but it was still climbing past 1.4GB
+      at 35 minutes with 95MB free, so it was stopped and disabled: the same
+      box runs betting-pod-shop and betting-round-leader-fade, and letting the
+      OOM killer choose between them the night before P-022's first placement
+      window is not a trade worth making.
+
+      Root cause is the window, not the loop: with no archive_state.json it
+      pulls a 10-day slice of ALL settled Kalshi markets, most of which are
+      MVE parlay husks. The fix is to bound the pull (write parquet
+      incrementally per chunk, or seed archive_state.json so the window is a
+      day rather than ten) — a real change to the collector, and Sam's call.
+      Until then the 90-day horizon keeps rolling and the calibration history
+      that falls off it is gone.
 
 # =============================================================================
 # WORKSTREAMS
@@ -1140,6 +1209,19 @@ workstreams:
         less than half of captured edge.
       metric: days_live
       threshold: 30
+      # THE CLOCK STARTS HERE. It had not started at all: the five collectors
+      # ran 139 times on the Mac and failed 139 times (macOS TCC denying cron
+      # read access under ~/Desktop — they failed awake, not only asleep), and
+      # nothing noticed because a failing collector and an idle one produced
+      # the same observable. 2026-07-22 -> 07-27 is permanently lost: ~1,200
+      # point-in-time quotes/day against a 90-day public horizon.
+      clock_start_utc: "2026-07-28T03:11:00Z"   # first verified droplet run,
+                                                # +114 quote intents by row count
+      projected_completion_utc: "2026-08-27"    # clock_start + 30 days
+      note: >
+        Days are counted from the paper maker's own rows, not from calendar:
+        a day on which evmap_paper_maker collected zero rows is not a day
+        live, and manager/checks.py alarms on exactly that.
     open_questions:
       - id: build3-gate
         blocked_on: data

@@ -24,16 +24,40 @@ def main():
     state = json.load(open(STATE)) if STATE.exists() else {}
     # overlap 2 days to be safe against settlement lag
     min_close = int(state.get("last_run_ts", time.time() - 8 * 86400)) - 2 * 86400
-    rows = []
+    # MEMORY, not methodology (2026-07-29).  This accumulated every settled
+    # market of the window in one list and then built one DataFrame.  On the
+    # 16GB Mac that was merely wasteful; on the 2GB droplet it reached 1.66GB
+    # RSS and was OOM-killed at 433s (exit -9) on its first run.  Kalshi
+    # settles a very large number of MVE parlay husks, and the filter that
+    # drops them ran only AFTER everything was in memory.
+    #
+    # Chunking is exactly equivalent, not an approximation: `build_frame` is
+    # row-wise and the MVE filter is row-wise, so filtering per chunk and
+    # concatenating gives the identical frame.  No field, threshold or
+    # semantic changes.
+    CHUNK = 20000
+    parts, rows, seen = [], [], 0
+
+    def _flush():
+        if not rows:
+            return
+        part = build_frame(rows)
+        # drop zero-volume MVE parlay husks to keep the archive lean
+        parts.append(part[~part.is_mve | (part.volume > 0)])
+        rows.clear()
+
     for m in kc.paginate("/markets", {"status": "settled", "limit": 1000,
                                       "min_close_ts": min_close},
                          list_key="markets"):
         rows.append(m)
-        if len(rows) % 100000 == 0:
-            print(f"[archive] {len(rows)}...", flush=True)
-    df = build_frame(rows)
-    # drop zero-volume MVE parlay husks to keep the archive lean
-    df = df[~df.is_mve | (df.volume > 0)]
+        seen += 1
+        if len(rows) >= CHUNK:
+            _flush()
+            print(f"[archive] {seen} scanned, "
+                  f"{sum(len(p) for p in parts)} kept...", flush=True)
+    _flush()
+    df = (pd.concat(parts, ignore_index=True) if parts
+          else build_frame([]).iloc[0:0])
     if OUT.exists():
         old = pd.read_parquet(OUT)
         df = pd.concat([old, df]).drop_duplicates(subset="ticker", keep="last")

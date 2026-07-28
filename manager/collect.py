@@ -808,6 +808,58 @@ class Collector:
             ],
         }
 
+    @safe("evmap_jobs")
+    def evmap_jobs(self) -> Dict[str, Any]:
+        """EV-Map collector outcomes, per job, from scripts/evmap_job.py.
+
+        These ran 139 times on the Mac and failed 139 times without anyone
+        noticing, because a failing collector and an idle collector produced
+        the same observable: nothing. Six days of point-in-time weather quotes
+        are permanently gone. This probe exists so that cannot recur silently.
+
+        Reports the last outcome, its age, consecutive failures, and the rows
+        the run actually WROTE — an exit-0 collector that writes nothing is
+        the same outcome as one that crashes.
+        """
+        path = self.root / "kalshi-ev-map/data/job_status.jsonl"
+        if not path.exists():
+            return {"available": False,
+                    "error": "no kalshi-ev-map/data/job_status.jsonl — no "
+                             "EV-Map job has run on this host"}
+        jobs: Dict[str, Any] = {}
+        rows_today: Dict[str, int] = {}
+        today = now().date().isoformat()
+        for line in tail_lines(path, count=400):
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            job = rec.get("job")
+            if not job:
+                continue
+            if (rec.get("iso") or "")[:10] == today:
+                rows_today[job] = rows_today.get(job, 0) + int(
+                    rec.get("rows_added") or 0)
+            jobs[job] = rec                       # last write wins
+        out: Dict[str, Any] = {"available": True, "jobs": {}}
+        for job, rec in sorted(jobs.items()):
+            ts = parse_ts(rec.get("iso"))
+            out["jobs"][job] = {
+                "ok": bool(rec.get("ok")),
+                "iso": rec.get("iso"),
+                "age_min": (round((now() - ts).total_seconds() / 60.0, 1)
+                            if ts else None),
+                "exit_code": rec.get("exit_code"),
+                "rows_added": rec.get("rows_added"),
+                "rows_after": rec.get("rows_after"),
+                "rows_today": rows_today.get(job, 0),
+                "consecutive_failures": rec.get("consecutive_failures") or 0,
+                "empty_reason": rec.get("empty_reason"),
+                "stderr_tail": (rec.get("stderr_tail") or [])[-2:],
+                "duration_s": rec.get("duration_s"),
+            }
+        return out
+
     @safe("p001_gate")
     def p001_gate(self) -> Dict[str, Any]:
         """P-001 progress under the re-scoped scenario-D gate.
@@ -1156,6 +1208,7 @@ class Collector:
             "p001": self.p001_gate() or {},
             "p022": self.p022_gate() or {},
             "p022_window": self.p022_window() or {},
+            "evmap": self.evmap_jobs() or {},
             "p014": self.p014_gate() or {},
             "invariants": self.invariants() or {},
             "errors": self.recent_errors() or {},

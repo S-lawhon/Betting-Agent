@@ -18,6 +18,12 @@
 #               (P-015 needs ~6 months of trades; nagging daily is noise.)
 #   data     -> Waiting on a data pull/backfill that is already running.
 #   external -> Waiting on a third party (API access, fee schedule, venue).
+#   measurement -> The blocker is not calendar and not a defect: it is that the
+#               ACCRUAL RATE is not yet measured, so no resolution date can be
+#               stated. Carries `recheck_after`. Distinct from `time`, which
+#               asserts a sample is accruing at a known rate -- claiming that
+#               when the rate is unknown is how a gate that cannot resolve gets
+#               reported as one that is patiently waiting.
 #   backtest -> Code exists and is INERT; waiting on its own validation study,
 #               not on calendar. Distinct from `time` on purpose: `time` means
 #               a sample is accruing toward a defined gate, and labelling a
@@ -324,7 +330,22 @@ workstreams:
     stage: paper
     tier: validating
     owner_dir: src/pods/kalshi_moneyline.py
-    blocked_on: time
+    # WAS `time`, which was dishonest in both directions. At the all-time 14.3%
+    # admissibility rate the gate needs ~31 weeks and cannot resolve inside the
+    # MLB season, so it was inert rather than accruing; and the reason the rate
+    # was 14.3% was a DEFECT, not calendar.
+    #
+    # Measured 2026-07-29: the defect is fixed. 3 of 3 post-fix placements are
+    # admissible, worst delta 7 minutes, and the exactly-24.00h tie-break
+    # fingerprint — 152 rows all-time — has ZERO post-fix instances, its last
+    # occurrence being 2026-07-26 21:26:45Z, five minutes before the fixed
+    # process started at 21:31:32Z.
+    #
+    # It is not `time` yet, because the RATE is measured at n=3. It becomes
+    # `time` the moment n >= 10 post-fix placements confirms it; see
+    # research/REPORT_P001_Admissibility_2026-07-29.md §6.
+    blocked_on: measurement
+    recheck_after: "2026-08-01"
     summary: >
       Core moneyline pod. Lifetime verdict was KEEP-but-RECALIBRATE (model
       overconfident ~5pp). CLV gate active since 2026-07-19 restricting to

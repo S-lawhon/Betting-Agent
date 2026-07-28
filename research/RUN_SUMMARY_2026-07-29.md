@@ -317,17 +317,29 @@ verifying a deploy against the machine that produced it. Fresh
 | `scripts/evmap_job.py`, `src/inplay_surprise.py` | PRESENT |
 | `docs/GATE_INSTRUMENTATION_STANDARD.md`, `research/P014_DECISION_RULE.md`, this summary | PRESENT |
 
-**The single-copy exposure is closed.** `main` remains 0 commits ahead of
-HEAD, so the fast-forward described below is still available and is still the
-right posture.
+**The single-copy exposure is closed.**
 
-**Merge posture, and the reasoning:** **fast-forward `main`.**
-`main` is 0 commits ahead of HEAD, so it is a genuine fast-forward with no
-merge commit and no conflict. Every commit is already deployed and running;
-there is no reviewer but Sam; and a PR would add a review artifact for code
-that has been in production for days. The branch name
-`p024-mlb-f5-research` describes a study killed on 2026-07-25 and should not
-outlive the merge.
+### `main` fast-forwarded and pushed
+
+```
+e9b6774..a049354  main -> main
+```
+
+**A true fast-forward: 0 merge commits introduced** (`git rev-list --count
+--merges e9b6774..a049354` = 0). Local `main`, `origin/main` and
+`p024-mlb-f5-research` are all `a049354`. Re-verified from a **second
+independent clone, of `main` this time** — 126 commits, and the resolver, fee
+fixture, throughput instrument, standard and this summary all present. Suite
+green on the checked-out `main`: **1,723 passed, 2 skipped.**
+
+**Merge posture, and the reasoning — done, and why fast-forward over a PR.**
+`main` was 0 commits ahead of HEAD, so this was a genuine fast-forward with no
+merge commit and no conflict. Every commit was already deployed and running;
+there is no reviewer but Sam; and a PR would have added a review artifact for
+code that has been in production for days. **The branch name
+`p024-mlb-f5-research` describes a study killed on 2026-07-25** and now points
+at the same commit as `main` — deleting it is Sam's call, and it is the only
+one of the nineteen local branches that is now genuinely redundant.
 
 **Everything committed.** The working tree was carrying the two loose research
 documents and all 24 `research/prompts/*.md` untracked; they are now in.
@@ -386,10 +398,11 @@ bash scripts/deploy.sh 129.212.176.202          # sync only, NO restart
 
 **New tonight**
 
-1. ~~**Push the branch**~~ **DONE** — tip `0e85bf3` on origin, verified from an
-   independent clone (§Task 7). The remaining half is the merge posture:
-   **fast-forward `main`** and retire the `p024-mlb-f5-research` name, which
-   describes a study killed on 2026-07-25.
+1. ~~**Push the branch, then fast-forward `main`**~~ **BOTH DONE** — `main` and
+   `origin/main` are at `a049354`, fast-forwarded with **0 merge commits** and
+   verified from two independent clones (§Task 7). The only thing left is
+   cosmetic: `p024-mlb-f5-research` now points at the same commit as `main`
+   and names a study killed on 2026-07-25. Deleting it is your call.
 2. **Accept or re-derive `P014_DECISION_RULE.md`** given the disclosed
    contamination (§9 of that file). My recommendation: accept and record it —
    the alternative trades a small, disclosed, checkable contamination for a

@@ -1,5 +1,5 @@
 {
-  "_note": "backtest over 677 game-days",
+  "_note": "Backtest RAN over 677 game-days (5676 fills) \u2014 but gate #1 CANNOT DISCRIMINATE, so these remain priors. The gate asks 'does edge rise with surprise?' and the low-surprise bucket(s) [0.00,0.02), [0.02,0.06) are EMPTY BY CONSTRUCTION: quoting.surprise_hi = 0.06 is the threshold at which the strategy quotes at all, so no fade can ever be booked below it. With no low-surprise control the headline is the edge of a strategy that only ever fires on high surprise; it is NOT evidence that surprise produces the edge. To make the gate discriminate, the replay must quote below surprise_hi purely to populate the control buckets. See REPORT_InPlay_Fade_2026-07.md.",
   "_status": "priors \u2014 NOT backtest-validated until the REPORT shows a non-flat surprise-bucket table",
   "quoting": {
     "surprise_hi": 0.06,

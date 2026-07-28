@@ -481,6 +481,42 @@ def write_results_report(fills: List[Dict[str, Any]], cov: Dict[str, Any],
         fh.write("\n".join(lines) + "\n")
 
 
+def gate1_note(fills: List[Dict[str, Any]], cov: Dict[str, Any],
+               params: SurpriseParams) -> str:
+    """`_note` for the params file, stating whether gate #1 can DISCRIMINATE.
+
+    "backtest over N game-days" was the old note and it was misleading: it read
+    as validation while `_status` still said "priors — NOT backtest-validated".
+    Gate #1 (spec §5/§8) asks whether edge RISES WITH SURPRISE, which needs
+    low-surprise fills to compare against. But the strategy only quotes at
+    `surprise_hi`, so every bucket below it is empty BY CONSTRUCTION and the
+    gate cannot answer its own question. That has to be stated where the
+    numbers are read, not inferred by the next reader.
+    """
+    n = len(fills)
+    days = cov.get("n_game_days")
+    buckets = bucketize(fills, "surprise", SURPRISE_BUCKETS)
+    empty_lo = [f"[{lo:.2f},{hi:.2f})" for (lo, hi), fs in buckets.items()
+                if hi <= params.surprise_hi and not fs]
+    if not empty_lo:
+        return (f"Backtest over {days} game-days, {n} fills. Gate #1 has "
+                f"non-empty low-surprise buckets — the surprise-bucket table "
+                f"in REPORT_InPlay_Fade_2026-07.md is the verdict.")
+    return (
+        f"Backtest RAN over {days} game-days ({n} fills) — but gate #1 CANNOT "
+        f"DISCRIMINATE, so these remain priors. The gate asks 'does edge rise "
+        f"with surprise?' and the low-surprise bucket(s) {', '.join(empty_lo)} "
+        f"are EMPTY BY CONSTRUCTION: quoting.surprise_hi = "
+        f"{params.surprise_hi} is the threshold at which the strategy quotes "
+        f"at all, so no fade can ever be booked below it. With no low-surprise "
+        f"control the headline is the edge of a strategy that only ever fires "
+        f"on high surprise; it is NOT evidence that surprise produces the "
+        f"edge. To make the gate discriminate, the replay must quote below "
+        f"surprise_hi purely to populate the control buckets. See "
+        f"REPORT_InPlay_Fade_2026-07.md."
+    )
+
+
 def write_params(params: SurpriseParams, note: str) -> None:
     payload = {
         "_note": note,
@@ -562,7 +598,7 @@ def main() -> int:
         print(f"  {ticker}: {len(fills)} faded fills")
 
     write_results_report(all_fills, cov, params)
-    write_params(params, f"backtest over {cov['n_game_days']} game-days")
+    write_params(params, gate1_note(all_fills, cov, params))
     print(f"Wrote {REPORT_PATH}\nWrote {PARAMS_PATH}")
     return 0
 

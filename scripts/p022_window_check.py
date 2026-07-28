@@ -256,7 +256,8 @@ def last_quote_per_ticker(path: Path) -> Dict[str, float]:
 
 
 def screen_after_band(engine: RoundLeaderFadeMakerEngine, ticker: str,
-                      event_code: str, mid: float):
+                      event_code: str, mid: float,
+                      pending_event: float = 0.0, pending_total: float = 0.0):
     """Every screen the pod applies AFTER the band, as (ok, reason, size, px).
 
     This is the one place the detector deliberately duplicates pod logic
@@ -267,20 +268,36 @@ def screen_after_band(engine: RoundLeaderFadeMakerEngine, ticker: str,
     test_screen_agrees_with_the_engines_own_decision``, which drives a real
     engine over the same states and asserts the two answers match.
 
-    Cap room is read from the engine's public collateral accessors, so it is
+    Cap room is read from the engine's public exposure accessors, so it is
     only meaningful after ``rebuild_from_log()`` has restored live exposure.
+
+    ``pending_event`` / ``pending_total`` carry the collateral the CALLER has
+    already allocated to earlier candidates in this same pass. The detector
+    holds no quotes of its own — it never calls ``cycle()`` — so without them
+    every candidate would see an empty book and the detector would expect the
+    pod to quote all of them. Once the per-tournament cap started dropping
+    names, that would have paged ``WINDOW_OPEN_CANDIDATE_NO_QUOTE`` on names
+    the pod correctly declined. Callers must walk candidates in the pod's own
+    allocation order (ticker, ascending) for these to mean anything.
     """
     book = engine.books.get(ticker)
     book_coll = book.collateral if book is not None else 0.0
     book_sold = book.sold if book is not None else 0.0
+    own_quote_coll = book.quoted_collateral if book is not None else 0.0
 
     room_name_coll = engine.max_collateral_per_name - book_coll
     room_name_ct = engine.max_contracts_per_name - book_sold
     if room_name_coll <= 0 or room_name_ct <= 0:
         return False, "cap_per_name", 0.0, None
+    # Exposure, not filled collateral — §7's caps bind on resting quotes too.
+    # This book's own resting quote is excluded because the quote priced below
+    # replaces it, exactly as the pod does.
     room_event = (engine.max_collateral_per_tournament
-                  - engine.tournament_collateral(event_code))
-    room_total = engine.max_total_collateral - engine.total_collateral()
+                  - (engine.tournament_exposure(event_code) - own_quote_coll)
+                  - pending_event)
+    room_total = (engine.max_total_collateral
+                  - (engine.total_exposure() - own_quote_coll)
+                  - pending_total)
     if room_event <= 0 or room_total <= 0:
         return False, "cap_collateral", 0.0, None
     quote_px = round(mid + engine.quote_offset, 2)
@@ -389,6 +406,8 @@ def assess(engine: RoundLeaderFadeMakerEngine,
 
     n_priced = n_in_band = n_candidates = n_quoted = 0
     pulls = 0
+    # Aggregate cap is across tournaments, so this accumulates across events.
+    pending_total = 0.0
     missing: List[str] = []
     refusals: Dict[str, int] = {}
     for e in in_window:
@@ -397,7 +416,13 @@ def assess(engine: RoundLeaderFadeMakerEngine,
         e.update({"n_priced": 0, "n_in_band": 0, "n_candidates": 0,
                   "n_quoted": 0, "candidates_without_quote": [],
                   "screen_refusals": {}})
-        for tk in e["tickers"]:
+        # The pod allocates the per-tournament cap greedily in ticker order,
+        # so the detector must ask its question in the same order or it will
+        # expect quotes on the names the cap dropped. Sorting also makes a
+        # `max_book_pulls` truncation a correct PREFIX of the pod's allocation
+        # rather than an arbitrary subset of it.
+        pending_event = 0.0
+        for tk in sorted(e["tickers"]):
             if pulls >= max_book_pulls:
                 break
             pulls += 1
@@ -414,7 +439,12 @@ def assess(engine: RoundLeaderFadeMakerEngine,
             e["n_in_band"] += 1
             n_in_band += 1
             ok, why, _size, _px = screen_after_band(
-                engine, tk, e["event_code"], mid)
+                engine, tk, e["event_code"], mid,
+                pending_event=pending_event, pending_total=pending_total)
+            if ok:
+                _alloc = _size * max(1.0 - (_px or 0.0), 1e-6)
+                pending_event += _alloc
+                pending_total += _alloc
             if not ok:
                 e["screen_refusals"][why] = e["screen_refusals"].get(why, 0) + 1
                 refusals[why] = refusals.get(why, 0) + 1

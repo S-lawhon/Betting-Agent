@@ -84,6 +84,16 @@ class MakerQuote:
     active_from: float
     mid_at_quote: float
 
+    @property
+    def collateral(self) -> float:
+        """Worst-case collateral if this resting sell-YES quote is fully lifted.
+
+        A resting quote is an unconditional obligation: it is consumed the
+        moment it rests, not when it fills. §7's caps are on "collateral at
+        risk", and a quote that can be lifted at any instant is at risk.
+        """
+        return (1.0 - self.price) * self.qty
+
 
 @dataclass
 class MakerFill:
@@ -126,7 +136,27 @@ class MarketBook:
 
     @property
     def collateral(self) -> float:
+        """FILLED collateral only. Kept as its own quantity on purpose — a
+        fill is realised exposure and a quote is contingent exposure, and the
+        settle/release paths key off the filled figure."""
         return sum(f.collateral for f in self.fills if not f.settled)
+
+    @property
+    def quoted_collateral(self) -> float:
+        """Worst-case collateral held by the resting quote, if any."""
+        q = self.ask_quote
+        return q.collateral if q is not None else 0.0
+
+    @property
+    def exposure(self) -> float:
+        """§7's "collateral at risk": filled PLUS resting-quote worst case.
+
+        This is the quantity the caps bind against. It is invariant across a
+        fill — a fill converts quoted collateral into filled collateral at the
+        same price and quantity — so the cap cannot be breached by the passage
+        of a quote into a position, only by placing or re-pricing a quote.
+        """
+        return self.collateral + self.quoted_collateral
 
 
 class RoundLeaderFadeMakerEngine:
@@ -248,12 +278,25 @@ class RoundLeaderFadeMakerEngine:
 
     # ── Collateral bookkeeping (caps) ────────────────────────────────
 
+    # `*_collateral` is FILLED only; `*_exposure` is filled + resting quotes.
+    # §7's caps bind on EXPOSURE. Both are public because the two questions are
+    # genuinely different — "what have I got on?" and "what could I have on
+    # before I can cancel anything?" — and collapsing them into one accessor is
+    # how the caps came to be enforced against the wrong quantity.
+
     def tournament_collateral(self, event_code: str) -> float:
         return sum(b.collateral for b in self.books.values()
                    if b.event_code == event_code)
 
     def total_collateral(self) -> float:
         return sum(b.collateral for b in self.books.values())
+
+    def tournament_exposure(self, event_code: str) -> float:
+        return sum(b.exposure for b in self.books.values()
+                   if b.event_code == event_code)
+
+    def total_exposure(self) -> float:
+        return sum(b.exposure for b in self.books.values())
 
     # ── §7 cap-breach recording ──────────────────────────────────────
     #
@@ -288,11 +331,16 @@ class RoundLeaderFadeMakerEngine:
         persisted, and a restart mid-tournament could silently double the
         per-name and per-tournament collateral. `rebuild_from_log()` closes
         that hole; this records it if anything else opens one.
+
+        Observes ``exposure`` (filled + resting quotes), which is the quantity
+        the caps are sized against. Observing only ``collateral`` was the
+        defect: 24 quotes carrying $111.65 against a $50 per-tournament limit
+        recorded no breach at all, because none of them had filled yet.
         """
         per_event: Dict[str, float] = {}
         total = 0.0
         for b in self.books.values():
-            coll = b.collateral
+            coll = b.exposure
             if coll <= 0:
                 continue
             total += coll
@@ -532,7 +580,23 @@ class RoundLeaderFadeMakerEngine:
     def cycle(self) -> None:
         killed = self.kill_file.exists()
         now = self._now()
-        for book in list(self.books.values()):
+        # ── the allocation rule, stated rather than inherited ──
+        # A tournament's names all become quotable in the same window and
+        # together they can want more collateral than §7's per-tournament cap
+        # allows, so the cap decides WHICH names get quoted. That decision must
+        # be a rule. Books are walked in ticker order: greedy first-come, where
+        # "first" is lexicographic on the Kalshi ticker.
+        #
+        # Ticker order is arbitrary with respect to edge — it is the golfer's
+        # name — which is the point. The alternatives were rejected on purpose:
+        # dict order is insertion order and therefore an artifact of the API's
+        # response ordering, which is not a rule; and best-edge-first would let
+        # the cap select the sample on a quantity correlated with the outcome
+        # being measured, which is the fitting §8.2 forbids. Pro-rata across
+        # all in-band names would keep more names at a smaller size, but it
+        # needs a price-everything-then-size pass the cycle does not have, and
+        # it is a larger change than a cap fix should be.
+        for book in sorted(self.books.values(), key=lambda b: b.ticker):
             if book.done:
                 continue
             try:
@@ -605,6 +669,22 @@ class RoundLeaderFadeMakerEngine:
         # ── caps: refuse to widen exposure past any limit ──
         # All three are COLLATERAL limits (§7 sizes on collateral at risk, never
         # contract count); max_contracts_per_name is only a secondary bound.
+        #
+        # The room is measured against EXPOSURE — filled collateral PLUS every
+        # resting quote — not against fills alone. A resting sell-YES quote is
+        # an unconditional obligation to take the position if it is lifted, so
+        # it consumes the cap the moment it rests. Sizing against fills alone
+        # let a whole tournament's names go out in one window and each one see a
+        # book that looked empty: 24 quotes, $111.65, against a $50 limit, with
+        # no breach recorded because nothing had filled.
+        #
+        # THIS book's own resting quote is excluded from the event and total
+        # figures, because the quote computed below REPLACES it. Counting it
+        # would make each re-price shrink the quote against itself and ratchet
+        # the book to zero over successive cycles. The per-name room needs no
+        # such subtraction: it is measured against filled collateral, which the
+        # resting quote is not part of.
+        own_quote_coll = book.quoted_collateral
         room_name_coll = (self.max_collateral_per_name
                           - book.collateral)
         room_name_ct = self.max_contracts_per_name - book.sold
@@ -612,8 +692,10 @@ class RoundLeaderFadeMakerEngine:
             self._pull(book, "cap_per_name")
             return
         room_event = (self.max_collateral_per_tournament
-                      - self.tournament_collateral(book.event_code))
-        room_total = self.max_total_collateral - self.total_collateral()
+                      - (self.tournament_exposure(book.event_code)
+                         - own_quote_coll))
+        room_total = (self.max_total_collateral
+                      - (self.total_exposure() - own_quote_coll))
         if room_event <= 0 or room_total <= 0:
             self._pull(book, "cap_collateral")
             return

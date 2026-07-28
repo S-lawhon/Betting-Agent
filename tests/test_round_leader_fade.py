@@ -601,16 +601,22 @@ class FakeMultiKalshi(FakeKalshi):
 def test_reservations_drain_so_the_pod_can_still_quote_later(tmp_path):
     """THE starvation regression, against a REAL AggregateRiskGuard.
 
-    Quote a full tournament, settle it, then quote another. Each tournament
-    reserves up to P-022's own 15%-of-bankroll aggregate ($150); the guard's
-    per-pod cap is 25% ($250). So round 2 fits ONLY if round 1's collateral
-    was released on settlement. If it were not, the guard would refuse
-    everything from then on and the pod would go silent forever — the exact
-    failure this whole workstream exists to detect, reintroduced by the fix
-    meant to satisfy §7.
+    Quote a full tournament, settle it, then quote another. So round 2 fits
+    ONLY if round 1's collateral was released on settlement. If it were not,
+    the guard would refuse everything from then on and the pod would go silent
+    forever — the exact failure this whole workstream exists to detect,
+    reintroduced by the fix meant to satisfy §7.
+
+    The guard is deliberately given a SMALLER bankroll than the pod. Since
+    quoted collateral began counting against §7's per-tournament cap, one
+    tournament reserves at most $50 rather than the ~$150 it used to, and
+    against the guard's own $1,000 that leaves so much headroom that round 2
+    would fit whether or not round 1 drained — the test would pass for the
+    wrong reason. At a $300 guard bankroll the per-pod limit is $75: one
+    tournament fits, two do not.
     """
     from src.aggregate_risk import AggregateRiskGuard
-    guard = AggregateRiskGuard(bankroll=1000.0, max_open_positions=200)
+    guard = AggregateRiskGuard(bankroll=300.0, max_open_positions=200)
     clock = Clock(CLOSE - 18 * 3600)
     r1 = [f"{EVENT}-N{i}" for i in range(40)]
     eng = make_engine(tmp_path, FakeMultiKalshi(r1), clock,
@@ -620,7 +626,9 @@ def test_reservations_drain_so_the_pod_can_still_quote_later(tmp_path):
     quoted_1 = [t for t in r1 if eng.books[t].ask_quote is not None]
     reserved_1 = sum(guard._reservations[t]["usd"] for t in eng._reserved_ids)
     assert len(quoted_1) > 10
-    assert reserved_1 > 125.0        # ~15% of bankroll; 2x this exceeds $250
+    # §7's per-tournament cap, honoured on QUOTED collateral. Two tournaments'
+    # worth would exceed the guard's $75 per-pod limit.
+    assert 37.5 < reserved_1 <= 50.0
 
     # settle the whole tournament
     clock.t = CLOSE + 3600
@@ -804,3 +812,126 @@ def test_passing_the_resolved_close_does_not_stop_processing_fills(tmp_path):
     assert not book.done
     assert book.sold > 0, "a resting quote must keep filling past the " \
                           "conservative close until the market really settles"
+
+
+# ── §7: the cap binds on QUOTED collateral, not just filled ──────────
+#
+# A resting sell-YES quote is an unconditional obligation, so it consumes the
+# per-tournament cap the moment it rests. Sizing used to subtract FILLED
+# collateral only, so every name in a tournament's window saw a book that
+# looked empty. Measured against live Kalshi data at AIGWO26 R1's real
+# window-open instant: 24 quotes, $111.65 of worst-case collateral, against a
+# $50 (5% of $1,000) per-tournament limit, with NO breach recorded because
+# nothing had filled. Under §7 that would have excluded the first tournament
+# of a 24-tournament gate.
+
+
+def test_quoted_collateral_counts_against_the_tournament_cap(tmp_path):
+    """The regression. 40 in-band names, one tournament, nothing filled."""
+    clock = Clock(CLOSE - 18 * 3600)
+    names = [f"{EVENT}-N{i:02d}" for i in range(40)]
+    eng = make_engine(tmp_path, FakeMultiKalshi(names), clock, bankroll=1000.0)
+    eng.discover()
+    eng.cycle()
+
+    quoted = [t for t in names if eng.books[t].ask_quote is not None]
+    assert quoted, "the pod must still quote — this is a cap, not a mute"
+    assert len(quoted) < len(names), "the cap must actually drop names"
+
+    # Nothing has filled, so the OLD accounting would read zero here.
+    assert eng.tournament_collateral(eng.books[quoted[0]].event_code) == 0.0
+    exposure = eng.tournament_exposure(eng.books[quoted[0]].event_code)
+    assert exposure <= eng.max_collateral_per_tournament + 1e-9, (
+        f"§7 per-tournament cap breached on quoted collateral: "
+        f"${exposure:.2f} > ${eng.max_collateral_per_tournament:.2f}")
+    assert eng.total_exposure() <= eng.max_total_collateral + 1e-9
+    assert not eng._breaches, "sizing must prevent the breach, not record it"
+
+
+def test_a_quote_does_not_shrink_itself_on_the_next_cycle(tmp_path):
+    """The ratchet the self-exclusion exists to prevent.
+
+    A re-price REPLACES the resting quote, so the book's own quoted collateral
+    must not be counted against the room available to it. If it were, every
+    cycle would size the quote against its own exposure and walk it down to
+    zero — a mute that looks exactly like a cap working.
+    """
+    clock = Clock(CLOSE - 18 * 3600)
+    names = [f"{EVENT}-N{i:02d}" for i in range(40)]
+    eng = make_engine(tmp_path, FakeMultiKalshi(names), clock, bankroll=1000.0)
+    eng.discover()
+    eng.cycle()
+    first = {t: eng.books[t].ask_quote.qty for t in names
+             if eng.books[t].ask_quote is not None}
+    assert first
+    for _ in range(5):
+        eng.cycle()
+    after = {t: (eng.books[t].ask_quote.qty if eng.books[t].ask_quote else 0.0)
+             for t in first}
+    assert after == first, (
+        f"quotes ratcheted down over repeated cycles: {first} -> {after}")
+
+
+def test_allocation_order_is_ticker_not_dict_order(tmp_path):
+    """The drop rule is greedy in ticker order and must not depend on the
+    order Kalshi happened to list the markets in."""
+    clock = Clock(CLOSE - 18 * 3600)
+    names = [f"{EVENT}-N{i:02d}" for i in range(40)]
+
+    eng_a = make_engine(tmp_path / "a", FakeMultiKalshi(list(names)), clock,
+                        bankroll=1000.0)
+    eng_a.discover()
+    eng_a.cycle()
+    eng_b = make_engine(tmp_path / "b", FakeMultiKalshi(list(reversed(names))),
+                        clock, bankroll=1000.0)
+    eng_b.discover()
+    eng_b.cycle()
+
+    def placed(e):
+        return {t: e.books[t].ask_quote.qty for t in names
+                if e.books[t].ask_quote is not None}
+
+    assert placed(eng_a) == placed(eng_b)
+    # and it is a PREFIX in ticker order, not an arbitrary subset
+    got = sorted(placed(eng_a))
+    assert got == sorted(names)[:len(got)]
+
+
+def test_a_fill_does_not_change_exposure(tmp_path):
+    """Exposure must be invariant across a fill, or the cap could be breached
+    by a quote merely being lifted — with no new quote placed anywhere."""
+    clock = Clock(CLOSE - 18 * 3600)
+    trades = [{"epoch": CLOSE - 17 * 3600, "yes_price": 0.09,
+               "count": 3, "taker_side": "yes"}]
+    eng = make_engine(tmp_path, FakeKalshi(trades=trades), clock,
+                      bankroll=1000.0)
+    eng.discover()
+    eng.cycle()                                  # place
+    book = eng.books[TICKER]
+    before = book.exposure
+    assert book.quoted_collateral > 0 and book.collateral == 0
+    eng.cycle()                                  # fill 3 of them
+    assert book.collateral > 0, "the fill must have happened"
+    assert abs(book.exposure - before) < 1e-9, (
+        f"exposure moved on a fill: {before} -> {book.exposure}")
+
+
+def test_cap_breach_is_recorded_against_quoted_collateral(tmp_path):
+    """check_caps must observe the same quantity the caps bind against.
+
+    Hand-place an over-cap quote (bypassing sizing) and assert the breach is
+    seen. Observing filled collateral only is what made a $111.65 book on a
+    $50 limit read as clean.
+    """
+    from src.round_leader_fade_maker import MakerQuote
+    clock = Clock(CLOSE - 18 * 3600)
+    eng = make_engine(tmp_path, FakeKalshi(), clock, bankroll=1000.0)
+    eng.discover()
+    book = eng.books[TICKER]
+    book.ask_quote = MakerQuote(price=0.07, qty=1000.0,
+                                active_from=clock(), mid_at_quote=0.05)
+    assert book.collateral == 0.0
+    eng.check_caps()
+    assert eng._breaches, "an over-cap resting quote must record a §7 breach"
+    kinds = {k for _, k in eng._breaches}
+    assert "per_tournament" in kinds and "per_name" in kinds

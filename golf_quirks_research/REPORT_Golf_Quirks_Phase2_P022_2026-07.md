@@ -154,6 +154,88 @@ CI of [−38.5, +7.0]¢/ct and the INCONCLUSIVE verdict, is in
 
 ---
 
+## 2.2 Is that decay? No — it is two markets — added 2026-07-28
+
+§2.1 records the movement and correctly declines to act on it. This section
+answers the question §2.1 leaves open, because "armed live and the edge just
+dropped 0.8¢" is the kind of thing that gets acted on by the next reader if
+nobody decomposes it.
+
+**The added block is a real out-of-sample window.** All 40 added markets sit in
+**4 tournaments absent from the published universe** (`3MO26` +15, `KIN26` +11,
+`ISPHWSO26` +10, `ISHSO26` +4), closing **2026-07-23 → 07-25**, strictly after
+the published block's 05-18 → 07-18. None of the 364 published tickers is
+missing. So this is a time extension, not a band widening — a genuine forward
+test, and it came back negative. (§2.1 says "3 tournaments"; that is the count
+that *produces fills* at the headline cell. Four were added.)
+
+**And it is 5.3% of the sample, carried by two fills.** At H=12/+0.02 the added
+block is 12 filled markets and 228 contracts. Every dollar of its −12.33¢/ct
+comes from two markets where the faded longshot actually won:
+
+| ticker | sold YES @ | settled | contracts | P&L |
+|---|---:|---:|---:|---:|
+| `KXLIVR1LEAD-KIN26-LHER` | 0.06 | **$1.0000** | 25 | **−$23.50** |
+| `KXPGAR3LEAD-3MO26-JKOI` | 0.10 | **$1.0000** | 25 | **−$22.50** |
+| *the other ten fills* | — | $0.0000 | 178 | **+$17.85** |
+
+The other ten fills are **all positive**. Remove these two and the added block
+is profitable. `KIN26` is a three-market tournament, and one of the two losses
+is inside it — which is why it aggregates to −38.49¢/ct and why the block CI
+runs to [−38.49, +7.00].
+
+**Against the strategy's own base rate this is unremarkable.** The edge exists
+because faded names win far less often than their price implies. In the
+published block they win **6 of 171 filled markets = 3.5%** at a mean quote of
+**7.5¢**. The added block ran **2 of 12 = 16.7%** at a 9.6¢ mean quote. Under
+the published rate:
+
+> **P(≥ 2 winners in 12 fills) = 0.064.** Expected winners: 0.4.
+
+Uncommon, not extraordinary — and observed **post-hoc**, because we went
+looking at the stretch that looked bad. It is not significant at any
+conventional threshold.
+
+**Three further reasons not to call it decay:**
+
+- The added block's CI **[−38.49, +7.00] contains the published +3.41¢**. The
+  hypothesis "same edge" cannot be rejected.
+- §2.1's "one adverse draw seen seven times" is **confirmed**: the seven cells
+  draw from a union of 31 added markets and are *nested subsets* of each other
+  (the 12 filled at 12/+0.02 are a subset of the 21 filled at 12/+0.00). Seven
+  views of one draw.
+- Three calendar days cannot speak to decay regardless of what they show.
+
+**A tournament-clustered test is the wrong instrument here, and it lies.** A
+permutation test resampling 3 tournaments from the published 19 puts
+P(draw ≤ −12.33¢/ct) at **0.000** — which reads as decisive and is an artifact.
+`KIN26` has three filled markets; one −$23.50 fill drags its *tournament*
+average to −38.49¢, a value nothing in the published tournament distribution
+(worst: `AND26` at −11.9¢) can reproduce by construction. Tournament-level
+aggregation manufactured an impossible observation out of a single market. The
+market-level binomial above (P=0.064) is the right test and points the other
+way. **Clustering by tournament is correct for the CI on a large sample and
+actively misleading on a 3-tournament block where tournaments hold 3–5
+markets.**
+
+**What this block IS evidence for — the tail, not decay.** These two fills are
+precisely the failure mode §5 already names: losses concentrate where a faded
+name actually leads. At a 6¢ quote a winner costs **15.7× the credit**, so 2 of
+183 filled markets moved the headline 0.84¢. That is a *sizing and per-name-cap*
+finding, and the response to it has already been taken (T = 14 → 24,
+`P022_DECISION_RULE.md` Amendment 1) — not an edge-decay finding.
+
+**Verdict: NOT DECAY, and this sample could not have demonstrated decay either
+way.** Nothing changed. The forward gate remains the instrument that decides
+P-022, which is exactly what it is for.
+
+> **Reproduce:**
+> ```
+> python3 golf_quirks_research/analyze_p022_added_block.py
+> ```
+
+---
+
 ## 3. Robustness
 
 Per-tournament (H=12, offset +0.02): **16 of 19 tournaments positive**. The 3

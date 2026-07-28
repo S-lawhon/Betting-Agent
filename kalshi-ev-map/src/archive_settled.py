@@ -28,6 +28,8 @@ consumer is P-022's runner, and the global OOM killer scores by RSS:
         --working-directory=/opt/betting-pod-shop/kalshi-ev-map \\
         /opt/betting-pod-shop/venv/bin/python src/archive_settled.py
 """
+import argparse
+import hashlib
 import json
 import sys
 import time
@@ -37,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kalshi_client as kc
 from pull_settled import build_frame
 
+import numpy as np
 import pandas as pd
 
 kc.MIN_INTERVAL = 0.25
@@ -45,6 +48,13 @@ OUT = kc.DATA_DIR / "settled_archive.parquet"
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--from-raw", action="store_true",
+                    help="skip pass A and merge an existing "
+                         "settled_archive.parquet.raw. Pass A is ~7 minutes of "
+                         "rate-limited pulling over 7M markets; a pass-B "
+                         "failure should not cost that twice.")
+    args = ap.parse_args()
     state = json.load(open(STATE)) if STATE.exists() else {}
     # overlap 2 days to be safe against settlement lag
     min_close = int(state.get("last_run_ts", time.time() - 8 * 86400)) - 2 * 86400
@@ -92,7 +102,8 @@ def main():
     # A killed run cannot clean up after itself — SIGKILL does not run
     # `finally` — so stale temporaries are cleared at STARTUP. v3 left a 34 MB
     # orphan behind exactly this way.
-    for stale in (raw, tmp):
+    keep_raw = args.from_raw and raw.exists()
+    for stale in ((tmp,) if keep_raw else (raw, tmp)):
         if stale.exists():
             print(f"[archive] removing stale {stale.name} from a killed run",
                   flush=True)
@@ -125,7 +136,13 @@ def main():
     # than mostly husks.
     rows, seen, skipped, written = [], 0, 0, 0
     writer = None
+    if keep_raw:
+        written = pq.ParquetFile(raw).metadata.num_rows
+        print(f"[archive] --from-raw: reusing {raw.name} with {written} rows, "
+              f"skipping pass A", flush=True)
     try:
+        if keep_raw:
+            raise StopIteration
         def _flush():
             nonlocal writer, written
             if not rows:
@@ -154,12 +171,18 @@ def main():
                 print(f"[archive] pass A: {seen} scanned, {skipped} husks "
                       f"skipped, {written} kept...", flush=True)
         _flush()
+    except StopIteration:
+        pass
     finally:
         if writer is not None:
             writer.close()
             writer = None
-    print(f"[archive] pass A done: {seen} scanned, {skipped} husks skipped "
-          f"({100*skipped/max(seen,1):.1f}%), {written} kept", flush=True)
+    if keep_raw:
+        print(f"[archive] pass A skipped ({written} rows reused)", flush=True)
+    else:
+        print(f"[archive] pass A done: {seen} scanned, {skipped} husks "
+              f"skipped ({100*skipped/max(seen,1):.1f}%), {written} kept",
+              flush=True)
 
     if written == 0 and not OUT.exists():
         # A run that legitimately found nothing must still leave a readable
@@ -170,69 +193,100 @@ def main():
         print(f"[done] no settled markets in window -> empty {OUT}", flush=True)
         return
 
-    # ── PASS B: dedup + merge, one batch at a time. ────────────────────────
-    out_writer = None
-    try:
-        new_tickers = None
-        keep_mask = None
-        if written:
-            # ONE column of the file just written — not the whole file. For
-            # ~300k rows this is a few MB of contiguous string data, against
-            # the tens of MB a Python set of the same strings cost, and it is
-            # read once instead of touched on every chunk.
-            col = pq.ParquetFile(raw).read(columns=["ticker"]).column("ticker")
-            ser = col.to_pandas()                      # materialised ONCE
-            keep_mask = ~ser.duplicated(keep="last")
-            new_tickers = pa.array(ser[keep_mask.values].values,
-                                   type=pa.string())
-            del ser, col
-            print(f"[archive] pass B: {written} rows -> "
-                  f"{int(keep_mask.sum())} unique tickers", flush=True)
+    # ── PASS B: merge. Bounded — no column is ever materialised in pandas. ──
+    #
+    # v5 finished pass A fine (7,055,386 markets scanned, 3,680,825 kept, 402 MB)
+    # and was then OOM-KILLED HERE, because this pass called `.to_pandas()` on
+    # the whole ticker column: 3.68 M Python strings is ~400 MB in one spike.
+    #
+    # And it was computing a NO-OP. Measured on that very file with a bounded
+    # hash pass: 3,680,825 rows, **3,680,825 distinct tickers, zero duplicates**.
+    # Kalshi's cursor pagination does not repeat a market, so the within-run
+    # `drop_duplicates` never removed anything. It is gone — but the assumption
+    # is now CHECKED rather than assumed, at ~30 MB (uint64 hashes) instead of
+    # ~400 MB (strings), so if Kalshi ever starts repeating we find out.
+    def _ticker_hashes(path):
+        """uint64 hash per row, in file order. ~8 B/row instead of ~110 B."""
+        pf_ = pq.ParquetFile(path)
+        out = np.empty(pf_.metadata.num_rows, dtype=np.uint64)
+        i = 0
+        for b in pf_.iter_batches(batch_size=200000, columns=["ticker"]):
+            for t in b.column("ticker").to_pylist():
+                out[i] = np.frombuffer(
+                    hashlib.blake2b((t or "").encode(), digest_size=8).digest(),
+                    dtype=np.uint64)[0]
+                i += 1
+        return out[:i]
 
-        pf = pq.ParquetFile(raw) if written else None
-        off = 0
-        if pf is not None:
-            for batch in pf.iter_batches(batch_size=CHUNK):
-                n = batch.num_rows
-                mask = pa.array(keep_mask.values[off:off + n])
-                off += n
-                filtered = pa.Table.from_batches([batch]).filter(mask)
-                if filtered.num_rows == 0:
-                    continue
-                if out_writer is None:
-                    out_writer = pq.ParquetWriter(tmp, filtered.schema)
-                out_writer.write_table(filtered)
-
-        carried = 0
-        if OUT.exists():
-            for batch in pq.ParquetFile(OUT).iter_batches(batch_size=CHUNK):
-                tbl = pa.Table.from_batches([batch])
-                if new_tickers is not None:
-                    tbl = tbl.filter(
-                        pc.invert(pc.is_in(tbl.column("ticker"),
-                                           value_set=new_tickers)))
-                if tbl.num_rows == 0:
-                    continue
-                if out_writer is None:
-                    out_writer = pq.ParquetWriter(tmp, tbl.schema)
-                out_writer.write_table(tbl)
-                carried += tbl.num_rows
-            print(f"[archive] carried {carried} existing rows forward",
+    if written:
+        h = _ticker_hashes(raw)
+        n_distinct = len(np.unique(h))
+        if n_distinct != len(h):
+            print(f"[archive] WARNING: {len(h) - n_distinct} DUPLICATE tickers "
+                  f"in this pull — pagination has started repeating. The "
+                  f"within-run de-duplication removed in v6 is now needed "
+                  f"again; the archive keeps every copy until it is restored.",
+                  flush=True)
+        else:
+            print(f"[archive] pass B: {len(h)} rows, all tickers distinct",
                   flush=True)
 
-        if out_writer is None:
-            build_frame([]).iloc[0:0].to_parquet(tmp, index=False)
-        else:
-            out_writer.close()
-            out_writer = None
-        tmp.replace(OUT)
-    finally:
-        if out_writer is not None:
-            out_writer.close()
-        if raw.exists():
-            raw.unlink()
-        if tmp.exists():
-            tmp.unlink()
+    if not OUT.exists():
+        # First run, or the archive was lost. Nothing to merge — the raw file
+        # IS the archive. A rename costs no memory and no time, where the old
+        # code streamed 3.68 M rows through a second writer to achieve exactly
+        # the same bytes.
+        raw.replace(OUT)
+        print("[archive] no existing archive to merge — raw promoted in place",
+              flush=True)
+    else:
+        # Merge: every new row wins, then carry forward the old rows whose
+        # ticker this pull did not rewrite. Compared by uint64 hash, so the
+        # exclusion set is ~30 MB rather than ~125 MB of arrow strings or
+        # ~400 MB of Python strings. Collision risk over 3.7 M keys in a 64-bit
+        # space is ~1e-6 and its only consequence is dropping one superseded
+        # OLD row that a NEW row already replaces — it cannot lose new data.
+        new_h = np.sort(h) if written else np.empty(0, dtype=np.uint64)
+        out_writer = None
+        carried = 0
+        try:
+            for src in (raw, OUT):
+                if src is raw and not written:
+                    continue
+                for batch in pq.ParquetFile(src).iter_batches(batch_size=CHUNK):
+                    tbl = pa.Table.from_batches([batch])
+                    if src is OUT and len(new_h):
+                        bh = np.array(
+                            [np.frombuffer(hashlib.blake2b(
+                                (t or "").encode(), digest_size=8).digest(),
+                                dtype=np.uint64)[0]
+                             for t in tbl.column("ticker").to_pylist()],
+                            dtype=np.uint64)
+                        idx = np.searchsorted(new_h, bh)
+                        idx[idx >= len(new_h)] = 0
+                        keep = new_h[idx] != bh
+                        tbl = tbl.filter(pa.array(keep))
+                        carried += tbl.num_rows
+                    if tbl.num_rows == 0:
+                        continue
+                    if out_writer is None:
+                        out_writer = pq.ParquetWriter(tmp, tbl.schema)
+                    out_writer.write_table(tbl)
+            if out_writer is None:
+                build_frame([]).iloc[0:0].to_parquet(tmp, index=False)
+            else:
+                out_writer.close()
+                out_writer = None
+            tmp.replace(OUT)
+            print(f"[archive] carried {carried} existing rows forward",
+                  flush=True)
+        finally:
+            if out_writer is not None:
+                out_writer.close()
+
+    for leftover in (raw, tmp):
+        if leftover.exists():
+            leftover.unlink()
 
     json.dump({"last_run_ts": int(time.time())}, open(STATE, "w"))
     total = pq.ParquetFile(OUT).metadata.num_rows

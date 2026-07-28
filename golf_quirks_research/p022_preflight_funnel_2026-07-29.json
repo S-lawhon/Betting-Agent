@@ -1,0 +1,499 @@
+[
+ {
+  "label": "A_aigwo_r1_window_open",
+  "clock_utc": "2026-07-29T15:31:00Z",
+  "params": {
+   "mid_band": [
+    0.03,
+    0.12
+   ],
+   "quote_offset": 0.02,
+   "fade_start_h": 24.0,
+   "no_new_quote_h": 12.0,
+   "pct_per_name": 0.005,
+   "pct_per_tournament": 0.05,
+   "pct_total": 0.15,
+   "bankroll": 1000.0,
+   "max_contracts_per_name": 25.0,
+   "n_series": 13,
+   "risk_guard": "AggregateRiskGuard"
+  },
+  "funnel": {
+   "1_markets_discovered": 957,
+   "2_resolved_close": 957,
+   "3_inside_window_12_24h": 144,
+   "4_priced_two_sided_or_ask": 144,
+   "5_inside_band": 13,
+   "6_would_place": 13
+  },
+  "in_window_events": [
+   "KXLPGAR1LEAD-AIGWO26"
+  ],
+  "hours_to_close_by_event": {
+   "KXLPGAR1LEAD-AIGWO26": 23.983
+  },
+  "mid_distribution": {
+   "n_none": 0,
+   "n_below_band": 0,
+   "n_in_band": 13,
+   "n_above_band": 131
+  },
+  "in_band_sample": [
+   [
+    "KXLPGAR1LEAD-AIGWO26-CHLWIL",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-BELWAR",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-CARTEJ",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-ANAPEL",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-POLMAC",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-ANNFUL",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-ANNFOS",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-JODEWA",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-AMADOH",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-MANDER",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-LAUCRU",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-VANBOU",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-JUSBOS",
+    0.050000000000000044
+   ]
+  ],
+  "quotes": [
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-CHLWIL",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-BELWAR",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-CARTEJ",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-ANAPEL",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-POLMAC",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-ANNFUL",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-ANNFOS",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-JODEWA",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-AMADOH",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-MANDER",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-LAUCRU",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-VANBOU",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-JUSBOS",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   }
+  ],
+  "quote_totals": {
+   "n": 13,
+   "contracts": 65.0,
+   "collateral_usd": 60.45
+  },
+  "pull_reasons": {},
+  "breaches": [],
+  "total_collateral_after": 0
+ },
+ {
+  "label": "B_roc_r1_window_open",
+  "clock_utc": "2026-07-29T18:31:00Z",
+  "params": {
+   "mid_band": [
+    0.03,
+    0.12
+   ],
+   "quote_offset": 0.02,
+   "fade_start_h": 24.0,
+   "no_new_quote_h": 12.0,
+   "pct_per_name": 0.005,
+   "pct_per_tournament": 0.05,
+   "pct_total": 0.15,
+   "bankroll": 1000.0,
+   "max_contracts_per_name": 25.0,
+   "n_series": 13,
+   "risk_guard": "AggregateRiskGuard"
+  },
+  "funnel": {
+   "1_markets_discovered": 957,
+   "2_resolved_close": 957,
+   "3_inside_window_12_24h": 293,
+   "4_priced_two_sided_or_ask": 293,
+   "5_inside_band": 18,
+   "6_would_place": 18
+  },
+  "in_window_events": [
+   "KXLPGAR1LEAD-AIGWO26",
+   "KXPGAR1LEAD-ROC26"
+  ],
+  "hours_to_close_by_event": {
+   "KXLPGAR1LEAD-AIGWO26": 20.983,
+   "KXPGAR1LEAD-ROC26": 23.983
+  },
+  "mid_distribution": {
+   "n_none": 0,
+   "n_below_band": 144,
+   "n_in_band": 18,
+   "n_above_band": 131
+  },
+  "in_band_sample": [
+   [
+    "KXPGAR1LEAD-ROC26-JQUI",
+    0.08999999999999997
+   ],
+   [
+    "KXPGAR1LEAD-ROC26-KHUS",
+    0.08999999999999997
+   ],
+   [
+    "KXPGAR1LEAD-ROC26-RCEL",
+    0.08999999999999997
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-CHLWIL",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-BELWAR",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-CARTEJ",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-ANAPEL",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-POLMAC",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-ANNFUL",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-ANNFOS",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-JODEWA",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-AMADOH",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-MANDER",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-LAUCRU",
+    0.050000000000000044
+   ],
+   [
+    "KXLPGAR1LEAD-AIGWO26-VANBOU",
+    0.050000000000000044
+   ]
+  ],
+  "quotes": [
+   {
+    "ticker": "KXPGAR1LEAD-ROC26-JQUI",
+    "event": "ROC26",
+    "ask": 0.11,
+    "mid": 0.08999999999999997,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXPGAR1LEAD-ROC26-KHUS",
+    "event": "ROC26",
+    "ask": 0.11,
+    "mid": 0.08999999999999997,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXPGAR1LEAD-ROC26-RCEL",
+    "event": "ROC26",
+    "ask": 0.11,
+    "mid": 0.08999999999999997,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXPGAR1LEAD-ROC26-DAZA",
+    "event": "ROC26",
+    "ask": 0.06,
+    "mid": 0.044999999999999984,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXPGAR1LEAD-ROC26-CAME",
+    "event": "ROC26",
+    "ask": 0.06,
+    "mid": 0.04150000000000002,
+    "size": 5.0,
+    "hours_to_close": 23.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-CHLWIL",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-BELWAR",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-CARTEJ",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-ANAPEL",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-POLMAC",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-ANNFUL",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-ANNFOS",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-JODEWA",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-AMADOH",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-MANDER",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-LAUCRU",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-VANBOU",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   },
+   {
+    "ticker": "KXLPGAR1LEAD-AIGWO26-JUSBOS",
+    "event": "AIGWO26",
+    "ask": 0.07,
+    "mid": 0.050000000000000044,
+    "size": 5.0,
+    "hours_to_close": 20.98,
+    "close_source": "tour_day_offset"
+   }
+  ],
+  "quote_totals": {
+   "n": 18,
+   "contracts": 90.0,
+   "collateral_usd": 83.2
+  },
+  "pull_reasons": {},
+  "breaches": [],
+  "total_collateral_after": 0
+ }
+]

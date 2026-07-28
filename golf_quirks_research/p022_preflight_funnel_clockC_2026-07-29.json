@@ -1,0 +1,54 @@
+{
+ "label": "C_three_events_in_window",
+ "clock_utc": "2026-07-30T18:31:00Z",
+ "params": {
+  "mid_band": [
+   0.03,
+   0.12
+  ],
+  "quote_offset": 0.02,
+  "fade_start_h": 24.0,
+  "no_new_quote_h": 12.0,
+  "pct_per_name": 0.005,
+  "pct_per_tournament": 0.05,
+  "pct_total": 0.15,
+  "bankroll": 1000.0,
+  "max_contracts_per_name": 25.0,
+  "n_series": 13,
+  "risk_guard": "AggregateRiskGuard"
+ },
+ "funnel": {
+  "1_markets_discovered": 957,
+  "2_resolved_close": 957,
+  "3_inside_window_12_24h": 371,
+  "4_priced_two_sided_or_ask": 371,
+  "5_inside_band": 0,
+  "6_would_place": 0
+ },
+ "in_window_events": [
+  "KXCHAMPTOURR1LEAD-POI26",
+  "KXLPGAR2LEAD-AIGWO26",
+  "KXPGAR2LEAD-ROC26"
+ ],
+ "hours_to_close_by_event": {
+  "KXCHAMPTOURR1LEAD-POI26": 21.483,
+  "KXLPGAR2LEAD-AIGWO26": 20.983,
+  "KXPGAR2LEAD-ROC26": 23.983
+ },
+ "mid_distribution": {
+  "n_none": 0,
+  "n_below_band": 2,
+  "n_in_band": 0,
+  "n_above_band": 369
+ },
+ "in_band_sample": [],
+ "quotes": [],
+ "quote_totals": {
+  "n": 0,
+  "contracts": 0,
+  "collateral_usd": 0
+ },
+ "pull_reasons": {},
+ "breaches": [],
+ "total_collateral_after": 0
+}

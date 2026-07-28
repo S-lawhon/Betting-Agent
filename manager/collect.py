@@ -765,6 +765,49 @@ class Collector:
         """
         return self._checkpoint("scripts/p022_checkpoint.py", "P-022")
 
+    @safe("p022_window")
+    def p022_window(self) -> Dict[str, Any]:
+        """P-022's quotable-window detector, surfaced to the alert path.
+
+        `scripts/p022_window_check.py` runs */30 and appends one row per run,
+        but nothing read it: its only consumer was a human opening
+        status.jsonl. The one state that matters —
+        WINDOW_OPEN_CANDIDATE_NO_QUOTE — is the pod being structurally unable
+        to quote while everything else looks healthy, and it has to page.
+
+        A missing or stale file is reported, never defaulted: the checker not
+        running looks exactly like the checker saying "fine".
+        """
+        path = self.root / "data/p022_window_check/status.jsonl"
+        if not path.exists():
+            return {"available": False,
+                    "error": "no status.jsonl — the */30 checker has never run"}
+        row = last_json_row(path)
+        if not row:
+            return {"available": False,
+                    "error": "status.jsonl has no parseable row"}
+        ts = parse_ts(row.get("iso"))
+        age_min = ((now() - ts).total_seconds() / 60.0) if ts else None
+        return {
+            "available": True,
+            "state": row.get("state"),
+            "alarm": bool(row.get("alarm")),
+            "iso": row.get("iso"),
+            "age_min": round(age_min, 1) if age_min is not None else None,
+            "detail": row.get("detail"),
+            "funnel": row.get("funnel") or {},
+            "n_in_window_events": row.get("n_in_window_events"),
+            "n_candidates": row.get("n_candidates"),
+            "candidates_without_quote": (row.get("candidates_without_quote")
+                                         or [])[:10],
+            "events": [
+                {k: e.get(k) for k in
+                 ("event", "close_ref_iso", "close_source",
+                  "hours_to_close_ref", "window_open_iso")}
+                for e in (row.get("events") or [])[:8]
+            ],
+        }
+
     @safe("p001_gate")
     def p001_gate(self) -> Dict[str, Any]:
         """P-001 progress under the re-scoped scenario-D gate.
@@ -1112,6 +1155,7 @@ class Collector:
             "p017": self.p017_gate() or {},
             "p001": self.p001_gate() or {},
             "p022": self.p022_gate() or {},
+            "p022_window": self.p022_window() or {},
             "p014": self.p014_gate() or {},
             "invariants": self.invariants() or {},
             "errors": self.recent_errors() or {},

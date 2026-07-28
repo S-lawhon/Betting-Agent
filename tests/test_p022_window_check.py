@@ -20,6 +20,7 @@ shout exactly when it is not**:
 """
 import importlib.util
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -95,7 +96,7 @@ def _market(close_epoch: float, open_epoch: float, n: int = 1):
     } for i in range(n)]
 
 
-def _engine(markets, mid=0.06, resolved_close="from_market"):
+def _engine(markets, mid=0.06, resolved_close="from_market", **kw):
     """`resolved_close` is what the external schedule returns.
 
     Default mirrors the market payload so the existing cases read unchanged;
@@ -109,16 +110,21 @@ def _engine(markets, mid=0.06, resolved_close="from_market"):
     return RoundLeaderFadeMakerEngine(
         kalshi=FakeKalshi(markets, mid),
         series=("KXPGAR1LEAD",),
-        log_dir=Path("/tmp"),
+        # A private dir per engine: `assess` now calls `rebuild_from_log`, so a
+        # shared /tmp would let one test's fills log leak into another's caps.
+        log_dir=Path(tempfile.mkdtemp(prefix="p022test-")),
         schedule=FakeSchedule(resolved_close),
         _now_fn=lambda: NOW,
+        **kw,
     )
 
 
-def _assess(engine, quotes=None, monkeypatch=None):
+def _assess(engine, quotes=None, quote_ts=None, grace_s=1200.0):
     wc.recent_quotes = lambda path, since: quotes or {
         "exists": False, "n_recent": 0, "total": 0, "last_ts": None}
-    return wc.assess(engine, placeholder_days=7.0, quote_lookback_s=3600.0)
+    wc.last_quote_per_ticker = lambda path: dict(quote_ts or {})
+    return wc.assess(engine, placeholder_days=7.0, quote_lookback_s=3600.0,
+                     grace_s=grace_s)
 
 
 # ── the live 2026-07-27 state ────────────────────────────────────────
@@ -145,7 +151,8 @@ def test_real_close_reference_outside_window_is_silent():
     close = NOW + 3 * 86400
     listed = NOW - 0.5 * 86400               # span 3.5d < 7d -> real
     r = _assess(_engine(_market(close, listed)))
-    assert r["state"] == "WAITING"
+    assert r["state"] == "NO_WINDOW"
+    assert r["legacy_state"] == "WAITING"
     assert r["alarm"] is False
 
 
@@ -159,32 +166,119 @@ def test_no_markets_listed_is_silent():
 
 # ── the condition the task was written to catch ──────────────────────
 
-def test_window_open_in_band_and_no_quotes_alarms():
-    close = NOW + 18 * 3600                  # inside [12h, 24h]
+def test_window_open_candidate_and_no_quote_alarms():
+    """THE state this file exists for: everything the pod screens on passes,
+    the window has been open past the grace period, and nothing was written."""
+    close = NOW + 18 * 3600                  # inside [12h, 24h]; open for 6h
     listed = NOW - 2 * 86400                 # span 2.75d -> real
     r = _assess(_engine(_market(close, listed, n=3), mid=0.06))
-    assert r["state"] == "WINDOW_OPEN_NO_QUOTES"
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
     assert r["alarm"] is True
     assert r["n_in_band"] == 3
+    assert r["funnel"]["passes_every_screen"] == 3
+    assert r["funnel"]["quoted_since_window_open"] == 0
+    assert len(r["candidates_without_quote"]) == 3
 
 
 def test_window_open_and_quoting_is_silent():
+    """A quote written after the window opened clears it — even though the
+    pod then rests that quote for hours writing nothing more."""
     close = NOW + 18 * 3600
     listed = NOW - 2 * 86400
+    window_open = close - 24 * 3600
     r = _assess(_engine(_market(close, listed, n=3), mid=0.06),
-                quotes={"exists": True, "n_recent": 3, "total": 3,
-                        "last_ts": NOW - 60})
-    assert r["state"] == "WINDOW_OPEN_QUOTING"
+                quotes={"exists": True, "n_recent": 0, "total": 3,
+                        "last_ts": window_open + 60},
+                quote_ts={f"{EVENT}-N{i}": window_open + 60 for i in range(3)})
+    assert r["state"] == "QUOTED"
     assert r["alarm"] is False
+    assert r["funnel"]["quoted_since_window_open"] == 3
 
 
-def test_window_open_but_nothing_in_band_is_silent():
-    """No name priced in [0.03, 0.12] is a legitimate reason not to quote."""
+def test_a_quote_from_BEFORE_this_window_does_not_clear_it():
+    """Otherwise last tournament's quote log would silence this tournament."""
+    close = NOW + 18 * 3600
+    window_open = close - 24 * 3600
+    r = _assess(_engine(_market(close, NOW - 2 * 86400, n=3), mid=0.06),
+                quote_ts={f"{EVENT}-N{i}": window_open - 3600 for i in range(3)})
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
+    assert r["alarm"] is True
+
+
+def test_window_open_but_nothing_in_band_is_silent_and_says_so():
+    """No name priced in [0.03, 0.12] is a legitimate reason not to quote —
+    but it is NOT the same state as 'no window is open', which is exactly the
+    conflation that made the detector useless."""
     close = NOW + 18 * 3600
     listed = NOW - 2 * 86400
     r = _assess(_engine(_market(close, listed, n=3), mid=0.55))
+    assert r["state"] == "WINDOW_OPEN_NO_CANDIDATE"
     assert r["alarm"] is False
     assert r["n_in_band"] == 0
+    assert r["funnel"]["inside_window"] == 3
+
+
+def test_in_band_but_caps_refuse_is_silent_not_an_alarm():
+    """A cap refusal is the pod obeying §7, not the pod being broken."""
+    close = NOW + 18 * 3600
+    r = _assess(_engine(_market(close, NOW - 2 * 86400, n=3), mid=0.06,
+                        max_contracts_per_name=0.0))
+    assert r["state"] == "WINDOW_OPEN_NO_CANDIDATE"
+    assert r["alarm"] is False
+    assert r["screen_refusals"] == {"cap_per_name": 3}
+
+
+def test_grace_period_covers_the_pods_rediscover_interval():
+    """`run_round_leader_fade.py` re-discovers every 900 s, so a window that
+    opened a minute ago is not yet evidence of anything."""
+    close = NOW + 24 * 3600 - 300            # window opened 5 min ago
+    r = _assess(_engine(_market(close, NOW - 2 * 86400, n=3), mid=0.06))
+    assert r["state"] == "WINDOW_OPEN_GRACE"
+    assert r["alarm"] is False
+    assert r["n_candidates"] == 3
+    assert r["candidates_without_quote"] == []
+
+
+def test_checker_failure_is_a_failure_never_a_skip():
+    """A total listing outage used to read as NO_MARKETS — indistinguishable
+    from 'between tournaments'."""
+    eng = _engine(_market(NOW + 18 * 3600, NOW - 2 * 86400, n=3))
+
+    def boom(series):
+        raise RuntimeError("kalshi 503")
+    eng.kalshi.open_markets = boom
+    r = _assess(eng)
+    assert r["state"] == "CHECK_FAILED"
+    assert r["alarm"] is True
+    assert "KXPGAR1LEAD" in r["discovery_errors"]
+
+
+def test_screen_agrees_with_the_engines_own_decision():
+    """The detector duplicates the pod's post-band screens on purpose (see
+    `screen_after_band`). This pins the duplication: a real engine is driven
+    over the same states and the two answers must match."""
+    close = NOW + 18 * 3600
+    cases = [
+        ({}, 0.06, True),                       # ordinary candidate
+        ({"max_contracts_per_name": 0.0}, 0.06, False),   # per-name cap
+        ({"pct_per_tournament": 0.0}, 0.06, False),       # tournament cap
+        ({"pct_total": 0.0}, 0.06, False),                # aggregate cap
+        ({"quote_offset": 0.0}, 0.06, False),             # px not above mid
+        ({"pct_per_name": 0.0000001}, 0.06, False),       # sizes to zero
+    ]
+    for kw, mid, expect in cases:
+        eng = _engine(_market(close, NOW - 2 * 86400, n=1), mid=mid, **kw)
+        ticker = f"{EVENT}-N0"
+        ok, _why, _size, _px = wc.screen_after_band(
+            eng, ticker, "ROC26", mid)
+        assert ok is expect, (kw, "detector")
+
+        # ... and the engine itself, through its real cycle path.
+        eng2 = _engine(_market(close, NOW - 2 * 86400, n=1), mid=mid, **kw)
+        eng2.discover()
+        eng2.cycle()
+        placed = eng2.books[ticker].ask_quote is not None
+        assert placed is expect, (kw, "engine")
 
 
 # ── the detector must track the POD, not a private copy ──────────────

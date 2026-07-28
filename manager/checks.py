@@ -709,6 +709,103 @@ def check_throughput(snap: Dict[str, Any]) -> List[Finding]:
     return out
 
 
+P022_CRITICAL_STATES = {
+    "WINDOW_OPEN_CANDIDATE_NO_QUOTE": (
+        "P-022 window OPEN with a qualifying name and NO quote written"),
+    "CLOSE_REF_PLACEHOLDER": (
+        "P-022 close reference is a placeholder — it CANNOT quote"),
+    "SCHEDULE_UNRESOLVED": (
+        "P-022 cannot time any listed round — failing closed and mute"),
+}
+
+
+def check_p022_window(snap: Dict[str, Any]) -> List[Finding]:
+    """Route P-022's quotable-window detector into the alert path.
+
+    The detector has run */30 since 2026-07-28 and nothing consumed it, so
+    the one state that means "the fund's only validated edge is structurally
+    unable to trade" reached a log file and stopped there. P-022 has now been
+    mute for five days across three fixes, two of which were declared verified
+    and failed live; the whole point is that its failure and its correct
+    behaviour are the same silence.
+    """
+    win = snap.get("p022_window") or {}
+    if not win:
+        return []
+    if not win.get("available"):
+        return [Finding(
+            key="p022.window.unavailable",
+            severity="warn",
+            title="P-022 window detector is not reporting",
+            detail="{}\n\nWhile this is unavailable P-022's ability to quote "
+                   "is UNMEASURED, which is not the same as fine."
+                   .format(win.get("error") or "no detail"),
+            workstream="P-022",
+            fix="ssh root@129.212.176.202 'cd /opt/betting-pod-shop && "
+                "sudo -u bettingbot ./venv/bin/python -m "
+                "scripts.p022_window_check'")]
+
+    out: List[Finding] = []
+    age = win.get("age_min")
+    if isinstance(age, (int, float)) and age > 90:
+        out.append(Finding(
+            key="p022.window.stale",
+            severity="warn",
+            title="P-022 window detector last ran {:.0f} min ago".format(age),
+            detail="It is crontabbed */30. A stale row means the checker is "
+                   "dead, and its last state below is not current.",
+            workstream="P-022",
+            fix="ssh root@129.212.176.202 'crontab -l | grep p022'",
+            value=round(age, 1)))
+
+    state = win.get("state")
+    funnel = win.get("funnel") or {}
+    funnel_line = ("funnel: listed {markets_listed} -> resolved "
+                   "{close_resolved} -> in window {inside_window} -> priced "
+                   "{priced} -> in band {in_band} -> passes every screen "
+                   "{passes_every_screen} -> quoted "
+                   "{quoted_since_window_open}").format(**{
+                       k: funnel.get(k, "?") for k in (
+                           "markets_listed", "close_resolved", "inside_window",
+                           "priced", "in_band", "passes_every_screen",
+                           "quoted_since_window_open")}) if funnel else ""
+
+    if state in P022_CRITICAL_STATES:
+        out.append(Finding(
+            key="p022.window.{}".format(state.lower()),
+            severity="critical",
+            title=P022_CRITICAL_STATES[state],
+            detail="\n".join(x for x in [
+                win.get("detail") or "",
+                funnel_line,
+                ("names: " + ", ".join(win.get("candidates_without_quote") or []))
+                if win.get("candidates_without_quote") else "",
+            ] if x),
+            workstream="P-022",
+            fix="ssh root@129.212.176.202 'journalctl -u "
+                "betting-round-leader-fade -n 100 --no-pager'",
+            value=state))
+    elif state == "CHECK_FAILED":
+        out.append(Finding(
+            key="p022.window.check_failed",
+            severity="warn",
+            title="P-022 window detector could not measure",
+            detail=(win.get("detail") or "")
+                   + "\n\nTreat P-022's state as UNKNOWN, not healthy.",
+            workstream="P-022",
+            value=state))
+    elif state:
+        out.append(Finding(
+            key="p022.window.state",
+            severity="info",
+            title="P-022 window: {}".format(state),
+            detail="\n".join(x for x in [win.get("detail") or "",
+                                         funnel_line] if x),
+            workstream="P-022",
+            value=state))
+    return out
+
+
 def check_faults(snap: Dict[str, Any]) -> List[Finding]:
     """The collector failing to measure something is itself a finding.
 
@@ -783,6 +880,7 @@ def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
     findings += check_registry_reconciliation(snap, registry)
     findings += check_errors(snap)
     findings += check_throughput(snap)
+    findings += check_p022_window(snap)
     findings += check_faults(snap)
     findings += check_workstreams(snap)
     findings.sort(key=lambda f: (SEVERITY_ORDER.get(f.severity, 9), f.key))

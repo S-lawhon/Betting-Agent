@@ -32,6 +32,40 @@ asks INDEPENDENT questions about the answer:
      reading Kalshi's own fields.)
   3. Are names actually priced in band with no quotes being written?
 
+THE DISTINCTION THIS SCRIPT EXISTS TO MAKE (added 2026-07-29)
+─────────────────────────────────────────────────────────────
+Until now the detector collapsed two very different situations into one
+silent `WAITING`: *no window is open* and *a window is open but nothing
+passes the screens*.  Only the first is unambiguously healthy.  The states
+are now:
+
+    NO_MARKETS                       no open round-leader market anywhere
+    NO_WINDOW                        listed, none within [12h, 24h] of close
+    WINDOW_OPEN_NO_CANDIDATE         window open, nothing clears band/caps
+    WINDOW_OPEN_CANDIDATE_NO_QUOTE   window open, a name clears EVERY screen,
+                                     and the pod has written no quote  -> ALARM
+    QUOTED                           >=1 quote written since the window opened
+    CLOSE_REF_PLACEHOLDER            close reference is a fallback     -> ALARM
+    SCHEDULE_UNRESOLVED              pod is failing closed             -> ALARM
+    CHECK_FAILED                     this checker could not measure    -> ALARM
+
+Two rules that keep the alarm honest rather than noisy:
+
+* **"Has it quoted?" is measured PER TICKER SINCE THAT EVENT'S WINDOW
+  OPENED**, not "in the last hour".  P-022 writes a QUOTE row when it places
+  or re-prices, then rests the quote through the round writing nothing — so
+  an hour-lookback would flip to ALARM a few minutes after a perfectly
+  healthy placement.
+* **A grace period.** `run_round_leader_fade.py` re-discovers every 900 s, so
+  a market whose window has just opened may legitimately not be in the pod's
+  book yet.  A candidate only counts as missing a quote once its window has
+  been open longer than `--grace-min` (default 20).
+
+A CHECKER FAILURE IS A FAILURE, NEVER A SKIP.  If listing raises for any
+series the state is `CHECK_FAILED` and the run alarms; the previous version
+printed a warning to stderr and then reported `NO_MARKETS`, which is the
+same "looks healthy" outcome as everything else this file exists to prevent.
+
 THE PLACEHOLDER PROBLEM (measured 2026-07-27, see the report)
 ─────────────────────────────────────────────────────────────
 On an OPEN Kalshi round-leader market, every time field collapses to one
@@ -101,13 +135,43 @@ STATUS_FILE = STATUS_DIR / "status.jsonl"
 QUOTES_LOG = Path("data/trade_logs/round_leader_fade_quotes.jsonl")
 
 # Bound the orderbook cost. Only markets the pod could plausibly be quoting
-# get a book pull; there are ~350 open leader markets and pulling all of them
+# get a book pull; there are ~950 open leader markets and pulling all of them
 # every run would be gratuitous against a public endpoint.
-MAX_BOOK_PULLS = 60
+#
+# Raised 60 -> 200 on 2026-07-29: one in-window event is a full tournament
+# field (144 markets for AIGWO26, 149 for ROC26), and at 60 the detector
+# priced less than half of it. The names that clear the band are NOT at the
+# front of the list — of AIGWO26's 144, the 13 in band are scattered — so a
+# 60-pull budget could report "no candidate" for an event the pod is quoting,
+# which is the same blindness in a new place.
+MAX_BOOK_PULLS = 200
 
-OK_STATES = ("NO_MARKETS", "WAITING", "WINDOW_OPEN_QUOTING")
-ALARM_STATES = ("CLOSE_REF_PLACEHOLDER", "WINDOW_OPEN_NO_QUOTES",
-                "SCHEDULE_UNRESOLVED")
+# How long after a window opens the pod is still allowed to be silent.
+#
+# For a market already in the pod's book — which is the normal case, since
+# round-leader markets list 2.7-4.9 days ahead of their round — the pod needs
+# only one 20 s cycle, because `book.close_epoch` is already resolved. The
+# grace exists solely for a market listed after the last `--rediscover 900`
+# pass, which for these series would require Kalshi to list a round-leader
+# market less than 24 h before the round; that has never been observed. 10
+# minutes covers the rediscover interval with margin while keeping end-to-end
+# detection inside the ~30 min the alert path can deliver.
+DEFAULT_GRACE_S = 600.0
+
+OK_STATES = ("NO_MARKETS", "NO_WINDOW", "WINDOW_OPEN_NO_CANDIDATE",
+             "WINDOW_OPEN_GRACE", "QUOTED")
+ALARM_STATES = ("CLOSE_REF_PLACEHOLDER", "WINDOW_OPEN_CANDIDATE_NO_QUOTE",
+                "SCHEDULE_UNRESOLVED", "CHECK_FAILED")
+
+# Pre-2026-07-29 names, recorded alongside the new state so the existing
+# status.jsonl history stays comparable.
+LEGACY_STATE = {
+    "NO_WINDOW": "WAITING",
+    "WINDOW_OPEN_NO_CANDIDATE": "WAITING",
+    "WINDOW_OPEN_GRACE": "WAITING",
+    "WINDOW_OPEN_CANDIDATE_NO_QUOTE": "WINDOW_OPEN_NO_QUOTES",
+    "QUOTED": "WINDOW_OPEN_QUOTING",
+}
 
 
 def _iso(epoch: Optional[float]) -> Optional[str]:
@@ -157,18 +221,110 @@ def recent_quotes(path: Path, since_epoch: float) -> Dict[str, Any]:
             "last_ts": last_ts}
 
 
+def last_quote_per_ticker(path: Path) -> Dict[str, float]:
+    """`ticker -> epoch of its most recent QUOTE row`.
+
+    The unit of "has the pod quoted?" has to be the ticker and the reference
+    point has to be that event's window opening.  P-022 writes a QUOTE row
+    only when it PLACES or RE-PRICES; a healthy quote then rests through the
+    round writing nothing at all, so any fixed lookback would read a correct
+    placement as silence within the hour.
+    """
+    out: Dict[str, float] = {}
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if rec.get("type") != "QUOTE":
+                    continue
+                tk = rec.get("ticker")
+                try:
+                    ts = float(rec.get("ts"))
+                except (TypeError, ValueError):
+                    continue
+                if tk and (tk not in out or ts > out[tk]):
+                    out[tk] = ts
+    except OSError:
+        return {}
+    return out
+
+
+def screen_after_band(engine: RoundLeaderFadeMakerEngine, ticker: str,
+                      event_code: str, mid: float):
+    """Every screen the pod applies AFTER the band, as (ok, reason, size, px).
+
+    This is the one place the detector deliberately duplicates pod logic
+    instead of importing it, because the pod's copy lives inline in
+    ``_cycle_book`` and reaching into it would make the detector agree with
+    the pod by construction — including when the pod is wrong.  The
+    duplication is pinned by ``tests/test_p022_window_check.py::
+    test_screen_agrees_with_the_engines_own_decision``, which drives a real
+    engine over the same states and asserts the two answers match.
+
+    Cap room is read from the engine's public collateral accessors, so it is
+    only meaningful after ``rebuild_from_log()`` has restored live exposure.
+    """
+    book = engine.books.get(ticker)
+    book_coll = book.collateral if book is not None else 0.0
+    book_sold = book.sold if book is not None else 0.0
+
+    room_name_coll = engine.max_collateral_per_name - book_coll
+    room_name_ct = engine.max_contracts_per_name - book_sold
+    if room_name_coll <= 0 or room_name_ct <= 0:
+        return False, "cap_per_name", 0.0, None
+    room_event = (engine.max_collateral_per_tournament
+                  - engine.tournament_collateral(event_code))
+    room_total = engine.max_total_collateral - engine.total_collateral()
+    if room_event <= 0 or room_total <= 0:
+        return False, "cap_collateral", 0.0, None
+    quote_px = round(mid + engine.quote_offset, 2)
+    if quote_px <= mid or quote_px >= 0.99:
+        return False, "quote_px_unusable", 0.0, quote_px
+    per_ct_coll = max(1.0 - quote_px, 1e-6)
+    size = float(int(min(room_name_ct,
+                         room_name_coll / per_ct_coll,
+                         room_event / per_ct_coll,
+                         room_total / per_ct_coll)))
+    if size <= 0:
+        return False, "cap_sized_to_zero", 0.0, quote_px
+    return True, "", size, quote_px
+
+
 def assess(engine: RoundLeaderFadeMakerEngine,
            placeholder_days: float,
            quote_lookback_s: float,
-           max_book_pulls: int = MAX_BOOK_PULLS) -> Dict[str, Any]:
+           max_book_pulls: int = MAX_BOOK_PULLS,
+           grace_s: float = DEFAULT_GRACE_S) -> Dict[str, Any]:
     now = engine._now()
     lo_band, hi_band = engine.mid_band
 
+    # The cap screen below reads the engine's collateral accessors, which are
+    # zero on a freshly constructed engine. Restoring the live book from the
+    # fills log is what makes "would the pod have quoted?" a real question
+    # rather than one whose answer is always "yes, there is room".
+    rebuild_error: Optional[str] = None
+    try:
+        engine.rebuild_from_log()
+    except Exception as exc:                           # noqa: BLE001
+        rebuild_error = f"{type(exc).__name__}: {exc}"
+
     markets: List[Dict[str, Any]] = []
+    discovery_errors: Dict[str, str] = {}
     for s in engine.series:
         try:
             markets.extend(engine.kalshi.open_markets(s))
         except Exception as exc:                       # noqa: BLE001
+            # A checker failure is a FAILURE, never a skip. Swallowing this
+            # made a total listing outage read as NO_MARKETS — "healthy and
+            # between tournaments" — which is the exact confusion this file
+            # exists to remove.
+            discovery_errors[s] = f"{type(exc).__name__}: {exc}"
             print(f"  WARN: discovery failed for {s}: {exc}", file=sys.stderr)
 
     # The pod's close reference now comes from the EXTERNAL schedule
@@ -222,9 +378,20 @@ def assess(engine: RoundLeaderFadeMakerEngine,
 
     # Only price the events the pod thinks it is quoting right now.
     in_window = [e for e in events.values() if e["in_pod_window"]]
-    n_in_band, pulls = 0, 0
+    quote_ts = last_quote_per_ticker(QUOTES_LOG)
+
+    n_priced = n_in_band = n_candidates = n_quoted = 0
+    pulls = 0
+    missing: List[str] = []
+    refusals: Dict[str, int] = {}
     for e in in_window:
-        e["n_in_band"] = 0
+        e["window_open_epoch"] = e["close_ref"] - engine.fade_start_h * 3600.0
+        e["window_open_iso"] = _iso(e["window_open_epoch"])
+        e["window_open_for_s"] = now - e["window_open_epoch"]
+        e["event_code"] = engine._event_code({"event_ticker": e["event"]})
+        e.update({"n_priced": 0, "n_in_band": 0, "n_candidates": 0,
+                  "n_quoted": 0, "candidates_without_quote": [],
+                  "screen_refusals": {}})
         for tk in e["tickers"]:
             if pulls >= max_book_pulls:
                 break
@@ -233,15 +400,58 @@ def assess(engine: RoundLeaderFadeMakerEngine,
                 mid = engine._mid(tk)
             except Exception:                          # noqa: BLE001
                 continue
-            if mid is not None and lo_band <= mid <= hi_band:
-                e["n_in_band"] += 1
-                n_in_band += 1
+            if mid is None:
+                continue
+            e["n_priced"] += 1
+            n_priced += 1
+            if not (lo_band <= mid <= hi_band):
+                continue
+            e["n_in_band"] += 1
+            n_in_band += 1
+            ok, why, _size, _px = screen_after_band(
+                engine, tk, e["event_code"], mid)
+            if not ok:
+                e["screen_refusals"][why] = e["screen_refusals"].get(why, 0) + 1
+                refusals[why] = refusals.get(why, 0) + 1
+                continue
+            e["n_candidates"] += 1
+            n_candidates += 1
+            ts = quote_ts.get(tk)
+            if ts is not None and ts >= e["window_open_epoch"]:
+                e["n_quoted"] += 1
+                n_quoted += 1
+            elif e["window_open_for_s"] >= grace_s:
+                # Only counts as missing once the pod has had a rediscover
+                # pass to see it. Before that, silence is scheduling.
+                e["candidates_without_quote"].append(tk)
+                missing.append(tk)
 
     quotes = recent_quotes(QUOTES_LOG, now - quote_lookback_s)
 
+    funnel = {
+        "markets_listed": len(markets),
+        "close_resolved": sum(e["n_markets"] for e in events.values()),
+        "inside_window": sum(e["n_markets"] for e in in_window),
+        "priced": n_priced,
+        "in_band": n_in_band,
+        "passes_every_screen": n_candidates,
+        "quoted_since_window_open": n_quoted,
+        "candidates_without_quote": len(missing),
+    }
+
     n_placeholder = sum(1 for e in events.values() if e["placeholder"])
-    n_listed_events = len(events) + len(unresolved)
-    if not markets:
+    if discovery_errors or rebuild_error:
+        state = "CHECK_FAILED"
+        bits = [f"{k}: {v}" for k, v in list(discovery_errors.items())[:4]]
+        if rebuild_error:
+            bits.append(f"rebuild_from_log: {rebuild_error}")
+        detail = (
+            f"the CHECKER could not measure P-022 ({len(discovery_errors)} of "
+            f"{len(engine.series)} series failed to list"
+            + (", and the live book could not be restored" if rebuild_error else "")
+            + "). Everything below is incomplete, so treat P-022's state as "
+              "UNKNOWN, not healthy. " + "; ".join(bits))
+    elif not markets:
         state = "NO_MARKETS"
         detail = ("no open round-leader markets in any of the "
                   f"{len(engine.series)} configured series — silence is "
@@ -265,21 +475,46 @@ def assess(engine: RoundLeaderFadeMakerEngine,
             f"[{engine.no_new_quote_h:g}h, {engine.fade_start_h:g}h] window is "
             "computed off a timestamp ~2 weeks past the real round end, so it "
             "cannot open while these markets are tradeable. P-022 CANNOT QUOTE.")
-    elif in_window and n_in_band > 0 and quotes["n_recent"] == 0:
-        state = "WINDOW_OPEN_NO_QUOTES"
+    elif missing:
+        state = "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
         detail = (
-            f"{len(in_window)} event(s) in the placement window with "
-            f"{n_in_band} name(s) priced inside the "
-            f"[{lo_band:.2f}, {hi_band:.2f}] band, and ZERO quotes written in "
-            f"the last {quote_lookback_s / 60:.0f} min. This is the condition "
-            "that went unnoticed for three days.")
-    elif in_window and n_in_band > 0:
-        state = "WINDOW_OPEN_QUOTING"
-        detail = (f"{n_in_band} name(s) in band across {len(in_window)} event(s); "
-                  f"{quotes['n_recent']} quote(s) in the last "
-                  f"{quote_lookback_s / 60:.0f} min")
+            f"{len(missing)} name(s) across {len(in_window)} event(s) clear "
+            f"EVERY screen the pod applies — inside the "
+            f"[{engine.no_new_quote_h:g}h, {engine.fade_start_h:g}h] window, "
+            f"priced inside [{lo_band:.2f}, {hi_band:.2f}], with cap room and a "
+            f"usable quote price — and P-022 has written NO quote for them "
+            f"since their window opened (grace {grace_s / 60:.0f} min elapsed). "
+            f"This is the failure that has cost five days. First: "
+            + ", ".join(missing[:5]))
+    elif n_quoted > 0:
+        state = "QUOTED"
+        detail = (f"{n_quoted} of {n_candidates} candidate name(s) across "
+                  f"{len(in_window)} event(s) have a QUOTE row written since "
+                  f"their window opened; {quotes['n_recent']} quote row(s) in "
+                  f"the last {quote_lookback_s / 60:.0f} min")
+    elif n_candidates > 0:
+        # Candidates exist, none quoted, but no window has been open long
+        # enough for the pod's 900 s rediscover pass. Distinct from
+        # NO_CANDIDATE so a run at window_open + 1 min is not mistaken for
+        # "there was nothing to quote".
+        state = "WINDOW_OPEN_GRACE"
+        detail = (
+            f"{n_candidates} candidate name(s) clear every screen but the "
+            f"earliest window has only been open "
+            f"{min(e['window_open_for_s'] for e in in_window) / 60:.0f} min "
+            f"(grace {grace_s / 60:.0f} min). Silence is still allowed; this "
+            "run does NOT clear P-022 — the next one does.")
+    elif in_window:
+        state = "WINDOW_OPEN_NO_CANDIDATE"
+        detail = (
+            f"{len(in_window)} event(s) in the placement window, "
+            f"{funnel['inside_window']} markets, {n_priced} priced, "
+            f"{n_in_band} in band, {n_candidates} clearing every screen"
+            + (f" (refused: {refusals})" if refusals else "")
+            + ". Not quoting is CORRECT here, but it is a different state from "
+              "'no window is open' and the two used to be the same silence.")
     else:
-        state = "WAITING"
+        state = "NO_WINDOW"
         detail = (f"{len(events)} event(s) listed with real close references, "
                   "none inside the placement window — silence is correct")
 
@@ -287,8 +522,14 @@ def assess(engine: RoundLeaderFadeMakerEngine,
         "ts": now,
         "iso": datetime.now(timezone.utc).isoformat(),
         "state": state,
+        "legacy_state": LEGACY_STATE.get(state, state),
         "alarm": state in ALARM_STATES,
         "detail": detail,
+        "funnel": funnel,
+        "screen_refusals": refusals,
+        "candidates_without_quote": missing,
+        "discovery_errors": discovery_errors,
+        "rebuild_error": rebuild_error,
         "n_events": len(events),
         "n_markets": len(markets),
         "n_resolved_events": len(events),
@@ -297,14 +538,17 @@ def assess(engine: RoundLeaderFadeMakerEngine,
         "n_placeholder_events": n_placeholder,
         "n_in_window_events": len(in_window),
         "n_in_band": n_in_band,
+        "n_candidates": n_candidates,
         "book_pulls": pulls,
         "quotes": quotes,
         "params": {
             "series": list(engine.series),
             "mid_band": [lo_band, hi_band],
+            "quote_offset": engine.quote_offset,
             "fade_start_h": engine.fade_start_h,
             "no_new_quote_h": engine.no_new_quote_h,
             "placeholder_days": placeholder_days,
+            "grace_min": grace_s / 60.0,
         },
         # Per-event close references are recorded every run on purpose: their
         # history answers "does Kalshi ever correct close_time before the
@@ -328,18 +572,37 @@ def main() -> int:
     ap.add_argument("--quote-lookback-min", type=float, default=60.0,
                     help="how far back to look for QUOTE rows")
     ap.add_argument("--max-book-pulls", type=int, default=MAX_BOOK_PULLS)
+    ap.add_argument("--grace-min", type=float, default=DEFAULT_GRACE_S / 60.0,
+                    help="how long after a window opens the pod may still be "
+                         "silent before a candidate counts as un-quoted "
+                         "(default covers run_round_leader_fade's 900s "
+                         "rediscover interval)")
     ap.add_argument("--no-write", action="store_true",
                     help="skip appending to the status log")
     args = ap.parse_args()
 
     try:
         config = load_config()
-    except Exception:                                  # noqa: BLE001
-        config = {}
-    engine = RoundLeaderFadeMakerPod.from_config(config)
-
-    result = assess(engine, args.placeholder_days,
-                    args.quote_lookback_min * 60.0, args.max_book_pulls)
+        engine = RoundLeaderFadeMakerPod.from_config(config)
+        result = assess(engine, args.placeholder_days,
+                        args.quote_lookback_min * 60.0, args.max_book_pulls,
+                        args.grace_min * 60.0)
+    except Exception as exc:                           # noqa: BLE001
+        # The checker dying must LOOK like a failure. Exiting on a traceback
+        # with no status row would leave the last healthy row as the most
+        # recent thing anyone reads.
+        import traceback
+        traceback.print_exc()
+        result = {
+            "ts": time.time(),
+            "iso": datetime.now(timezone.utc).isoformat(),
+            "state": "CHECK_FAILED",
+            "legacy_state": "CHECK_FAILED",
+            "alarm": True,
+            "detail": ("the P-022 window checker RAISED and measured nothing: "
+                       f"{type(exc).__name__}: {exc}. P-022's state is UNKNOWN."),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
 
     if not args.no_write:
         try:
@@ -356,14 +619,24 @@ def main() -> int:
 
     print("P-022 quotable-window check")
     print("=" * 62)
+    if "funnel" not in result:
+        print(f"  *** ALARM: {result['state']} ***")
+        print(f"  {result['detail']}")
+        return 1
     print(f"  events resolved: {result['n_resolved_events']} "
           f"({result['n_markets']} markets listed)")
     print(f"  UNRESOLVED     : {result['n_unresolved_events']} event(s) "
           "— the pod fails closed on these")
     print(f"  placeholder    : {result['n_placeholder_events']} of "
           f"{result['n_events']} events")
-    print(f"  in pod window  : {result['n_in_window_events']} events, "
-          f"{result['n_in_band']} names in band")
+    f = result["funnel"]
+    print("  funnel         : "
+          f"listed {f['markets_listed']} -> resolved {f['close_resolved']} "
+          f"-> in window {f['inside_window']} -> priced {f['priced']} "
+          f"-> in band {f['in_band']} -> passes every screen "
+          f"{f['passes_every_screen']} -> QUOTED {f['quoted_since_window_open']}")
+    if result["screen_refusals"]:
+        print(f"  screen refusals: {result['screen_refusals']}")
     q = result["quotes"]
     print(f"  quotes         : {q['n_recent']} recent / {q['total']} ever"
           + ("" if q["exists"] else "   (no quote log has ever been written)"))

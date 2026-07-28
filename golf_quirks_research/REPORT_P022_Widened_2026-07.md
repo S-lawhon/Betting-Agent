@@ -196,9 +196,20 @@ estimate is now **+2.57¢ [+0.1, +4.5]**. If the true effect is nearer +2.6¢ th
 as the inverse square of the effect, so ~14 → ~24 tournaments for the same
 power.
 
-**I am not re-deriving the threshold.** §1 of the pre-declaration forbids it and
-the reasoning holds: a wider backtest changes the prior, not the gate. This is
-flagged for Sam exactly as §1 said it would be.
+**I did not re-derive the threshold** — §1 of the pre-declaration forbids it,
+and a wider backtest changes the prior, not the gate. It was flagged for Sam
+exactly as §1 said it would be.
+
+> **Sam raised it: T = 14 → 24, 2026-07-28** (`P022_DECISION_RULE.md`
+> Amendment 1). Made at **T = 0**, with zero forward observations in existence.
+> Not a renegotiation: §5's *criterion* — "the smallest sample with 90% power
+> against the effect actually measured" — is unchanged, and re-solving it with
+> the revised +2.57¢ and the same σ = 3.781 gives 23.3 → **24**, a row §5's own
+> table already carried. The direction is conservative.
+>
+> **`MIN_T_EXTENSION` stays 40 and is now inconsistent with its own rationale**
+> ("80% power vs half the measured effect" now solves to ~70; 40 delivers ~53%).
+> Left open for Sam and recorded in the rule, the code and a test.
 
 ## 7. The impulse I was told to report rather than act on
 

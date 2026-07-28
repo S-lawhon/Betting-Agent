@@ -247,10 +247,12 @@ rather than evidence the edge is gone.
 **+3.41¢ [+1.7, +5.1] → +2.57¢ [+0.1, +4.5]**. The added block's anchors are
 *fresher* than the original's, which removes the obvious benign explanation.
 
-**For you, reported not acted on:** T = 14's power was sized against +3.4¢/ct.
-At +2.57¢ it is underpowered — roughly 24 tournaments for the same power. I did
-**not** re-derive the threshold; a wider backtest changes the prior, not the
-gate.
+**Consequence, since acted on by Sam:** T = 14's power was sized against
++3.4¢/ct; at +2.57¢ it delivers only 71%. **Sam raised the threshold to T = 24**
+(`P022_DECISION_RULE.md` Amendment 1, 2026-07-28) — the rule's own criterion
+re-solved with the revised effect, made at T = 0 with no observations in
+existence. **`MIN_T_EXTENSION` stays 40 and is now inconsistent with its own
+rationale (~70 would be consistent); that decision is still open.**
 
 ---
 
@@ -340,7 +342,12 @@ Verified on the droplet after restart:
 12. ~~**P-002/P-006 phantom exposure: void or retire?**~~ **VOIDED 2026-07-27
     20:58 UTC** on your call — 282 rows appended, $4,642.06 → $0.00, no existing
     line modified, all five gates unchanged.
-13. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
+13. **`MIN_T_EXTENSION` (currently 40).** Amendment 1 raised the decision point
+    to T = 24 but left the extension at 40, which no longer matches its stated
+    rationale of "80% power vs half the measured effect" — that now solves to
+    ~70, and 40 delivers ~53%. Recorded in the rule, the code and a test rather
+    than silently fixed.
+14. **Widening approval** (`STATUS_REASSESSMENT` §5.1) was never recorded. The
     pre-declaration is committed; the decision is still open.
 
 ---

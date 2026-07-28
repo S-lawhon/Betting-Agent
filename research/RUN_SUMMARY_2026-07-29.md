@@ -36,7 +36,7 @@
 | **4** | EV-Map → droplet | **FIXED (4 of 5) + BLOCKED (1)** | clock starts **2026-07-28T03:11Z → 2026-08-27**; archiver OOM |
 | **5** | P-014 decision rule, blind | **DONE — with one disclosed contamination** | n = 500 rows ≈ **123 game clusters**, detecting ~6–12 ¢/ct |
 | **6** | P-001 post-fix admissibility | **MEASURED — LIVE GATE** | **3 of 3**, worst error 7 min; **152 → 0** on the tie-break fingerprint |
-| **7** | Branch consolidation + push | **BLOCKED** | 77 commits still in one place — **the push was denied, see §Task 7** |
+| **7** | Branch consolidation + push | **DONE** | tip **`0e85bf3`** on origin, 125 commits, verified from an independent clone |
 | **8** | Gate instrumentation standard | **BUILT** | re-detects P-014 and P-015 by their exact signatures; **found P-016** |
 
 **Suite: 1,723 passed, 2 skipped** (from 1,665 at session start; +58).
@@ -73,12 +73,12 @@ measurement.** Removing the contaminated observation changes nothing.
 `P014_DECISION_RULE.md` is **NOT LOCKED**; its §9 asks Sam to accept it as
 written or have the thresholds re-derived by a session that has seen nothing.
 
-### 2. The push was denied — the 77 commits are still in one place
+### 2. ~~The push was denied~~ — **RESOLVED: pushed and verified**
 
-`git push -u origin p024-mlb-f5-research` was **blocked by the permission
-layer**, not by git. Everything below therefore still exists only on this
-laptop. This was the whole point of Task 7 and it is the one thing tonight did
-not fix. **One command, §Task 7.**
+`git push -u origin p024-mlb-f5-research` was blocked by the permission layer
+on the first attempt and was not worked around. Sam authorised it directly and
+it ran: **tip `0e85bf3` on origin, 125 commits, verified from a fresh
+independent clone** (§Task 7). The single-copy exposure is closed.
 
 ---
 
@@ -288,30 +288,40 @@ observations. That class needs a live-behaviour watch — which is what
 
 ---
 
-## Task 7 — branch consolidation · **BLOCKED on the push**
+## Task 7 — branch consolidation · **PUSHED**
 
-**`git push -u origin p024-mlb-f5-research` was denied by the permission
-layer.** I did not work around it. **77 commits — every integrity fix, every
-kill, the resolver, the fee fixture, the throughput instrument, all five gate
-readers, and everything from tonight — still exist in exactly one place.**
+The push was denied by the permission layer on the first attempt and was **not
+worked around**; Sam authorised it directly and it ran.
 
-```bash
-git push -u origin p024-mlb-f5-research
+```
+e4768c8..0e85bf3  p024-mlb-f5-research -> p024-mlb-f5-research
+branch 'p024-mlb-f5-research' set up to track 'origin/p024-mlb-f5-research'
 ```
 
-Then verify by fetching into a scratch clone and confirming the tip SHA and
-that the resolver, the fee fixture and the throughput instrument are present:
+**Tip on origin: `0e85bf3acca45d7f641e71b9a953335d275c4cf6`, 125 commits.**
 
-```bash
-git rev-parse p024-mlb-f5-research        # compare against origin's tip
-git ls-tree -r --name-only HEAD | grep -E 'golf_schedule|kalshi_series_fees|throughput'
-```
+**Verified from an independent clone**, not from the local remote-tracking ref
+— a `git push` that reports success and a remote that actually holds the
+objects are different claims, and this workstream has been burned twice by
+verifying a deploy against the machine that produced it. Fresh
+`git clone --single-branch` into a scratch directory, then:
 
-The tip at the moment of the audit was `17f3778`; it advances by the commits
-that land this summary, so compare the branch's own current SHA rather than a
-literal from this file.
+| check | result |
+|---|---|
+| tip SHA on origin vs local | **identical** |
+| commits reachable | 125 |
+| `src/golf_schedule.py` (the P-022 resolver) | PRESENT |
+| `src/fixtures/kalshi_series_fees.json` (the fee fixture) | PRESENT |
+| `manager/throughput.py` (the throughput instrument) | PRESENT |
+| `scripts/p022_window_check.py`, `scripts/check_gate_instrumentation.py` | PRESENT |
+| `scripts/evmap_job.py`, `src/inplay_surprise.py` | PRESENT |
+| `docs/GATE_INSTRUMENTATION_STANDARD.md`, `research/P014_DECISION_RULE.md`, this summary | PRESENT |
 
-**Merge posture, and the reasoning:** once pushed, **fast-forward `main`.**
+**The single-copy exposure is closed.** `main` remains 0 commits ahead of
+HEAD, so the fast-forward described below is still available and is still the
+right posture.
+
+**Merge posture, and the reasoning:** **fast-forward `main`.**
 `main` is 0 commits ahead of HEAD, so it is a genuine fast-forward with no
 merge commit and no conflict. Every commit is already deployed and running;
 there is no reviewer but Sam; and a PR would add a review artifact for code
@@ -376,8 +386,10 @@ bash scripts/deploy.sh 129.212.176.202          # sync only, NO restart
 
 **New tonight**
 
-1. **Push the branch** (§Task 7). One command. Until it runs, 77 commits exist
-   on one laptop.
+1. ~~**Push the branch**~~ **DONE** — tip `0e85bf3` on origin, verified from an
+   independent clone (§Task 7). The remaining half is the merge posture:
+   **fast-forward `main`** and retire the `p024-mlb-f5-research` name, which
+   describes a study killed on 2026-07-25.
 2. **Accept or re-derive `P014_DECISION_RULE.md`** given the disclosed
    contamination (§9 of that file). My recommendation: accept and record it —
    the alternative trades a small, disclosed, checkable contamination for a
@@ -461,5 +473,6 @@ P-022 is armed and will tell us loudly if it is not; the night's larger
 finding is that **three of the four things that looked like calendar problems
 were measurement problems** — P-001 was never inert, the EV-Map clock had
 never started, and P-014's gate counts a unit four times larger than its own
-statistic — and the one thing that is genuinely still at risk is that 77
-commits of all of it remain on a single laptop.
+statistic — and the 79 commits that held all of it on a single
+laptop are now on origin, verified from a clone that never touched this
+machine.

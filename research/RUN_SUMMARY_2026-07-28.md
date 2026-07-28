@@ -28,7 +28,7 @@
 | **2** | Gate throughput audit | **KILL** (hypothesis refuted) | 432 P-001 settlements in 28 days → **0** gate-countable rows; 4 of 5 gates are not measuring |
 | **3** | P-028 golf template sweep | **KILL** (both leads) | H2H ties pay **0.50/0.50**, not $0 — pair sums to $1.00 exactly; category-leader has **2 tournament-clusters** |
 | **4** | R5 follow-ups | **ANSWERED / KILL / SCHEDULED** | tick size: **0 sub-cent levels in P-022's band**, no verdict moves · partitions: **0 of 15 executable** · NCAAF poller built |
-| **5** | P-022 widen the backtest | **PARTIAL** | pre-declaration committed before any pull; **13/13 series** have history back to **2026-05-22** — "~1 month" refuted |
+| **5** | P-022 widen the backtest | **INCONCLUSIVE** (added block **negative**) | backward window **empty at source**; added block **−12.33¢/ct** on 3 tournaments; pooled **+3.41 → +2.57¢/ct** |
 | **6** | Corrections + droplet hygiene | **DONE** | JDAY re-book moved P-017 to **−9.89¢/ct**; droplet 20MB→28KB; phantom exposure **$4,642 → $0.00** (voided) |
 | **7** | Fee-table fixture + CI | **FIXED** | **fifth drift found**; blast radius **zero verdicts changed** |
 | **8** | Data-readiness audit | **MIXED** | P-018 **ahead**; MLB props **on time to the day**; weather **dead, 139 of 139 runs failing** |
@@ -37,6 +37,7 @@
 [P-028 golf sweep](../golf_quirks_research/REPORT_P028_Template_Sweep_2026-07.md) ·
 [R5 follow-ups](REPORT_R5_Followups_2026-07.md) ·
 [corrections](REPORT_Corrections_2026-07-27.md) ·
+[P-022 widening](../golf_quirks_research/REPORT_P022_Widened_2026-07.md) ·
 [gate throughput](REPORT_Gate_Throughput_2026-07.md) ·
 [fee audit](REPORT_Fee_Audit_2026-07-27.md) ·
 [data readiness](REPORT_Data_Readiness_2026-07-27.md) ·
@@ -223,13 +224,33 @@ It distorted log-derived views only. **Voided on Sam's decision 2026-07-27
 20:58 UTC**: 282 terminal rows appended, no existing line modified, exposure now
 $0.00, all five gates unchanged.
 
-### Task 5 — widening · **PARTIAL, discipline intact**
+### Task 5 — widening · **INCONCLUSIVE, and the added block is negative**
 
-Pre-declaration committed in its own earlier commit, before any extended data
-was pulled — parameters frozen, staleness threshold (>6h) and refutation
-condition (WEAKENED if added block ≤ 0 or pooled < +2.1¢/ct) declared in
-advance. Horizon measured: **13/13 series reachable, overall earliest print
-2026-05-22**; "~1 month" refuted. Items 2–6 not done.
+**The task's premise was wrong.** It assumed the constraint was trade-history
+depth. Measured: Kalshi lists 78 settled round-leader events and **zero close
+before the study's own start** — the constraint is the *listing* horizon, and
+round-leader markets did not exist before mid-May 2026. **There is nothing
+behind the study to widen into.**
+
+Amended the pre-declaration (before any effect number) to run the only two
+things available: 4 within-window gaps the original pull missed, and 4
+tournaments that settled after the cache ends. **The gap block contributed
+nothing** — not one of its markets has an H−12h anchor inside the band.
+
+Both declared conditions fired. **INCONCLUSIVE** is primary (3 added
+tournaments against a floor of 6), but **WEAKENED also fired: the added block is
+−12.33¢/ct**, and I am not using the softer verdict to bury that. Its CI
+[−38.5, +7.0] overlaps the original's completely, so it is a small adverse draw
+rather than evidence the edge is gone.
+
+**The widening loosened the CI rather than tightening it:** pooled
+**+3.41¢ [+1.7, +5.1] → +2.57¢ [+0.1, +4.5]**. The added block's anchors are
+*fresher* than the original's, which removes the obvious benign explanation.
+
+**For you, reported not acted on:** T = 14's power was sized against +3.4¢/ct.
+At +2.57¢ it is underpowered — roughly 24 tournaments for the same power. I did
+**not** re-derive the threshold; a wider backtest changes the prior, not the
+gate.
 
 ---
 

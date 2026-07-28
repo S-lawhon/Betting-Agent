@@ -264,6 +264,9 @@ class RoundLeaderFadeMakerEngine:
         # (event_code, cap_kind) already recorded, so a breach is written once
         # rather than every cycle. Repopulated from the log on restart.
         self._breaches: set = set()
+        # ticker -> the book snapshot behind the most recent _mid() call, so a
+        # QUOTE row can record what it was priced off. Observability only.
+        self._last_book: Dict[str, Dict[str, Any]] = {}
 
     # ── Logging ──────────────────────────────────────────────────────
 
@@ -609,15 +612,29 @@ class RoundLeaderFadeMakerEngine:
     def _mid(self, ticker: str) -> Optional[float]:
         ob = self.kalshi.orderbook(ticker)
         if not ob:
+            self._last_book[ticker] = {"book_side": "no_book"}
             return None
         b, a = ob.get("yes_bid"), ob.get("yes_ask")
+        # OBSERVABILITY ONLY — the reference price and every branch below are
+        # unchanged. The sidedness of each reference is recorded so a fill can
+        # be attributed to the book it was quoted off. Measured 2026-07-28 on
+        # AIGWO26 R1: 143 of 146 markets in the event carry NO resting YES bid
+        # at any price, so the one-sided branch drives essentially every
+        # placement. A quote whose provenance was never recorded cannot be
+        # adjudicated later, and this is the first tournament of a
+        # 24-tournament gate.
+        snap = {"yes_bid": b, "yes_ask": a,
+                "bid_qty": ob.get("bid_qty"), "ask_qty": ob.get("ask_qty")}
         # Round-leader lottery books are frequently one-sided (bid 0). Accept a
         # one-sided ask as the reference when there is no bid, since that is
         # the price retail lifts; otherwise use the two-sided mid.
         if a is not None and 0 < a < 1 and (b is None or b <= 0):
+            self._last_book[ticker] = snap | {"book_side": "one_sided_ask"}
             return a
         if b is None or a is None or not (0 < b <= a < 1):
+            self._last_book[ticker] = snap | {"book_side": "unpriceable"}
             return None
+        self._last_book[ticker] = snap | {"book_side": "two_sided"}
         return (b + a) / 2.0
 
     def _cycle_book(self, book: MarketBook, killed: bool, now: float) -> None:
@@ -741,6 +758,14 @@ class RoundLeaderFadeMakerEngine:
                 # (median +1.6h).
                 "close_source": book.close_source,
                 "close_ref": book.close_epoch,
+                # The book this quote was priced off. `book_side` is the branch
+                # of `_mid` that produced `mid`; the raw levels are kept so the
+                # classification can be re-derived rather than trusted, and so
+                # the depth question ("how much rests at a better price than
+                # ours?") is answerable from the log — the pod screens on
+                # neither, and that omission is now visible rather than
+                # inferred.
+                **{k: v for k, v in self._last_book.get(book.ticker, {}).items()},
             })
 
     def _reserve(self, book: MarketBook, collateral_usd: float) -> bool:

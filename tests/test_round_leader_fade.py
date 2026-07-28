@@ -935,3 +935,65 @@ def test_cap_breach_is_recorded_against_quoted_collateral(tmp_path):
     assert eng._breaches, "an over-cap resting quote must record a §7 breach"
     kinds = {k for _, k in eng._breaches}
     assert "per_tournament" in kinds and "per_name" in kinds
+
+
+# ── observability: what book was each quote priced off? ──────────────
+#
+# Measured 2026-07-28 on AIGWO26 R1: 143 of the event's 146 markets carry NO
+# resting YES bid at any price, so `_mid`'s one-sided branch drives essentially
+# every live placement. The backtest never priced off a one-sided ask —
+# `quirks_common.candle_price` rejects one outright — so the provenance of each
+# live quote has to be in the log to be adjudicated later.
+
+
+def test_quote_records_the_book_it_was_priced_off_two_sided(tmp_path):
+    clock = Clock(CLOSE - 18 * 3600)
+    eng = make_engine(tmp_path, FakeKalshi(), clock)
+    eng.discover()
+    eng.cycle()
+    rec = [json.loads(l) for l in
+           (tmp_path / "round_leader_fade_quotes.jsonl").read_text().splitlines()
+           if '"QUOTE"' in l][-1]
+    assert rec["book_side"] == "two_sided"
+    assert rec["yes_bid"] == 0.04 and rec["yes_ask"] == 0.06
+    assert rec["ask_qty"] == 50
+    assert rec["close_source"] == "tee_times"
+
+
+def test_quote_records_a_one_sided_ask_reference(tmp_path):
+    """The live case. yes_bid absent -> the reference IS the ask, and the row
+    must say so; `mid` alone cannot distinguish 0.05 the mid from 0.05 the
+    ask, and those are different claims about what was quoted."""
+    k = FakeKalshi(book={"yes_bid": None, "yes_ask": 0.05,
+                         "bid_qty": 0, "ask_qty": 10})
+    clock = Clock(CLOSE - 18 * 3600)
+    eng = make_engine(tmp_path, k, clock)
+    eng.discover()
+    eng.cycle()
+    q = eng.books[TICKER].ask_quote
+    assert q is not None
+    # the arithmetic: reference = the ASK (0.05), quote = ask + 0.02 = 0.07
+    assert abs(q.mid_at_quote - 0.05) < 1e-9
+    assert abs(q.price - 0.07) < 1e-9
+    rec = [json.loads(l) for l in
+           (tmp_path / "round_leader_fade_quotes.jsonl").read_text().splitlines()
+           if '"QUOTE"' in l][-1]
+    assert rec["book_side"] == "one_sided_ask"
+    assert rec["yes_bid"] is None and rec["yes_ask"] == 0.05
+    assert rec["ask_qty"] == 10
+    assert abs(rec["mid"] - 0.05) < 1e-9
+
+
+def test_one_sided_reference_is_the_ask_not_a_none_coerced_mid(tmp_path):
+    """A None-to-zero coercion would make the reference (0 + ask)/2 = ask/2.
+    Pin the difference: at ask 0.08 that would be 0.04 and quote 0.06, versus
+    the intended 0.08 -> 0.10."""
+    k = FakeKalshi(book={"yes_bid": None, "yes_ask": 0.08,
+                         "bid_qty": 0, "ask_qty": 3})
+    clock = Clock(CLOSE - 18 * 3600)
+    eng = make_engine(tmp_path, k, clock)
+    eng.discover()
+    eng.cycle()
+    q = eng.books[TICKER].ask_quote
+    assert abs(q.mid_at_quote - 0.08) < 1e-9, "reference must be the ask itself"
+    assert abs(q.price - 0.10) < 1e-9

@@ -1,0 +1,137 @@
+{
+  "hours": 12.0,
+  "offset": 0.02,
+  "n_recs": 364,
+  "headline": {
+    "posted": 364,
+    "filled": 171,
+    "contracts": 4060.6,
+    "net_c": 3.41,
+    "ci": [
+      1.65,
+      5.13
+    ],
+    "tournaments": 19,
+    "skipped_no_anchor": 0
+  },
+  "anchor_route_counts": {
+    "traded_one_sided_ask": 181,
+    "traded_two_sided": 145,
+    "two_sided_tight": 38
+  },
+  "book_at_T_counts": {
+    "traded_two_sided": 135,
+    "one_sided_ask": 117,
+    "traded_one_sided_ask": 77,
+    "two_sided_tight": 23,
+    "two_sided_wide": 12
+  },
+  "skipped_reason_counts": {},
+  "edge_by_anchor_route": {
+    "traded_one_sided_ask": {
+      "posted": 181,
+      "filled": 54,
+      "contracts": 1262.1,
+      "net_c": 3.9,
+      "ci": [
+        0.33,
+        7.19
+      ],
+      "tournaments": 15,
+      "n_markets": 181
+    },
+    "traded_two_sided": {
+      "posted": 145,
+      "filled": 94,
+      "contracts": 2257.7,
+      "net_c": 4.47,
+      "ci": [
+        1.69,
+        7.27
+      ],
+      "tournaments": 12,
+      "n_markets": 145
+    },
+    "two_sided_tight": {
+      "posted": 38,
+      "filled": 23,
+      "contracts": 540.8,
+      "net_c": -2.21,
+      "ci": [
+        -16.16,
+        7.21
+      ],
+      "tournaments": 11,
+      "n_markets": 38
+    }
+  },
+  "edge_by_book_at_T": {
+    "one_sided_ask": {
+      "posted": 117,
+      "filled": 18,
+      "contracts": 441.0,
+      "net_c": -1.48,
+      "ci": [
+        -11.93,
+        8.15
+      ],
+      "tournaments": 8,
+      "n_markets": 117
+    },
+    "traded_one_sided_ask": {
+      "posted": 77,
+      "filled": 36,
+      "contracts": 821.1,
+      "net_c": 6.79,
+      "ci": [
+        6.13,
+        7.51
+      ],
+      "tournaments": 12,
+      "n_markets": 77
+    },
+    "traded_two_sided": {
+      "posted": 135,
+      "filled": 91,
+      "contracts": 2182.7,
+      "net_c": 4.39,
+      "ci": [
+        1.51,
+        7.3
+      ],
+      "tournaments": 12,
+      "n_markets": 135
+    },
+    "two_sided_tight": {
+      "posted": 23,
+      "filled": 18,
+      "contracts": 435.9,
+      "net_c": 1.21,
+      "ci": [
+        -15.69,
+        7.74
+      ],
+      "tournaments": 9,
+      "n_markets": 23
+    },
+    "two_sided_wide": {
+      "posted": 12,
+      "filled": 8,
+      "contracts": 179.9,
+      "net_c": -6.67,
+      "ci": [
+        -9.17,
+        5.84
+      ],
+      "tournaments": 2,
+      "n_markets": 12
+    }
+  },
+  "anchor_lag_h": {
+    "n": 364,
+    "median": 0.98,
+    "p90": 40.13,
+    "max": 249.17
+  },
+  "n_posted_by_market": 364
+}

@@ -3,6 +3,37 @@
 Appends all newly settled markets since the last run to
 data/settled_archive.parquet. The public API only keeps ~90 days reachable;
 run at least weekly so calibration history is never lost.
+
+⚠️ STATUS 2026-07-28: STILL BLOCKED ON MEMORY. Do not enable the timer.
+────────────────────────────────────────────────────────────────────────
+Two attempts, both real improvements, neither sufficient:
+
+  * 2026-07-29 chunked the accumulation. It could not have worked — `parts`
+    still held every chunk, so peak was the whole frame plus a copy for the
+    final concat. 1.66 GB, killed by the global OOM killer at 433 s.
+  * 2026-07-28 (below) streams row groups to a ParquetWriter and merges the
+    old archive via `iter_batches`. Peak 599 MB — a ~3x reduction and ~4x the
+    work done (1.82 M markets scanned, 300 k kept, 34 MB written) — but it
+    was still killed, at a deliberate 600 MB cgroup cap.
+
+WHAT STILL GROWS, measured: memory tracks KEPT ROWS, not the window. The
+remaining cost is `new_tickers` (300 k+ ticker strings) plus the array pandas
+materialises for `part.ticker.isin(...)` on every chunk, which the allocator
+does not hand back. THE NEXT FIX is to drop the in-memory ticker set entirely
+and de-duplicate in a second pass over the written parquet's ticker column.
+
+KNOWN DEFECT, unfixed: SIGKILL bypasses the `finally` block, so a killed run
+leaves `settled_archive.parquet.tmp` behind. It is harmless (the next run
+opens a fresh writer over it) but it is litter, and a temp file that outlives
+its process should be cleaned at STARTUP, not only at exit.
+
+RUN IT UNDER A CAP until the above is done — on a 2 GB box the largest RSS
+consumer is P-022's runner, and the global OOM killer scores by RSS:
+
+    systemd-run --unit=evmap-archive-probe --property=MemoryMax=600M \\
+        --property=MemorySwapMax=0 --uid=bettingbot \\
+        --working-directory=/opt/betting-pod-shop/kalshi-ev-map \\
+        /opt/betting-pod-shop/venv/bin/python src/archive_settled.py
 """
 import json
 import sys

@@ -42,7 +42,7 @@
 | **4** | P-018 rule + gate #1 | **KILL** | placebo **+19.19 ¢** vs fade **+9.09 ¢** — surprise adds nothing |
 | **5** | P-017 decision rule | **WRITTEN** | **P(a tournament ≤ −9.89 ¢) = 0.0082, ≈1 in 122**; T = 8 kept |
 | **6** | P-016 reader or retire | **RETIRED properly** | gate had already **resolved**; standard 15 → **12** failing checks |
-| **7** | Ops backlog | **3 of 4 DONE, 1 needs Sam** | archiver **1.66 GB → ~600 MB peak**, 3× better, not solved |
+| **7** | Ops backlog | **2 of 4 DONE, 1 needs Sam, 1 STILL BLOCKED** | archiver **1.66 GB → 599 MB**, 3× better — **still OOMs** |
 | **8** | P-001 placement rate | **EXPLAINED** | candidates **rose** 60→169→301; CLV gate rejects **89.7%** |
 
 **Suite: 1,751 passed, 2 skipped** (from 1,723 at session start; **+28**).
@@ -199,7 +199,7 @@ The five `kalshi-ev-map` lines are **still active**.
 > Backups: `~/mac_crontab.live.2026-07-28.bak` (verbatim current) and
 > `~/mac_crontab.bak.2026-07-29`.
 
-**3. EV-Map archiver — FIXED, and the capacity finding is the bigger one.**
+**3. EV-Map archiver — STILL BLOCKED, and the capacity finding is the bigger one.**
 
 The 07-29 chunking was a real change that **could not have worked**: `parts`
 accumulated every chunk, so peak was still the whole filtered frame plus a copy
@@ -216,23 +216,44 @@ seed from in the first place.
 Measured on the droplet under a **600 MB hard cap with swap disabled**, so it
 could not threaten P-022:
 
-| | before | after |
+> **⚠️ FINAL OUTCOME: it still OOMs. The archiver remains BLOCKED.** I wrote
+> "487 MB and flat" while it was running, then had to correct it twice as it
+> climbed, and it was ultimately **killed at the 600 MB cap after 2 m 26 s of
+> CPU**. Reported as it happened rather than as I first called it.
+
+| | 07-29 attempt | today's attempt |
 |---|---|---|
-| peak RSS | **1.66 GB** → OOM-killed at 433 s | **487 → 599 MB**, see below |
-| progress | died at 433 s | **1.82 M markets scanned, 300 k kept** and still going at 15 min |
+| peak RSS | **1.66 GB** | **599 MB** (killed at the cap) |
+| killed by | the **global** OOM killer | the **cgroup** — contained by design |
+| work done before dying | 433 s | **1.82 M markets scanned, 300 k kept**, 34 MB of parquet written |
+| verdict | blocked | **still blocked** |
 
-**Correction to my own claim, made before publishing it: the memory is NOT
-flat.** I first recorded "487 MB and flat"; watched longer it climbed
-487 → 519 → 554 → 599 MB against the 600 MB cap. The growth tracks kept rows,
-so the residual leak is the `new_tickers` de-duplication set (300 k+ ticker
-strings) plus per-chunk `isin` temporaries — **bounded by the archive's own
-size, not by the window**, but not zero.
+**What the fix did achieve:** a ~3× memory reduction and roughly 4× the work
+before failing. The streaming `ParquetWriter` removed the `parts` accumulation
+that was the dominant cost. **What it did not achieve: a bounded run.**
 
-**This is a 3× improvement, not a solved problem.** It completes far more work
-in far less memory, but a first run over ~2 M settled markets may still reach
-the cap. The next iteration is to replace the in-memory ticker set with a
-dedup pass over the written parquet. **Recorded as unfinished rather than
-claimed as fixed.**
+**Diagnosis of what still grows** — the memory tracks *kept rows*, not the
+window, so the remaining cost is the `new_tickers` de-duplication set (300 k+
+ticker strings) plus a fresh array materialised by `part.ticker.isin(...)` on
+every chunk, which Python's allocator does not return to the OS. **The next
+fix is to remove the in-memory ticker set entirely** and de-duplicate in a
+second pass over the written parquet's ticker column. **Not attempted today** —
+a second half-fix under time pressure is exactly how the 07-29 chunking change
+came to look like a fix while being unable to work.
+
+**The containment is the part that worked, and it is worth stating.** The
+kernel log reads `Memory cgroup out of memory` — the 600 MB cap killed the
+archiver and nothing else. **`betting-round-leader-fade` (started 17:38:42Z)
+and `betting-pod-shop` (15:57:03Z) both survived untouched**, which was the
+entire reason for running it capped the night before P-022's first window.
+
+**Cleaned up:** SIGKILL bypasses the `finally` block, so a stale 34 MB
+`settled_archive.parquet.tmp` was left behind and has been removed. That is a
+defect in my own code — a killed run should not leave a temp file claiming to
+be an archive — and it is on the list below.
+
+**The timer stays DISABLED.** It is weekly, so this costs nothing before
+tomorrow's window.
 
 **The droplet's real headroom, which the prompt correctly said is worth more:**
 
@@ -317,7 +338,7 @@ POI26's exclusion.
 | **2** | Accept or re-derive `P014_DECISION_RULE.md` given the disclosed contamination | **STILL OPEN** — untouched today |
 | **3** | POI26's close reference has no verified margin | **ADDRESSED** — exclusion from T pre-registered before the window; confirm or override |
 | **5** | Disable the Mac crontab | **STILL OPEN — needs you at a terminal**, attempted and hung |
-| **6** | How to unblock the EV-Map archiver | **CLOSED** — streaming parquet writes; 1.66 GB → 554 MB |
+| **6** | How to unblock the EV-Map archiver | **STILL OPEN** — 1.66 GB → 599 MB is 3× better and still OOMs at the cap. Next fix identified (drop the in-memory ticker set); timer stays disabled |
 | **7** | P-017 has no decision rule | **CLOSED** — written; acceptance is item 3 above |
 | **10** | `t_start_utc` for P-022, and it is not implemented as a filter anywhere | **STILL OPEN** |
 | **11** | Weather-suspended tournaments in T | **STILL OPEN** — EXCLUDE costs the backtest's five best tournaments |

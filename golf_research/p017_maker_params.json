@@ -1,0 +1,148 @@
+{
+  "_comment": "P-017A same-direction maker — KILL. Does resting a YES bid at the pre-tournament anchor beat lifting the ask, once non-fill is paid for? No: Delta = -6.59c per posted market per intended contract, CI [-9.24,-4.03], 11/12 tournaments negative. KILL on BOTH pre-registered triggers independently (contract fill fraction 2.2% < 25% floor; Delta <= -1.0c with CI excluding zero). All 18 grid cells negative with CI excluding zero; best cell anywhere -5.13c. The 1.04c taker fee is worth paying and this question is CLOSED. Pre-declared in golf_research/P017_MAKER_PREDECLARATION.md (commit 927555f) before any effect number. Full detail: golf_research/REPORT_P017_Maker_2026-07-30.md; raw grid: p017_maker_results.json.",
+  "status": "KILL",
+  "date": "2026-07-28",
+  "predeclaration": "golf_research/P017_MAKER_PREDECLARATION.md",
+  "predeclaration_commit": "927555f",
+  "report": "golf_research/REPORT_P017_Maker_2026-07-30.md",
+  "harness": "golf_research/backtest_p017_maker.py",
+
+  "universe": {
+    "series": ["KXPGATOP10", "KXPGATOP20"],
+    "ask_band": [0.08, 0.45],
+    "_band_note": "The SHIPPED band, per p017_params.json leg_A_pre_tourn_taker.",
+    "max_spread": 0.06,
+    "anchor_days_to_close": [4.0, 10.0],
+    "n_admissible": 1149,
+    "_n_reproduces": "Matches the published n=1149 at the 0.08-0.45 band EXACTLY — the Leg A rule is reproduced, not approximated.",
+    "n_tournaments": 12,
+    "result_distribution": {"no": 829, "yes": 320},
+    "n_scalar": 0,
+    "_scalar_note": "ZERO scalar rows in the admissible universe, so settlement is binary $1/$0 and is identical across both arms. Independently confirms the p017_params.json note that scalar does not touch this leg.",
+    "n_with_tick_tape": 866,
+    "n_without_tick_tape": 283
+  },
+
+  "design": {
+    "quote_size_contracts": 25.0,
+    "_quote_size_note": "Intended size, IDENTICAL in both arms. A research cap, NOT a live sizing recommendation.",
+    "primary_statistic": "delta_ct_per_posted_per_intended",
+    "_primary_definition": "Delta = sum_m [ net_maker(m) - net_taker(m) ] / (Q * posted_markets), in cents. Per POSTED market, not per filled contract: a maker that earns more on its fills is still worse if it forgoes the taker's edge on everything it misses.",
+    "pairing": "WITHIN-MARKET. Both arms computed on the same market from the same anchor candle. Leg A's own CI spans 5.6c and cannot resolve a ~1c effect by differencing two independent means.",
+    "bootstrap": "5000 resamples, clustered by TOURNAMENT, seed 12345 (quirks_common.bootstrap_unweighted; every market carries identical intended size Q, so equal weighting IS contract weighting).",
+    "taker_arm": "buy Q at the anchor ASK, pay taker fee 0.07*P*(1-P)",
+    "maker_arm": "rest a bid for Q at the anchor BID, fill only on taker_side='no' prints strictly through, maker fee 0.0",
+    "primary_cell": "bid_cancel96h",
+    "_primary_window": "Post at the anchor observation; cancel at close - 96h, the far edge of Leg A's own 4-10 day window. Median ~19.7h of resting time; the quote NEVER rests inside the tournament, which is what keeps this a one-variable experiment. Resting past 96h is Leg B's question."
+  },
+
+  "result_primary": {
+    "cell": "bid_cancel96h",
+    "posted_markets": 866,
+    "filled_markets": 30,
+    "fill_rate_markets": 0.0346,
+    "phi_contract_fill_fraction": 0.0221,
+    "maker_net_ct_on_fills": 0.1369,
+    "_maker_net_on_fills_warning": "THE SEDUCTIVE NUMBER. +13.69c/ct looks superb but is 30 markets and 2.2% of the capital, alongside Delta = -6.59c. Reporting per-contract-on-fills alone would have INVERTED this verdict. Secondary, never headline.",
+    "taker_net_ct_paired": 0.0690,
+    "delta_ct_per_posted_per_intended": -0.0659,
+    "delta_ci95": [-0.0924, -0.0403],
+    "delta_usd_per_posted_market": -1.6485,
+    "tournaments_negative": "11/12 (TRAV26 the lone positive at +4.84c — the same signature-event week that is Leg A's lone negative)",
+    "leave_one_out_range_ct": [-0.0742, -0.0575],
+    "e_settle_posted": 0.2702,
+    "e_settle_filled": 0.3959
+  },
+
+  "grid_summary": {
+    "placements": ["bid", "mid-0.00", "mid-0.02", "mid-0.04"],
+    "cancel_hours_before_close": [96.0, 48.0, 0.0],
+    "fill_conventions": ["strictly-through (headline)", "at-or-through (robustness)"],
+    "n_cells": 18,
+    "n_cells_with_delta_ge_0": 0,
+    "best_delta_any_cell_ct": -0.0513,
+    "_best_cell": "mid-0.00_cancel48h_atOrThrough — the friendliest convention in the grid, still -5.13c with CI [-7.31,-3.01].",
+    "max_phi_any_cell": 0.6325,
+    "_no_cherry_pick": "Full grid reported in the report; no cell was selected after the fact. The primary cell was fixed in the pre-declaration."
+  },
+
+  "why_it_fails": {
+    "price_advantage_is_real": {
+      "maker_naive_ct_if_all_filled": 0.0952,
+      "taker_net_ct_paired": 0.0690,
+      "advantage_ct": 0.0262,
+      "decomposition": "taker fee at the mean admissible ask (0.1909) = 1.08c; mean ask-to-bid distance = 1.54c; total 2.62c = fee + spread.",
+      "_predeclared_ceiling_check": "The pre-declaration predicted fee + spread ~= 2.1c and set the look-ahead alarm at Delta > +2.2c. Measured 2.62c lands within 0.05c of a from-first-principles recomputation, so there is NO look-ahead in the fill logic."
+    },
+    "failure_1_cannot_fill": {
+      "phi_at_primary": 0.0221,
+      "breakeven_phi_predeclared": 0.77,
+      "breakeven_phi_for_plus_1c": 0.88,
+      "max_phi_observed": 0.6325,
+      "note": "With a +2.62c per-filled gain against a forgone +7.14c on every unfilled contract, Delta >= 0 needs phi ~ 77%. Four to five days pre-tournament almost nobody sells through the bid on a 19c top-20 name."
+    },
+    "failure_2_fills_cost_adverse_selection": {
+      "e_settle_posted": 0.2702,
+      "e_settle_filled_by_cancel_h": {"96": 0.3959, "48": 0.2685, "0": 0.1865},
+      "maker_net_ct_on_fills_by_cancel_h": {"96": 0.1369, "48": 0.0316, "0": -0.0115},
+      "note": "The ONLY lever that raises phi is resting longer, which walks the quote into the tournament where the informed side hits it. The two failure modes are mutually reinforcing: you buy fills with adverse selection at roughly the rate that cancels them out."
+    },
+    "leg_b_repeating": "YES — named explicitly per the pre-declaration. At cancel 0h the FILLED cohort settles at 0.186 vs 0.270 posted (a 31% relative haircut) and the maker's edge on its own fills goes NEGATIVE. Same mechanic as Leg B (opposite side of the book) and as the make-cut study (0.361 vs 0.558). A resting quote on a market that trades through its own determining period is a one-way option written to the informed side, and the DIRECTION of the quote does not change that."
+  },
+
+  "declared_checks": {
+    "anchor_contemporaneity": {
+      "days_to_close": {"min": 4.0439, "p10": 4.4306, "median": 4.8196, "p90": 4.8722, "max": 4.8833},
+      "spread": {"median": 0.01, "p90": 0.04, "max": 0.06},
+      "verdict": "CLEAN. Both arms transact at the anchor instant (post_at_anchor=True), so staleness is SHARED and cannot bias Delta. No repeat of the make-cut study's median-68h-stale +9.5c artifact."
+    },
+    "selection_866_vs_1149": {
+      "cause": "The tick tape was pulled under the P-023c screen (anchor at 48h within 0.08-0.45), NOT Leg A's 4-10 day screen. A missing tape file does NOT mean the market never traded — it chiefly means the name had drifted out of the band by tournament start.",
+      "settle_rate_with_tape": 0.2702,
+      "settle_rate_without_tape": 0.3039,
+      "mean_ask_with_tape": 0.1909,
+      "mean_ask_without_tape": 0.2141,
+      "taker_net_ct_with_tape": 0.069,
+      "taker_net_ct_without_tape": 0.0788,
+      "verdict": "The intersection is MILDLY UNFAVOURABLE to the taker baseline, i.e. slightly generous to the maker — it strengthens the KILL rather than threatening it. Pairing is within-market regardless, so Delta is insulated."
+    },
+    "taker_fill_assumption": "The taker's 100% fill is an ASSUMPTION (Leg A models no fill risk), generous to the taker, and therefore a genuine limitation of a KILL. It does not rescue the result: closing a 6.6c gap needs the live taker to miss ~half its intended size, and the phi < 25% trigger fires independently of Delta.",
+    "fees": "src/kalshi_fees.fee_per_contract with series_ticker passed. Taker 0.07*P*(1-P); maker 0.0 for KXPGATOP10/KXPGATOP20 (quadratic, resolved through the generated fixture). Nothing hard-coded, INCLUDING the zero."
+  },
+
+  "harness_provenance": {
+    "no_third_harness": "quirks_common.replay() ALREADY implemented side='buy_yes'. No inversion of the sell-side logic was required.",
+    "additive_changes": [
+      "quote_px_by_ticker — per-market quote price ('rest at the anchor BID' cannot be expressed as a scalar offset off the anchor mid)",
+      "collect_per_market — per-market fill detail, required to pair maker against taker on the same market"
+    ],
+    "inertness_verified": "backtest_fade_fills.py --validate produces BYTE-IDENTICAL output before and after, confirmed by stashing the change and re-running. Both parameters default to prior behaviour.",
+    "anchor_injection": "Leg A's anchor candle is handed to replay as the market's sole candle, so the replay's internal anchor resolves to exactly the candle Leg A priced off and post_at_anchor=True posts at the moment Leg A transacted."
+  },
+
+  "gate_reset_answer": {
+    "question": "Does changing execution mid-gate reset P-017's settled-tournament count?",
+    "explicit_rule_exists": false,
+    "_honest_answer": "The locked documents do NOT state a reset rule explicitly. That should not be paraphrased into one.",
+    "inference": "They answer it by construction in two places: (1) P-017_Golf_Pod_Spec.md already treats the maker variant as a SEPARATE leg with its own gate ('P-017M validates on fill quality (>=30% of quoted names fill) AND positive markout-implied net'); (2) RESEARCH_TESTING_BRIEF_2026-07-26.md sec.4 makes pre-registering the forward gate before the first fill 'non-negotiable', and P-017's gate metric is denominated in half the TAKER backtest baseline. Read together: a maker switch is a new leg needing its own gate, i.e. the count would RESTART.",
+    "status": "INFERENCE, not a quoted rule. If Sam wants it binding it should be written into the spec.",
+    "moot_here": "Verdict is KILL, so nothing is proposed. Note also that at the primary cell this design fills 3.5% of quoted names and would fail P-017M's OWN >=30% fill-quality gate by an order of magnitude, independently of Delta."
+  },
+
+  "brief_corrections": {
+    "origin_report_missing": "The brief cites fee_parabola_research/REPORT_Fee_Parabola_2026-07-28.md. No such file or directory exists in this repo and no commit references one. Its figures (1.20c/ct tape estimate, 13.3% of in-band volume filling a resting bid, +0.23c vs -1.41c by flow side) could not be verified and are NOT relied on. The 1.04c fee IS independently confirmed at 1.08c on the mean admissible ask.",
+    "ceiling_was_too_low": "The brief set the ceiling on Delta at +1.04c (the fee) and flagged >+1.5c as a look-ahead red flag. That holds only if the maker quotes at the TAKER's price; resting at the BID also captures the spread, so the per-filled-contract ceiling is fee + spread ~= 2.1c. The alarm was raised to +2.2c in the pre-declaration BEFORE any number was seen. This mattered: the measured price advantage is +2.62c/ct, which under the brief's threshold would have been mis-read as a bug rather than as the correct structural gain."
+  },
+
+  "incidental_finding": {
+    "what": "backtest_fade_fills.py --validate FAILS on main, and did so BEFORE this study touched anything.",
+    "cause": "Cache growth: the cached universe is now 404 markets / 22 tournaments vs the published 364 / 19, so every published cell mismatches (H12 off+0.02: +2.6c [+0.1,+4.5] now vs +3.4c [+1.7,+5.1] published).",
+    "impact": "backtest_topn_fade_fills.py ABORTS on it ('ABORT: harness does not reproduce P-022. Trust nothing.') and is un-runnable without --skip-validate.",
+    "not_caused_by_this_study": "Confirmed by stashing the changes and re-running: identical failure.",
+    "fix": "Re-baseline the validation targets to the current cache, or restate the published figures at n=404. Separate triage."
+  },
+
+  "companion_task_not_attempted": "Live fee bill by pod from the droplet trade log (P-001/P-015 trade near the fee peak on maker-CHARGING tennis series: VWAP 0.519, taker 1.156c/ct, maker 0.289c/ct). Requires the deploy key; the local trade log is from 2026-03-13. Outside this study's stop rule.",
+
+  "stop_rule_honoured": "STOPPED at the report. No pod change, no config change, no deploy."
+}

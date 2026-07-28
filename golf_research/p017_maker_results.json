@@ -1,0 +1,1746 @@
+{
+  "generated": "golf_research/backtest_p017_maker.py",
+  "predeclaration": "golf_research/P017_MAKER_PREDECLARATION.md",
+  "universe": {
+    "series": [
+      "KXPGATOP10",
+      "KXPGATOP20"
+    ],
+    "band": [
+      0.08,
+      0.45
+    ],
+    "max_spread": 0.06,
+    "anchor_days_to_close": [
+      4.0,
+      10.0
+    ],
+    "n_markets": 1149,
+    "n_tournaments": 12,
+    "tournaments": [
+      "CHSC26",
+      "COPC26",
+      "GESO26",
+      "ISC26",
+      "JODC26",
+      "PGC26",
+      "RBBCAN26",
+      "THCCBN26",
+      "THMTPBW26",
+      "THOC26",
+      "TRAV26",
+      "USO26"
+    ],
+    "result_distribution": {
+      "no": 829,
+      "yes": 320
+    },
+    "n_with_tape": 866
+  },
+  "quote_size": 25.0,
+  "maker_fee": 0.0,
+  "maker_fee_source": "src/kalshi_fees.fee_per_contract(series_ticker=) -> 0.0 for KXPGATOP10/KXPGATOP20 (quadratic, from the generated fixture)",
+  "taker_fee_source": "src/kalshi_fees.fee_per_contract(maker=False) = 0.07*P*(1-P)",
+  "taker_baseline_full_universe": {
+    "net_ct": 0.0714,
+    "ci95": [
+      0.0419,
+      0.0988
+    ],
+    "n": 1149
+  },
+  "selection_diagnostic": {
+    "n_with_tape": 866,
+    "n_without_tape": 283,
+    "settle_rate_with_tape": 0.2702,
+    "settle_rate_without_tape": 0.3039,
+    "mean_ask_with_tape": 0.1909,
+    "mean_ask_without_tape": 0.2141,
+    "taker_net_ct_with_tape": 0.069,
+    "taker_net_ct_with_tape_ci": [
+      0.0442,
+      0.0941
+    ],
+    "taker_net_ct_without_tape": 0.0788,
+    "taker_net_ct_without_tape_ci": [
+      0.0148,
+      0.1713
+    ]
+  },
+  "anchor_contemporaneity": {
+    "anchor_days_to_close": {
+      "min": 4.0439,
+      "p10": 4.4307,
+      "median": 4.8196,
+      "p90": 4.8681,
+      "max": 4.8833
+    },
+    "anchor_spread": {
+      "median": 0.01,
+      "p90": 0.04,
+      "max": 0.06
+    },
+    "note": "Both arms transact at the anchor instant, so staleness is shared. The quote is posted at the anchor candle end (post_at_anchor=True), never at a later nominal T."
+  },
+  "primary_cell": "bid_cancel96h",
+  "verdict": "KILL (contract fill fraction < 25%)",
+  "grid": {
+    "bid_cancel96h": {
+      "posted_markets": 866,
+      "filled_markets": 30,
+      "fill_rate_markets": 0.0346,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 487.0,
+      "phi_contract_fill_fraction": 0.0225,
+      "maker_net_ct_on_fills": 0.1369,
+      "maker_net_ct_on_fills_ci": [
+        0.0168,
+        0.33
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.086,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0659,
+      "delta_ci95": [
+        -0.0924,
+        -0.0403
+      ],
+      "delta_usd_per_posted_market": -1.6468,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.3959,
+      "maker_naive_ct_if_all_filled": 0.0952,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0688,
+        "COPC26": -0.0655,
+        "GESO26": -0.0662,
+        "ISC26": -0.0619,
+        "JODC26": -0.068,
+        "PGC26": -0.0646,
+        "RBBCAN26": -0.0649,
+        "THCCBN26": -0.0575,
+        "THMTPBW26": -0.0701,
+        "THOC26": -0.0625,
+        "TRAV26": -0.0742,
+        "USO26": -0.0662
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0417
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0713
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0617
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1333
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0451
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0758
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1555
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0154
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0955
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0484
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0625
+        }
+      },
+      "_is_primary": true
+    },
+    "bid_cancel48h": {
+      "posted_markets": 866,
+      "filled_markets": 333,
+      "fill_rate_markets": 0.3845,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 6101.2,
+      "phi_contract_fill_fraction": 0.2818,
+      "maker_net_ct_on_fills": 0.0316,
+      "maker_net_ct_on_fills_ci": [
+        -0.0105,
+        0.0651
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0256,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.06,
+      "delta_ci95": [
+        -0.0817,
+        -0.0394
+      ],
+      "delta_usd_per_posted_market": -1.5012,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2685,
+      "maker_naive_ct_if_all_filled": 0.0952,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0629,
+        "COPC26": -0.0594,
+        "GESO26": -0.0577,
+        "ISC26": -0.0556,
+        "JODC26": -0.0609,
+        "PGC26": -0.0582,
+        "RBBCAN26": -0.0595,
+        "THCCBN26": -0.054,
+        "THMTPBW26": -0.0627,
+        "THOC26": -0.06,
+        "TRAV26": -0.0661,
+        "USO26": -0.0635
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0364
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0688
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0882
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1354
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0519
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0658
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1246
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0279
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0604
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0229
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0226
+        }
+      }
+    },
+    "bid_cancel0h": {
+      "posted_markets": 866,
+      "filled_markets": 574,
+      "fill_rate_markets": 0.6628,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 12170.0,
+      "phi_contract_fill_fraction": 0.5621,
+      "maker_net_ct_on_fills": -0.0115,
+      "maker_net_ct_on_fills_ci": [
+        -0.0592,
+        0.0307
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0049,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0754,
+      "delta_ci95": [
+        -0.0941,
+        -0.0571
+      ],
+      "delta_usd_per_posted_market": -1.8857,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.1865,
+      "maker_naive_ct_if_all_filled": 0.0952,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0762,
+        "COPC26": -0.0739,
+        "GESO26": -0.072,
+        "ISC26": -0.0713,
+        "JODC26": -0.0717,
+        "PGC26": -0.0751,
+        "RBBCAN26": -0.0764,
+        "THCCBN26": -0.0743,
+        "THMTPBW26": -0.0757,
+        "THOC26": -0.0787,
+        "TRAV26": -0.0806,
+        "USO26": -0.0795
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0692
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0958
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.1173
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1459
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.1118
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0652
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0871
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0727
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0471
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": -0.0051
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0323
+        }
+      }
+    },
+    "mid-0.00_cancel96h": {
+      "posted_markets": 866,
+      "filled_markets": 113,
+      "fill_rate_markets": 0.1305,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 1925.2,
+      "phi_contract_fill_fraction": 0.0889,
+      "maker_net_ct_on_fills": 0.0394,
+      "maker_net_ct_on_fills_ci": [
+        -0.0602,
+        0.1695
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0308,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0655,
+      "delta_ci95": [
+        -0.0931,
+        -0.0386
+      ],
+      "delta_usd_per_posted_market": -1.6363,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2738,
+      "maker_naive_ct_if_all_filled": 0.0867,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0691,
+        "COPC26": -0.065,
+        "GESO26": -0.0676,
+        "ISC26": -0.0623,
+        "JODC26": -0.0663,
+        "PGC26": -0.0642,
+        "RBBCAN26": -0.0652,
+        "THCCBN26": -0.0564,
+        "THMTPBW26": -0.0682,
+        "THOC26": -0.0604,
+        "TRAV26": -0.0744,
+        "USO26": -0.0662
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0356
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0708
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.039
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1194
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0574
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0684
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1624
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0321
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.1097
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0568
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0571
+        }
+      }
+    },
+    "mid-0.00_cancel48h": {
+      "posted_markets": 866,
+      "filled_markets": 389,
+      "fill_rate_markets": 0.4492,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 7423.5,
+      "phi_contract_fill_fraction": 0.3429,
+      "maker_net_ct_on_fills": 0.0231,
+      "maker_net_ct_on_fills_ci": [
+        -0.0183,
+        0.0535
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0277,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.061,
+      "delta_ci95": [
+        -0.0851,
+        -0.0372
+      ],
+      "delta_usd_per_posted_market": -1.5255,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2564,
+      "maker_naive_ct_if_all_filled": 0.0867,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0647,
+        "COPC26": -0.0606,
+        "GESO26": -0.0607,
+        "ISC26": -0.0556,
+        "JODC26": -0.06,
+        "PGC26": -0.0593,
+        "RBBCAN26": -0.0606,
+        "THCCBN26": -0.0546,
+        "THMTPBW26": -0.0625,
+        "THOC26": -0.0607,
+        "TRAV26": -0.0691,
+        "USO26": -0.064
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0312
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0667
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0654
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1527
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0709
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0657
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1301
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.043
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0639
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0493
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0288
+        }
+      }
+    },
+    "mid-0.00_cancel0h": {
+      "posted_markets": 866,
+      "filled_markets": 595,
+      "fill_rate_markets": 0.6871,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 12773.4,
+      "phi_contract_fill_fraction": 0.59,
+      "maker_net_ct_on_fills": -0.0078,
+      "maker_net_ct_on_fills_ci": [
+        -0.0506,
+        0.0284
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.012,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0736,
+      "delta_ci95": [
+        -0.0935,
+        -0.0527
+      ],
+      "delta_usd_per_posted_market": -1.8393,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.1961,
+      "maker_naive_ct_if_all_filled": 0.0867,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0748,
+        "COPC26": -0.0726,
+        "GESO26": -0.0721,
+        "ISC26": -0.0685,
+        "JODC26": -0.0691,
+        "PGC26": -0.0731,
+        "RBBCAN26": -0.0741,
+        "THCCBN26": -0.0717,
+        "THMTPBW26": -0.073,
+        "THOC26": -0.0765,
+        "TRAV26": -0.0807,
+        "USO26": -0.0767
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0635
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0861
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0909
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1601
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.1172
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0683
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0939
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0803
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0476
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0234
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0397
+        }
+      }
+    },
+    "mid-0.02_cancel96h": {
+      "posted_markets": 866,
+      "filled_markets": 6,
+      "fill_rate_markets": 0.0069,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 135.3,
+      "phi_contract_fill_fraction": 0.0063,
+      "maker_net_ct_on_fills": -0.2529,
+      "maker_net_ct_on_fills_ci": [
+        -0.3003,
+        -0.1656
+      ],
+      "maker_net_ct_on_fills_unweighted": -0.2517,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0705,
+      "delta_ci95": [
+        -0.0957,
+        -0.0456
+      ],
+      "delta_usd_per_posted_market": -1.7633,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.0,
+      "maker_naive_ct_if_all_filled": 0.1064,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0731,
+        "COPC26": -0.0705,
+        "GESO26": -0.0705,
+        "ISC26": -0.0669,
+        "JODC26": -0.0732,
+        "PGC26": -0.0697,
+        "RBBCAN26": -0.0694,
+        "THCCBN26": -0.0629,
+        "THMTPBW26": -0.0752,
+        "THOC26": -0.0662,
+        "TRAV26": -0.0783,
+        "USO26": -0.0706
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0493
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0713
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0713
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1326
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0443
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0826
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1527
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0151
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.1083
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.035
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0702
+        }
+      }
+    },
+    "mid-0.02_cancel48h": {
+      "posted_markets": 866,
+      "filled_markets": 292,
+      "fill_rate_markets": 0.3372,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 5283.6,
+      "phi_contract_fill_fraction": 0.244,
+      "maker_net_ct_on_fills": 0.0288,
+      "maker_net_ct_on_fills_ci": [
+        -0.0143,
+        0.0643
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0286,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0619,
+      "delta_ci95": [
+        -0.0823,
+        -0.0413
+      ],
+      "delta_usd_per_posted_market": -1.5483,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2583,
+      "maker_naive_ct_if_all_filled": 0.1064,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0651,
+        "COPC26": -0.0614,
+        "GESO26": -0.0604,
+        "ISC26": -0.058,
+        "JODC26": -0.0633,
+        "PGC26": -0.0603,
+        "RBBCAN26": -0.061,
+        "THCCBN26": -0.0566,
+        "THMTPBW26": -0.0639,
+        "THOC26": -0.0594,
+        "TRAV26": -0.0687,
+        "USO26": -0.0651
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0355
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0689
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0806
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1285
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0482
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.072
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1191
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0385
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0837
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0304
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0285
+        }
+      }
+    },
+    "mid-0.02_cancel0h": {
+      "posted_markets": 866,
+      "filled_markets": 554,
+      "fill_rate_markets": 0.6397,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 11574.1,
+      "phi_contract_fill_fraction": 0.5346,
+      "maker_net_ct_on_fills": -0.0122,
+      "maker_net_ct_on_fills_ci": [
+        -0.0591,
+        0.0286
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0078,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0755,
+      "delta_ci95": [
+        -0.0933,
+        -0.0568
+      ],
+      "delta_usd_per_posted_market": -1.8864,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.1758,
+      "maker_naive_ct_if_all_filled": 0.1064,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0764,
+        "COPC26": -0.0739,
+        "GESO26": -0.0722,
+        "ISC26": -0.0715,
+        "JODC26": -0.0728,
+        "PGC26": -0.0752,
+        "RBBCAN26": -0.0773,
+        "THCCBN26": -0.0737,
+        "THMTPBW26": -0.0747,
+        "THOC26": -0.0771,
+        "TRAV26": -0.0813,
+        "USO26": -0.0796
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0677
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.096
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.1149
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1434
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.102
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0567
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0938
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.085
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0612
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0049
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0309
+        }
+      }
+    },
+    "mid-0.04_cancel96h": {
+      "posted_markets": 866,
+      "filled_markets": 2,
+      "fill_rate_markets": 0.0023,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 50.0,
+      "phi_contract_fill_fraction": 0.0023,
+      "maker_net_ct_on_fills": -0.24,
+      "maker_net_ct_on_fills_ci": [
+        -0.38,
+        -0.1
+      ],
+      "maker_net_ct_on_fills_unweighted": -0.24,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0695,
+      "delta_ci95": [
+        -0.0947,
+        -0.0447
+      ],
+      "delta_usd_per_posted_market": -1.7377,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.0,
+      "maker_naive_ct_if_all_filled": 0.1272,
+      "delta_leave_one_out": {
+        "CHSC26": -0.072,
+        "COPC26": -0.0694,
+        "GESO26": -0.0694,
+        "ISC26": -0.0658,
+        "JODC26": -0.0721,
+        "PGC26": -0.0686,
+        "RBBCAN26": -0.0684,
+        "THCCBN26": -0.0617,
+        "THMTPBW26": -0.0745,
+        "THOC26": -0.0656,
+        "TRAV26": -0.0771,
+        "USO26": -0.0695
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0493
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0713
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0713
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1326
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0443
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0807
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1527
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0104
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.1037
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.035
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0699
+        }
+      }
+    },
+    "mid-0.04_cancel48h": {
+      "posted_markets": 866,
+      "filled_markets": 238,
+      "fill_rate_markets": 0.2748,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 4341.8,
+      "phi_contract_fill_fraction": 0.2005,
+      "maker_net_ct_on_fills": 0.0497,
+      "maker_net_ct_on_fills_ci": [
+        0.0003,
+        0.097
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0444,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.059,
+      "delta_ci95": [
+        -0.08,
+        -0.0397
+      ],
+      "delta_usd_per_posted_market": -1.4744,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2738,
+      "maker_naive_ct_if_all_filled": 0.1272,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0627,
+        "COPC26": -0.0583,
+        "GESO26": -0.0586,
+        "ISC26": -0.0552,
+        "JODC26": -0.0605,
+        "PGC26": -0.0571,
+        "RBBCAN26": -0.0572,
+        "THCCBN26": -0.0528,
+        "THMTPBW26": -0.0614,
+        "THOC26": -0.0586,
+        "TRAV26": -0.0648,
+        "USO26": -0.0607
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0284
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0676
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0638
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1235
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0439
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0777
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1253
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0307
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.062
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0206
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0402
+        }
+      }
+    },
+    "mid-0.04_cancel0h": {
+      "posted_markets": 866,
+      "filled_markets": 520,
+      "fill_rate_markets": 0.6005,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 10725.4,
+      "phi_contract_fill_fraction": 0.4954,
+      "maker_net_ct_on_fills": -0.0008,
+      "maker_net_ct_on_fills_ci": [
+        -0.0464,
+        0.0379
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0138,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0693,
+      "delta_ci95": [
+        -0.0879,
+        -0.0512
+      ],
+      "delta_usd_per_posted_market": -1.7332,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.1714,
+      "maker_naive_ct_if_all_filled": 0.1272,
+      "delta_leave_one_out": {
+        "CHSC26": -0.071,
+        "COPC26": -0.0678,
+        "GESO26": -0.0665,
+        "ISC26": -0.0649,
+        "JODC26": -0.0672,
+        "PGC26": -0.0684,
+        "RBBCAN26": -0.071,
+        "THCCBN26": -0.0661,
+        "THMTPBW26": -0.0697,
+        "THOC26": -0.0716,
+        "TRAV26": -0.0746,
+        "USO26": -0.0732
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0556
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0892
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.1033
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1453
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0901
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0518
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1041
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0653
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0493
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0028
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0276
+        }
+      }
+    },
+    "bid_cancel96h_atOrThrough": {
+      "posted_markets": 866,
+      "filled_markets": 163,
+      "fill_rate_markets": 0.1882,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 2974.3,
+      "phi_contract_fill_fraction": 0.1374,
+      "maker_net_ct_on_fills": 0.0719,
+      "maker_net_ct_on_fills_ci": [
+        0.0124,
+        0.1505
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0506,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0591,
+      "delta_ci95": [
+        -0.0846,
+        -0.0343
+      ],
+      "delta_usd_per_posted_market": -1.4767,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2927,
+      "maker_naive_ct_if_all_filled": 0.0952,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0624,
+        "COPC26": -0.0581,
+        "GESO26": -0.0607,
+        "ISC26": -0.0555,
+        "JODC26": -0.0598,
+        "PGC26": -0.0572,
+        "RBBCAN26": -0.0612,
+        "THCCBN26": -0.0516,
+        "THMTPBW26": -0.0628,
+        "THOC26": -0.0537,
+        "TRAV26": -0.0669,
+        "USO26": -0.0589
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0314
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0713
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0396
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1192
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.052
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0374
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1391
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0149
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.1058
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0475
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0611
+        }
+      }
+    },
+    "bid_cancel48h_atOrThrough": {
+      "posted_markets": 866,
+      "filled_markets": 418,
+      "fill_rate_markets": 0.4827,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 8185.7,
+      "phi_contract_fill_fraction": 0.3781,
+      "maker_net_ct_on_fills": 0.0314,
+      "maker_net_ct_on_fills_ci": [
+        0.0025,
+        0.054
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0305,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0571,
+      "delta_ci95": [
+        -0.0798,
+        -0.0348
+      ],
+      "delta_usd_per_posted_market": -1.427,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2499,
+      "maker_naive_ct_if_all_filled": 0.0952,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0597,
+        "COPC26": -0.0564,
+        "GESO26": -0.0549,
+        "ISC26": -0.0524,
+        "JODC26": -0.0579,
+        "PGC26": -0.055,
+        "RBBCAN26": -0.0572,
+        "THCCBN26": -0.0511,
+        "THMTPBW26": -0.0594,
+        "THOC26": -0.0568,
+        "TRAV26": -0.0647,
+        "USO26": -0.0596
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0358
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0658
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0834
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1374
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0491
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0563
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.1208
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0291
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0593
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0473
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0306
+        }
+      }
+    },
+    "bid_cancel0h_atOrThrough": {
+      "posted_markets": 866,
+      "filled_markets": 601,
+      "fill_rate_markets": 0.694,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 13166.4,
+      "phi_contract_fill_fraction": 0.6081,
+      "maker_net_ct_on_fills": 0.0028,
+      "maker_net_ct_on_fills_ci": [
+        -0.0348,
+        0.0363
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0183,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0673,
+      "delta_ci95": [
+        -0.0855,
+        -0.0472
+      ],
+      "delta_usd_per_posted_market": -1.6817,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.1975,
+      "maker_naive_ct_if_all_filled": 0.0952,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0675,
+        "COPC26": -0.0662,
+        "GESO26": -0.0649,
+        "ISC26": -0.0627,
+        "JODC26": -0.0647,
+        "PGC26": -0.0662,
+        "RBBCAN26": -0.0676,
+        "THCCBN26": -0.0658,
+        "THMTPBW26": -0.0674,
+        "THOC26": -0.0702,
+        "TRAV26": -0.0741,
+        "USO26": -0.0702
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0654
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0811
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0965
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1455
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0927
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.064
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0832
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0657
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.042
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0267
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0363
+        }
+      }
+    },
+    "mid-0.00_cancel96h_atOrThrough": {
+      "posted_markets": 866,
+      "filled_markets": 182,
+      "fill_rate_markets": 0.2102,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 3241.6,
+      "phi_contract_fill_fraction": 0.1497,
+      "maker_net_ct_on_fills": 0.0902,
+      "maker_net_ct_on_fills_ci": [
+        0.0203,
+        0.1766
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0547,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0555,
+      "delta_ci95": [
+        -0.0814,
+        -0.0297
+      ],
+      "delta_usd_per_posted_market": -1.3864,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.3162,
+      "maker_naive_ct_if_all_filled": 0.0867,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0594,
+        "COPC26": -0.0543,
+        "GESO26": -0.0576,
+        "ISC26": -0.0517,
+        "JODC26": -0.0564,
+        "PGC26": -0.0532,
+        "RBBCAN26": -0.0587,
+        "THCCBN26": -0.0483,
+        "THMTPBW26": -0.0588,
+        "THOC26": -0.0495,
+        "TRAV26": -0.063,
+        "USO26": -0.0546
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0227
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0708
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0293
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1194
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0464
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0226
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.132
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0158
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.1077
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0474
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0647
+        }
+      }
+    },
+    "mid-0.00_cancel48h_atOrThrough": {
+      "posted_markets": 866,
+      "filled_markets": 458,
+      "fill_rate_markets": 0.5289,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 9024.4,
+      "phi_contract_fill_fraction": 0.4168,
+      "maker_net_ct_on_fills": 0.0424,
+      "maker_net_ct_on_fills_ci": [
+        0.0109,
+        0.0676
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0361,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0513,
+      "delta_ci95": [
+        -0.0731,
+        -0.0301
+      ],
+      "delta_usd_per_posted_market": -1.2817,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.2639,
+      "maker_naive_ct_if_all_filled": 0.0867,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0549,
+        "COPC26": -0.0497,
+        "GESO26": -0.0498,
+        "ISC26": -0.0457,
+        "JODC26": -0.0526,
+        "PGC26": -0.0486,
+        "RBBCAN26": -0.0519,
+        "THCCBN26": -0.0473,
+        "THMTPBW26": -0.0525,
+        "THOC26": -0.051,
+        "TRAV26": -0.0585,
+        "USO26": -0.0528
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0215
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0716
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0687
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1468
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0384
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0449
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0933
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0363
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0535
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0479
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0348
+        }
+      }
+    },
+    "mid-0.00_cancel0h_atOrThrough": {
+      "posted_markets": 866,
+      "filled_markets": 623,
+      "fill_rate_markets": 0.7194,
+      "contracts_intended": 21650.0,
+      "contracts_filled": 13694.7,
+      "phi_contract_fill_fraction": 0.6325,
+      "maker_net_ct_on_fills": 0.0119,
+      "maker_net_ct_on_fills_ci": [
+        -0.0247,
+        0.0451
+      ],
+      "maker_net_ct_on_fills_unweighted": 0.0279,
+      "taker_net_ct_paired": 0.069,
+      "taker_net_ct_paired_ci": [
+        0.0442,
+        0.0941
+      ],
+      "delta_ct_per_posted_per_intended": -0.0614,
+      "delta_ci95": [
+        -0.0791,
+        -0.0434
+      ],
+      "delta_usd_per_posted_market": -1.5351,
+      "e_settle_posted": 0.2702,
+      "e_settle_filled": 0.213,
+      "maker_naive_ct_if_all_filled": 0.0867,
+      "delta_leave_one_out": {
+        "CHSC26": -0.0623,
+        "COPC26": -0.0603,
+        "GESO26": -0.0591,
+        "ISC26": -0.0566,
+        "JODC26": -0.0594,
+        "PGC26": -0.0597,
+        "RBBCAN26": -0.0636,
+        "THCCBN26": -0.0604,
+        "THMTPBW26": -0.0607,
+        "THOC26": -0.0639,
+        "TRAV26": -0.0675,
+        "USO26": -0.0634
+      },
+      "delta_per_tournament": {
+        "CHSC26": {
+          "contracts": 94.0,
+          "net_per_contract": -0.0538
+        },
+        "COPC26": {
+          "contracts": 61.0,
+          "net_per_contract": -0.0764
+        },
+        "GESO26": {
+          "contracts": 66.0,
+          "net_per_contract": -0.0891
+        },
+        "ISC26": {
+          "contracts": 48.0,
+          "net_per_contract": -0.1429
+        },
+        "JODC26": {
+          "contracts": 80.0,
+          "net_per_contract": -0.0812
+        },
+        "PGC26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0786
+        },
+        "RBBCAN26": {
+          "contracts": 77.0,
+          "net_per_contract": -0.0391
+        },
+        "THCCBN26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0717
+        },
+        "THMTPBW26": {
+          "contracts": 67.0,
+          "net_per_contract": -0.0702
+        },
+        "THOC26": {
+          "contracts": 89.0,
+          "net_per_contract": -0.0397
+        },
+        "TRAV26": {
+          "contracts": 59.0,
+          "net_per_contract": 0.0225
+        },
+        "USO26": {
+          "contracts": 74.0,
+          "net_per_contract": -0.0397
+        }
+      }
+    }
+  }
+}

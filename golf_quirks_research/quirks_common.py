@@ -368,7 +368,9 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
            window_end_h: float = 0.0, strict: bool = True,
            max_spread: float = ANCHOR_MAX_SPREAD,
            round_quote: bool = True,
-           post_at_anchor: bool = False) -> Dict[str, Any]:
+           post_at_anchor: bool = False,
+           quote_px_by_ticker: Optional[Dict[str, float]] = None,
+           collect_per_market: bool = False) -> Dict[str, Any]:
     """Rest ONE maker quote per market and replay the public tape against it.
 
     side = "sell_yes"  (P-022 fade)  — rest a YES ask at anchor + offset.
@@ -396,6 +398,19 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
     decayed below half a cent drops out of the posted count at offset 0 but
     reappears at offset +0.02. That quirk is present in the published P-022
     table and is reproduced here.
+
+    `quote_px_by_ticker` (ADDED 2026-07-28 for the P-017A same-direction maker
+    study) supplies an explicit per-market quote price and skips any market
+    absent from the mapping; `offset` and `round_quote` are then unused. It
+    exists because "rest at the anchor BID" is a per-market price that no
+    scalar offset off the anchor mid can express. Default None leaves every
+    published P-022 / P-023 cell bit-identical — asserted by
+    `backtest_fade_fills.validate()`.
+
+    `collect_per_market` (same date, same study) adds a `per_market` list to
+    the result so a caller can PAIR each market's maker outcome against a
+    taker outcome on the SAME market. Default False keeps the returned dict —
+    and therefore every existing JSON artifact — unchanged.
     """
     if side not in ("sell_yes", "buy_yes"):
         raise ValueError(f"bad side {side!r}")
@@ -412,6 +427,7 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
     pnl_usd = 0.0
     worst_market = None
     skipped_no_anchor = 0
+    per_market: List[Dict[str, Any]] = []
 
     for rec in recs:
         a = anchor_at(rec["_candles"], hours, max_spread)
@@ -419,8 +435,15 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
             skipped_no_anchor += 1
             continue
         anchor_px = a[1]
-        raw_q = anchor_px + offset if side == "sell_yes" else anchor_px - offset
-        quote_px = round(raw_q, 2) if round_quote else raw_q
+        if quote_px_by_ticker is not None:
+            explicit = quote_px_by_ticker.get(rec["ticker"])
+            if explicit is None:
+                continue
+            quote_px = float(explicit)
+        else:
+            raw_q = (anchor_px + offset if side == "sell_yes"
+                     else anchor_px - offset)
+            quote_px = round(raw_q, 2) if round_quote else raw_q
         if quote_px <= 0.0 or quote_px >= 1.0:
             continue
         sv = settlement_value(rec)
@@ -478,6 +501,17 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
             if remaining <= 1e-9:
                 break
 
+        if collect_per_market:
+            pnl_ct = (quote_px - sv) if side == "sell_yes" else (sv - quote_px)
+            per_market.append({
+                "ticker": rec["ticker"], "tournament": tourn,
+                "quote_px": quote_px, "settlement_value": sv,
+                "filled": round(filled, 4),
+                "pnl_usd": round(pnl_ct * filled, 6),
+                "anchor_epoch": a[0], "close_epoch": close,
+                "t_start": t_start, "t_end": t_end,
+            })
+
         if filled > 0:
             filled_markets += 1
             contracts += filled
@@ -494,7 +528,7 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
 
     mean, lo, hi = bootstrap_weighted(entries)
     pt = per_tournament(entries)
-    return {
+    out = {
         "side": side, "hours": hours, "offset": offset,
         "quote_size": quote_size, "window_end_h": window_end_h,
         "strict_through": strict, "post_at_anchor": post_at_anchor,
@@ -526,6 +560,9 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
         "skipped_no_anchor": skipped_no_anchor,
         "maker_fee": 0.0,
     }
+    if collect_per_market:
+        out["per_market"] = per_market
+    return out
 
 
 def r4(x: Optional[float]) -> Optional[float]:

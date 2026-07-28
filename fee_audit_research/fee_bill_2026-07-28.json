@@ -1,0 +1,281 @@
+{
+  "_generated_by": "fee_audit_research/fee_bill_by_pod.py",
+  "_venue_note": "Kalshi fee model applied ONLY to venue=kalshi rows.",
+  "n_unique_placed_all_venues": 7005,
+  "modes": {
+    "paper": 3766
+  },
+  "taker_by_pod_kalshi": {
+    "?": {
+      "n_trades": 417,
+      "contracts": 38216.0,
+      "notional_usd": 12715.3,
+      "taker_fee_usd": 444.54,
+      "fee_cents_per_contract": 1.1632,
+      "vwap": 0.3327,
+      "fee_pct_of_notional": 3.496,
+      "maker_fee_if_made_usd": 83.68,
+      "recoverable_usd": 360.86,
+      "recoverable_pct": 81.2,
+      "taker_fee_on_maker_free_series_usd": 109.81,
+      "taker_fee_on_maker_charging_series_usd": 334.73,
+      "first_utc": "2026-03-04T02:51:54.048299+00:00",
+      "last_utc": "2026-04-01T02:05:49.438564+00:00"
+    },
+    "P-001": {
+      "n_trades": 2233,
+      "contracts": 75180.9,
+      "notional_usd": 15661.28,
+      "taker_fee_usd": 597.01,
+      "fee_cents_per_contract": 0.7941,
+      "vwap": 0.2083,
+      "fee_pct_of_notional": 3.812,
+      "maker_fee_if_made_usd": 132.53,
+      "recoverable_usd": 464.48,
+      "recoverable_pct": 77.8,
+      "taker_fee_on_maker_free_series_usd": 66.88,
+      "taker_fee_on_maker_charging_series_usd": 530.13,
+      "first_utc": "2026-04-03T02:16:17.743115+00:00",
+      "last_utc": "2026-07-28T04:24:14.585596+00:00"
+    },
+    "P-002": {
+      "n_trades": 978,
+      "contracts": 36091.6,
+      "notional_usd": 12984.31,
+      "taker_fee_usd": 501.69,
+      "fee_cents_per_contract": 1.39,
+      "vwap": 0.3598,
+      "fee_pct_of_notional": 3.864,
+      "maker_fee_if_made_usd": 125.26,
+      "recoverable_usd": 376.43,
+      "recoverable_pct": 75.0,
+      "taker_fee_on_maker_free_series_usd": 0.65,
+      "taker_fee_on_maker_charging_series_usd": 501.03,
+      "first_utc": "2026-04-01T02:34:07.811431+00:00",
+      "last_utc": "2026-07-21T07:15:29.766622+00:00"
+    },
+    "P-013": {
+      "n_trades": 89,
+      "contracts": 62627.8,
+      "notional_usd": 5485.42,
+      "taker_fee_usd": 261.93,
+      "fee_cents_per_contract": 0.4182,
+      "vwap": 0.0876,
+      "fee_pct_of_notional": 4.775,
+      "maker_fee_if_made_usd": 0.0,
+      "recoverable_usd": 261.93,
+      "recoverable_pct": 100.0,
+      "taker_fee_on_maker_free_series_usd": 261.93,
+      "taker_fee_on_maker_charging_series_usd": 0.0,
+      "first_utc": "2026-03-29T19:55:32.647382+00:00",
+      "last_utc": "2026-03-31T02:53:38.386503+00:00"
+    },
+    "P-015": {
+      "n_trades": 5,
+      "contracts": 77.5,
+      "notional_usd": 70.08,
+      "taker_fee_usd": 0.46,
+      "fee_cents_per_contract": 0.5973,
+      "vwap": 0.9044,
+      "fee_pct_of_notional": 0.66,
+      "maker_fee_if_made_usd": 0.12,
+      "recoverable_usd": 0.35,
+      "recoverable_pct": 75.0,
+      "taker_fee_on_maker_free_series_usd": 0.0,
+      "taker_fee_on_maker_charging_series_usd": 0.46,
+      "first_utc": "2026-07-25T15:05:19.620341+00:00",
+      "last_utc": "2026-07-25T22:00:21.813533+00:00"
+    },
+    "P-017": {
+      "n_trades": 44,
+      "contracts": 3186.9,
+      "notional_usd": 398.37,
+      "taker_fee_usd": 23.71,
+      "fee_cents_per_contract": 0.744,
+      "vwap": 0.125,
+      "fee_pct_of_notional": 5.952,
+      "maker_fee_if_made_usd": 0.0,
+      "recoverable_usd": 23.71,
+      "recoverable_pct": 100.0,
+      "taker_fee_on_maker_free_series_usd": 23.71,
+      "taker_fee_on_maker_charging_series_usd": 0.0,
+      "first_utc": "2026-07-21T03:22:58.016593+00:00",
+      "last_utc": "2026-07-27T22:13:51.996064+00:00"
+    }
+  },
+  "non_kalshi_excluded": {
+    "P-002@polymarket": {
+      "n_trades": 978,
+      "contracts": 49090.0,
+      "notional_usd": 12984.31,
+      "vwap": 0.2645,
+      "note": "Kalshi fee model NOT applied \u2014 other venue, other schedule"
+    },
+    "P-006@polymarket": {
+      "n_trades": 1905,
+      "contracts": 67770.7,
+      "notional_usd": 29028.02,
+      "vwap": 0.4283,
+      "note": "Kalshi fee model NOT applied \u2014 other venue, other schedule"
+    }
+  },
+  "maker_by_pod": {
+    "P-016": {
+      "n_fills": 691,
+      "contracts": 5774.5,
+      "notional_usd": 3095.79,
+      "maker_fee_usd": 20.58,
+      "fee_cents_per_contract": 0.3564,
+      "vwap": 0.5361,
+      "series_charges_maker_fee": true
+    }
+  },
+  "by_series_kalshi": {
+    "KXMLBGAME": {
+      "n_trades": 1628,
+      "contracts": 47151.3,
+      "taker_fee_usd": 614.75,
+      "fee_cents_per_contract": 1.3038,
+      "vwap": 0.3587,
+      "maker_would_charge": true
+    },
+    "KXBTCD": {
+      "n_trades": 84,
+      "contracts": 58921.8,
+      "taker_fee_usd": 244.35,
+      "fee_cents_per_contract": 0.4147,
+      "vwap": 0.0872,
+      "maker_would_charge": false
+    },
+    "KXATPMATCH": {
+      "n_trades": 605,
+      "contracts": 28965.2,
+      "taker_fee_usd": 241.71,
+      "fee_cents_per_contract": 0.8345,
+      "vwap": 0.2128,
+      "maker_would_charge": true
+    },
+    "KXNBAGAME": {
+      "n_trades": 254,
+      "contracts": 21232.9,
+      "taker_fee_usd": 172.5,
+      "fee_cents_per_contract": 0.8124,
+      "vwap": 0.2005,
+      "maker_would_charge": true
+    },
+    "KXNHLGAME": {
+      "n_trades": 285,
+      "contracts": 20368.0,
+      "taker_fee_usd": 168.29,
+      "fee_cents_per_contract": 0.8262,
+      "vwap": 0.208,
+      "maker_would_charge": true
+    },
+    "KXWTAMATCH": {
+      "n_trades": 365,
+      "contracts": 11064.9,
+      "taker_fee_usd": 122.72,
+      "fee_cents_per_contract": 1.1091,
+      "vwap": 0.2913,
+      "maker_would_charge": true
+    },
+    "KXATPSETWINNER": {
+      "n_trades": 331,
+      "contracts": 9994.3,
+      "taker_fee_usd": 112.48,
+      "fee_cents_per_contract": 1.1254,
+      "vwap": 0.348,
+      "maker_would_charge": false
+    },
+    "KXNBA2HWINNER": {
+      "n_trades": 73,
+      "contracts": 4023.5,
+      "taker_fee_usd": 38.77,
+      "fee_cents_per_contract": 0.9635,
+      "vwap": 0.3137,
+      "maker_would_charge": false
+    },
+    "KXNCAAMBGAME": {
+      "n_trades": 22,
+      "contracts": 2680.6,
+      "taker_fee_usd": 37.21,
+      "fee_cents_per_contract": 1.388,
+      "vwap": 0.3841,
+      "maker_would_charge": true
+    },
+    "KXNBA1HWINNER": {
+      "n_trades": 7,
+      "contracts": 2622.7,
+      "taker_fee_usd": 17.53,
+      "fee_cents_per_contract": 0.6683,
+      "vwap": 0.1522,
+      "maker_would_charge": false
+    },
+    "KXBTC15M": {
+      "n_trades": 4,
+      "contracts": 848.9,
+      "taker_fee_usd": 12.7,
+      "fee_cents_per_contract": 1.4962,
+      "vwap": 0.3276,
+      "maker_would_charge": false
+    },
+    "KXPGATOP20": {
+      "n_trades": 25,
+      "contracts": 1367.6,
+      "taker_fee_usd": 11.92,
+      "fee_cents_per_contract": 0.8715,
+      "vwap": 0.1528,
+      "maker_would_charge": false
+    },
+    "KXPGATOP10": {
+      "n_trades": 19,
+      "contracts": 1819.3,
+      "taker_fee_usd": 11.79,
+      "fee_cents_per_contract": 0.6482,
+      "vwap": 0.1041,
+      "maker_would_charge": false
+    },
+    "KXNFLGAME": {
+      "n_trades": 56,
+      "contracts": 549.0,
+      "taker_fee_usd": 9.18,
+      "fee_cents_per_contract": 1.672,
+      "vwap": 0.4937,
+      "maker_would_charge": true
+    },
+    "KXNCAAMB1HWINNER": {
+      "n_trades": 2,
+      "contracts": 702.6,
+      "taker_fee_usd": 4.96,
+      "fee_cents_per_contract": 0.7055,
+      "vwap": 0.1158,
+      "maker_would_charge": false
+    }
+  },
+  "files_scanned": {
+    "trade_log.jsonl": 73,
+    "trade_log.archive_20260628_191829.jsonl.gz": 2704,
+    "trade_log.archive_20260630_060001.jsonl.gz": 132,
+    "trade_log.archive_20260702_060001.jsonl.gz": 155,
+    "trade_log.archive_20260705_060001.jsonl.gz": 139,
+    "trade_log.archive_20260708_060001.jsonl.gz": 95,
+    "trade_log.archive_20260711_060001.jsonl.gz": 75,
+    "trade_log.archive_20260717_060001.jsonl.gz": 81,
+    "trade_log.archive_20260720_060001.jsonl.gz": 86,
+    "trade_log.archive_20260722_060001.jsonl.gz": 62,
+    "2026-03.jsonl.gz": 164
+  },
+  "excluded_rows": {
+    "no_usable_price_or_size": 356
+  },
+  "excluded_rows_by_pod": {
+    "P-014": 356
+  },
+  "maker_shadow_fills_excluded": 123,
+  "totals": {
+    "taker_fee_usd": 1829.34,
+    "maker_fee_if_made_usd": 341.59,
+    "recoverable_usd": 1487.75,
+    "recoverable_pct": 81.3
+  }
+}

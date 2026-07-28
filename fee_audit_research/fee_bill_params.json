@@ -1,0 +1,77 @@
+{
+  "_comment": "Live fee bill by pod, pulled from the production droplet 2026-07-28. Companion task deferred by golf_research/REPORT_P017_Maker_2026-07-30.md sec.8 (needed the deploy key). ALL RECORDS ARE mode:paper -- 3766 of 3766 -- so this is a NOTIONAL bill; no money was paid. Full detail: REPORT_Fee_Bill_By_Pod_2026-07-28.md; raw: fee_bill_2026-07-28.json; harness: fee_bill_by_pod.py.",
+  "status": "MEASURED",
+  "date": "2026-07-28",
+  "source": "129.212.176.202:/opt/betting-pod-shop/data/trade_logs/",
+  "fee_model": "the DEPLOYED src/kalshi_fees.py, not a local copy",
+  "mode": "paper",
+  "coverage": {
+    "n_unique_placed_all_venues": 7005,
+    "n_kalshi_placed_priced": 3766,
+    "n_polymarket_excluded": 2883,
+    "n_excluded_no_price": 356,
+    "date_span": "2026-03-04 .. 2026-07-28"
+  },
+
+  "totals_kalshi_taker": {
+    "taker_fee_usd": 1829.34,
+    "maker_fee_if_made_usd": 341.59,
+    "recoverable_usd": 1487.75,
+    "recoverable_pct": 81.3,
+    "_recoverable_warning": "UPPER BOUND ON AN OPPORTUNITY, NOT A P&L LINE. The P-017A study measured a real, correctly-sized fee advantage (+2.62c/ct) and found it COMPLETELY UNREACHABLE -- 2.2% of intended contracts fill. This figure is what PERFECT COSTLESS MAKING would have saved. For the one pod where it was actually tested the realisable share was zero.",
+    "_split_is_exact_by_construction": "maker-free (quadratic) series recover 100%; maker-charging (quadratic_with_maker_fees) recover exactly 75%, because the maker coefficient 0.0175 is precisely 1/4 of the taker coefficient 0.07."
+  },
+
+  "by_pod": {
+    "P-001": {"trades": 2233, "contracts": 75180.9, "notional_usd": 15661.28, "taker_fee_usd": 597.01, "cents_per_contract": 0.7941, "vwap": 0.2083, "recoverable_usd": 464.48},
+    "P-002_kalshi_leg": {"trades": 978, "contracts": 36092.0, "notional_usd": 12984.0, "taker_fee_usd": 501.69, "cents_per_contract": 1.390, "vwap": 0.360, "recoverable_usd": 376.43, "_note": "P-002 is an arb; its other 978 legs are Polymarket and carry no Kalshi fee."},
+    "pre_pod_id": {"trades": 417, "contracts": 38216.0, "notional_usd": 12715.3, "taker_fee_usd": 444.54, "cents_per_contract": 1.1632, "vwap": 0.3327, "recoverable_usd": 360.86, "_note": "records from before pod_id was written, 2026-03-04..04-01"},
+    "P-013": {"trades": 89, "contracts": 62627.8, "notional_usd": 5485.42, "taker_fee_usd": 261.93, "cents_per_contract": 0.4182, "vwap": 0.0876, "recoverable_usd": 261.93, "_note": "killed pod; 3 days of trading in March"},
+    "P-017": {"trades": 44, "contracts": 3187.0, "notional_usd": 398.0, "taker_fee_usd": 23.71, "cents_per_contract": 0.744, "vwap": 0.125, "recoverable_usd": 23.71},
+    "P-015": {"trades": 5, "contracts": 77.5, "notional_usd": 70.0, "taker_fee_usd": 0.46, "cents_per_contract": 0.597, "vwap": 0.904, "recoverable_usd": 0.35, "_note": "immaterial -- five trades"},
+    "P-014": {"trades": 356, "taker_fee_usd": null, "_note": "UNMEASURABLE. Every P-014 PLACED trade carries fill_price: null. See defect below."}
+  },
+
+  "maker_side": {
+    "P-016": {"fills": 691, "contracts": 5774.5, "notional_usd": 3095.79, "maker_fee_usd": 20.58, "cents_per_contract": 0.3564, "vwap": 0.5361, "series_charges_maker_fee": true, "series": "KXMLBGAME"},
+    "_shadow_fills_excluded": 123
+  },
+
+  "non_kalshi_excluded": {
+    "P-002@polymarket": {"trades": 978, "notional_usd": 12984.0, "vwap": 0.265},
+    "P-006@polymarket": {"trades": 1905, "notional_usd": 29028.02, "vwap": 0.428},
+    "_note": "P-006 trades Polymarket EXCLUSIVELY and therefore has no Kalshi fee bill at all. Kalshi's fee formula must not be applied to either."
+  },
+
+  "brief_premise_refuted": {
+    "claim": "P-001 and P-015 trade near the fee peak on maker-charging series (tennis match markets: VWAP 0.519, taker 1.156c/ct, maker 0.289c/ct).",
+    "measured_KXATPMATCH": {"vwap": 0.213, "cents_per_contract": 0.835, "maker_charges": true},
+    "measured_KXWTAMATCH": {"vwap": 0.291, "cents_per_contract": 1.109, "maker_charges": true},
+    "verdict": "REFUTED. Neither tennis series is near VWAP 0.519. The fee peaks at P=0.50 and 1.75c/ct; P-001's book-wide VWAP is 0.208 at 0.794c/ct -- it trades cheap longshots, structurally AWAY from the peak, at under half peak cost. P-015 is five trades and $0.46, immaterial either way.",
+    "who_is_actually_near_the_peak": "P-016 (vwap 0.536 -- and it is ALREADY a maker at 0.356c/ct) and P-002's Kalshi leg (vwap 0.360, 1.390c/ct). If there is a fee-peak problem in this book it is P-002's, not P-001's.",
+    "_concavity_note": "Measured c/ct sits below fee(VWAP) throughout because 0.07*P*(1-P) is concave: the contract-weighted mean fee is less than the fee at the weighted-mean price. Both are reported so the gap reads as arithmetic, not error."
+  },
+
+  "where_the_money_is": {
+    "KXMLBGAME": {"taker_fee_usd": 614.75, "cents_per_contract": 1.304, "vwap": 0.359, "maker_charges": true, "_note": "a THIRD of the entire bill"},
+    "tennis_combined": {"taker_fee_usd": 476.91, "contracts": 50024, "_series": ["KXATPMATCH", "KXWTAMATCH", "KXATPSETWINNER"]},
+    "KXBTCD": {"taker_fee_usd": 244.35, "cents_per_contract": 0.415, "vwap": 0.087, "_note": "volume, not rate -- 58,922 contracts of 8.7c longshots"}
+  },
+
+  "data_traps": [
+    "Records carry NO fee field; the bill must be computed as contracts = position_size_usd / fill_price, then fee_per_contract(fill_price, maker, series) * contracts.",
+    "Most files in data/trade_logs/ are SNAPSHOTS, not history. Only trade_log.jsonl, trade_log.archive_*.jsonl.gz and archive/2026-*.jsonl.gz are distinct; the .bak*, *pre-compact* and *pre_cleanup* files repeat the same records and would multiply the bill. Fingerprint dedup is the second line of defence.",
+    "The live trade_log.jsonl holds almost nothing -- 73 of 3766 Kalshi PLACED trades -- because rotation moves history out. Reading it alone understates the bill by ~98%.",
+    "41% of PLACED trades are POLYMARKET and must not be charged Kalshi fees. The venue field is AUTHORITATIVE: it disagrees with a 'ticker starts with 0x' heuristic on 233 rows. Venue-less rows all carry KX* tickers and default to kalshi. The first version of this analysis omitted the gate and charged Kalshi fees to P-006; caught before any number was reported."
+  ],
+
+  "defect_found": {
+    "pod": "P-014",
+    "what": "Every PLACED trade carries fill_price: null -- all 356, spanning 2026-03-28 .. 2026-07-28, the pod's entire life, still occurring today. No other pod does this.",
+    "impact": "P-014's fee cost is uncomputable (no price -> no 0.07*P*(1-P)), as is its contract count (position_size_usd / fill_price undefined) and therefore every per-contract metric. It is the ONLY pod excluded from this bill, and silently unless you read excluded_rows_by_pod.",
+    "schema": "src/trade_log_schema.py lists fill_price as REQUIRED, so validation is accepting None on a required field -- 356 times over four months.",
+    "status": "filed as a separate task; observability fix, not a trading change"
+  },
+
+  "reproduce": "scp fee_audit_research/fee_bill_by_pod.py root@129.212.176.202:/tmp/ && ssh root@129.212.176.202 'cd /opt/betting-pod-shop && python3 /tmp/fee_bill_by_pod.py'  (--json for machine-readable). Read-only. The LOCAL trade log is from 2026-03-13 and will NOT reproduce these figures -- that staleness is why this had to be a remote pull."
+}

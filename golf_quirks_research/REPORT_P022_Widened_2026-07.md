@@ -150,7 +150,19 @@ the last usable candle actually is.
 
 ---
 
-## 5. Was the harness changed? **No — and `--validate` now fails anyway**
+## 5. Was the harness changed? **No — and `--validate` failed anyway**
+
+> **RESOLVED 2026-07-28.** The pin below was committed but never wired in, so
+> `--validate` stayed broken and `backtest_topn_fade_fills.py` (which hard-aborts
+> on it) was un-runnable without `--skip-validate`. `--validate` now reads
+> `published_universe_364.json` and restricts the cache to those 364 tickers
+> before checking a single cell; it PASSES on the n=404 cache, reproducing every
+> published figure exactly. A pinned ticker *missing* from the cache still fails
+> loudly — that is real data loss, which cache growth cannot explain. The n=404
+> readings of the same cells are recorded in
+> `REPORT_Golf_Quirks_Phase2_P022_2026-07.md` §2.1. Everything below stands as
+> written on 2026-07-28.
+
 
 `--validate` reads the entire cache, so adding 40 markets necessarily breaks a
 check that asserts `universe == 364`:

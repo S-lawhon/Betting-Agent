@@ -18,9 +18,24 @@ cannot reproduce a known result must not be trusted to produce a new one
 (the P-016 v2 lesson). `backtest_makecut_fills.py` refuses to run unless
 this passes.
 
+**`--validate` is PINNED to the 364 tickers the published cells rest on**
+(`published_universe_364.json`), NOT to whatever happens to be in `data/`.
+The 2026-07-28 widening added 40 markets to the cache and broke every cell of
+a whole-cache validator, which made the reproduction test un-runnable for a
+reason that had nothing to do with the harness (see REPORT_P022_Widened §5 —
+it called this out and pinned the ticker list, but never wired it in). A
+reproduction test must be independent of cache growth or it decays into a
+cache-fingerprint test. If a pinned ticker is MISSING from the cache the
+validator fails loudly: that is real data loss, not growth.
+
+The analysis path (`--out`, no `--validate`) still runs the FULL cache by
+default; `--universe pinned` restricts it, which is how the n=364 vs n=404
+rows in the Phase-2 report §2.1 were produced.
+
 Usage
   python3 backtest_fade_fills.py --validate
   python3 backtest_fade_fills.py --out fade_fill_results.json
+  python3 backtest_fade_fills.py --universe pinned      # published universe only
 """
 from __future__ import annotations
 
@@ -70,6 +85,11 @@ PUBLISHED_UNIVERSE = 364
 PUBLISHED_POS_TOURN = (16, 19)          # 16 of 19 positive at H=12/+0.02
 PUBLISHED_LOO_USO26 = 0.030             # dropping USO26: +3.4c -> +3.0c
 
+# The exact ticker list the published cells rest on. Committed 2026-07-28 by
+# the widening run precisely so the published universe could be restored;
+# wired into --validate 2026-07-28.
+PINNED_UNIVERSE_PATH = os.path.join(qc.HERE, "published_universe_364.json")
+
 
 def load() -> List[Dict[str, Any]]:
     recs = qc.load_trade_recs(TRADE_DIR)
@@ -77,6 +97,37 @@ def load() -> List[Dict[str, Any]]:
         raise SystemExit(f"no cached tick data in {TRADE_DIR} — "
                          f"run: python3 pull_trades.py --mode leader")
     return recs
+
+
+def pinned_tickers() -> List[str]:
+    """The 364 tickers of the published Phase-2 universe."""
+    try:
+        with open(PINNED_UNIVERSE_PATH) as fh:
+            blob = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"cannot read {PINNED_UNIVERSE_PATH}: {exc}\n"
+                         f"the published universe pin is required to validate")
+    tickers = blob.get("tickers") or []
+    if len(tickers) != PUBLISHED_UNIVERSE:
+        raise SystemExit(f"{PINNED_UNIVERSE_PATH} holds {len(tickers)} tickers, "
+                         f"expected {PUBLISHED_UNIVERSE}")
+    return list(tickers)
+
+
+def restrict_to_pinned(recs: Sequence[Dict[str, Any]]
+                       ) -> Tuple[List[Dict[str, Any]], int, List[str]]:
+    """`recs` cut down to the published universe.
+
+    Returns (pinned_recs, n_excluded, missing_tickers). `missing` is the real
+    failure mode — a pinned ticker absent from the cache means the sample the
+    published cells rest on has been LOST, which no amount of cache growth can
+    explain. Extra cached markets are expected and are merely counted.
+    """
+    want = set(pinned_tickers())
+    have = {r.get("ticker"): r for r in recs}
+    kept = [have[t] for t in sorted(want) if t in have]
+    missing = sorted(want - set(have))
+    return kept, len(recs) - len(kept), missing
 
 
 def run_grid(recs: Sequence[Dict[str, Any]], quote_size: float = 25.0
@@ -92,11 +143,20 @@ def validate(recs: Sequence[Dict[str, Any]], verbose: bool = True) -> bool:
     ok = True
     lines: List[str] = []
 
+    n_cached = len(recs)
+    recs, n_excluded, missing = restrict_to_pinned(recs)
+
     n_uni = len(recs)
-    uni_ok = n_uni == PUBLISHED_UNIVERSE
+    uni_ok = n_uni == PUBLISHED_UNIVERSE and not missing
     ok &= uni_ok
     lines.append(f"{'PASS' if uni_ok else 'FAIL'}  universe: "
-                 f"{n_uni} cached markets (published {PUBLISHED_UNIVERSE})")
+                 f"{n_uni} of the {PUBLISHED_UNIVERSE} pinned markets present "
+                 f"({n_cached} cached, {n_excluded} outside the published "
+                 f"universe and excluded)")
+    if missing:
+        lines.append(f"      MISSING from cache — the published sample has been "
+                     f"LOST, not merely grown: {', '.join(missing[:10])}"
+                     + (f" (+{len(missing) - 10} more)" if len(missing) > 10 else ""))
 
     header = (f"{'H':>4} {'off':>5} | {'posted':>13} {'filled':>11} "
               f"{'contracts':>13} {'net c/ct':>15} {'CI lo':>13} {'CI hi':>13} "
@@ -171,11 +231,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                     help="reproduce the published Phase-2 table and exit")
     ap.add_argument("--out", default=None, help="write full results JSON here")
     ap.add_argument("--quote-size", type=float, default=25.0)
+    ap.add_argument("--universe", choices=("all", "pinned"), default="all",
+                    help="'all' = every cached market (default); 'pinned' = "
+                         "only the 364 markets the published cells rest on. "
+                         "Ignored by --validate, which is always pinned.")
     args = ap.parse_args(argv)
 
     recs = load()
     if args.validate:
         return 0 if validate(recs) else 1
+
+    if args.universe == "pinned":
+        recs, n_excluded, missing = restrict_to_pinned(recs)
+        if missing:
+            print(f"WARNING: {len(missing)} pinned markets missing from the "
+                  f"cache — this is NOT the published universe", file=sys.stderr)
+        print(f"universe: pinned, {len(recs)} markets "
+              f"({n_excluded} cached markets excluded)")
+    else:
+        print(f"universe: all, {len(recs)} cached markets "
+              f"(published cells rest on {PUBLISHED_UNIVERSE} — "
+              f"use --universe pinned to reproduce them)")
 
     res = run_grid(recs, args.quote_size)
     head = res["H12_off0.02"]

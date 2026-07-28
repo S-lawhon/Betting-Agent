@@ -299,11 +299,17 @@ readers, and everything from tonight — still exist in exactly one place.**
 git push -u origin p024-mlb-f5-research
 ```
 
-Then verify by fetching into a scratch clone and confirming the tip SHA:
+Then verify by fetching into a scratch clone and confirming the tip SHA and
+that the resolver, the fee fixture and the throughput instrument are present:
 
+```bash
+git rev-parse p024-mlb-f5-research        # compare against origin's tip
+git ls-tree -r --name-only HEAD | grep -E 'golf_schedule|kalshi_series_fees|throughput'
 ```
-tip: 17f3778c1a242b96387edc1c195716e85484c362
-```
+
+The tip at the moment of the audit was `17f3778`; it advances by the commits
+that land this summary, so compare the branch's own current SHA rather than a
+literal from this file.
 
 **Merge posture, and the reasoning:** once pushed, **fast-forward `main`.**
 `main` is 0 commits ahead of HEAD, so it is a genuine fast-forward with no

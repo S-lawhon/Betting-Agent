@@ -42,9 +42,26 @@ the capture contribute two tickers**, and those two markets resolve on the
 same event with **perfectly anti-correlated** outcomes. Clustering on ticker
 therefore counts up to **240 clusters where there are 124**.
 
-Consequence: the published CI **[+5.33, +13.10]** is **too narrow**, by
-roughly √(240/124) ≈ **1.39×** if fills were evenly spread. Corrected, the
-same point estimate would carry a CI closer to **[+3.9, +14.5]**.
+**CORRECTED 2026-07-28, after measurement — my own prediction here was wrong
+and is left visible rather than rewritten.** This section originally predicted
+the CI would **widen** by ≈ √(240/124) ≈ 1.39×, to roughly [+3.9, +14.5].
+Measured on the identical 5,676 fills, it **narrowed by about 7%**:
+
+| clustering | 95% CI | width |
+|---|---|---:|
+| ticker (published) | [+5.33, +13.10] | 7.77 ¢ |
+| **game (correct)** | **[+5.53, +12.75]** | **7.22 ¢** |
+
+The √(n/n′) reasoning assumed within-cluster observations are positively
+correlated or independent. They are **anti-correlated**: the two markets of a
+game resolve on the same event with opposite outcomes, so merging them into
+one cluster lets their P&L partially offset and *reduces* between-cluster
+variance.
+
+**The unit correction stands** — 240 tickers are 124 games and two markets of
+one game are one observation — **but it makes the published CI slightly
+conservative, not anti-conservative.** See
+`research/REPORT_P018_Gate1_2026-07-28.md` §6.
 
 > **RULE:** the cluster is the **game**, keyed on the ticker's matchup
 > segment (`ticker.split("-")[1]`), never the ticker. Any verdict computed
@@ -117,30 +134,33 @@ systematically over-represents the markets where fills happen.
 
 ## 7. Power — what this gate can actually detect
 
-**[outcome-independent]** Derived from the sample's structure, not its
-outcomes.
+**[outcome-independent]** Derived from the sample's dispersion, not its
+direction — the table below would be identical if the headline were −9.09 ¢.
+**Revised 2026-07-28** from measured clustered SEs after the §2 correction;
+the original projection was too pessimistic.
 
-The clustered SE scales as `s / √G` over `G` games. Taking the published
-CI half-width of ≈ 3.9 ¢ at the (wrong) 240 ticker-clusters, the implied
-per-cluster dispersion gives, at the correct 124 game clusters, a half-width
-of ≈ **5.4 ¢**, i.e. **SE ≈ 2.8 ¢**.
+The clustered SE scales as `s / √G` over `G` games. **Measured** on the
+game-clustered bootstrap (not projected — see the §2 correction, where a
+projection of exactly this kind was wrong): at **91 games carrying fills** the
+half-width is **3.6 ¢**, i.e. **SE ≈ 1.85 ¢**. Scaling as `1/√G`:
 
 | G games | SE (¢) | detectable at z ≥ 2 (¢) |
 |---:|---:|---:|
-| 20 | ≈ 7.0 | ≈ 14.0 |
-| 50 | ≈ 4.4 | ≈ 8.8 |
-| **124** | ≈ **2.8** | ≈ **5.6** |
+| 20 | ≈ 3.9 | ≈ 7.9 |
+| 50 | ≈ 2.5 | ≈ 5.0 |
+| **91** (observed) | ≈ **1.85** | ≈ **3.7** |
+| 124 (all games) | ≈ 1.6 | ≈ 3.2 |
 
-**Read this honestly: at the full 124 games the gate detects ≈ +5.6 ¢ and no
-smaller.** It is adequate against +9.09 ¢ and **inadequate against anything
-in the +1 to +5 ¢ range** — which is where every edge this fund has actually
-measured has lived (P-022 +3.4 ¢, P-023c +0.2 ¢, P-017 +6.8 ¢ backtest /
-−9.9 ¢ live).
+**Read this honestly: at the observed 91 games the gate detects ≈ +3.7 ¢ and
+no smaller.** It is adequate against +9.09 ¢ and **inadequate against anything
+below ≈ +3.7 ¢** — and +1 to +3 ¢ is where several edges this fund has
+measured have lived (P-022 +3.4 ¢, P-023c +0.2 ¢). Better than the ≈ +5.6 ¢
+this section first projected, and still not fine-grained.
 
 > **Therefore: a NO DECISION from this gate is the expected outcome for a
 > real-but-modest edge, and must never be read as evidence of absence.**
 > T = 20 is set as the *minimum* for a PASS, not as sufficient power; a PASS
-> at T = 20 requires ≈ 14 ¢, which would itself be grounds for suspicion.
+> at T = 20 requires ≈ 7.9 ¢, which would itself be grounds for suspicion.
 
 ## 8. The sanctioned reader
 

@@ -1,5 +1,5 @@
 {
-  "_note": "priors; backtest blocked on data (see REPORT)",
+  "_note": "backtest over 677 game-days",
   "_status": "priors \u2014 NOT backtest-validated until the REPORT shows a non-flat surprise-bucket table",
   "quoting": {
     "surprise_hi": 0.06,

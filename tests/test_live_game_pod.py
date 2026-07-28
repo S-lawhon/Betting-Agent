@@ -249,6 +249,96 @@ class TestPaperOrders:
         assert id1 != id2
 
 
+# ── fill_price on PLACED rows ─────────────────────────────────────────
+#
+# P-014 wrote `fill_price: null` on 356 of 356 PLACED rows across its
+# entire life (2026-03-28 .. 2026-07-28, verified on the droplet).  The
+# ScanResult simply never set the field, and because the pod calls
+# write_log() itself, MultiExecutor's paper fill never reached disk.  No
+# price meant no fee (0.07*P*(1-P)) and no contract count, so P-014 was
+# the only pod that had to be dropped from the fee bill.
+
+from src.kalshi_live_discovery import KalshiMarketMatch
+from src.live_fair_value import LiveFairValueResult
+from src.trade_log_schema import TradeLogSchema
+
+
+def _make_match(yes_bid=70, yes_ask=75, yes_side="home"):
+    return KalshiMarketMatch(
+        game_id="game_1",
+        ticker="KXMLBGAME-26JUL251310KCDET-DET",
+        title="Will Detroit win?",
+        yes_side=yes_side,
+        home_team="Lakers",
+        away_team="Celtics",
+        yes_bid=yes_bid,
+        yes_ask=yes_ask,
+        volume=1495790,
+        fuzzy_score=98.0,
+        market_type="game_winner",
+    )
+
+
+def _place(pod, side="YES", fair_prob=0.80, venue_prob=0.725):
+    return pod._try_place_trade(
+        snapshot=_make_snapshot(),
+        game_state=_make_game_state(),
+        kalshi_match=_make_match(),
+        side=side,
+        fair_prob=fair_prob,
+        venue_prob=venue_prob,
+        edge=(fair_prob - venue_prob) / venue_prob,
+        now_str=FIXED_NOW.isoformat(),
+        signal_source="consensus",
+        fv_result=LiveFairValueResult(
+            home_prob=fair_prob, away_prob=1.0 - fair_prob,
+            method="live_ensemble", confidence=0.99, num_books=3,
+        ),
+    )
+
+
+class TestFillPriceRecorded:
+    def test_placed_row_carries_fill_price(self, tmp_path):
+        pod = _make_pod()
+        pod.trade_log_path = tmp_path / "p014.jsonl"
+        result = _place(pod)
+        assert result.action == "PLACED"
+        assert result.fill_price is not None
+        assert result.fill_price == pytest.approx(0.725)
+
+    def test_fill_price_is_the_price_of_the_side_bought(self, tmp_path):
+        """For NO, venue_prob is already 1 − mid, so fill_price is the NO
+        price — the price paid — not the YES price.  contracts =
+        position_size_usd / fill_price must hold for both sides."""
+        pod = _make_pod()
+        pod.trade_log_path = tmp_path / "p014.jsonl"
+        result = _place(pod, side="NO", fair_prob=0.343, venue_prob=0.275)
+        assert result.side == "NO"
+        assert result.fill_price == pytest.approx(0.275)
+
+    def test_written_row_passes_schema_validation(self, tmp_path):
+        """The row as it lands on disk, not just the in-memory dataclass."""
+        import json
+        pod = _make_pod()
+        pod.trade_log_path = tmp_path / "p014.jsonl"
+        _place(pod)
+        lines = pod.trade_log_path.read_text().strip().splitlines()
+        placed = [json.loads(x) for x in lines]
+        placed = [e for e in placed if e.get("action") == "PLACED"]
+        assert placed, "no PLACED row written"
+        for entry in placed:
+            assert entry["fill_price"] is not None
+            assert TradeLogSchema.validate(entry) == []
+
+    def test_skipped_rows_have_no_fill_price(self, tmp_path):
+        """A trade that was never placed must not claim a fill."""
+        pod = _make_pod(max_exposure_per_game_usd=0.0)
+        pod.trade_log_path = tmp_path / "p014.jsonl"
+        result = _place(pod)
+        assert result.action == "SKIPPED_RISK"
+        assert result.fill_price is None
+
+
 # ── Kelly fraction tests ──────────────────────────────────────────────
 
 class TestKelly:

@@ -133,8 +133,30 @@ class TradeLogSchema:
                 if not entry.get(field):
                     issues.append(f"missing required field: {field}")
 
+            # ── fill_price is REQUIRED on PLACED ──────────────────────
+            # This check used to be "numeric IF not None", which is not a
+            # required-field check at all — a null passed it silently.
+            # P-014 wrote `fill_price: null` on 356 of 356 PLACED rows
+            # over four months and validation never objected.  A PLACED
+            # row with no price cannot be billed (fee = 0.07*P*(1-P)) and
+            # cannot be converted to contracts (size / price), so treat
+            # its absence as a hard schema issue, not a missing extra.
+            fill = entry.get("fill_price")
+            if fill is None:
+                issues.append("missing required field: fill_price")
+            else:
+                try:
+                    fill_val = float(fill)
+                except (ValueError, TypeError):
+                    issues.append(f"non-numeric fill_price: {fill!r}")
+                else:
+                    # Every consumer divides by this (contracts = size /
+                    # fill_price), so zero is as unusable as null.
+                    if fill_val <= 0:
+                        issues.append(f"non-positive fill_price: {fill!r}")
+
             # Numeric checks
-            for field in ("position_size_usd", "fill_price"):
+            for field in ("position_size_usd",):
                 val = entry.get(field)
                 if val is not None:
                     try:

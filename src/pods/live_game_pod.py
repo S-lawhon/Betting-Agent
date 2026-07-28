@@ -572,6 +572,28 @@ class LiveGamePod(BasePod):
             extra["momentum_score"] = momentum_signal.overreaction_score
             extra["momentum_direction"] = momentum_signal.direction
 
+        # ── fill_price ────────────────────────────────────────────────
+        # P-014 wrote `fill_price: null` on all 356 PLACED rows of its
+        # life (2026-03-28 .. 2026-07-28) because this ScanResult never
+        # set the field.  Nothing downstream could fill the gap: the pod
+        # calls write_log() itself, so MultiExecutor's paper fill
+        # (fill_price=result.venue_prob) never reaches disk.  With no
+        # price there is no fee (0.07*P*(1-P)) and no contract count
+        # (position_size_usd / price), so the pod could not be billed.
+        #
+        # `venue_prob` is the price OF THE SIDE BEING BOUGHT — for NO it
+        # is already 1 − mid (see _evaluate_consensus_edge) — and it is
+        # what _place_order() passes as the limit.  In paper mode the
+        # fill IS the limit by construction, which is the same rule
+        # MultiExecutor applies.  In live mode the Kalshi response
+        # carries no fill price, so this is the limit, not an
+        # exchange-reported fill; `fill_price_basis` records which.
+        fill_price = venue_prob if action == "PLACED" else None
+        if action == "PLACED":
+            extra["fill_price_basis"] = (
+                "paper_limit" if self.mode == "paper" else "live_limit"
+            )
+
         result = ScanResult(
             fingerprint=fingerprint,
             timestamp_utc=now_str,
@@ -591,6 +613,7 @@ class LiveGamePod(BasePod):
             position_size_usd=position_size,
             action=action,
             order_id=order_id,
+            fill_price=fill_price,
             skip_reason="order_failed" if not order_id and action == "SKIPPED_RISK" else None,
             extra=extra,
         )

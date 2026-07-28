@@ -262,6 +262,14 @@ class BasePod(ABC):
         if "yes_side" not in entry and extra.get("kalshi_yes_side"):
             entry["yes_side"] = extra["kalshi_yes_side"]
 
+        # Schema check on the WRITE path.  TradeLogSchema.validate() existed
+        # for the whole life of the log but was only ever called by
+        # migrate_file(), so nothing looked at a row as it was written —
+        # which is how P-014 shipped 356 PLACED rows with `fill_price: null`
+        # unnoticed from 2026-03-28 to 2026-07-28.  Warn, never block: a
+        # schema complaint must not cost a recorded trade.
+        self._warn_on_schema_issues(entry)
+
         if self._trade_store is not None:
             try:
                 self._trade_store.append(entry)
@@ -276,6 +284,25 @@ class BasePod(ABC):
                 f.write(json.dumps(entry, default=str) + "\n")
         except OSError:
             pass  # Write error does not crash scan_once
+
+    def _warn_on_schema_issues(self, entry: Dict[str, Any]) -> None:
+        """Log a WARNING when an outgoing entry violates the log schema.
+
+        Purely observational — the entry is written either way.
+        """
+        try:
+            from src.trade_log_schema import TradeLogSchema
+            issues = TradeLogSchema.validate(entry)
+        except Exception:  # never let a schema check break a write
+            return
+        if issues:
+            logging.getLogger(__name__).warning(
+                "%s: trade log schema issues on %s %s: %s",
+                self.pod_id,
+                entry.get("action"),
+                entry.get("market_id"),
+                "; ".join(issues),
+            )
 
     def _load_seen_from_log(self) -> None:
         """Reload fingerprints and open positions from existing log.

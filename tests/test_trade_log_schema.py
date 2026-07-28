@@ -51,19 +51,62 @@ class TestNormalize(unittest.TestCase):
         self.assertEqual(result["outcome"], "WIN")
 
 
+def _placed(**overrides):
+    """A minimal PLACED entry that validates clean."""
+    entry = {
+        "action": "PLACED",
+        "fingerprint": "fp1",
+        "timestamp_utc": "2026-01-01T00:00:00+00:00",
+        "pod_id": "P-001",
+        "venue": "kalshi",
+        "market_id": "KXNCAA-DUC",
+        "side": "YES",
+        "fill_price": 0.42,
+    }
+    entry.update(overrides)
+    return entry
+
+
 class TestValidate(unittest.TestCase):
 
     def test_valid_placed_entry(self):
-        entry = {
-            "action": "PLACED",
-            "fingerprint": "fp1",
-            "timestamp_utc": "2026-01-01T00:00:00+00:00",
-            "pod_id": "P-001",
-            "venue": "kalshi",
-            "market_id": "KXNCAA-DUC",
-            "side": "YES",
-        }
+        issues = TradeLogSchema.validate(_placed())
+        self.assertEqual(issues, [])
+
+    # ── fill_price: the 356-row P-014 regression ─────────────────────
+    # P-014 wrote `fill_price: null` on every PLACED row from 2026-03-28
+    # to 2026-07-28 and validation passed all of them, because the old
+    # check only tested "numeric IF not None".  No price means no fee
+    # (0.07*P*(1-P)) and no contract count (size / price), so the pod was
+    # the one pod that could not be billed.
+
+    def test_null_fill_price_on_placed_is_an_issue(self):
+        issues = TradeLogSchema.validate(_placed(fill_price=None))
+        self.assertTrue(
+            any("fill_price" in i for i in issues),
+            f"null fill_price must be flagged, got {issues!r}",
+        )
+
+    def test_absent_fill_price_on_placed_is_an_issue(self):
+        entry = _placed()
+        del entry["fill_price"]
         issues = TradeLogSchema.validate(entry)
+        self.assertTrue(any("fill_price" in i for i in issues))
+
+    def test_zero_fill_price_on_placed_is_an_issue(self):
+        """contracts = size / fill_price — zero is as unusable as null."""
+        issues = TradeLogSchema.validate(_placed(fill_price=0.0))
+        self.assertTrue(any("fill_price" in i for i in issues))
+
+    def test_non_numeric_fill_price_on_placed_is_an_issue(self):
+        issues = TradeLogSchema.validate(_placed(fill_price="cheap"))
+        self.assertTrue(any("non-numeric fill_price" in i for i in issues))
+
+    def test_fill_price_not_required_on_settlement_rows(self):
+        """Settlement rows carry no fill; only PLACED is checked."""
+        issues = TradeLogSchema.validate(
+            {"action": "WIN", "fingerprint": "fp1", "pnl_usd": 3.0}
+        )
         self.assertEqual(issues, [])
 
     def test_missing_required_fields(self):

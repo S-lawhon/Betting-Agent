@@ -56,7 +56,14 @@ STALL_DAYS: Dict[str, float] = {
     "P-014": 14.0,    # intermittent by design
     "P-015": 45.0,    # qualifying weeks are lumpy; see registry milestones
     "P-017": 21.0,    # ~1 golf event/week, settling in two waves
-    "P-022": 14.0,    # 4-5 golf tournaments/week across 13 series
+    # CORRECTED 2026-07-28. This said "4-5 golf tournaments/week"; the
+    # measured rate across all 13 series is 3.16 event codes/week
+    # (13.7/month) — see research/P022_RULE_DECISIONS_2026-07-29.md §4.3.
+    # A tolerance keyed to a cadence 42% too fast fires on healthy
+    # silence, which is how an alarm stops being read. 14 x (4.5/3.16)
+    # = 19.9 -> 21 days, the same tolerance P-017 carries for the same
+    # reason (~1 golf event/week settling in two waves).
+    "P-022": 21.0,    # measured 3.16 golf event codes/week across 13 series
 }
 
 

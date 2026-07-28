@@ -239,11 +239,18 @@ Solving `T = ((2.0 + z_power) * sigma / d)^2`:
 - Neither number is round, and neither was chosen after seeing a forward
   result.
 
-**Cadence.** Phase 2 covered 19 tournaments in roughly one month across
-PGA / DP World / LIV / LPGA / Champions round-leader series, i.e. ~15–19
-qualifying tournaments per month if the pod quotes the full series set.
-At that rate T = 14 lands ~3–4 weeks after the runner starts and T = 40
-lands ~2.5–3 months. If the paper runner quotes a narrower set or misses
+**Cadence. ~~~15–19 qualifying tournaments per month~~ — CORRECTED
+2026-07-28 to a MEASURED 13.7/month (3.16 event codes/week).** Phase 2
+covered 19 tournaments in roughly one month across PGA / DP World / LIV /
+LPGA / Champions round-leader series, and this section inferred ~15–19
+per month from that. Counting listed event codes directly across all 13
+series gives **3.16 per week = 13.7 per month** — the original figure was
+~25% high at its low end and ~40% high at its top
+(`research/P022_RULE_DECISIONS_2026-07-29.md` §4.3). It is an **upper
+bound on gate throughput**: a listed tournament only becomes an
+observation if the pod quotes it, fills, and it settles.
+At the measured rate T = 14 lands ~4.4 weeks after the first quote and
+T = 40 lands ~3 months. If the paper runner quotes a narrower set or misses
 posting windows, the calendar stretches — and **silence is not
 confirmation** (§8.4).
 
@@ -466,7 +473,7 @@ quote. Starting T is Sam's call.
 | T before this | **0** — the service had been up since 2026-07-23 but could not quote, so no observation was made or lost |
 | Threshold | **T = 14** (§4), single extension to T = 40 (§4a) |
 | Reader | `scripts/p022_checkpoint.py` — the only sanctioned reader (§10) |
-| Expected T=14 | ~3–4 weeks at 15–19 qualifying tournaments/month |
+| Expected T=14 | ~~~3–4 weeks at 15–19/month~~ → **~4.4 weeks at the measured 3.16 event codes/week**, from the FIRST QUOTE (not from T-start: the pod could not quote until 2026-07-29). Corrected 2026-07-28. |
 
 Parameters live, read back from the merged droplet config:
 

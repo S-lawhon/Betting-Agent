@@ -248,3 +248,58 @@ def test_no_breaches_leaves_the_verdict_untouched(tmp_path):
     rows = cp.load_settled([path])
     assert cp.load_breached_events([path]) == {}
     assert cp.evaluate(rows)["T"] == cp.evaluate(rows, {})["T"] == 2
+
+
+# ── AMENDMENT 1 (2026-07-28): T = 14 -> 24 ───────────────────────────
+
+def test_decision_threshold_is_24_and_matches_the_rules_own_arithmetic():
+    """The threshold is not a chosen number — it is the solve of the rule's own
+    criterion, and this test re-derives it rather than hard-coding trust.
+
+    §5 fixes the criterion as "the smallest sample with 90% power against the
+    effect actually measured" and gives the formula and sigma. T=14 was
+    ceil(13.3) for the Phase-2 estimate of +3.4c/ct. The 2026-07-28 widening
+    revised the pooled estimate to +2.57c/ct; the same solve gives 23.3 -> 24.
+    """
+    import math
+    se19 = (5.1 - 1.7) / 2 / 1.95996          # the published T=19 CI
+    sigma = se19 * math.sqrt(19)
+    assert abs(sigma - 3.781) < 0.01, "sigma drifted from the rule's stated 3.781"
+
+    def solve(effect_cents, z_power=1.2816):   # 1.2816 = 90% power
+        return ((2.0 + z_power) * sigma / effect_cents) ** 2
+
+    assert math.ceil(solve(3.40)) == 14, "the ORIGINAL threshold must still solve to 14"
+    assert math.ceil(solve(2.57)) == cp.MIN_T_DECISION == 24
+
+
+def test_the_amendment_only_moved_the_threshold():
+    """HARD KILL and the PASS bar are untouched — the amendment raised the
+    sample size, not the standard of proof."""
+    assert cp.PASS_Z == 2.0
+    assert cp.HARD_KILL_Z == -2.0
+
+
+def test_extension_is_still_40_and_known_to_be_inconsistent():
+    """Deliberately NOT amended. Its stated rationale is 80% power vs HALF the
+    measured effect; half of +2.57c solves to ~70, and 40 now delivers ~53%.
+    Sam has not ruled on it, so it stays 40 — this test exists so the
+    inconsistency is visible rather than forgotten."""
+    import math
+    se19 = (5.1 - 1.7) / 2 / 1.95996
+    sigma = se19 * math.sqrt(19)
+    consistent = ((2.0 + 0.8416) * sigma / (2.57 / 2)) ** 2
+    assert cp.MIN_T_EXTENSION == 40
+    assert math.ceil(consistent) == 70, "the rationale-consistent extension"
+    assert cp.MIN_T_EXTENSION < consistent, "40 is below its own rationale"
+
+
+def test_a_sample_between_14_and_24_is_now_NO_DECISION(tmp_path):
+    """The behavioural consequence: a T=19 sample that would have produced a
+    verdict under the old threshold must now report NO DECISION."""
+    rows = [_settle(f"f{i}", f"KXPGAR1LEAD-T{i}26-A", f"T{i}26", "no", 0.0, 0.06, 5)
+            for i in range(19)]
+    r = cp.evaluate(cp.load_settled([_write(tmp_path, rows)]))
+    assert r["T"] == 19
+    assert r["verdict"] == "NO DECISION"
+    assert "24" in r["reason"]

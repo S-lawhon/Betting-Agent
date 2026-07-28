@@ -899,7 +899,10 @@ workstreams:
       metric: settled_tournaments
       source: p022_checkpoint
       reader: scripts/p022_checkpoint.py
-      threshold: 14           # 90% power vs the measured +3.4c effect (rule §5)
+      # AMENDMENT 1 (2026-07-28, Sam, at T=0): 14 -> 24. Same criterion (90%
+      # power against the measured effect); the 2026-07-28 widening revised the
+      # effect from +3.4c to +2.57c/ct and the rule's own solve gives 24.
+      threshold: 24           # 90% power vs the measured +3.4c effect (rule §5)
       t_start_utc: 2026-07-26T22:36:52Z
       # progress is DERIVED by the reader. Do not hand-maintain it here.
       decision: >

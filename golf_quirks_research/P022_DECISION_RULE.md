@@ -3,6 +3,49 @@
 **LOCKED 2026-07-26, before the pod exists and before a single contract
 has been quoted. Do not renegotiate.**
 
+> ## AMENDMENT 1 — 2026-07-28: decision threshold T = 14 → **T = 24**
+>
+> **Authorised by Sam. Made at T = 0, with zero forward observations in
+> existence** — the only moment this change can be made without touching
+> evidence.
+>
+> **What changed:** §4's decision point and §5's `T = 14`. Everything else —
+> band, offset, window, series set, every §7 cap, the HARD KILL at z ≤ −2.0,
+> and the single-extension structure — is **untouched**.
+>
+> **Why, and why this is not renegotiation.** §5 fixes the *criterion* as
+> "the smallest sample with **90% power against the effect actually
+> measured**", and then solves it. T = 14 was `ceil(13.3)`, the answer for the
+> Phase-2 estimate of **+3.4¢/ct**. The 2026-07-28 widening
+> (`REPORT_P022_Widened_2026-07.md`, pre-declared and Sam-approved) revised the
+> pooled estimate to **+2.57¢/ct [+0.1, +4.5]**. Re-solving the *same criterion*
+> with the *same* σ = 3.781¢:
+>
+> ```
+> T = ((2.0 + 1.2816) · 3.781 / 2.57)²  =  23.3   →  ceil = 24
+> ```
+>
+> **§5's own table already contained this row**: `24 | 3.30 | 90%` against the
+> ¾-effect column. The criterion is unchanged; only its input moved. At T = 14
+> the power against +2.57¢ would be **71%** — below the 90% bar §5 sets, and
+> close to the 71%-at-T=8 look §5 explicitly forbids as "noise".
+>
+> **The direction is conservative.** This raises the bar: more evidence is now
+> required before a PASS. It is the opposite of the P-013 failure this document
+> was written to prevent, which was criteria *loosened* after the fact.
+>
+> **§8.1 is not triggered.** It resets T for changes to "offset, band, window,
+> series set, caps" — the *quoting* parameters. The decision threshold is not
+> among them, the pod's behaviour is byte-identical, and T is 0 regardless.
+>
+> **OPEN, and deliberately not decided here: `T = 40` no longer means what §5
+> says it means.** Its stated rationale is "80% power against **half** the
+> measured effect". Half of +2.57¢ is +1.29¢, and the same solve gives
+> **T ≈ 70**, not 40. At T = 40 the power against half the *revised* effect is
+> ~53%, not 80%. Raising the extension is a second decision and it has not been
+> made — `MIN_T_EXTENSION` stays 40, now **inconsistent with its own
+> rationale**, until Sam rules on it.
+
 This document exists because P-013 lost **$2,094** while its criteria
 were still being decided after the fact. P-015's rule was locked in
 advance for the same reason. P-022 is written down before it can trade
@@ -123,10 +166,10 @@ outcome the pod exists to harvest, and the settler fix of 2026-07-26
 | Tournaments (T) | Rule |
 |---|---|
 | **any** | **HARD KILL** if `z ≤ −2.0` (significantly negative). Stop immediately; no extension, no re-parameterisation. |
-| **T < 14** | **NO DECISION** — underpowered. Do not act, do not raise caps, do not report a verdict. |
-| **T ≥ 14** | **KILL** if `edge ≤ 0`. |
-| **T ≥ 14** | **CONTINUE (single extension)** if `edge > 0` and `z < 2.0` — see §4a. |
-| **T ≥ 14** | **PASS** if `edge > 0` and `z ≥ 2.0`. |
+| **T < 24** | **NO DECISION** — underpowered. Do not act, do not raise caps, do not report a verdict. *(was T < 14; see Amendment 1)* |
+| **T ≥ 24** | **KILL** if `edge ≤ 0`. |
+| **T ≥ 24** | **CONTINUE (single extension)** if `edge > 0` and `z < 2.0` — see §4a. |
+| **T ≥ 24** | **PASS** if `edge > 0` and `z ≥ 2.0`. |
 | **T ≥ 40** | **KILL** if `edge > 0` and `z < 2.0`. The extension is spent. |
 
 "PASS" means the forward test replicated. It authorises **more paper
@@ -139,7 +182,7 @@ grants it.
 
 Modelled on P-016's: **one extension, at unchanged parameters.**
 
-If at T = 14 the estimate is positive but not separable from zero
+If at T = 24 the estimate is positive but not separable from zero
 (`0 < edge`, `z < 2.0`), the pod continues to **T = 40 and no further**,
 with `offset`, the H = 12–24h posting window, the [0.03, 0.12] anchor
 band, the series set, and every cap in §7 **byte-identical**. At T = 40
@@ -278,7 +321,7 @@ These are **conditions of the gate, not tuning knobs**:
    partial payouts, not voids. Excluding them, or booking them at $0,
    deletes the entire mechanism under test. This was a live bug in
    `KalshiGolfSettler` until 2026-07-26.
-4. **Silence is not confirmation.** If the pod never reaches T = 14, the
+4. **Silence is not confirmation.** If the pod never reaches T = 24, the
    verdict stays NO DECISION and it stays in paper indefinitely. An
    unfalsifiable strategy is not promoted by default.
 5. **No CLV substitute.** Round-leader markets have no sharp external

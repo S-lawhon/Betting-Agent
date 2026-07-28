@@ -21,7 +21,7 @@ Rule summary (see the doc for the derivation)
     Rounds of the same golf event pool into ONE observation.
   * edge = mean(x_t), se = sd(x_t)/sqrt(T), z = edge/se.
   * any T  -> HARD KILL if z <= -2.0.
-  * T < 14 -> NO DECISION (underpowered: 91% power at T=14 vs the
+  * T < 24 -> NO DECISION (underpowered: 91% power at T=24 vs the
               measured +3.4c effect, only 71% at T=8).
   * T >= 14 -> KILL if edge <= 0; PASS if z >= 2.0; else CONTINUE, the
               single extension, to T = 40 at UNCHANGED parameters.
@@ -75,8 +75,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 POD_ID = "P-022"
-MIN_T_DECISION = 14          # 90% power vs the measured +3.4c effect
-MIN_T_EXTENSION = 40         # 80% power vs half that effect
+# AMENDMENT 1 (2026-07-28, authorised by Sam, made at T = 0): 14 -> 24.
+# The rule's criterion is unchanged — "the smallest sample with 90% power
+# against the effect actually measured". The 2026-07-28 widening revised that
+# effect from +3.4c to +2.57c/ct, and re-solving the SAME formula with the SAME
+# sigma=3.781 gives ((2.0+1.2816)*3.781/2.57)^2 = 23.3 -> 24. Section 5's own
+# table already carried the row. At T=14 the power against +2.57c is 71%.
+MIN_T_DECISION = 24          # 90% power vs the widened +2.57c effect
+# NOT amended, and now INCONSISTENT with its own stated rationale ("80% power
+# vs half the measured effect"): half of +2.57c is +1.29c, which solves to
+# T ~ 70, and at T=40 the power against half the revised effect is ~53%.
+# Raising it is a separate decision Sam has not made.
+MIN_T_EXTENSION = 40         # rationale drifted — see golf_quirks_research/P022_DECISION_RULE.md
 PASS_Z = 2.0
 HARD_KILL_Z = -2.0
 

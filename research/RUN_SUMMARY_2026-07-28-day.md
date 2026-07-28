@@ -42,7 +42,7 @@
 | **4** | P-018 rule + gate #1 | **KILL** | placebo **+19.19 ¢** vs fade **+9.09 ¢** — surprise adds nothing |
 | **5** | P-017 decision rule | **WRITTEN** | **P(a tournament ≤ −9.89 ¢) = 0.0082, ≈1 in 122**; T = 8 kept |
 | **6** | P-016 reader or retire | **RETIRED properly** | gate had already **resolved**; standard 15 → **12** failing checks |
-| **7** | Ops backlog | **3 of 4 DONE, 1 needs Sam** | archiver **1.66 GB → 487 MB peak, flat** |
+| **7** | Ops backlog | **3 of 4 DONE, 1 needs Sam** | archiver **1.66 GB → ~600 MB peak**, 3× better, not solved |
 | **8** | P-001 placement rate | **EXPLAINED** | candidates **rose** 60→169→301; CLV gate rejects **89.7%** |
 
 **Suite: 1,751 passed, 2 skipped** (from 1,723 at session start; **+28**).
@@ -218,8 +218,21 @@ could not threaten P-022:
 
 | | before | after |
 |---|---|---|
-| peak RSS | **1.66 GB** → OOM-killed at 433 s | **554 MB and flat** |
-| progress | died | **1.52 M markets scanned, 254 k kept**, still running at write-up |
+| peak RSS | **1.66 GB** → OOM-killed at 433 s | **487 → 599 MB**, see below |
+| progress | died at 433 s | **1.82 M markets scanned, 300 k kept** and still going at 15 min |
+
+**Correction to my own claim, made before publishing it: the memory is NOT
+flat.** I first recorded "487 MB and flat"; watched longer it climbed
+487 → 519 → 554 → 599 MB against the 600 MB cap. The growth tracks kept rows,
+so the residual leak is the `new_tickers` de-duplication set (300 k+ ticker
+strings) plus per-chunk `isin` temporaries — **bounded by the archive's own
+size, not by the window**, but not zero.
+
+**This is a 3× improvement, not a solved problem.** It completes far more work
+in far less memory, but a first run over ~2 M settled markets may still reach
+the cap. The next iteration is to replace the in-memory ticker set with a
+dedup pass over the written parquet. **Recorded as unfinished rather than
+claimed as fixed.**
 
 **The droplet's real headroom, which the prompt correctly said is worth more:**
 
@@ -234,8 +247,11 @@ archiver, 2026-07-28 03:14. Disk is fine (26% of 67 GB).
 > **The risk was never the archiver — it is that the OOM killer scores by RSS,
 > so the most likely victim of the next memory event is P-022's runner**, the
 > single largest process on the box, the night before its first window. That is
-> why this run was capped rather than run free. **Nothing with a deadline is at
-> risk today**, with ~1 GB available and 1.75 GB of swap free.
+> why this run was capped at 600 MB with swap disabled rather than run free:
+> under a cgroup cap the archiver can only kill itself. **Nothing with a
+> deadline is at risk today**, with ~1 GB available and 1.75 GB of swap free —
+> **and the archiver must keep running under a cap until its memory is
+> genuinely bounded.**
 
 **The timer is still DISABLED.** It is weekly (Sunday), so enabling it costs
 nothing before the P-022 window — but I am not enabling a job that has never

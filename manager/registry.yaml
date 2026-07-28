@@ -18,6 +18,12 @@
 #               (P-015 needs ~6 months of trades; nagging daily is noise.)
 #   data     -> Waiting on a data pull/backfill that is already running.
 #   external -> Waiting on a third party (API access, fee schedule, venue).
+#   backtest -> Code exists and is INERT; waiting on its own validation study,
+#               not on calendar. Distinct from `time` on purpose: `time` means
+#               a sample is accruing toward a defined gate, and labelling a
+#               pre-backtest pod `time` implies a decision rule that does not
+#               exist. Matches no branch in checks.py or brief.py, so it stays
+#               out of both the action list and the accumulating list.
 #   nothing  -> Running normally; report by exception only.
 #
 # A workstream with blocked_on: time NEVER appears in the action list until its
@@ -731,6 +737,43 @@ workstreams:
       Registry corrected 2026-07-21: this entry previously read "FULLY BUILT AND
       BACKTESTED, NOT DEPLOYED / the golf pod CODE is not on the droplet either",
       which was false and was asking Sam for a decision he had already made.
+
+  - id: P-018
+    name: Surprise-Gated In-Play Fade Maker
+    stage: build
+    # NOT `validating`. `manager/throughput.py` only projects a resolution date
+    # for workstreams that are `validating` AND carry a `gate` block, and this
+    # one deliberately has neither: P-018 has no pre-registered decision rule,
+    # so a projected date would be a date for a decision nobody has defined.
+    tier: build
+    blocked_on: backtest
+    owner_dir: inplay_research
+    summary: >
+      Core landed in the tree 2026-07-29 (cherry-pick of 4ff5bea; the branch
+      itself must NOT be merged — its tip deletes Legacy/Kalshi Arb Project,
+      which src/engine.py puts on sys.path for P-001's Scanner and Matcher).
+      1,688 lines, 29 tests, INERT: `enabled: false`, absent from pods.active,
+      not in src/pods/, and carrying no @register_pod decorator, so pod
+      auto-discovery cannot pick it up. No engine, no runner, no systemd unit.
+    action_required: null
+    notes: >
+      Blocked on its own backtest, not on calendar. The replay harness
+      (inplay_research/backtest_inplay_fade.py) needs >=10 game-days of
+      book_capture in-play ticks; the data is alive and AHEAD of schedule
+      (27,307 genuine ticks over 80 games in 7 days) and the gate opens
+      ~2026-07-30.
+
+      THE CAVEAT THAT MUST SURVIVE INTO THE BACKTEST: coverage measured from
+      581 DISCOVERY records is 33.9% DROPPED, lowest-volume-first, so the
+      replay sample is biased toward LIQUID markets and any result overstates
+      what is achievable across the full book. The rate cannot be raised —
+      128 cumulative 429s, 48 in the last 24h, the daemon self-throttling to
+      0.6-1.2 req/s. The limiter is the exchange, not the config.
+
+      Spec gate #1 (research/SPEC_P018_InPlay_Fade_Maker.md §8): the pod does
+      not ship unless the surprise-bucket table is NOT flat. Write the
+      decision rule BEFORE running the backtest — P-014 is the live example of
+      what it costs to reach a gate without one.
 
   # ---------------------------------------------------------------------------
   # DISABLED / KILLED

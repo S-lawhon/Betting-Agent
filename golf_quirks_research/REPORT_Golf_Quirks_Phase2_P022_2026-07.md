@@ -88,6 +88,72 @@ story, less pessimistic.)
 
 ---
 
+## 2.1 The same cells on the widened cache (n = 404) — added 2026-07-28
+
+The table above is the **published** result and rests on a frozen 364-market
+universe (`published_universe_364.json`). The 2026-07-28 widening run added 40
+markets / 3 tournaments to `data/leader_trades/`, so a run over the *whole
+cache* no longer reproduces it. **That is a different sample, not a different
+harness**: pinned to the 364, the untouched harness still reproduces every cell
+exactly (`backtest_fade_fills.py --validate`, PASS as of 2026-07-28).
+
+Recorded here because P-022 is **GREEN-LIT and armed live**, so a movement in
+its measured edge on a larger sample is worth knowing even when the added block
+is too small to decide anything.
+
+| H (h) | offset | net ¢/ct **n=364** | net ¢/ct **n=404** | Δ | 95% CI n=364 | 95% CI n=404 | filled 364→404 | tourn (+) 364→404 |
+|------:|-------:|---:|---:|---:|---|---|---|---|
+| 12 | 0.00 | +2.1 | **+1.6** | −0.5 | [+0.8, +3.5] | [−0.1, +3.1] | 211→232 | 19 (16) → 22 (16) |
+| **12** | **0.02** | **+3.4** | **+2.6** | **−0.8** | **[+1.7, +5.1]** | **[+0.1, +4.5]** | 171→183 | 19 (16) → 22 (17) |
+| 12 | 0.04 | +4.7 | **+3.7** | −1.0 | [+2.7, +6.7] | [+0.9, +5.9] | 147→155 | 19 (16) → 22 (18) |
+| 6 | 0.00 | +0.5 | **−0.7** | −1.2 | [−1.9, +3.0] | [−3.7, +1.9] | 112→123 | 15 (—) → 17 (9) |
+| 6 | 0.02 | +1.7 | **+0.2** | −1.5 | [−1.0, +4.6] | [−3.6, +3.2] | 97→104 | 15 (—) → 17 (10) |
+| 24 | 0.00 | +2.4 | **+1.9** | −0.5 | [+0.0, +4.3] | [−0.4, +3.8] | 172→197 | 19 (16) → 22 (16) |
+| 24 | 0.02 | +3.5 | **+2.9** | −0.6 | [+0.5, +5.9] | [−0.4, +5.3] | 138→155 | 19 (16) → 22 (17) |
+
+Robustness cells (§3) at n=404, headline H=12 / +0.02:
+**17 of 22 tournaments positive** (published 16 of 19); **leave-one-out drop
+USO26 → +2.15¢** (published +3.04¢), all 22 jackknives still positive, min
+**+2.15¢**.
+
+**Reading it, without overreading it:**
+
+- **Every one of the seven cells moved DOWN**, by 0.5–1.5¢. That uniformity is
+  not seven independent draws — the same 3 added tournaments
+  (`ISPHWSO26`, `ISHSO26`, `KIN26` / `3MO26`, −12.33¢/ct as a block) sit in all
+  seven, so this is one adverse draw seen seven times, not seven confirmations.
+- **The qualitative shape is unchanged**: offset still monotonically helps
+  (+1.6 → +2.6 → +3.7), H=6 is still the collapse, H=12/24 still the tradeable
+  window, and the fill-vs-posted adverse-selection gap is still there
+  (E[settle] filled 0.051 vs posted 0.021 at the headline).
+- **What did change is the confidence, not the sign.** At n=364 four cells had a
+  CI strictly above zero; at n=404 only three do (12/+0.02, 12/+0.04, and
+  12/0.00 is now marginal at −0.1). The headline's lower bound went **+1.7 →
+  +0.1**. The leave-one-out margin shrank correspondingly (+3.04¢ → +2.15¢).
+- **The two H=6 cells now straddle or sit below zero.** §2's "post early"
+  conclusion is *strengthened* by this, not weakened — H=6 was already the
+  marginal row and is now the negative one.
+
+**Not acted on.** No parameter, band, offset, window or gate changed on the
+strength of this table; the live pod's quoting parameters are unchanged. The
+one consequence that was already taken is the decision threshold: sizing
+against +2.57¢ instead of +3.4¢ raised **T = 14 → 24** (`P022_DECISION_RULE.md`
+Amendment 1, made at T = 0). Full analysis of the added block, including its
+CI of [−38.5, +7.0]¢/ct and the INCONCLUSIVE verdict, is in
+`REPORT_P022_Widened_2026-07.md`.
+
+> **Reproduce both rows:**
+> ```
+> python3 golf_quirks_research/backtest_fade_fills.py --validate            # n=364, must PASS
+> python3 golf_quirks_research/backtest_fade_fills.py --universe all        # n=404
+> ```
+> `--validate` is pinned to the 364 tickers and is **independent of cache
+> growth** — that is deliberate. A reproduction test that reads whatever is in
+> `data/` is a cache fingerprint, not a reproduction test, and it broke the
+> moment the cache legitimately grew.
+
+---
+
 ## 3. Robustness
 
 Per-tournament (H=12, offset +0.02): **16 of 19 tournaments positive**. The 3
@@ -98,6 +164,9 @@ broad and modest (+1.5¢ to +9.0¢).
 **Leave-one-out:** removing the single largest positive contributor (USO26)
 moves the overall from +3.4¢ to +3.0¢ — the edge is *not* a one-tournament
 artifact. Every jackknife stays comfortably positive.
+
+(On the widened n=404 cache both cells weaken but hold: 17 of 22 positive,
+drop-USO26 → +2.15¢, all 22 jackknives positive. See §2.1.)
 
 ---
 

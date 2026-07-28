@@ -371,6 +371,13 @@ def assess(engine: RoundLeaderFadeMakerEngine,
     for e in events.values():
         span = e["listing_span_days"]
         e["hours_to_close_ref"] = (e["close_ref"] - now) / 3600.0
+        # Recorded for every event, not only the ones already in window: this
+        # is the single number a human watching a pre-flight actually wants,
+        # and it MOVES — every event below resolves through the coarse
+        # per-tour day offset today and will be re-resolved to the precise
+        # tee-time close as soon as ESPN publishes pairings.
+        e["window_open_epoch"] = e["close_ref"] - engine.fade_start_h * 3600.0
+        e["window_open_iso"] = _iso(e["window_open_epoch"])
         e["placeholder"] = bool(span is not None and span >= placeholder_days)
         e["in_pod_window"] = (
             engine.no_new_quote_h <= e["hours_to_close_ref"] <= engine.fade_start_h
@@ -385,8 +392,6 @@ def assess(engine: RoundLeaderFadeMakerEngine,
     missing: List[str] = []
     refusals: Dict[str, int] = {}
     for e in in_window:
-        e["window_open_epoch"] = e["close_ref"] - engine.fade_start_h * 3600.0
-        e["window_open_iso"] = _iso(e["window_open_epoch"])
         e["window_open_for_s"] = now - e["window_open_epoch"]
         e["event_code"] = engine._event_code({"event_ticker": e["event"]})
         e.update({"n_priced": 0, "n_in_band": 0, "n_candidates": 0,

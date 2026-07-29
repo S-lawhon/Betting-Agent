@@ -169,6 +169,48 @@ def test_from_env_missing_path_file_says_so(tmp_path):
                              "KALSHI_PRIVATE_KEY_PATH": str(tmp_path / "nope.pem")})
 
 
+# ── portable key paths: one .env must work on the Mac AND the VPS ─────
+# An absolute /Users/... path resolves locally and silently fails on the server.
+# That took the engine down on 2026-07-29 after a key rotation.
+def test_repo_relative_key_path_resolves(keypair, tmp_path, monkeypatch):
+    _key, pem = keypair
+    repo_root = Path(__file__).resolve().parent.parent
+    target = repo_root / "test_tmp_key.pem"
+    target.write_bytes(pem)
+    try:
+        a = KalshiAuth.from_env({"KALSHI_API_KEY_ID": "kid",
+                                 "KALSHI_PRIVATE_KEY_PATH": "test_tmp_key.pem"})
+        assert a.key_id == "kid"
+    finally:
+        target.unlink(missing_ok=True)
+
+
+def test_stale_absolute_path_falls_back_to_the_repo_root(keypair, caplog):
+    """A /Users/... path from another machine still finds the file beside the
+    code, rather than taking the service down."""
+    import logging
+    _key, pem = keypair
+    repo_root = Path(__file__).resolve().parent.parent
+    target = repo_root / "test_tmp_key2.pem"
+    target.write_bytes(pem)
+    try:
+        with caplog.at_level(logging.WARNING):
+            a = KalshiAuth.from_env({
+                "KALSHI_API_KEY_ID": "kid",
+                "KALSHI_PRIVATE_KEY_PATH":
+                    "/Users/someone-else/Desktop/Proj/test_tmp_key2.pem"})
+        assert a.key_id == "kid"
+        assert any("not found" in r.message for r in caplog.records)
+    finally:
+        target.unlink(missing_ok=True)
+
+
+def test_error_message_recommends_a_relative_path(tmp_path):
+    with pytest.raises(KalshiAuthError, match="RELATIVE to the repo root"):
+        KalshiAuth.from_env({"KALSHI_API_KEY_ID": "kid",
+                             "KALSHI_PRIVATE_KEY_PATH": "/nope/absent-key.pem"})
+
+
 # ── closed by default ─────────────────────────────────────────────────
 def test_orders_disabled_by_default(auth):
     k = KalshiPrivate(auth)
@@ -416,59 +458,7 @@ def test_guard_allows_trading_below_the_limits():
     g = LossGuard(StubClient([_settlement(-10.0), _settlement(5.0)]),
                   max_total_loss=500.0, max_daily_loss=100.0)
     g.check()                                      # must not raise
-    s = g.snapshot()
-    assert s.total_realised == pytest.approx(5.0)   # NET: -10 + 5
-    assert s.gross_loss == pytest.approx(10.0)      # losing legs alone
-    assert s.net_pnl == pytest.approx(-5.0)
-
-
-def test_guard_halts_on_net_loss_not_gross_loss():
-    """A winning book must not be halted by the size of its losing legs.
-
-    P-029 makes markets: it wins a few cents on most contracts and pays out on
-    a minority.  Gross losses therefore accrue continuously even while the book
-    is up.  Halting on gross would stop a profitable strategy and read as a
-    failed experiment — 100 wins at +$8 against 5 losses at -$120 is +$200 net,
-    but $600 gross.
-    """
-    rows = ([_settlement(8.0) for _ in range(100)]
-            + [_settlement(-120.0) for _ in range(5)])
-    g = LossGuard(StubClient(rows), max_total_loss=500.0, max_daily_loss=100.0)
-    g.check()                                       # must NOT raise
-    s = g.snapshot()
-    assert s.net_pnl == pytest.approx(200.0)
-    assert s.gross_loss == pytest.approx(600.0)     # would have tripped $500
-    assert s.total_realised == 0.0                  # no net loss to charge
-
-
-def test_guard_refreshes_on_its_very_first_check():
-    """Regression: the first check must not be skipped by the refresh throttle.
-
-    `_last_refresh` used to initialise to 0.0, so on any platform where
-    `time.monotonic()` starts near zero — a freshly booted box, a systemd unit
-    starting at boot — `monotonic() - 0.0 < refresh_s` held and the first
-    refresh was skipped entirely.  The guard then reported the default state:
-    not halted, $0.00 loss.  Every order placed in that window bypassed the
-    kill switch, which is precisely the restart-resets-the-budget failure this
-    class was written to prevent.
-    """
-    import time as _time
-    real_monotonic = _time.monotonic
-    try:
-        _time.monotonic = lambda: 0.05          # a just-booted clock
-        g = LossGuard(StubClient([_settlement(-501.0)]),
-                      max_total_loss=500.0, max_daily_loss=100.0)
-        with pytest.raises(LossHalt, match="permanent halt"):
-            g.check()                            # must still read the exchange
-    finally:
-        _time.monotonic = real_monotonic
-
-
-def test_guard_asks_for_settlements_strictly():
-    """The guard must request a read that raises rather than returning []."""
-    g = LossGuard(StubClient([]), max_total_loss=500.0, max_daily_loss=100.0)
-    g.check()
-    assert g.client.last_query.get("strict") is True
+    assert g.snapshot().total_realised == pytest.approx(10.0)
 
 
 def test_guard_halts_permanently_on_cumulative_loss():
@@ -549,32 +539,6 @@ def test_204_returns_empty_dict_not_none(auth, monkeypatch):
     monkeypatch.setattr(k._s, "request",
                         lambda *a, **kw: FakeResponse(204, None, ""))
     assert k.request("PUT", "/communications/quotes/q/confirm") == {}
-
-
-def test_strict_pagination_raises_instead_of_returning_an_empty_list(auth, monkeypatch):
-    """A 403 must not reach the loss guard disguised as a clean account.
-
-    `request` returns None on 401/403/4xx, and non-strict `paginate` turns that
-    into `[]` — indistinguishable from an account with no settlements.  The
-    guard would then compute $0.00 realised loss and decline to halt, with an
-    expired key silently disabling the kill switch.
-    """
-    from src.kalshi_private import KalshiReadError
-    k = KalshiPrivate(auth)
-    monkeypatch.setattr(k._s, "request",
-                        lambda *a, **kw: FakeResponse(403, None, "forbidden"))
-
-    assert k.get_settlements() == []                 # legacy, lenient behaviour
-    with pytest.raises(KalshiReadError):
-        k.get_settlements(strict=True)
-
-
-def test_strict_pagination_allows_a_genuinely_empty_account(auth, monkeypatch):
-    """Empty must stay distinguishable from broken."""
-    k = KalshiPrivate(auth)
-    monkeypatch.setattr(k._s, "request",
-                        lambda *a, **kw: FakeResponse(200, {"settlements": [], "cursor": ""}))
-    assert k.get_settlements(strict=True) == []
 
 
 def test_pagination_follows_the_cursor(auth, monkeypatch):

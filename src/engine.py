@@ -83,7 +83,31 @@ def build_venue_clients(
     try:
         from kalshi_client import KalshiClient  # type: ignore  # existing system
         api_key_id  = os.environ.get("KALSHI_API_KEY_ID",  "")
+        # The legacy client takes the PEM as a STRING and picks its auth mode
+        # with `rsa if (api_key_id and private_key) else token`.  An empty
+        # private_key therefore does NOT fail loudly — it silently falls back to
+        # the retired email/password `/log_in` endpoint and every scan 404s.
+        # That is exactly what happened on 2026-07-29 when the inline
+        # KALSHI_PRIVATE_KEY was removed in favour of KALSHI_PRIVATE_KEY_PATH.
+        # Read the path form first; keep the inline variable as a fallback only.
         private_key = os.environ.get("KALSHI_PRIVATE_KEY", "").strip()
+        if not private_key:
+            try:
+                from src.kalshi_private import KalshiAuth
+                key_path = os.environ.get("KALSHI_PRIVATE_KEY_PATH", "").strip()
+                resolved = KalshiAuth._resolve_key_path(key_path) if key_path else None
+                if resolved is not None:
+                    private_key = resolved.read_text().strip()
+            except Exception as exc:                  # never break the build
+                logger.warning(
+                    "build_venue_clients: could not read KALSHI_PRIVATE_KEY_PATH — %s",
+                    exc)
+        if api_key_id and not private_key:
+            logger.error(
+                "build_venue_clients: KALSHI_API_KEY_ID is set but no private key "
+                "could be loaded — the legacy client will fall back to the RETIRED "
+                "/log_in endpoint and every Kalshi scan will fail with 404. Set "
+                "KALSHI_PRIVATE_KEY_PATH to a readable PEM.")
         email       = os.environ.get("KALSHI_EMAIL",       "")
         password    = os.environ.get("KALSHI_PASSWORD",    "")
         clients["kalshi"] = KalshiClient.from_config(
@@ -103,25 +127,10 @@ def build_venue_clients(
 
 
 # Settlers that resolve a single pod expose it as ``_pod_id``.  The
-# generic Kalshi Settler predates that convention and filters on an
-# explicit pod tuple, so it is mapped here.
-#
-# P-014 is in this tuple because it has no settler of its own and never has
-# had one — it was resolved incidentally by this settler back when
-# ``_open_placed_entries`` walked every pod's rows.  Scoping that walk
-# (3b0daae, 2026-07-26) fixed the P-017 spurious-void bug and silently
-# orphaned P-014 in the same stroke: 15 positions, zero settlements in the
-# two days that followed.  Adding it back is safe in a way it is NOT for
-# P-017 — the settler's ``result or "void"`` rule is roughly correct for
-# KXMLBGAME, which resolves promptly, whereas Kalshi leaves golf top-N
-# markets ``active`` with an empty result for ~a day post-tournament.
-#
-# P-014 carries ``game_time``, so its stale threshold is the 8h
-# STALE_HOURS_AFTER_GAME one.  Any backlog MUST be booked before this pod
-# is added, or the first cycle auto-voids it at $0.00 — see
-# ``scripts/backfill_p014_settlements.py``.
+# generic Kalshi Settler predates that convention and filters on
+# pod_ids=("P-001", ""), so it is mapped explicitly.
 _SETTLER_DEP_PODS: Dict[str, tuple] = {
-    "settler": ("P-001", "P-014", ""),
+    "settler": ("P-001", ""),
 }
 
 

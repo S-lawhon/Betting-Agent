@@ -65,6 +65,15 @@ every pod that eventually goes live.
   otherwise. `dry_run=True` logs the body and never touches the network.
 - **`LossGuard`** — $500 cumulative (permanent halt) / $100 daily. Reads the **exchange**, not an
   in-process counter, because a counter resets on restart. **Fails closed.**
+  **Both thresholds are NET realised loss, changed 2026-07-29** — they were gross (the sum of the
+  losing settlements alone) until a review found the guard would permanently halt a *winning* book:
+  100 wins at +$8 against 5 losses at −$120 is +$200 net but $600 gross, tripping a $500 "budget"
+  that had not been spent. For a maker collecting a few cents on ~94% of contracts and paying out on
+  the rest, gross runs ahead of net continuously, so the old reading would have ended Phase 3 early
+  and looked like a failed experiment. `gross_loss` and `net_pnl` are both on `LossState` so the
+  distinction stays visible. **This changes what a pre-registered number means** — $500 is now a real
+  drawdown ceiling, which is strictly *more* permissive than what was registered on 2026-07-28.
+  Tighten it if that is not the intent; do not loosen it further without writing down why.
 - **Subaccount routing**, RFQ/quote helpers, combo market creation, the `communications` WebSocket
   consumer, and a 0.1¢-grid price snapper.
 
@@ -248,6 +257,23 @@ rows on a 2 GB box), and appended to one gzip file — where a process killed mi
 stream and makes the **entire file** unreadable, which systemd restarts do routinely. Now streams,
 and writes immutable numbered parts via temp-file + atomic rename. Verified by SIGKILL: all 22
 parts / 550,000 rows stayed readable.
+
+**5. The archiver then wedged anyway — the fix moved the memory, it did not remove it** (found
+2026-07-29, one day after shipping). Streaming fixed the *write* buffer but dedup still built an
+in-RAM `set` per day. Run 1 succeeded only because the archive was empty (`already_present: 0`,
+6,677,105 rows). Every run afterwards had to rebuild a 6.7M-entry set inside `MemoryMax=1G` before
+writing anything, and could not: the service sat pinned **11 KB under its cgroup cap for four
+hours**, read **249 GB against a 462 MB archive**, wrote **zero bytes**, and — because it never left
+`activating` — **blocked its own daily timer**, so the archive would have silently stopped updating
+with nothing marked `failed`. The archiver worked exactly once, by construction.
+Dedup now lives in SQLite (`seen.sqlite`), so memory is flat in archive size: measured **34 MB RSS
+vs 1.0 GB**, indexing ~4M tickers in three minutes on the same box. Parts are recorded as indexed
+only *after* they are durably written, so a crash re-indexes rather than drops.
+**Rules: (a) a wedged service is not a failed one — monitor for `activating` that never ends, not
+just for `failed`; (b) when you fix an unbounded-memory bug, check whether the bound moved to
+another structure in the same loop; (c) `--days-back` is now 2, not 7 — raising it scales the index
+build linearly.** `return 0 if pub.errors == 0 else 0` — both branches identical — meant no archiver
+failure could ever reach systemd either; it now exits non-zero on an aborted run.
 
 ---
 

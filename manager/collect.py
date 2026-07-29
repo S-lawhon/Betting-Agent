@@ -241,6 +241,18 @@ def is_local_job(job: Dict[str, Any]) -> bool:
     return str((job.get("output") or {}).get("root", "")).lower() == "local"
 
 
+# Hosts this project's two collectors can actually stat files on. Anything else
+# named in a job's `host:` is a third box (P-029's dedicated VPS) whose paths
+# exist on neither, so measuring it here would produce a confident "missing"
+# for a job that may be running perfectly — the same false negative the Mac
+# branch in job_record() exists to prevent.
+MEASURABLE_HOSTS = ("droplet", "mac", "local", "laptop")
+
+
+def job_host(job: Dict[str, Any]) -> str:
+    return str(job.get("host", "droplet")).lower()
+
+
 def safe(label: str):
     """Decorator: turn any collector exception into a recorded fault."""
     def wrap(fn):
@@ -423,6 +435,15 @@ class Collector:
         }
 
         if not self.can_check(job):
+            if job_host(job) not in MEASURABLE_HOSTS:
+                reason = ("job runs on '{}', a host neither collector can stat; "
+                          "this collector is on '{}'. Measured by the "
+                          "p029-daily-health-check scheduled task instead."
+                          .format(base_rec["host"], self.host))
+            else:
+                reason = ("job runs on '{}' (paths under {}); this collector is "
+                          "on '{}' where that root is not present"
+                          .format(base_rec["host"], self.local_root, self.host))
             base_rec.update({
                 "output": None,
                 "exists": None,          # NOT False — we did not look
@@ -431,10 +452,7 @@ class Collector:
                 "stale": None,
                 "measurable": False,
                 "state": "uncheckable",
-                "uncheckable_reason": (
-                    "job runs on '{}' (paths under {}); this collector is on "
-                    "'{}' where that root is not present"
-                    .format(base_rec["host"], self.local_root, self.host)),
+                "uncheckable_reason": reason,
             })
             return base_rec
 
@@ -487,7 +505,16 @@ class Collector:
         Local-rooted jobs are checkable only where local_root actually exists.
         On the Mac local_root IS the checkout, so they resolve; on the droplet
         it does not, so they do not.
+
+        A job declared on a THIRD host is checkable from neither collector.
+        Added 2026-07-29 for P-029, whose Phase 0 logger and archiver run on
+        their own VPS: without this branch the droplet would stat
+        /var/lib/p029/... , find nothing, and report a healthy collector as a
+        missing output every 15 minutes.
         """
+        host = job_host(job)
+        if host not in MEASURABLE_HOSTS and host != self.host.lower():
+            return False
         if not is_local_job(job):
             return True
         return self.local_root.exists()

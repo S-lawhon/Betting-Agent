@@ -102,6 +102,16 @@ class LossHalt(RuntimeError):
     """The loss guard has halted trading.  Requires manual intervention."""
 
 
+class KalshiReadError(RuntimeError):
+    """A read that must not be allowed to look like an empty result failed.
+
+    ``paginate`` normally swallows a failed page and returns what it has, which
+    is right for market data and **wrong** for the loss guard: an expired key or
+    a 403 would arrive as ``[]`` and read as "no losses".  Pass ``strict=True``
+    to turn a failed page into this exception so the caller can fail closed.
+    """
+
+
 # ──────────────────────────────────────────────────────────────────────
 # price helpers — combos quote on a 0.1c grid, not the usual 1c
 # ──────────────────────────────────────────────────────────────────────
@@ -280,8 +290,18 @@ class TokenBucket:
 # ──────────────────────────────────────────────────────────────────────
 @dataclass
 class LossState:
+    """Snapshot of the guard's view of the account.
+
+    ``total_realised`` is the **net** realised loss — the figure the halt is
+    compared against, and the one a human means by "a $500 budget".
+    ``gross_loss`` is the sum of the losing settlements alone, kept for
+    visibility: for a maker that wins small and often, gross runs far ahead of
+    net, and halting on it would stop a profitable book.
+    """
     total_realised: float = 0.0
     today_realised: float = 0.0
+    net_pnl: float = 0.0
+    gross_loss: float = 0.0
     day: str = ""
     halted: bool = False
     reason: str = ""
@@ -393,7 +413,13 @@ class LossGuard:
                 "the primary subaccount will count toward this budget and can "
                 "trip the halt. Point the client at a dedicated subaccount.")
         self.state = LossState()
-        self._last_refresh = 0.0
+        # None, not 0.0.  `time.monotonic()` is not guaranteed to be large at
+        # process start — on a freshly booted box, or any platform where it
+        # counts from process start, `monotonic() - 0.0 < refresh_s` is true and
+        # the FIRST check would silently skip its refresh and report "no loss".
+        # That is the restart-resets-the-budget failure this class exists to
+        # prevent, reintroduced by a sentinel value.
+        self._last_refresh: Optional[float] = None
         self._lock = threading.Lock()
 
     def reset(self) -> None:
@@ -404,7 +430,8 @@ class LossGuard:
         logger.warning("LossGuard reset by operator")
 
     def _refresh(self, force: bool = False) -> None:
-        if not force and (time.monotonic() - self._last_refresh) < self.refresh_s:
+        if (not force and self._last_refresh is not None
+                and (time.monotonic() - self._last_refresh) < self.refresh_s):
             return
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         query: Dict[str, Any] = {"limit": 1000}
@@ -414,7 +441,11 @@ class LossGuard:
             # hide the pod's own losses inside it.
             query["min_ts"] = self._min_ts
         try:
-            rows = self.client.get_settlements(**query)
+            # strict=True so a 401/403/5xx raises instead of arriving as an
+            # empty list.  Without it a failed read is indistinguishable from a
+            # clean account and the guard reports $0.00 — the same blindness as
+            # the missing-P&L-field bug, one layer further out.
+            rows = self.client.get_settlements(strict=True, **query)
         except Exception as exc:                     # fail closed, loudly
             with self._lock:
                 self.state.halted = True
@@ -422,10 +453,10 @@ class LossGuard:
             logger.error("LossGuard failing closed: %s", exc)
             return
 
-        total = day = 0.0
+        net = day_net = gross = 0.0
         seen = readable = 0
         for r in rows:
-            ts = (r.get("settled_time") or r.get("created_time") or "")[:10]
+            ts = str(r.get("settled_time") or r.get("created_time") or "")[:10]
             if self.since and ts and ts < self.since:
                 continue                       # predates the experiment
             seen += 1
@@ -433,16 +464,25 @@ class LossGuard:
             if pnl is None:
                 continue
             readable += 1
-            if pnl >= 0:
-                continue
-            loss = -pnl
-            total += loss
+            net += pnl
+            if pnl < 0:
+                gross -= pnl
             if ts == today:
-                day += loss
+                day_net += pnl
+
+        # Halt on NET loss.  Summing only the losing legs would stop a book that
+        # is winning: a maker collecting 3c on 94% of contracts and paying out on
+        # 6% accrues gross losses continuously while net climbs.  Measured on a
+        # synthetic +$200-net book, gross reached $600 and tripped a $500
+        # "budget" that had not actually been spent.
+        total = max(0.0, -net)
+        day_loss = max(0.0, -day_net)
 
         with self._lock:
             self.state.total_realised = total
-            self.state.today_realised = day
+            self.state.today_realised = day_loss
+            self.state.net_pnl = net
+            self.state.gross_loss = gross
             self.state.day = today
             self.state.rows_seen = seen
             self.state.rows_readable = readable
@@ -460,10 +500,10 @@ class LossGuard:
                 self.state.reason = (
                     f"cumulative realised loss ${total:,.2f} >= "
                     f"${self.max_total_loss:,.2f} — permanent halt")
-            elif day >= self.max_daily_loss:
+            elif day_loss >= self.max_daily_loss:
                 self.state.halted = True
                 self.state.reason = (
-                    f"daily realised loss ${day:,.2f} >= "
+                    f"daily realised loss ${day_loss:,.2f} >= "
                     f"${self.max_daily_loss:,.2f} — paused until UTC midnight")
             self._last_refresh = time.monotonic()
 
@@ -623,8 +663,17 @@ class KalshiPrivate:
 
     def paginate(self, path: str, key: str,
                  params: Optional[dict] = None,
-                 max_pages: int = 200) -> List[dict]:
-        """Follow Kalshi's cursor pagination and return the flattened list."""
+                 max_pages: int = 200,
+                 strict: bool = False) -> List[dict]:
+        """Follow Kalshi's cursor pagination and return the flattened list.
+
+        Args:
+            strict: Raise :class:`KalshiReadError` if a page fails, rather than
+                returning the rows gathered so far.  Callers that treat an empty
+                result as meaningful — the loss guard above all — must set this,
+                because ``request`` returns ``None`` on 401/403/4xx/persistent
+                5xx and a silent ``[]`` then reads as "nothing here".
+        """
         out: List[dict] = []
         cursor = None
         for _ in range(max_pages):
@@ -632,7 +681,12 @@ class KalshiPrivate:
             if cursor:
                 p["cursor"] = cursor
             d = self.get(path, p)
-            if not d:
+            if d is None:                       # the request itself failed
+                if strict:
+                    raise KalshiReadError(
+                        f"GET {path} failed; last statuses: {self.status_log[-3:]}")
+                break
+            if not d:                           # 204 / empty body — end of data
                 break
             out.extend(d.get(key) or [])
             cursor = d.get("cursor")
@@ -658,11 +712,16 @@ class KalshiPrivate:
     def get_fills(self, **params) -> List[dict]:
         return self.paginate("/portfolio/fills", "fills", self._scoped(params))
 
-    def get_settlements(self, **params) -> List[dict]:
+    def get_settlements(self, strict: bool = False, **params) -> List[dict]:
         """Settlements.  Supports `ticker`, `event_ticker`, `min_ts`, `max_ts`
-        and `subaccount` — prefer `min_ts` over client-side date filtering."""
+        and `subaccount` — prefer `min_ts` over client-side date filtering.
+
+        Args:
+            strict: Raise :class:`KalshiReadError` instead of returning ``[]``
+                when the read fails.  The loss guard sets this.
+        """
         return self.paginate("/portfolio/settlements", "settlements",
-                             self._scoped(params))
+                             self._scoped(params), strict=strict)
 
     def get_orders(self, **params) -> List[dict]:
         return self.paginate("/portfolio/orders", "orders", self._scoped(params))

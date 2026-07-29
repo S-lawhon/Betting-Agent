@@ -243,6 +243,52 @@ jobs:
   # exit code — `manager/checks.py::check_evmap` treats exit 0 with zero rows
   # as a failure, because that is the half of the 139 that an exit code could
   # never have seen.
+  # ---------------------------------------------------------------------------
+  # P-029 Phase 0 — on its OWN VPS (143.198.162.120), not the droplet and not
+  # the Mac. Both collectors report these `uncheckable` by design: the paths
+  # live on a third host, and a plain stat() from here would report "missing"
+  # with total confidence for a logger that is collecting fine. That is the
+  # same false negative the Mac-hosted evmap jobs used to produce for weeks.
+  #
+  # These entries therefore do NOT measure P-029 — they make its absence from
+  # this registry impossible, which is the failure P-022 demonstrated (active
+  # and doing nothing for three days, with no monitoring entry to have an
+  # opinion). The MEASUREMENT is the `p029-daily-health-check` scheduled task
+  # on the Mac, which SSHes to the box. Once the P-029 host can be reached by
+  # a collector, drop the `host:` override and these become real checks.
+  #
+  # Deliberately NOT in `services:` above — check_services shells out to a
+  # LOCAL systemctl, so a p029-shadow entry there would resolve to "not-found"
+  # on the droplet and page CRITICAL every 15 minutes for a healthy unit.
+  - id: p029_shadow
+    host: p029
+    schedule: continuous (p029-shadow.service, Restart=always)
+    description: P-029 Phase 0 public shadow logger — combo margin tape for Gate 0
+    output:
+      file: /var/lib/p029/shadow.sqlite
+      max_stale_hours: 2
+    severity: warn
+    note: >
+      Single-instance guarded via a SQLite lock: a second copy refuses to start,
+      and a stalled logger still reports systemd-active. Freshness of the DB is
+      the only real liveness signal. A gap in the tape CANNOT be backfilled.
+
+  - id: p029_archive
+    host: p029
+    schedule: "*-*-* 09:30 UTC (p029-archive.timer, RandomizedDelaySec=600)"
+    description: P-029 settled-combo archiver — Kalshi purges these after ~3 months
+    output:
+      file: /var/lib/p029/archive/
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      A missed day is PERMANENT data loss, not a delayed job — Kalshi purges
+      settled combo markets after ~3 months and the NFL/NBA season is the regime
+      that matters (the whole research tape is summer MLB/WNBA/World Cup).
+      Worth running even if P-029 is killed at Gate 0. Archived files must be
+      pulled down and committed under combo_research/archive/ — see the
+      check_research_committed.sh convention in CLAUDE.md.
+
   - id: evmap_weather_sheet
     host: droplet
     schedule: "*-*-* 06:53 America/Chicago (evmap-weather-sheet.timer)"
@@ -990,6 +1036,98 @@ workstreams:
         Aggregate risk is enforced against P-022's OWN book only — it is a
         separate process from the 5-minute engine, so the 15% cap does not span
         both. See rule §11d.
+
+  - id: P-029
+    name: Kalshi Combo (Multi-Leg) Maker
+    stage: research
+    # `none`, NOT `validating`: tier asserts the pod is TRADING, and Phase 0
+    # holds no credentials and cannot place an order. Not `build` either — the
+    # spec forbids implementing the pod before Gate 1 returns. Setting
+    # `validating` here trips check_registry_reconciliation (b) as an error,
+    # correctly: it would claim a pod is trading that does not exist yet.
+    tier: none
+    owner_dir: combo_research
+    # `measurement`, not `time`: the accrual rate of resolved in-zone combos is
+    # NOT yet measured, so no date can be stated for when Gate 0 can be called.
+    # Claiming `time` here would report a gate that cannot resolve as one that
+    # is patiently waiting — the exact distinction this field exists to draw.
+    blocked_on: measurement
+    recheck_after: 2026-08-05
+    # No `service:` — Phase 0 runs on its own VPS, so the reconciliation check
+    # must not expect a local unit. See the p029_shadow/p029_archive jobs.
+    summary: >
+      Sells Kalshi combos (multi-leg parlays) as a MAKER, where the maker fee is
+      zero (`quadratic`). Measured on 68 event days and 556.5M contracts in the
+      target zone (2-4 legs, 10-35c): +7.20c/ct last-price basis, +3.17c/ct on
+      the conservative first-print basis, ~4.0% return on posted collateral per
+      turn, no measurable decay across 11 weeks.
+      CURRENT STATE: Phase 0 only — a public-data shadow logger and a settled-
+      combo archiver on a dedicated VPS (143.198.162.120), provisioned
+      2026-07-28. NO credentials, NO capital, nothing in this phase can place an
+      order. Phases are strictly serial; Phase 1 needs a read-only key, Phase 3
+      is the real gate at <=$500.
+      WHY THE TWO 0-for-5 PRIORS DO NOT AUTOMATICALLY APPLY: the maker/fade 0-for-5
+      all fought a fee and died on fills, and the fee half does not carry over
+      here (it is zero). The FILL half does, which is precisely what the gate
+      measures. The multi-leg 0-for-5 were arbitrage attempts taxed per leg;
+      P-029 never trades the legs.
+    gate:
+      question: >
+        Is there room between correlation-aware fair value and where combos
+        actually trade — enough to pay for the build?
+      metric: resolved_in_zone_combos
+      source: p029_shadow
+      threshold: 500
+      decision: >
+        Pre-registered in combo_research/TEST_PLAN_P-029.md §Gate 0, decided
+        after 5-7 days of collection. CONTINUE if the in-zone median margin
+        against a CORRELATION-ADJUSTED price is >= +2.0c at n >= 500. STOP if
+        the median is < +1.0c. Extend one week if it lands between — do not
+        proceed on a marginal read.
+        The n=39 first signal (+1.06c in-zone median) is INDICATIVE ONLY and
+        must not be updated on: it spans minutes, is selected toward combos that
+        trade instantly, and part of that margin is genuine leg correlation
+        rather than profit. Trade-rate-among-resolved is biased upward until the
+        run is older than 48h.
+    watch:
+      - >
+        MUST BE PRICED WITH A COPULA, NEVER THE INDEPENDENCE PRODUCT.
+        Independence understates a correlated 3-leg joint by ~30-35% relative,
+        which is LARGER THAN THE ENTIRE EDGE. A positive margin against an
+        independence price is expected even against a perfectly fair quoter, so
+        an independence-based Gate 0 read would manufacture a pass.
+      - >
+        Collateral is the full (1 - price) per contract, unhedged and
+        unnettable: combo and leg events sit in different netting groups, so
+        hedging the legs ADDS capital. Undocumented — Gate 5 must measure it
+        before anything is sized. Size per TURN, not per contract: realised sd
+        at 5,000 contracts is 2.8x independence.
+      - >
+        HARD EXCLUSION above 60c — measured -2.46c/ct in July, the seller LOSES
+        there. Also exclude below 5c (decaying tail; taker rounding fee is 17.5%
+        of premium). Neither is a tuning parameter.
+      - >
+        Ships with KalshiComboSettler from day one. P-017 shipped without a
+        settler and on_settlement was dead code for months. result="scalar" is a
+        PARTIAL PAYOUT at settlement_value_dollars, never VOID — 56,128 settled
+        combos resolve scalar, and booking them at $0 repeats the golf-settler
+        error exactly.
+      - >
+        OPEN ACTION (Sam): the RSA private key in .env was exposed in a Cowork
+        transcript 2026-07-28 and can place and cancel real trades. Rotate it,
+        and create a SEPARATE read-only key for Phases 0-1. Phase 0 needs no
+        credentials, so this does not block collection — it blocks Phase 1.
+      - >
+        The archiver is worth running EVEN IF P-029 is killed at Gate 0. Every
+        day it does not run is a day of season combo data that will not exist
+        later. Same-game correlation is unmeasured (n=39, both live collections
+        are cross-slate) and stays blocked until NBA/NFL season.
+      - >
+        Phase 0 was provisioned but NEVER VERIFIED from this checkout — no key
+        on the Mac could authenticate to 143.198.162.120 as of 2026-07-29
+        (Permission denied (publickey)). Until that is fixed the daily health
+        check reports ACCESS BLOCKED and the registry knows nothing about the
+        actual state of the logger.
 
   - id: P-013
     name: Kalshi-Deribit Crypto Options

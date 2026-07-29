@@ -38,6 +38,11 @@ mkdir -p "$DATA/archive" "$DIR"
 chown -R "$USER_NAME:$USER_NAME" "$DATA"
 
 say "code"
+# The clone is owned by $USER_NAME but this script runs as root, so git refuses
+# with "detected dubious ownership" and `set -e` aborts the whole provision.
+# This did not fire on the first run (nothing to fetch — it took the clone
+# path), so it would have surfaced only on the first re-deploy.
+git config --global --add safe.directory "$DIR" 2>/dev/null || true
 if [ -d "$DIR/.git" ]; then
   git -C "$DIR" fetch --quiet origin && git -C "$DIR" reset --hard --quiet origin/HEAD
 else
@@ -94,8 +99,20 @@ Wants=network-online.target
 Type=oneshot
 User=$USER_NAME
 WorkingDirectory=$DIR/combo_research
-ExecStart=$DIR/venv/bin/python3 $DIR/combo_research/archive_settled_combos.py --out $DATA/archive --days-back 7
+ExecStart=$DIR/venv/bin/python3 $DIR/combo_research/archive_settled_combos.py --out $DATA/archive --days-back 2
 MemoryMax=1G
+# A wedged run must become a FAILED unit, not an eternal "activating" one.
+# On 2026-07-29 this service sat activating for four hours pinned against
+# MemoryMax, which blocked its own timer: systemd will not start a run while the
+# previous one is still going, so the archive silently stopped updating with
+# nothing marked failed.
+#
+# Sized off the one measured GOOD run: 3h01m (03:17:19 -> 06:18:37). Note that
+# --days-back does NOT shorten this — the sweep pages every settled market per
+# series and filters by day client-side, so API work is the same at 2 days as at
+# 7; the window only bounds what is written and deduped. 6h is ~2x the known
+# good run and still leaves 3.5h of clearance before the next 09:30 trigger.
+TimeoutStartSec=6h
 Nice=10
 StandardOutput=append:$DATA/archive.log
 StandardError=append:$DATA/archive.log

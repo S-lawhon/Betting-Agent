@@ -416,7 +416,59 @@ def test_guard_allows_trading_below_the_limits():
     g = LossGuard(StubClient([_settlement(-10.0), _settlement(5.0)]),
                   max_total_loss=500.0, max_daily_loss=100.0)
     g.check()                                      # must not raise
-    assert g.snapshot().total_realised == pytest.approx(10.0)
+    s = g.snapshot()
+    assert s.total_realised == pytest.approx(5.0)   # NET: -10 + 5
+    assert s.gross_loss == pytest.approx(10.0)      # losing legs alone
+    assert s.net_pnl == pytest.approx(-5.0)
+
+
+def test_guard_halts_on_net_loss_not_gross_loss():
+    """A winning book must not be halted by the size of its losing legs.
+
+    P-029 makes markets: it wins a few cents on most contracts and pays out on
+    a minority.  Gross losses therefore accrue continuously even while the book
+    is up.  Halting on gross would stop a profitable strategy and read as a
+    failed experiment — 100 wins at +$8 against 5 losses at -$120 is +$200 net,
+    but $600 gross.
+    """
+    rows = ([_settlement(8.0) for _ in range(100)]
+            + [_settlement(-120.0) for _ in range(5)])
+    g = LossGuard(StubClient(rows), max_total_loss=500.0, max_daily_loss=100.0)
+    g.check()                                       # must NOT raise
+    s = g.snapshot()
+    assert s.net_pnl == pytest.approx(200.0)
+    assert s.gross_loss == pytest.approx(600.0)     # would have tripped $500
+    assert s.total_realised == 0.0                  # no net loss to charge
+
+
+def test_guard_refreshes_on_its_very_first_check():
+    """Regression: the first check must not be skipped by the refresh throttle.
+
+    `_last_refresh` used to initialise to 0.0, so on any platform where
+    `time.monotonic()` starts near zero — a freshly booted box, a systemd unit
+    starting at boot — `monotonic() - 0.0 < refresh_s` held and the first
+    refresh was skipped entirely.  The guard then reported the default state:
+    not halted, $0.00 loss.  Every order placed in that window bypassed the
+    kill switch, which is precisely the restart-resets-the-budget failure this
+    class was written to prevent.
+    """
+    import time as _time
+    real_monotonic = _time.monotonic
+    try:
+        _time.monotonic = lambda: 0.05          # a just-booted clock
+        g = LossGuard(StubClient([_settlement(-501.0)]),
+                      max_total_loss=500.0, max_daily_loss=100.0)
+        with pytest.raises(LossHalt, match="permanent halt"):
+            g.check()                            # must still read the exchange
+    finally:
+        _time.monotonic = real_monotonic
+
+
+def test_guard_asks_for_settlements_strictly():
+    """The guard must request a read that raises rather than returning []."""
+    g = LossGuard(StubClient([]), max_total_loss=500.0, max_daily_loss=100.0)
+    g.check()
+    assert g.client.last_query.get("strict") is True
 
 
 def test_guard_halts_permanently_on_cumulative_loss():
@@ -497,6 +549,32 @@ def test_204_returns_empty_dict_not_none(auth, monkeypatch):
     monkeypatch.setattr(k._s, "request",
                         lambda *a, **kw: FakeResponse(204, None, ""))
     assert k.request("PUT", "/communications/quotes/q/confirm") == {}
+
+
+def test_strict_pagination_raises_instead_of_returning_an_empty_list(auth, monkeypatch):
+    """A 403 must not reach the loss guard disguised as a clean account.
+
+    `request` returns None on 401/403/4xx, and non-strict `paginate` turns that
+    into `[]` — indistinguishable from an account with no settlements.  The
+    guard would then compute $0.00 realised loss and decline to halt, with an
+    expired key silently disabling the kill switch.
+    """
+    from src.kalshi_private import KalshiReadError
+    k = KalshiPrivate(auth)
+    monkeypatch.setattr(k._s, "request",
+                        lambda *a, **kw: FakeResponse(403, None, "forbidden"))
+
+    assert k.get_settlements() == []                 # legacy, lenient behaviour
+    with pytest.raises(KalshiReadError):
+        k.get_settlements(strict=True)
+
+
+def test_strict_pagination_allows_a_genuinely_empty_account(auth, monkeypatch):
+    """Empty must stay distinguishable from broken."""
+    k = KalshiPrivate(auth)
+    monkeypatch.setattr(k._s, "request",
+                        lambda *a, **kw: FakeResponse(200, {"settlements": [], "cursor": ""}))
+    assert k.get_settlements(strict=True) == []
 
 
 def test_pagination_follows_the_cursor(auth, monkeypatch):

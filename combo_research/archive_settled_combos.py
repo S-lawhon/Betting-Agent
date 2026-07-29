@@ -34,6 +34,7 @@ import json
 import logging
 import os
 import shutil
+import sqlite3
 import sys
 import time
 from collections import Counter
@@ -182,14 +183,80 @@ def read_rows(path: Path) -> Iterator[dict]:
                     path.name, type(exc).__name__)
 
 
-def load_seen(out: Path, day: str) -> set:
-    seen = set()
-    for p in parts_for(out, day):
-        for r in read_rows(p):
-            t = r.get("ticker")
-            if t:
-                seen.add(t)
-    return seen
+class SeenIndex:
+    """On-disk dedup index over every ticker already archived.
+
+    This replaces an in-RAM ``set`` per day, which did not survive contact with
+    a real archive.  The first run wrote 6,677,105 rows; every run after it had
+    to rebuild a 6.7M-entry Python set inside ``MemoryMax=1G`` before it could
+    write anything, and could not.  On 2026-07-29 the service sat pinned 11 KB
+    under its cgroup cap for four hours, read 249 GB against a 462 MB archive,
+    wrote zero bytes, and blocked its own timer by never leaving ``activating``.
+    The archiver worked exactly once, by construction.
+
+    SQLite holds the index instead, so memory stays flat regardless of how large
+    the archive grows — which matters most in NFL and NBA season, when daily
+    volume goes up rather than down.
+
+    The index is derived state and can be rebuilt from the parts at any time.
+    Parts are recorded as indexed only *after* their rows are committed, so a
+    crash mid-flush re-indexes that part on the next run rather than losing it.
+    """
+
+    def __init__(self, out: Path):
+        self.path = out / "seen.sqlite"
+        self.db = sqlite3.connect(self.path)
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA synchronous=NORMAL")
+        self.db.execute("CREATE TABLE IF NOT EXISTS seen (ticker TEXT PRIMARY KEY)")
+        self.db.execute("CREATE TABLE IF NOT EXISTS parts (name TEXT PRIMARY KEY)")
+        self.db.commit()
+
+    def backfill(self, out: Path) -> int:
+        """Index any part not yet recorded.  Streams; holds no set in memory."""
+        done = {r[0] for r in self.db.execute("SELECT name FROM parts")}
+        todo = [p for p in sorted(out.glob("combos_*.jsonl.gz"))
+                if p.name not in done]
+        if not todo:
+            return 0
+        log.info("indexing %d archive part(s) not yet in the dedup index", len(todo))
+        n = 0
+        for i, p in enumerate(todo, 1):
+            self.db.executemany(
+                "INSERT OR IGNORE INTO seen (ticker) VALUES (?)",
+                ((r["ticker"],) for r in read_rows(p) if r.get("ticker")))
+            self.db.execute("INSERT OR IGNORE INTO parts (name) VALUES (?)", (p.name,))
+            self.db.commit()
+            n += 1
+            if i % 100 == 0:
+                log.info("  indexed %d/%d parts", i, len(todo))
+        return n
+
+    def unseen(self, rows: List[dict]) -> List[dict]:
+        """Rows whose ticker is not already archived, order preserved."""
+        tickers = [r.get("ticker") for r in rows]
+        known: set = set()
+        # Chunked to stay well under SQLite's variable limit (999 by default).
+        for i in range(0, len(tickers), 500):
+            chunk = [t for t in tickers[i:i + 500] if t]
+            if not chunk:
+                continue
+            q = "SELECT ticker FROM seen WHERE ticker IN (%s)" % ",".join("?" * len(chunk))
+            known.update(r[0] for r in self.db.execute(q, chunk))
+        return [r for r in rows if r.get("ticker") and r["ticker"] not in known]
+
+    def record(self, rows: List[dict], part_name: Optional[str] = None) -> None:
+        self.db.executemany("INSERT OR IGNORE INTO seen (ticker) VALUES (?)",
+                            ((r["ticker"],) for r in rows if r.get("ticker")))
+        if part_name:
+            self.db.execute("INSERT OR IGNORE INTO parts (name) VALUES (?)", (part_name,))
+        self.db.commit()
+
+    def count(self) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM seen").fetchone()[0]
+
+    def close(self) -> None:
+        self.db.close()
 
 
 def write_part(out: Path, day: str, rows: List[dict]) -> Path:
@@ -219,14 +286,18 @@ def run(out: Path, days_back: int) -> int:
     pub = Public()
     per_series = Counter()
     written = skipped = 0
+    aborted = False
 
     # Stream to disk. Buffering the whole sweep would hold millions of rows in
     # RAM -- 18.4M settled combos exist -- and this project has already lost
     # five weeks to a memory/disk exhaustion crash loop. Flush on a bounded
-    # buffer instead, and keep the per-day `seen` sets so restarts stay
-    # idempotent.
+    # buffer instead, and keep dedup ON DISK so memory does not grow with the
+    # archive (see SeenIndex).
+    index = SeenIndex(out)
+    index.backfill(out)
+    log.info("dedup index holds %d tickers", index.count())
+
     buckets: Dict[str, List[dict]] = {}
-    seen_cache: Dict[str, set] = {}
     buffered = 0
     FLUSH_EVERY = 50_000
 
@@ -239,16 +310,14 @@ def run(out: Path, days_back: int) -> int:
                 f"free space {free_gb(out):.1f} GB below the {MIN_FREE_GB} GB "
                 "floor; stopping before the disk fills")
         for day, rows in sorted(buckets.items()):
-            if day not in seen_cache:
-                seen_cache[day] = load_seen(out, day)
-            seen = seen_cache[day]
-            fresh = [r for r in rows if r.get("ticker") not in seen]
+            fresh = index.unseen(rows)
             skipped += len(rows) - len(fresh)
             if not fresh:
                 continue
-            write_part(out, day, fresh)
-            for r in fresh:
-                seen.add(r.get("ticker"))
+            # Write the part FIRST, then record it. A crash in between re-indexes
+            # the part next run; the reverse would drop rows permanently.
+            part = write_part(out, day, fresh)
+            index.record(fresh, part.name)
             written += len(fresh)
         buckets.clear()
         buffered = 0
@@ -273,8 +342,10 @@ def run(out: Path, days_back: int) -> int:
         flush()
     except RuntimeError as exc:
         log.error("%s", exc)
+        aborted = True
     except KeyboardInterrupt:
         log.warning("interrupted; flushing what is buffered")
+        aborted = True
         try:
             flush()
         except RuntimeError:
@@ -291,12 +362,24 @@ def run(out: Path, days_back: int) -> int:
         "written": written, "already_present": skipped,
         "api_calls": pub.calls, "api_errors": pub.errors,
         "per_series": dict(per_series), "free_gb": round(free_gb(out), 2),
+        "indexed_tickers": index.count(), "aborted": aborted,
     }
     manifest.write_text(json.dumps(hist, indent=1))
 
     log.info("done: %d new rows, %d already archived, %d api calls, %d errors, "
              "%.1f GB free", written, skipped, pub.calls, pub.errors, free_gb(out))
-    return 0 if pub.errors == 0 else 0        # API hiccups are not a job failure
+    index.close()
+
+    # An aborted run MUST exit non-zero. This previously read
+    # `return 0 if pub.errors == 0 else 0` -- both branches identical -- so no
+    # failure could ever reach systemd, and nothing on this box is watched by
+    # the fund manager.
+    if aborted:
+        log.error("run did not complete; exiting non-zero for systemd")
+        return 1
+    if pub.errors:
+        log.warning("%d API errors during an otherwise complete run", pub.errors)
+    return 0
 
 
 def report(out: Path) -> int:
@@ -327,7 +410,7 @@ def report(out: Path) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="/var/lib/p029/archive")
-    ap.add_argument("--days-back", type=int, default=7,
+    ap.add_argument("--days-back", type=int, default=2,
                     help="how far back to sweep each run (default 7)")
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()

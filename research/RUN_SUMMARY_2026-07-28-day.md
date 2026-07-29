@@ -42,7 +42,7 @@
 | **4** | P-018 rule + gate #1 | **KILL** | placebo **+19.19 ¢** vs fade **+9.09 ¢** — surprise adds nothing |
 | **5** | P-017 decision rule | **WRITTEN** | **P(a tournament ≤ −9.89 ¢) = 0.0082, ≈1 in 122**; T = 8 kept |
 | **6** | P-016 reader or retire | **RETIRED properly** | gate had already **resolved**; standard 15 → **12** failing checks |
-| **7** | Ops backlog | **2 of 4 DONE, 1 needs Sam, 1 STILL BLOCKED** | archiver **1.66 GB → 599 MB**, 3× better — **still OOMs** |
+| **7** | Ops backlog | **3 of 4 DONE, 1 needs Sam** | archiver **FIXED** — root cause was pyarrow `pre_buffer`; archive exists, timer enabled |
 | **8** | P-001 placement rate | **EXPLAINED** | candidates **rose** 60→169→301; CLV gate rejects **89.7%** |
 
 **Suite: 1,751 passed, 2 skipped** (from 1,723 at session start; **+28**).
@@ -199,7 +199,63 @@ The five `kalshi-ev-map` lines are **still active**.
 > Backups: `~/mac_crontab.live.2026-07-28.bak` (verbatim current) and
 > `~/mac_crontab.bak.2026-07-29`.
 
-**3. EV-Map archiver — STILL BLOCKED, and the capacity finding is the bigger one.**
+**3. EV-Map archiver — RESOLVED. Timer enabled. Archive exists for the first time.**
+
+> **The root cause was none of my first three diagnoses.**
+> `pq.ParquetFile(path).iter_batches()` leaks by default: `pre_buffer=True`
+> caches every column chunk the reader touches and never releases it, so
+> `pool.bytes_allocated()` climbs monotonically **with the size of the file
+> being read**. Not allocator retention — `release_unused()` does nothing,
+> because the bytes are still allocated. Measured on the 3.68 M-row archive:
+> default `iter_batches` **509 MB** / `use_threads=False` **507 MB** /
+> `ds.dataset().to_batches()` **826 MB** / **`pre_buffer=False` 177 MB, flat**.
+> **This is why it died on a 2.03-day window — the size of the pull never
+> mattered, only the size of the archive being read back.**
+
+I reached that only after three wrong answers I acted on before measuring:
+the `parts` accumulation (real, insufficient), the ticker set (which was
+computing a **no-op over zero duplicates** — 3,680,825 rows, 3,680,825
+distinct tickers), and the pandas column read (real for the wrapper, not the
+cause here). The measurement that settled it took ten minutes and belonged
+first.
+
+**Enabling the timer exposed two more, both now fixed:**
+
+* **`scripts/evmap_job.py` counted rows with `len(pd.read_parquet(path))`** —
+  reading the whole 340 MB archive into pandas twice per run. It was
+  OOM-killed in **1.4 seconds**, before the archiver it wraps did anything.
+  Harmless while the archive did not exist; fatal the moment I created it.
+  **The mechanism built to detect silent failure had become the failure.**
+  Now reads the parquet footer: 3.68 M rows in **0.22 s at 66 MB**.
+* **A killed wrapper wrote no ledger row at all** — the run was invisible.
+  Each run now writes a fsync'd write-ahead `phase: "START"` row before any
+  work and its outcome row after, sharing one `ts`. Verified with a real
+  SIGKILL on the droplet. The regression it could have introduced —
+  `_prev_failures` counts rows, so START + END would double-count one failure
+  and halve the alarm threshold — was caught by a test, not in production.
+
+**Production result, through the real unit, `exit 0`:**
+
+```
+pass A: 3,686,015 scanned, 3,069,168 husks skipped (83.3%), 616,847 kept
+pass B: 616,847 rows, all tickers distinct; 3,111,325 carried forward
+archive: 3,680,825 -> 3,728,172 -> 3,740,344 rows, 346 MB
+```
+
+**Merge verified LOSSLESS by hashing every ticker against a pre-merge backup:
+0 old rows lost, 0 duplicates.** `job_status.jsonl` carries `archive_settled
+ok=true`. Timer enabled with `MemoryMax=700M`, `MemorySwapMax=0`,
+`TimeoutStartSec=2700`; next fire **Sun 2026-08-02 08:17 UTC**. Both pods
+untouched throughout.
+
+**Still open (scale, not correctness):** 3.74 M rows for a 10-day window
+implies **~33 M rows / ~3 GB** over the stated 90-day horizon. The reader is
+bounded now, but that ratio is untested at ten times the size — and **83% of
+what is fetched is discarded**, with much of the remainder per-minute crypto
+and hourly weather. Whether the archive needs to be exchange-wide is a
+product decision, not an engineering one.
+
+**Superseded below — the original write-up, left visible:**
 
 The 07-29 chunking was a real change that **could not have worked**: `parts`
 accumulated every chunk, so peak was still the whole filtered frame plus a copy
@@ -338,7 +394,7 @@ POI26's exclusion.
 | **2** | Accept or re-derive `P014_DECISION_RULE.md` given the disclosed contamination | **STILL OPEN** — untouched today |
 | **3** | POI26's close reference has no verified margin | **ADDRESSED** — exclusion from T pre-registered before the window; confirm or override |
 | **5** | Disable the Mac crontab | **STILL OPEN — needs you at a terminal**, attempted and hung |
-| **6** | How to unblock the EV-Map archiver | **STILL OPEN** — 1.66 GB → 599 MB is 3× better and still OOMs at the cap. Next fix identified (drop the in-memory ticker set); timer stays disabled |
+| **6** | How to unblock the EV-Map archiver | **CLOSED** — root cause was pyarrow `pre_buffer=True`; archive built (3.74 M rows), merge verified lossless, **timer ENABLED** |
 | **7** | P-017 has no decision rule | **CLOSED** — written; acceptance is item 3 above |
 | **10** | `t_start_utc` for P-022, and it is not implemented as a filter anywhere | **STILL OPEN** |
 | **11** | Weather-suspended tournaments in T | **STILL OPEN** — EXCLUDE costs the backtest's five best tournaments |

@@ -127,10 +127,25 @@ def build_venue_clients(
 
 
 # Settlers that resolve a single pod expose it as ``_pod_id``.  The
-# generic Kalshi Settler predates that convention and filters on
-# pod_ids=("P-001", ""), so it is mapped explicitly.
+# generic Kalshi Settler predates that convention and filters on an
+# explicit pod tuple, so it is mapped here.
+#
+# P-014 is in this tuple because it has no settler of its own and never has
+# had one — it was resolved incidentally by this settler back when
+# ``_open_placed_entries`` walked every pod's rows.  Scoping that walk
+# (3b0daae, 2026-07-26) fixed the P-017 spurious-void bug and silently
+# orphaned P-014 in the same stroke: 15 positions, zero settlements in the
+# two days that followed.  Adding it back is safe in a way it is NOT for
+# P-017 — the settler's ``result or "void"`` rule is roughly correct for
+# KXMLBGAME, which resolves promptly, whereas Kalshi leaves golf top-N
+# markets ``active`` with an empty result for ~a day post-tournament.
+#
+# P-014 carries ``game_time``, so its stale threshold is the 8h
+# STALE_HOURS_AFTER_GAME one.  Any backlog MUST be booked before this pod
+# is added, or the first cycle auto-voids it at $0.00 — see
+# ``scripts/backfill_p014_settlements.py``.
 _SETTLER_DEP_PODS: Dict[str, tuple] = {
-    "settler": ("P-001", ""),
+    "settler": ("P-001", "P-014", ""),
 }
 
 

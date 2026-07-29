@@ -37,6 +37,28 @@ that preserves the edge. That is Gate 0, and it costs nothing to answer.
 - **Settled-combo archiver** — `p029-archive.timer`, daily 09:33 UTC. Captures settled combos before
   Kalshi purges them.
 
+**Update 2026-07-29 (ρ fit session — `REPORT_P029_Rho_Fit_2026-07.md` for detail):**
+
+- **The leg correlation is now MEASURED, not a prior**, off the 8-day archive (103,019
+  settled combos, all legs settled): `cross +0.107 [+0.040,+0.144]`,
+  `same_day +0.116 [+0.099,+0.384]`, `same_game +0.208 [+0.084,+0.221]` — **all above
+  their priors**. `same_player` is unidentified (431 pairs on 2 event days) and keeps the
+  0.35 prior; `load_rho` now refuses `identified: false` blocks (was a live bug).
+  `combo_research/fitted_rho.json`, committed.
+- **The Gate 0 in-zone median vs the copula moved +2.87¢ → +1.85¢** under fitted ρ
+  (n=26 traded in-zone rows) — **below the +2.0¢ CONTINUE line, in the extend band**,
+  and above the +1.0¢ STOP. Not decidable at this n (gate needs 500), but the margin
+  SHRANK when the prior became a measurement. Whole-universe median vs fitted copula is
+  *negative* (−0.93¢).
+- The shadow DB is migrated (`copula_price`, `leg_relation` columns) and pre-copula rows
+  are backfilled from stored marks (`backfill_copula.py`; it waits out the logger's
+  minutes-long write locks — never restart the logger for a backfill). The gate read on
+  2026-08-04 should **recompute zone membership uniformly offline** rather than trust the
+  stored `in_zone` across the indep→copula code boundary.
+- Archiver verified healthy on the fixed code (623.8M peak vs 1G cap, 0 swap, 0 errors,
+  day-over-day growth) — but the first TIMER run of the fixed code fires 2026-07-30
+  09:34:45 UTC and should be checked after (`REPORT_P029_Archiver_Health_2026-07-29.md`).
+
 **Built and tested, not yet used against a live account:**
 
 - `src/kalshi_private.py` — the authenticated Kalshi client (71 tests).

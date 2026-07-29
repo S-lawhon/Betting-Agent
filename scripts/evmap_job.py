@@ -167,18 +167,48 @@ def _output_path(spec: Dict[str, Any],
     return None
 
 
+def _append(rec: Dict[str, Any]) -> None:
+    """Append one ledger row and FLUSH IT TO DISK.
+
+    `os.fsync` is not ceremony here: the whole point of the write-ahead row is
+    to survive a SIGKILL, and a row sitting in the page cache when the process
+    dies is a row that survives — but one sitting in Python's buffer is not.
+    """
+    DATA.mkdir(parents=True, exist_ok=True)
+    with open(STATUS, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec, default=str) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
 def _prev_failures(job: str) -> int:
-    """Consecutive failures immediately before this run."""
-    n = 0
+    """Consecutive failures immediately before this run.
+
+    ONE RUN = ONE ``ts``. Since 2026-07-28 each run writes a write-ahead
+    ``phase: "START"`` row and then its outcome row, both stamped with the
+    same ``t0``, so the two must be collapsed or a completed failure would
+    count twice. The outcome row always supersedes its own START.
+    """
     try:
         with open(STATUS, "r", encoding="utf-8") as fh:
             rows = [json.loads(ln) for ln in fh if ln.strip()]
     except (OSError, json.JSONDecodeError):
         return 0
-    for rec in reversed(rows):
+    order: List[Any] = []
+    latest: Dict[Any, Dict[str, Any]] = {}
+    for i, rec in enumerate(rows):
         if rec.get("job") != job:
             continue
-        if rec.get("ok"):
+        # A row with no ts cannot be paired with anything; give it its own key.
+        key = rec.get("ts") if rec.get("ts") is not None else f"_norun{i}"
+        if key not in latest:
+            order.append(key)
+            latest[key] = rec
+        elif rec.get("phase") != "START":
+            latest[key] = rec            # outcome supersedes its own START
+    n = 0
+    for key in reversed(order):
+        if latest[key].get("ok"):
             break
         n += 1
     return n
@@ -194,13 +224,55 @@ def run(job: str, dry_run: bool = False) -> int:
         args[args.index("--day=YESTERDAY")] = f"--day={y}"
 
     per_day = bool(spec.get("output_glob"))
-    # A per-day job starts from zero by construction: only the file this run
-    # writes counts (see `_rows`).
-    before = 0 if per_day else _rows(spec)
     t0 = _now()
     if dry_run:
         print(f"[evmap_job] would run: {sys.executable} {script} {' '.join(args)}")
         return 0
+
+    # ── WRITE-AHEAD ROW: a killed wrapper must not be invisible ────────────
+    #
+    # 2026-07-28: this wrapper was itself OOM-KILLED, inside `_rows()` below,
+    # 1.4 s after starting and before the archiver it wraps had done anything.
+    # SIGKILL runs no handler, so NOTHING was written and `job_status.jsonl`
+    # showed no `archive_settled` row at all — the run was INVISIBLE. The
+    # ledger built so that a failing collector could not look like an idle one
+    # had exactly that hole for the case where the collector is killed rather
+    # than exiting non-zero.
+    #
+    # So the outcome is now recorded in two rows sharing one `ts`: this one,
+    # written before any work, and the real one after. `ok: false` here is
+    # deliberate and fail-closed — until an outcome row supersedes it, the
+    # ledger's last word on this job is "started, never finished".
+    #
+    # `manager/collect.py` reads last-write-wins per job and needs no change:
+    # a killed run leaves this row last, reports `ok: false`, and carries an
+    # `empty_reason` that says what happened.
+    prev_fail = _prev_failures(job)
+    _append({
+        "ts": t0,
+        "iso": datetime.now(timezone.utc).isoformat(),
+        "job": job,
+        "phase": "START",
+        "ok": False,
+        "exit_code": None,
+        "duration_s": None,
+        "rows_before": None,
+        "rows_after": None,
+        "rows_added": None,
+        "expect_rows": spec["expect_rows"],
+        "empty_reason": ("run STARTED and never recorded an outcome — the "
+                         "wrapper was killed (OOM / unit timeout / host died) "
+                         "rather than exiting. This row is superseded the "
+                         "moment the run completes either way."),
+        "host": os.uname().nodename,
+        "stdout_tail": [],
+        "stderr_tail": [],
+        "consecutive_failures": prev_fail + 1,
+    })
+
+    # A per-day job starts from zero by construction: only the file this run
+    # writes counts (see `_rows`).
+    before = 0 if per_day else _rows(spec)
     proc = subprocess.run(
         [sys.executable, str(script), *args],
         cwd=str(EVMAP), capture_output=True, text=True,
@@ -224,6 +296,7 @@ def run(job: str, dry_run: bool = False) -> int:
         "ts": t0,
         "iso": datetime.now(timezone.utc).isoformat(),
         "job": job,
+        "phase": "END",
         "ok": ok,
         "exit_code": proc.returncode,
         "duration_s": round(dt, 2),
@@ -235,11 +308,11 @@ def run(job: str, dry_run: bool = False) -> int:
         "host": os.uname().nodename,
         "stdout_tail": (proc.stdout or "").strip().splitlines()[-3:],
         "stderr_tail": (proc.stderr or "").strip().splitlines()[-6:],
-        "consecutive_failures": (0 if ok else _prev_failures(job) + 1),
+        # `prev_fail` was captured before the START row was written, so
+        # this cannot count that START as a prior failure of its own run.
+        "consecutive_failures": (0 if ok else prev_fail + 1),
     }
-    DATA.mkdir(parents=True, exist_ok=True)
-    with open(STATUS, "a", encoding="utf-8") as fh:
-        fh.write(json.dumps(rec, default=str) + "\n")
+    _append(rec)
 
     print(f"[evmap_job] {job} ok={ok} exit={proc.returncode} "
           f"rows {before} -> {after} (+{delta}) in {dt:.1f}s")

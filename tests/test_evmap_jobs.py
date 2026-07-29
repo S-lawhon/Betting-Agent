@@ -157,7 +157,16 @@ def test_consecutive_failures_accumulate_then_reset(sandbox, tmp_path, monkeypat
                                        "every": "test"})
     ej.run("j")
     ej.run("j")
-    assert [r["consecutive_failures"] for r in _status(sandbox)] == [1, 2]
+    # Each run now writes TWO rows — a write-ahead START and its outcome —
+    # sharing one `ts` and one failure count. Asserting on every row would
+    # conflate "the counter incremented" with "how many rows a run writes".
+    rows = _status(sandbox)
+    assert [r["consecutive_failures"] for r in rows] == [1, 1, 2, 2]
+    assert [r.get("phase") for r in rows] == ["START", "END", "START", "END"]
+    # The count that matters is per RUN, and it must not double-count a run
+    # just because it is now recorded twice.
+    outcomes = [r for r in rows if r.get("phase") != "START"]
+    assert [r["consecutive_failures"] for r in outcomes] == [1, 2]
     ej.JOBS["j"]["script"] = "fine.py"
     ej.run("j")
     assert _status(sandbox)[-1]["consecutive_failures"] == 0
@@ -221,3 +230,148 @@ def test_wired_into_run_checks():
                       "jobs": {"paper_maker": _healthy(ok=False,
                                                        consecutive_failures=3)}}}
     assert any(f.key.startswith("evmap.") for f in checks.run_checks(snap))
+
+
+# ── the write-ahead row: a KILLED wrapper must not be invisible ──────────
+#
+# 2026-07-28: this wrapper was OOM-killed inside `_rows()`, 1.4s in, before the
+# archiver it wraps had done anything. SIGKILL runs no handler, so nothing was
+# written and `job_status.jsonl` had no `archive_settled` row at all. The
+# ledger built so a failing collector could not look like an idle one had
+# exactly that hole for a collector that is KILLED rather than exiting.
+
+
+def _outcome_rows(data):
+    return [r for r in _status(data) if r.get("phase") != "START"]
+
+
+def test_start_row_is_written_before_any_work(sandbox, tmp_path, monkeypatch):
+    """The START row must land BEFORE `_rows()`, because `_rows()` is where the
+    wrapper actually died."""
+    data = sandbox
+    _script(tmp_path, "j.py", "print('hi')\n")
+    monkeypatch.setitem(ej.JOBS, "j", {"script": "j.py", "args": [],
+                                       "output": "o.parquet", "expect_rows": 0})
+
+    seen = {}
+
+    def boom(*a, **k):
+        seen["rows_called_with_status"] = (data / "job_status.jsonl").exists()
+        raise MemoryError("simulated OOM inside _rows")
+
+    monkeypatch.setattr(ej, "_rows", boom)
+    with pytest.raises(MemoryError):
+        ej.run("j")
+
+    assert seen["rows_called_with_status"] is True, \
+        "the START row must exist before _rows() runs"
+    rows = _status(data)
+    assert len(rows) == 1 and rows[0]["phase"] == "START"
+    assert rows[0]["ok"] is False
+    assert "never recorded an outcome" in rows[0]["empty_reason"]
+
+
+def test_a_killed_run_leaves_a_not_ok_row_as_the_last_word(sandbox, tmp_path,
+                                                           monkeypatch):
+    """What manager/collect.py reads (last-write-wins per job) must say NOT OK."""
+    data = sandbox
+    _script(tmp_path, "j.py", "print('hi')\n")
+    monkeypatch.setitem(ej.JOBS, "j", {"script": "j.py", "args": [],
+                                       "output": "o.parquet", "expect_rows": 0})
+    monkeypatch.setattr(ej, "_rows", lambda *a, **k: (_ for _ in ()).throw(
+        MemoryError("killed")))
+    with pytest.raises(MemoryError):
+        ej.run("j")
+    last = _status(data)[-1]
+    assert last["job"] == "j"
+    assert bool(last.get("ok")) is False
+    assert last.get("rows_added") is None      # never coerced to 0
+
+
+def test_a_completed_run_supersedes_its_own_start_row(sandbox, tmp_path,
+                                                      monkeypatch):
+    data = sandbox
+    _script(tmp_path, "j.py", "print('done')\n")
+    monkeypatch.setitem(ej.JOBS, "j", {"script": "j.py", "args": [],
+                                       "output": "o.csv", "expect_rows": 0})
+    assert ej.run("j") == 0
+    rows = _status(data)
+    assert [r.get("phase") for r in rows] == ["START", "END"]
+    assert rows[0]["ts"] == rows[1]["ts"], "both rows are ONE run"
+    assert rows[-1]["ok"] is True
+    assert len(_outcome_rows(data)) == 1
+
+
+def test_a_completed_failure_is_counted_ONCE_not_twice(sandbox, tmp_path,
+                                                       monkeypatch):
+    """THE regression the START row could have introduced: `_prev_failures`
+    counts rows, so a START plus its END would double-count one failure and
+    the consecutive-failure alarm would fire at half the intended threshold."""
+    data = sandbox
+    _script(tmp_path, "j.py", "import sys; sys.exit(2)\n")
+    monkeypatch.setitem(ej.JOBS, "j", {"script": "j.py", "args": [],
+                                       "output": "o.csv", "expect_rows": 0})
+    ej.run("j")
+    assert _status(data)[-1]["consecutive_failures"] == 1
+    ej.run("j")
+    assert _status(data)[-1]["consecutive_failures"] == 2
+    ej.run("j")
+    assert _status(data)[-1]["consecutive_failures"] == 3
+
+
+def test_a_killed_run_still_increments_the_failure_count(sandbox, tmp_path,
+                                                         monkeypatch):
+    """A kill is a failure and the NEXT run must see it as one."""
+    data = sandbox
+    _script(tmp_path, "j.py", "import sys; sys.exit(2)\n")
+    monkeypatch.setitem(ej.JOBS, "j", {"script": "j.py", "args": [],
+                                       "output": "o.csv", "expect_rows": 0})
+    # Simulate the kill for the FIRST run only. `monkeypatch.undo()` would also
+    # revert the sandbox fixture's DATA/STATUS patches and point run 2 at the
+    # real data directory, so the switch is a flag rather than an undo.
+    killed = {"on": True}
+    real_rows = ej._rows
+
+    def maybe_die(*a, **k):
+        if killed["on"]:
+            raise MemoryError("simulated OOM")
+        return real_rows(*a, **k)
+
+    monkeypatch.setattr(ej, "_rows", maybe_die)
+    with pytest.raises(MemoryError):
+        ej.run("j")
+    assert _status(data)[-1]["consecutive_failures"] == 1
+
+    killed["on"] = False
+    ej.run("j")
+    assert _status(data)[-1]["consecutive_failures"] == 2, \
+        "the killed run must count toward the streak"
+
+
+def test_a_success_resets_the_streak_across_start_rows(sandbox, tmp_path,
+                                                       monkeypatch):
+    data = sandbox
+    _script(tmp_path, "j.py", "import sys; sys.exit(2)\n")
+    monkeypatch.setitem(ej.JOBS, "j", {"script": "j.py", "args": [],
+                                       "output": "o.csv", "expect_rows": 0})
+    ej.run("j")
+    ej.run("j")
+    assert _status(data)[-1]["consecutive_failures"] == 2
+    _script(tmp_path, "j.py", "print('fine')\n")
+    assert ej.run("j") == 0
+    assert _status(data)[-1]["consecutive_failures"] == 0
+    _script(tmp_path, "j.py", "import sys; sys.exit(2)\n")
+    ej.run("j")
+    assert _status(data)[-1]["consecutive_failures"] == 1
+
+
+def test_the_ledger_row_is_fsynced(sandbox, tmp_path, monkeypatch):
+    """A row buffered in Python when SIGKILL lands is a row that never existed."""
+    calls = []
+    real = ej.os.fsync
+    monkeypatch.setattr(ej.os, "fsync", lambda fd: (calls.append(fd), real(fd))[1])
+    _script(tmp_path, "j.py", "print('x')\n")
+    monkeypatch.setitem(ej.JOBS, "j", {"script": "j.py", "args": [],
+                                       "output": "o.csv", "expect_rows": 0})
+    ej.run("j")
+    assert len(calls) >= 2, "both the START and the outcome row must be fsynced"

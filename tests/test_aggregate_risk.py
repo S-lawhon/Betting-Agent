@@ -598,8 +598,10 @@ class TestSettledPodIds(unittest.TestCase):
             "polymarket_settler": None,       # not built
             "nowcast_client": object(),       # not a settler
         }
+        # P-014 rides on the generic settler's explicit tuple — it has no
+        # settler object of its own, so it can only appear via _SETTLER_DEP_PODS.
         self.assertEqual(
-            _settled_pod_ids(deps), {"P-001", "", "P-017", "P-015"},
+            _settled_pod_ids(deps), {"P-001", "P-014", "", "P-017", "P-015"},
         )
 
     def test_empty_when_no_settlers(self):

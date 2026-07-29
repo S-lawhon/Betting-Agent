@@ -307,3 +307,46 @@ class TestSettleCyclePodFilter(unittest.TestCase):
             log_path=log_path, odds_api_key="k", _now_fn=lambda: FIXED_NOW,
         )
         self.assertEqual(len(settler._open_placed_entries()), 5)
+
+
+class TestP014StaysInScope(unittest.TestCase):
+    """P-014 has no settler of its own — the generic one is all it has.
+
+    Scoping `_open_placed_entries` to ("P-001", "") on 2026-07-26 fixed the
+    P-017 spurious-void bug and orphaned P-014 in the same commit: 15
+    positions accrued over the following two days with no terminal row, and
+    the only visible symptom was OPEN rows piling up on the dashboard.
+
+    P-014 is safe to include where P-017 is not — KXMLBGAME resolves promptly,
+    so the settler's `result or "void"` rule is roughly right for it, whereas
+    Kalshi leaves golf top-N `active` with an empty result for ~a day.
+    """
+
+    def test_engine_maps_p014_onto_the_generic_settler(self):
+        from src.engine import _SETTLER_DEP_PODS
+        self.assertIn("P-014", _SETTLER_DEP_PODS["settler"])
+        # ...and P-017/P-015 remain OUT — they have purpose-built settlers
+        # whose whole reason for existing is that this one's rule is wrong.
+        self.assertNotIn("P-017", _SETTLER_DEP_PODS["settler"])
+        self.assertNotIn("P-015", _SETTLER_DEP_PODS["settler"])
+
+    def test_p014_rows_are_reachable_under_the_engine_tuple(self):
+        from src.engine import _SETTLER_DEP_PODS
+
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", mode="w", delete=False) as f:
+            log_path = Path(f.name)
+        _write_log(log_path, [
+            _placed_entry("KXMLBGAME-26JUL28-PHI", pod_id="P-001"),
+            _placed_entry("KXMLBGAME-26JUL281840PHIMIA-PHI", pod_id="P-014",
+                          sport="baseball_mlb"),
+            _placed_entry("KXPGATOP10-ROC26-ZBLA", pod_id="P-017"),
+        ])
+        settler = Settler(
+            kalshi=MagicMock(), ledger=Ledger(initial_bankroll=1000.0,
+                                              _now_fn=lambda: FIXED_NOW),
+            log_path=log_path, odds_api_key="k", _now_fn=lambda: FIXED_NOW,
+            pod_ids=_SETTLER_DEP_PODS["settler"],
+        )
+        pods = {r.get("pod_id", "") for r in settler._open_placed_entries().values()}
+        self.assertIn("P-014", pods)
+        self.assertNotIn("P-017", pods)

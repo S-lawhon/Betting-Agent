@@ -1,0 +1,74 @@
+[Unit]
+Description=Betting Pod Shop — Cross-Venue Basis Collector (Kalshi vs ProphetX)
+After=network-online.target
+Wants=network-online.target
+
+# P-030 pre-registered falsification, research/SPEC_P030_CrossVenue_Kalshi_ProphetX.md.
+# NOT INSTALLED YET — blocked on ProphetX API credentials. Before enabling:
+#   1. GATE 0: get the s165(d) / s1092 characterization answer from a CPA.
+#      Gambling treatment moves the breakeven gap from 2.25c to ~3.85c and
+#      probably kills P-030 outright. Do not spend 14 days collecting first.
+#   2. Request API access (prophethelp.zendesk.com/hc/en-us/requests/new or
+#      marketmaking@prophetexchange.com), then set PROPHETX_ACCESS_KEY and
+#      PROPHETX_SECRET_KEY in /opt/betting-pod-shop/.env.
+#   3. Reconcile response shapes on the SANDBOX first — every ProphetX field
+#      name in src/prophetx_client.py came from the OpenAPI spec, not from an
+#      observed response:
+#        python3 scripts/collect_crossvenue_basis.py --probe
+#        python3 scripts/collect_crossvenue_basis.py --dump-shapes /tmp/px.jsonl --once
+#        python3 scripts/collect_crossvenue_basis.py --discover   # build VOCAB maps
+#   4. Sanity-check matching:  python3 scripts/collect_crossvenue_basis.py --match-only
+#
+# Deploy after edits:
+#   scp scripts/betting-crossvenue-basis.service root@129.212.176.202:/etc/systemd/system/
+#   ssh root@129.212.176.202 'systemctl daemon-reload && systemctl restart betting-crossvenue-basis'
+
+[Service]
+Type=simple
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+EnvironmentFile=/opt/betting-pod-shop/.env
+
+# Measurement only — READ-ONLY on both venues. src/prophetx_client.py contains
+# NO order path and tests/test_crossvenue_p030.py asserts (via AST, not grep)
+# that it stays that way. Separate unit from betting-pod-shop so a collector
+# bug cannot touch trading, and vice versa.
+#
+# --env production: the sandbox is for shape reconciliation; the BASIS must be
+# measured against real books or the sample means nothing.
+# --tax-rate is the s165(d) term. 0.32 is a placeholder pending GATE 0; it does
+# NOT affect the pre-registered gate threshold (a fixed 3.85c constant in
+# scripts/analyze_crossvenue_gates.py), only the per-row breakeven_with_tax
+# field recorded for analysis.
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.collect_crossvenue_basis \
+    --env production --sample-secs 60 --refresh-secs 600 --tax-rate 0.32
+
+Restart=always
+RestartSec=30
+ExecStartPre=/bin/sleep 5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=betting-crossvenue-basis
+
+# The droplet is a 2 GB box already running six workloads and it has OOMed
+# before (see the 2026-06-28 incident). This is research, not trading: it
+# yields to everything and is capped tighter than the Q3 collector.
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=256M
+
+# ── Security hardening (mirrors betting-inplay-basis.service) ────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

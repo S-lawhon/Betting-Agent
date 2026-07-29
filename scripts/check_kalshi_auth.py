@@ -29,7 +29,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.env_loader import load
-from src.kalshi_private import KalshiAuthError, KalshiPrivate, OrdersDisabled
+from src.kalshi_private import (KalshiAuthError, KalshiPrivate, OrdersDisabled,
+                                settlement_pnl)
 
 
 def main() -> int:
@@ -68,13 +69,20 @@ def main() -> int:
     print(f"positions  : {len(pos)}")
     print(f"recent fills: {len(fills)}")
 
+    # Kalshi returns NO P&L field on settlements — it must be derived from
+    # revenue (cents) minus the cost/fee fields (dollars). Summing a field that
+    # does not exist is what silently reported $0.00 here and blinded the loss
+    # guard on a live account.
     setts = k.get_settlements(limit=100)
-    realised = 0.0
-    for r in setts:
-        v = r.get("realized_pnl_dollars")
-        if v is not None:
-            realised += float(v)
-    print(f"settlements: {len(setts)}  (realised P&L on this page: ${realised:+,.2f})")
+    vals = [settlement_pnl(r) for r in setts]
+    readable = [v for v in vals if v is not None]
+    realised = sum(readable)
+    print(f"settlements: {len(setts)}  "
+          f"(derived P&L on this page: ${realised:+,.2f} "
+          f"from {len(readable)}/{len(setts)} readable rows)")
+    if setts and not readable:
+        print("  ✗ NO settlement row yielded a P&L value — the loss guard would")
+        print("    be blind. Run scripts/inspect_settlements.py before trading.")
 
     if a.probe_write:
         print("\nprobing write scope (creates nothing — count=0 is always rejected)")

@@ -265,7 +265,51 @@ Rows already booked by the buggy version carry
 `scripts/backfill_golf_scalar_corrections.py`, which writes a corrected series to
 a NEW file and never touches trade history.
 
+## Authenticated Kalshi access — `src/kalshi_private.py` (added 2026-07-29)
+
+Until this landed there was **no authenticated Kalshi path in the repo at all** — which is why P-022
+could be "ARMED" with 13 quotes and no way to place them. Use this module; do not write another.
+
+- **Signing:** `timestamp_ms + METHOD + path`, path includes `/trade-api/v2` and **excludes the
+  query string**; RSA-PSS/MGF1-SHA256, salt = digest length, base64, timestamp in **ms**. A signed
+  path carrying `?params` is the classic silent 401; a test asserts it must not verify.
+- **Closed by default:** `allow_orders=False`. Order/RFQ/quote methods raise `OrdersDisabled`
+  otherwise. `dry_run=True` logs the body and never hits the network.
+- **`LossGuard`** reads the **exchange**, never an in-process counter (a counter resets on restart —
+  the P-014 failure mode), and **fails closed**. Pass **both** `subaccount=` and `since=`.
+- **Credentials:** `KALSHI_PRIVATE_KEY_PATH`, never the inline `KALSHI_PRIVATE_KEY`.
+  **Never `cat`/`sed`/`grep` `.env` or any file that may hold a PEM** — a multi-line PEM survives
+  naive redaction, and one leaked this way on 2026-07-28. Ask Sam to confirm values instead.
+  **After creating any file next to secrets, run `git check-ignore` before committing** — a backup
+  file reached the public repo on 2026-07-29 because `.gitignore` had `.env`, which matches only that
+  exact name (now `.env*`).
+
+**Kalshi permits ONE ACCOUNT PER PERSON.** Never create a second. Isolate an algo from Sam's manual
+GUI trading with a **subaccount** (0–63) — they are API-only, so the web and mobile apps cannot reach
+them. P-029 uses subaccount 1.
+
+## More Kalshi API gotchas (added 2026-07-29, from the combo work)
+
+- **`/portfolio/settlements` returns NO P&L field.** Derive it:
+  `revenue/100 − yes_total_cost_dollars − no_total_cost_dollars − fee_cost`. **`revenue` and `value`
+  are integer CENTS; the cost fields are DOLLAR strings.** `value` is per-contract (max 100 = $1.00)
+  — never sum it. Reading the non-existent `realized_pnl_dollars` silently blinded the loss guard on
+  a live account. Diagnose with `scripts/inspect_settlements.py`.
+- **`status=open` is the FILTER; rows read `active`.** The string `"open"` never appears as a value.
+- **`/markets?ticker=X` (singular) is silently ignored** — returns the unfiltered list, HTTP 200.
+  Use `?tickers=` (plural CSV), and **batch by character budget** (414s at ~9,600 URL chars).
+- **Read the tick from `price_ranges`, not `tick_size`** (which is `None` even on sub-cent markets).
+  Combos quote on a **0.1¢ `deci_cent`** grid.
+- **`result="scalar"` is a partial payout at `settlement_value_dollars`, never VOID.**
+- **Never append to one gzip file from a long-running job.** A kill mid-append truncates the stream
+  and makes the whole file unreadable — systemd restarts do this routinely. Write immutable parts via
+  temp-file + `os.replace`. See `combo_research/archive_settled_combos.py`.
+
+**Cowork cannot SSH** — port 22 is blocked outbound from the sandbox. Package VPS work as
+self-contained scripts for Sam to run (the DigitalOcean web console works when no key is installed).
+
 ## Canonical docs
 
 `PROJECT_PLAN_Kalshi_Sports_v2.md` (current mission) · `PROJECT_STATUS.md` (state) ·
-`golf_research/`, `tennis_research/`, `mlb_props_research/` (per-sport work).
+`golf_research/`, `tennis_research/`, `mlb_props_research/` (per-sport work) ·
+**`combo_research/HANDOFF_P-029.md` (combo market-making — start here for P-029)**.

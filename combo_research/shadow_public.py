@@ -36,6 +36,7 @@ import sqlite3
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -57,6 +58,42 @@ RESOLVE_MAX_AGE_H = 48.0              # stop chasing a combo after this long
 LEG_CACHE_TTL = 20.0                  # s; leg books move, but not every call
 
 log = logging.getLogger("shadow")
+
+# The copula lives in src/, which is not on the path when this runs from
+# combo_research/ on the droplet. Import it defensively: if it is unavailable
+# the logger must keep collecting on the independence basis rather than stop —
+# a gap in the tape cannot be backfilled, but a missing copula column can be
+# filled offline from the stored raw leg marks.
+_COPULA = None
+_corr_matrix = None
+_strongest_relation = None
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from src.combo_copula import correlation_matrix as _corr_matrix  # noqa: E402
+    from src.combo_copula import ComboCopula, load_rho, relation as _relation  # noqa: E402
+
+    # Fitted ρ when combo_research/fitted_rho.json exists (written by
+    # fit_correlation.py); load_rho falls back to the priors per block — an
+    # unfitted block keeps its prior rather than silently becoming zero.
+    _RHO_PATH = str(Path(__file__).resolve().parent / "fitted_rho.json")
+    _COPULA = ComboCopula(rho=load_rho(_RHO_PATH))
+
+    def _strongest_relation(tickers: List[str]) -> str:
+        """The most-correlated pair in the combo — the adjustment is driven by
+        it, and same-game vs cross-game differ by an order of magnitude."""
+        order = {"same_player": 3, "same_game": 2, "same_day": 1, "cross": 0}
+        best = "cross"
+        for i in range(len(tickers)):
+            for j in range(i + 1, len(tickers)):
+                r = _relation(tickers[i], tickers[j])
+                if order[r] > order[best]:
+                    best = r
+        return best
+except Exception as _exc:                        # pragma: no cover
+    log.warning("combo_copula unavailable (%s) — independence basis only", _exc)
+
+    def _strongest_relation(tickers: List[str]) -> str:  # type: ignore[misc]
+        return "unknown"
 
 
 # --------------------------------------------------------------------------
@@ -163,8 +200,10 @@ CREATE TABLE IF NOT EXISTS combo (
     n_legs          INTEGER,
     legs_json       TEXT,      -- [[ticker, side], ...]
     leg_marks_json  TEXT,      -- RAW leg books at discovery -- reprice offline
-    indep_price     REAL,      -- product of leg marks (baseline, NOT the model)
-    model_price     REAL,      -- current model = indep (copula lands at Gate 3)
+    indep_price     REAL,      -- product of leg marks (biased LOW baseline)
+    copula_price    REAL,      -- correlation-adjusted joint -- THE GATE 0 BASIS
+    model_price     REAL,      -- = copula when available, else indep
+    leg_relation    TEXT,      -- strongest pair: same_player|same_game|same_day|cross
     combo_yes_bid   REAL,
     combo_yes_ask   REAL,
     in_zone         INTEGER,
@@ -294,13 +333,25 @@ class LegPricer:
         return rec
 
     def price_combo(self, legs: List[Tuple[str, str]]
-                    ) -> Tuple[Optional[float], List[dict]]:
-        """Independence product over leg marks. This is the BASELINE, not the
-        model we would quote -- independence understates a correlated joint by
-        ~30-35% relative, which is larger than the entire measured edge. The
-        copula replaces this at Gate 3; raw marks are stored so that can happen
-        offline."""
+                    ) -> Tuple[Optional[float], Optional[float], List[dict], str]:
+        """Price a combo two ways from live leg marks.
+
+        Returns ``(independence, copula, marks, relation)``.
+
+        The independence product is kept because it is what the first day of
+        Gate 0 data was measured against and the two must stay comparable. The
+        **copula price is the one the gate is specified against** — independence
+        understates a correlated joint, so a margin measured against it is
+        biased upward and part of it is correlation rather than profit.
+
+        ``relation`` is the strongest leg-pair relationship in the combo
+        (``same_player`` / ``same_game`` / ``same_day`` / ``cross``). It is
+        reported separately because the adjustment is an order of magnitude
+        larger on same-game combos than cross-game ones, so pooling them would
+        hide the effect.
+        """
         marks, prod, ok = [], 1.0, True
+        eff: List[float] = []
         for tkr, side in legs:
             rec = self.mark(tkr)
             if rec is None:
@@ -313,8 +364,25 @@ class LegPricer:
             if mid is None:
                 ok = False
                 continue
-            prod *= mid if side == "yes" else (1.0 - mid)
-        return (prod if ok else None), marks
+            p = mid if side == "yes" else (1.0 - mid)
+            prod *= p
+            eff.append(p)
+
+        if not ok:
+            return None, None, marks, "unknown"
+
+        tickers = [t for t, _ in legs]
+        rel = _strongest_relation(tickers)
+        copula = None
+        if _COPULA is not None:
+            try:
+                # Pass the copula's own ρ — the bare call would silently use
+                # DEFAULT_RHO and discard the fitted values.
+                corr = _corr_matrix(tickers, _COPULA.rho)
+                copula = _COPULA.joint_yes(eff, corr)
+            except Exception as exc:            # never break collection
+                log.warning("copula pricing failed (%s); independence only", exc)
+        return prod, copula, marks, rel
 
 
 # --------------------------------------------------------------------------
@@ -370,22 +438,24 @@ def discover(con: sqlite3.Connection, pub: Public, pricer: LegPricer) -> int:
                 legs = legs_of(m)
                 if not (MIN_LEGS <= len(legs) <= MAX_LEGS + 4):
                     continue                    # log a little wider than we trade
-                indep, marks = pricer.price_combo(legs)
+                indep, copula, marks, rel = pricer.price_combo(legs)
                 if indep is None:
                     continue
-                if not (LOG_MIN_PX <= indep <= LOG_MAX_PX):
+                model = copula if copula is not None else indep
+                if not (LOG_MIN_PX <= model <= LOG_MAX_PX):
                     continue
                 in_zone = int(MIN_LEGS <= len(legs) <= MAX_LEGS
-                              and MIN_PX <= indep <= MAX_PX)
+                              and MIN_PX <= model <= MAX_PX)
                 con.execute(
                     "INSERT OR IGNORE INTO combo (market_ticker, collection,"
                     " event_ticker, created_ts, seen_ts, n_legs, legs_json,"
-                    " leg_marks_json, indep_price, model_price, combo_yes_bid,"
-                    " combo_yes_ask, in_zone) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    " leg_marks_json, indep_price, copula_price, model_price,"
+                    " leg_relation, combo_yes_bid, combo_yes_ask, in_zone)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (tkr, m.get("mve_collection_ticker"), m.get("event_ticker"),
                      m.get("created_time") or m.get("open_time"), now_iso(),
                      len(legs), json.dumps(legs), json.dumps(marks),
-                     indep, indep,
+                     indep, copula, model, rel,
                      fnum(m.get("yes_bid_dollars")), fnum(m.get("yes_ask_dollars")),
                      in_zone))
                 seen.add(tkr)
@@ -461,27 +531,77 @@ def report(con: sqlite3.Connection) -> None:
               f"run is older than that.")
 
     rows = con.execute(
-        "SELECT indep_price, first_trade_px, n_legs, in_zone FROM combo"
+        "SELECT indep_price, copula_price, first_trade_px, n_legs, in_zone,"
+        " leg_relation FROM combo"
         " WHERE traded=1 AND first_trade_px IS NOT NULL").fetchall()
     if len(rows) < 5:
         print("not enough resolved trades yet for a margin estimate")
         return
-    print("\n=== COMPETITION MARGIN: winning price - independence product ===")
-    print("(the room a quoter had; NOT the edge -- independence is a baseline,")
-    print(" and part of this margin is genuine correlation, not profit)")
-    for label, sel in (("all", lambda r: True),
-                       ("in-zone", lambda r: r[3] == 1),
-                       ("2 legs", lambda r: r[2] == 2),
-                       ("3 legs", lambda r: r[2] == 3),
-                       ("4 legs", lambda r: r[2] == 4)):
-        sub = [(r[1] - r[0]) * 100.0 for r in rows if sel(r)]
+
+    def _stats(label, sub):
         if len(sub) < 5:
-            continue
-        sub.sort()
+            return
+        sub = sorted(sub)
         n = len(sub)
-        print(f"  {label:<9} n={n:>6}  median {sub[n//2]:+7.2f}c  "
-              f"p25 {sub[n//4]:+7.2f}c  p75 {sub[3*n//4]:+7.2f}c  "
-              f"mean {sum(sub)/n:+7.2f}c  frac>0 {100*sum(1 for x in sub if x>0)/n:.0f}%")
+        print(f"  {label:<14} n={n:>6}  median {sub[n // 2]:+7.2f}c  "
+              f"p25 {sub[n // 4]:+7.2f}c  p75 {sub[3 * n // 4]:+7.2f}c  "
+              f"mean {sum(sub) / n:+7.2f}c  "
+              f"frac>0 {100 * sum(1 for x in sub if x > 0) / n:.0f}%")
+
+    slices = (("all", lambda r: True),
+              ("in-zone", lambda r: r[4] == 1),
+              ("2 legs", lambda r: r[3] == 2),
+              ("3 legs", lambda r: r[3] == 3),
+              ("4 legs", lambda r: r[3] == 4),
+              ("same_player", lambda r: r[5] == "same_player"),
+              ("same_game", lambda r: r[5] == "same_game"),
+              ("same_day", lambda r: r[5] == "same_day"),
+              ("cross", lambda r: r[5] == "cross"))
+
+    have = sum(1 for r in rows if r[1] is not None)
+    print("\n=== GATE 0: COMPETITION MARGIN ===")
+    print(f"copula priced on {have}/{len(rows)} traded rows")
+
+    print("\n--- vs COPULA (correlation-adjusted) -- THIS IS THE GATE ---")
+    if have < 5:
+        print("  too few copula-priced rows; rows logged before the copula")
+        print("  landed carry NULL. Re-price them offline from leg_marks_json.")
+    else:
+        for label, sel in slices:
+            _stats(label, [(r[2] - r[1]) * 100.0
+                           for r in rows if sel(r) and r[1] is not None])
+
+    print("\n--- vs INDEPENDENCE (biased UPWARD -- kept for comparability) ---")
+    print("  independence understates a correlated joint, so this OVERSTATES")
+    print("  the room a quoter had. Do NOT judge the gate on it.")
+    for label, sel in slices:
+        _stats(label, [(r[2] - r[0]) * 100.0 for r in rows if sel(r)])
+
+    by_rel = {}
+    for r in rows:
+        if r[1] is not None:
+            by_rel.setdefault(r[5] or "unknown", []).append((r[1] - r[0]) * 100.0)
+    if by_rel:
+        print("\n--- how much of the independence margin is CORRELATION, not profit ---")
+        for rel, vals in sorted(by_rel.items(), key=lambda kv: -len(kv[1])):
+            vals.sort()
+            print(f"    {rel:<12} n={len(vals):>6}  "
+                  f"median premium {vals[len(vals) // 2]:+.2f}c")
+
+    print("\n=== GATE 0 DECISION (pre-registered 2026-07-28) ===")
+    zone = [r for r in rows if r[4] == 1 and r[1] is not None]
+    if len(zone) < 5:
+        print("  in-zone copula-priced sample too small to decide")
+        return
+    m = sorted((r[2] - r[1]) * 100.0 for r in zone)
+    med, n = m[len(m) // 2], len(m)
+    verdict = ("CONTINUE" if (med >= 2.0 and n >= 500)
+               else "STOP" if med < 1.0 else "EXTEND one week")
+    print(f"  in-zone median vs copula: {med:+.2f}c   n={n}")
+    print("  thresholds: CONTINUE >= +2.0c with n>=500 | STOP < +1.0c")
+    print(f"  -> {verdict}")
+    if n < 500:
+        print("  (n below 500 -- not yet decidable either way)")
 
 
 # --------------------------------------------------------------------------

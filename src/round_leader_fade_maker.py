@@ -189,6 +189,15 @@ class RoundLeaderFadeMakerEngine:
         # ── window: post EARLY, rest through the round to close ──
         fade_start_h: float = 24.0,      # earliest to place a quote
         no_new_quote_h: float = 12.0,    # latest to place a NEW quote
+        # ── size screen: refuse to price off a thin book ──
+        # R5 house rule: screen on TOP-OF-BOOK SIZE, never spread. Inside one
+        # event family a 152,862-contract bid and a 1-contract bid both passed
+        # a "spread <= 2c" test; only size separates a real reference price
+        # from a phantom one. The screen gates NEW placement only — a resting
+        # quote stays through the round per the locked strategy. This is a
+        # TIGHTENING of the quoted population (allowed at any time under the
+        # pre-registration rules); it can only refuse quotes, never add them.
+        min_top_size: float = 100.0,     # contracts at top of the reference side(s)
         kill_file: Path = Path("data/KILL_ROUND_LEADER_FADE"),
         # P022_DECISION_RULE.md §7: "Before P-022 can quote, it must be wired
         # into AggregateRiskGuard with RESERVATIONS (reserve_trade), not
@@ -246,6 +255,11 @@ class RoundLeaderFadeMakerEngine:
         self.max_total_collateral = self.bankroll * self.pct_total
         self.fade_start_h = fade_start_h
         self.no_new_quote_h = no_new_quote_h
+        self.min_top_size = float(min_top_size)
+        # Tickers whose thin-book refusal has been logged, so the refusal is
+        # written once per episode rather than every cycle. Cleared when the
+        # book thickens, so a re-thinning is visible again.
+        self._thin_refused: set = set()
         self.kill_file = Path(kill_file)
         self.risk_guard = risk_guard
         self._now = _now_fn or time.time
@@ -683,6 +697,31 @@ class RoundLeaderFadeMakerEngine:
         if not (lo <= mid <= hi):
             return
 
+        # ── size screen: a reference price is only as real as the size behind
+        # it (R5: screen on TOP-OF-BOOK SIZE, not spread). The side screened is
+        # the side `_mid` priced off: a one-sided ask needs size at that ask;
+        # a two-sided book needs size on BOTH sides, since the mid leans on
+        # each. Missing quantities count as zero — an unreadable book is thin.
+        if self.min_top_size > 0:
+            snap = self._last_book.get(book.ticker) or {}
+            bid_q = snap.get("bid_qty") or 0.0
+            ask_q = snap.get("ask_qty") or 0.0
+            thin = (ask_q < self.min_top_size
+                    if snap.get("book_side") == "one_sided_ask"
+                    else min(bid_q, ask_q) < self.min_top_size)
+            if thin:
+                if book.ticker not in self._thin_refused:
+                    self._thin_refused.add(book.ticker)
+                    self._write(self.quotes_log, {
+                        "type": "REFUSED", "pod_id": "P-022",
+                        "ticker": book.ticker, "event": book.event_code,
+                        "reason": "thin_book",
+                        "min_top_size": self.min_top_size,
+                        **{k: v for k, v in snap.items()},
+                    })
+                return
+            self._thin_refused.discard(book.ticker)
+
         # ── caps: refuse to widen exposure past any limit ──
         # All three are COLLATERAL limits (§7 sizes on collateral at risk, never
         # contract count); max_contracts_per_name is only a secondary bound.
@@ -1034,6 +1073,7 @@ class RoundLeaderFadeMakerPod:
             quote_offset=float(q.get("quote_offset", 0.02)),
             fade_start_h=float(q.get("fade_start_h", 24.0)),
             no_new_quote_h=float(q.get("no_new_quote_h", 12.0)),
+            min_top_size=float(q.get("min_top_size", 100.0)),
             bankroll=bankroll,
             # Percentages are the configurable surface. Raising any of them is a
             # NEW hypothesis under §8.1 and resets T to 0 under a new pod ID —

@@ -536,6 +536,12 @@ pods:
       # quote stays to close. Phase 2 showed H=6h collapses to marginal.
       fade_start_h: 24.0
       no_new_quote_h: 12.0
+      # Size screen (added 2026-07-30, R5 house rule): refuse to place a NEW
+      # quote off a book with fewer than this many contracts at the top of the
+      # reference side(s) — spread says nothing (a 152,862-contract bid and a
+      # 1-contract bid both pass "spread <= 2c"). A TIGHTENING of the quoted
+      # population, allowed at any time under §8; resting quotes are untouched.
+      min_top_size: 100
     risk:
       # §7 caps, as PERCENTAGES of bankroll. They were fixed dollars ($5/$50/$150
       # equivalents) which matched the rule only by coincidence at a $1,000

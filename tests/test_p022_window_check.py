@@ -56,7 +56,10 @@ class FakeKalshi:
     def orderbook(self, ticker, depth=5):
         if self._mid is None:
             return None
-        return {"yes_bid": self._mid - 0.01, "yes_ask": self._mid + 0.01}
+        # Thick by default so tests measure what they name; the size-screen
+        # parity case sets min_top_size above this instead of thinning here.
+        return {"yes_bid": self._mid - 0.01, "yes_ask": self._mid + 0.01,
+                "bid_qty": 500, "ask_qty": 500}
 
     def get(self, path, params=None):
         if path.startswith("/events/"):
@@ -265,10 +268,16 @@ def test_screen_agrees_with_the_engines_own_decision():
         ({"pct_total": 0.0}, 0.06, False),                # aggregate cap
         ({"quote_offset": 0.0}, 0.06, False),             # px not above mid
         ({"pct_per_name": 0.0000001}, 0.06, False),       # sizes to zero
+        # R5 size screen: the fake book carries 500 a side, so a floor above
+        # that refuses — and the engine must refuse identically.
+        ({"min_top_size": 1000.0}, 0.06, False),
     ]
     for kw, mid, expect in cases:
         eng = _engine(_market(close, NOW - 2 * 86400, n=1), mid=mid, **kw)
         ticker = f"{EVENT}-N0"
+        # Price through the engine's own _mid first, as assess() does — the
+        # size screen reads the book snapshot that call records.
+        eng._mid(ticker)
         ok, _why, _size, _px = wc.screen_after_band(
             eng, ticker, "ROC26", mid)
         assert ok is expect, (kw, "detector")

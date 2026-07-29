@@ -280,6 +280,21 @@ def screen_after_band(engine: RoundLeaderFadeMakerEngine, ticker: str,
     the pod correctly declined. Callers must walk candidates in the pod's own
     allocation order (ticker, ascending) for these to mean anything.
     """
+    # ── size screen (R5), duplicated from _cycle_book in the same position:
+    # after the band, before the caps. Reads the book snapshot `engine._mid`
+    # recorded — callers must have priced the ticker through `engine._mid`
+    # first (``assess`` does), or an empty snapshot reads as thin, which is
+    # correct: a book the detector never saw cannot vouch for its own size.
+    if engine.min_top_size > 0:
+        snap = getattr(engine, "_last_book", {}).get(ticker) or {}
+        bid_q = snap.get("bid_qty") or 0.0
+        ask_q = snap.get("ask_qty") or 0.0
+        thin = (ask_q < engine.min_top_size
+                if snap.get("book_side") == "one_sided_ask"
+                else min(bid_q, ask_q) < engine.min_top_size)
+        if thin:
+            return False, "thin_book", 0.0, None
+
     book = engine.books.get(ticker)
     book_coll = book.collateral if book is not None else 0.0
     book_sold = book.sold if book is not None else 0.0

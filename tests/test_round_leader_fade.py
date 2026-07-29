@@ -39,8 +39,11 @@ class FakeKalshi:
     """Stands in for KalshiPublic: orderbook, trades_since, open_markets, get."""
 
     def __init__(self, book=None, trades=None, settle=None):
+        # Default book is comfortably THICK (>= the 100-contract size screen)
+        # so tests about other mechanics measure the thing they name; the
+        # size-screen tests below set thin books deliberately.
         self.book = book if book is not None else {
-            "yes_bid": 0.04, "yes_ask": 0.06, "bid_qty": 50, "ask_qty": 50}
+            "yes_bid": 0.04, "yes_ask": 0.06, "bid_qty": 500, "ask_qty": 500}
         self.trades = trades or []
         self._settle = settle or {}
 
@@ -393,7 +396,7 @@ def test_band_matches_the_locked_decision_rule():
 def test_a_mid_inside_the_rule_band_is_quoted(tmp_path):
     """mid = 0.11 sits inside [0.03, 0.12] but outside the shipped (0.03, 0.10)."""
     k = FakeKalshi(book={"yes_bid": 0.10, "yes_ask": 0.12,
-                         "bid_qty": 50, "ask_qty": 50})
+                         "bid_qty": 500, "ask_qty": 500})
     eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600))
     eng.discover()
     eng.cycle()
@@ -956,7 +959,7 @@ def test_quote_records_the_book_it_was_priced_off_two_sided(tmp_path):
            if '"QUOTE"' in l][-1]
     assert rec["book_side"] == "two_sided"
     assert rec["yes_bid"] == 0.04 and rec["yes_ask"] == 0.06
-    assert rec["ask_qty"] == 50
+    assert rec["ask_qty"] == 500
     assert rec["close_source"] == "tee_times"
 
 
@@ -967,7 +970,9 @@ def test_quote_records_a_one_sided_ask_reference(tmp_path):
     k = FakeKalshi(book={"yes_bid": None, "yes_ask": 0.05,
                          "bid_qty": 0, "ask_qty": 10})
     clock = Clock(CLOSE - 18 * 3600)
-    eng = make_engine(tmp_path, k, clock)
+    # min_top_size=0: this test measures reference-price observability, not
+    # the size screen; the thin fixture is deliberate.
+    eng = make_engine(tmp_path, k, clock, min_top_size=0)
     eng.discover()
     eng.cycle()
     q = eng.books[TICKER].ask_quote
@@ -991,9 +996,103 @@ def test_one_sided_reference_is_the_ask_not_a_none_coerced_mid(tmp_path):
     k = FakeKalshi(book={"yes_bid": None, "yes_ask": 0.08,
                          "bid_qty": 0, "ask_qty": 3})
     clock = Clock(CLOSE - 18 * 3600)
-    eng = make_engine(tmp_path, k, clock)
+    eng = make_engine(tmp_path, k, clock, min_top_size=0)
     eng.discover()
     eng.cycle()
     q = eng.books[TICKER].ask_quote
     assert abs(q.mid_at_quote - 0.08) < 1e-9, "reference must be the ask itself"
     assert abs(q.price - 0.10) < 1e-9
+
+
+# ── R5 size screen: TOP-OF-BOOK SIZE, not spread ─────────────────────
+# CONTROLH-2026-R carried 152,862 contracts at bid; KXRHOUSESEATS-27-230
+# carried 1. Both passed a "spread <= 2c" test. Size is the only thing that
+# separates a real reference price from a phantom one, so the screen is on
+# size and the threshold is config.
+
+def test_thin_one_sided_book_is_refused(tmp_path):
+    """The live case: no YES bid, a 1-lot ask. The mid is 'priceable' but the
+    reference has nothing behind it — no quote may rest on it."""
+    k = FakeKalshi(book={"yes_bid": None, "yes_ask": 0.05,
+                         "bid_qty": 0, "ask_qty": 1})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600))
+    eng.discover()
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is None
+    recs = [json.loads(l) for l in
+            (tmp_path / "round_leader_fade_quotes.jsonl").read_text().splitlines()]
+    refusals = [r for r in recs if r.get("type") == "REFUSED"]
+    assert len(refusals) == 1 and refusals[0]["reason"] == "thin_book"
+    assert refusals[0]["ask_qty"] == 1
+    # the refusal is logged once, not once per cycle
+    eng.cycle()
+    recs2 = [json.loads(l) for l in
+             (tmp_path / "round_leader_fade_quotes.jsonl").read_text().splitlines()
+             if json.loads(l).get("type") == "REFUSED"]
+    assert len(recs2) == 1
+
+
+def test_thin_two_sided_book_is_refused_on_either_side(tmp_path):
+    """A two-sided mid leans on both sides, so BOTH must carry size — a thick
+    ask cannot vouch for a 1-lot bid (the CONTROLH/HOUSESEATS asymmetry)."""
+    k = FakeKalshi(book={"yes_bid": 0.04, "yes_ask": 0.06,
+                         "bid_qty": 1, "ask_qty": 152_862})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600))
+    eng.discover()
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is None
+
+
+def test_thick_book_passes_the_screen(tmp_path):
+    k = FakeKalshi(book={"yes_bid": 0.04, "yes_ask": 0.06,
+                         "bid_qty": 100, "ask_qty": 100})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600))
+    eng.discover()
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is not None
+
+
+def test_screen_gates_placement_not_resting_quotes(tmp_path):
+    """The locked strategy rests quotes through the round; the screen may only
+    refuse NEW placement. A book that thins after the quote rests must not
+    pull it."""
+    k = FakeKalshi(book={"yes_bid": 0.04, "yes_ask": 0.06,
+                         "bid_qty": 500, "ask_qty": 500})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600))
+    eng.discover()
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is not None
+    k.book = {"yes_bid": 0.04, "yes_ask": 0.06, "bid_qty": 1, "ask_qty": 1}
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is not None, \
+        "a resting quote must survive the book thinning"
+
+
+def test_missing_quantities_count_as_thin(tmp_path):
+    """An unreadable size is not evidence of size."""
+    k = FakeKalshi(book={"yes_bid": 0.04, "yes_ask": 0.06,
+                         "bid_qty": None, "ask_qty": None})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600))
+    eng.discover()
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is None
+
+
+def test_min_top_size_zero_disables_the_screen(tmp_path):
+    k = FakeKalshi(book={"yes_bid": 0.04, "yes_ask": 0.06,
+                         "bid_qty": 1, "ask_qty": 1})
+    eng = make_engine(tmp_path, k, Clock(CLOSE - 18 * 3600), min_top_size=0)
+    eng.discover()
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is not None
+
+
+def test_min_top_size_comes_from_config(tmp_path):
+    from src.round_leader_fade_maker import RoundLeaderFadeMakerPod as P
+    eng = P.from_config({"risk": {"initial_bankroll": 4000.0},
+                         "pods": {"P-022": {"quoting": {"min_top_size": 250}}}},
+                        risk_guard=None, schedule=FakeSchedule())
+    assert eng.min_top_size == 250.0
+    eng2 = P.from_config({"risk": {"initial_bankroll": 4000.0}},
+                         risk_guard=None, schedule=FakeSchedule())
+    assert eng2.min_top_size == 100.0, "default must be the registered 100"

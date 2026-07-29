@@ -41,6 +41,7 @@ import json
 import logging
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -52,6 +53,33 @@ from src.combo_copula import (  # noqa: E402
 log = logging.getLogger("backfill")
 
 BATCH = 500          # rows per write transaction — keep locks short (WAL)
+
+# The shadow logger holds its write transaction across rate-limited API calls,
+# so the DB can stay write-locked for MINUTES at a stretch — far past any
+# busy_timeout. Waiting it out is correct (the logger must never be restarted
+# for a backfill); failing after 60s is not. Measured live 2026-07-29: the
+# first run died on batch 2 with `database is locked`.
+RETRY_WINDOW_S = 1800.0     # give one batch up to 30 min of patience
+RETRY_SLEEP_S = 10.0
+
+
+def write_batch(con: sqlite3.Connection,
+                pending: List[Tuple[float, str, str]]) -> None:
+    """Apply one update burst, waiting out the logger's long transactions."""
+    deadline = time.monotonic() + RETRY_WINDOW_S
+    while True:
+        try:
+            con.executemany(
+                "UPDATE combo SET copula_price=?, leg_relation=? "
+                "WHERE market_ticker=?", pending)
+            con.commit()
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower() or time.monotonic() > deadline:
+                raise
+            con.rollback()
+            log.info("db locked by the logger; waiting %.0fs", RETRY_SLEEP_S)
+            time.sleep(RETRY_SLEEP_S)
 
 
 def ensure_columns(con: sqlite3.Connection) -> List[str]:
@@ -161,19 +189,13 @@ def main() -> int:
             continue
         pending.append((price, strongest_relation(tickers), tkr))
         if len(pending) >= BATCH:
-            con.executemany(
-                "UPDATE combo SET copula_price=?, leg_relation=? "
-                "WHERE market_ticker=?", pending)
-            con.commit()
+            write_batch(con, pending)
             done += len(pending)
             pending = []
             if done % 10_000 < BATCH:
                 log.info("priced %d/%d", done, total)
     if pending:
-        con.executemany(
-            "UPDATE combo SET copula_price=?, leg_relation=? "
-            "WHERE market_ticker=?", pending)
-        con.commit()
+        write_batch(con, pending)
         done += len(pending)
 
     log.info("done: priced %d, skipped %d (unusable marks), of %d",

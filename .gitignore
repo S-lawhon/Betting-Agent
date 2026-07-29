@@ -36,3 +36,8 @@ Thumbs.db
 # Fund manager — secrets and generated state
 manager/manager.env
 manager/state/
+
+# secrets — belt and braces
+.env*
+!.env.example
+_to_delete/

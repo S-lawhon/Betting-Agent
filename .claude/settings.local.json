@@ -65,7 +65,10 @@
       "Read(//private/tmp/**)",
       "WebFetch(domain:kalshisportsdata.com)",
       "WebFetch(domain:datagolf.com)",
-      "WebFetch(domain:unabated.com)"
+      "WebFetch(domain:unabated.com)",
+      "Bash(git fetch *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(git checkout *)"
     ]
   }
 }

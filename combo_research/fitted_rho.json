@@ -1,0 +1,65 @@
+{
+ "fitted_at": "2026-07-29T20:52:06.401216+00:00",
+ "n_combos": 103019,
+ "n_legs_resolved": 6281,
+ "blocks": {
+  "cross": {
+   "n_pairs": 16430,
+   "n_days": 9,
+   "identified": true,
+   "note": null,
+   "marginal_a": 0.5192,
+   "marginal_b": 0.4801,
+   "joint_observed": 0.2662,
+   "joint_if_independent": 0.2493,
+   "rho": 0.1065,
+   "ci95": [
+    0.0395,
+    0.1445
+   ]
+  },
+  "same_day": {
+   "n_pairs": 88151,
+   "n_days": 7,
+   "identified": true,
+   "note": null,
+   "marginal_a": 0.5012,
+   "marginal_b": 0.4872,
+   "joint_observed": 0.2627,
+   "joint_if_independent": 0.2442,
+   "rho": 0.1159,
+   "ci95": [
+    0.0988,
+    0.3838
+   ]
+  },
+  "same_game": {
+   "n_pairs": 28731,
+   "n_days": 5,
+   "identified": true,
+   "note": null,
+   "marginal_a": 0.5061,
+   "marginal_b": 0.4794,
+   "joint_observed": 0.276,
+   "joint_if_independent": 0.2427,
+   "rho": 0.2084,
+   "ci95": [
+    0.0836,
+    0.2213
+   ]
+  },
+  "same_player": {
+   "n_pairs": 431,
+   "n_days": 2,
+   "identified": false,
+   "note": "SINGLE SLATE -- rho is confounded with that day's outcome rate and must NOT be used; widen the sample",
+   "marginal_a": 0.5313,
+   "marginal_b": 0.4571,
+   "joint_observed": 0.2947,
+   "joint_if_independent": 0.2429,
+   "rho": 0.3231,
+   "ci95": null
+  }
+ },
+ "caveat": "Measured among legs RETAIL CHOSE TO COMBINE \u2014 the right population for pricing retail flow, the wrong one for anything else. Blocks under the pair floor are unfitted; keep the prior and say so."
+}

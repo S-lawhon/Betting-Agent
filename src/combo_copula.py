@@ -283,9 +283,14 @@ def load_rho(path: str, strict: bool = False) -> Dict[str, float]:
                        path, exc)
         return out
     for block, rec in blocks.items():
-        rho = (rec or {}).get("rho")
-        if rho is None:
-            logger.info("block %r unfitted; keeping prior %.3f",
+        rec = rec or {}
+        rho = rec.get("rho")
+        # `identified: false` means the fitter computed a number but refused to
+        # stand behind it (fewer than 3 event days -> rho is confounded with
+        # the slate's outcome rate). An unidentified rho must not be used any
+        # more than a missing one — same_player ships exactly this shape.
+        if rho is None or not rec.get("identified", True):
+            logger.info("block %r unfitted/unidentified; keeping prior %.3f",
                         block, out.get(block, 0.0))
             continue
         out[block] = float(rho)

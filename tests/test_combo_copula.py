@@ -213,3 +213,53 @@ def test_more_legs_than_the_predrawn_sample_still_prices():
     c = ComboCopula(draws=20_000, max_legs=3)
     v = c.joint_yes([0.6] * 5)
     assert v == pytest.approx(0.6 ** 5, abs=0.02)
+
+
+# ── load_rho against the COMMITTED fitted file ───────────────────────
+# combo_research/fitted_rho.json is the 2026-07-29 fit off the 8-day VPS
+# archive (103,019 combos, all legs settled). These tests pin the contract the
+# Gate 0 pricer depends on: the file loads, identified blocks override their
+# priors, and an UNIDENTIFIED block — same_player ships with a computed rho
+# but identified:false (431 pairs on only 2 event days) — retains the prior
+# rather than smuggling in a confounded number.
+
+FITTED_PATH = str(Path(__file__).resolve().parent.parent
+                  / "combo_research" / "fitted_rho.json")
+
+
+def test_fitted_rho_file_loads():
+    from src.combo_copula import load_rho
+    rho = load_rho(FITTED_PATH, strict=True)
+    # identified blocks override the priors
+    assert rho["cross"] != DEFAULT_RHO["cross"]
+    assert rho["same_day"] != DEFAULT_RHO["same_day"]
+    assert 0.0 < rho["cross"] < 1.0
+    assert 0.0 < rho["same_day"] < 1.0
+    assert 0.0 < rho["same_game"] < 1.0
+
+
+def test_unidentified_block_retains_prior():
+    """same_player carries rho=0.3231 with identified:false — the fitter
+    computed it but refused to stand behind it. load_rho must not use it."""
+    import json
+    from src.combo_copula import load_rho
+    rec = json.load(open(FITTED_PATH))["blocks"]["same_player"]
+    assert rec["identified"] is False and rec["rho"] is not None, \
+        "fixture drifted: this test wants a computed-but-unidentified block"
+    rho = load_rho(FITTED_PATH, strict=True)
+    assert rho["same_player"] == DEFAULT_RHO["same_player"]
+
+
+def test_unfitted_null_block_retains_prior(tmp_path):
+    p = tmp_path / "rho.json"
+    p.write_text('{"blocks": {"same_game": {"rho": null, "identified": false},'
+                 ' "cross": {"rho": 0.10, "identified": true, "n_days": 9}}}')
+    from src.combo_copula import load_rho
+    rho = load_rho(str(p))
+    assert rho["same_game"] == DEFAULT_RHO["same_game"]
+    assert rho["cross"] == 0.10
+
+
+def test_missing_file_falls_back_to_priors(tmp_path):
+    from src.combo_copula import load_rho
+    assert load_rho(str(tmp_path / "nope.json")) == DEFAULT_RHO

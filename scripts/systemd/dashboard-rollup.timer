@@ -1,0 +1,21 @@
+# Hourly at :07 — deliberately after the top of the hour, and after the 06:00
+# rotate_active_log cron, so the 06:07 run picks up a freshly-rotated archive in
+# the same hour it appeared rather than a whole hour later.
+#
+# Persistent=true because a reboot or maintenance window would otherwise drop a
+# run with no trace — the same reason the evmap timers set it. Missing a run is
+# not data loss (the next run catches up: archives are immutable and the tail is
+# re-read in full), but a silent gap in the timer's own history is worth avoiding.
+[Unit]
+Description=Betting Pod Shop — Dashboard lifetime rollup (timer)
+
+[Timer]
+OnCalendar=*-*-* *:07:00
+Persistent=true
+# A fixed second would put this on the same instant as every other :07 unit
+# after a reboot.
+RandomizedDelaySec=45
+Unit=dashboard-rollup.service
+
+[Install]
+WantedBy=timers.target

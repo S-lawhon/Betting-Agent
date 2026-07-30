@@ -140,6 +140,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-browser", action="store_true", dest="no_browser",
         help="Don't auto-open the browser when --web is set",
     )
+    p.add_argument(
+        "--dashboard-state-dir", default="data/dashboard",
+        dest="dashboard_state_dir",
+        help=(
+            "Where the engine writes engine_state.json / open_positions.json "
+            "each cycle for the standalone dashboard to read. Written whether "
+            "or not --web is set; pass '' to disable (default: %(default)s)"
+        ),
+    )
 
     # ── Health check ──────────────────────────────────────────────
     p.add_argument(
@@ -234,6 +243,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         dash_renderer = DashboardRenderer(use_color=True, width=80)
         logger.info("Dashboard mode enabled")
 
+    # The snapshot the standalone dashboard reads. Deliberately independent of
+    # --web: the file-backed server must keep working when the embedded one is
+    # off, which is the whole point of splitting them.
+    _sd = getattr(args, "dashboard_state_dir", "data/dashboard")
+    dashboard_state_dir: Optional[Path] = Path(_sd) if _sd else None
+
     web_server: Optional[WebDashboardServer] = None
     if getattr(args, "web", False):
         web_server = WebDashboardServer(
@@ -258,6 +273,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         web_server=web_server,
         trade_log_path=trade_log_path,
         trade_store=trade_store,
+        dashboard_state_dir=dashboard_state_dir,
+        interval_seconds=getattr(args, "interval", None),
     )
 
     try:

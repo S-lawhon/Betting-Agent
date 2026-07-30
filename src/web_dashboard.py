@@ -41,10 +41,16 @@ import hmac
 import html as html_mod
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+#: Valid ``?section=`` values on ``/api/v2/dashboard``. Mirrors
+#: ``src.dashboard_api.SECTIONS``; kept as a literal here so importing this
+#: module never depends on import order, and asserted equal in the tests.
+_V2_SECTIONS = ("now", "gates", "pnl", "pipeline", "ops", "work")
 
 
 # ── Dashboard state ───────────────────────────────────────────────────
@@ -58,7 +64,14 @@ class DashboardState:
     all reads and writes.
     """
 
-    def __init__(self) -> None:
+    #: Hard cap on the trade rows held in memory and echoed into
+    #: ``/api/status``.  Before this cap the list was unbounded, serialised
+    #: verbatim into every response *and* iterated three times per request —
+    #: inside the engine process, which has no ``MemoryMax`` and had already
+    #: caused a five-week OOM crash loop in June 2026.  ``0`` disables the cap.
+    DEFAULT_MAX_TRADES = 400
+
+    def __init__(self, max_trades: int = DEFAULT_MAX_TRADES) -> None:
         self._lock          = threading.Lock()
         self._snapshot: Optional[Any] = None
         self._report: Optional[Any]   = None
@@ -66,6 +79,8 @@ class DashboardState:
         self._allocations:  Dict[str, Any] = {}
         self._settlement: Optional[Dict[str, Any]] = None
         self._trades: list = []
+        self._trades_truncated = False
+        self._max_trades = int(max_trades) if max_trades and max_trades > 0 else 0
         self._engine_status = "starting"
 
     # ── Write side ───────────────────────────────────────────────────
@@ -93,7 +108,14 @@ class DashboardState:
             if settlement_summary is not None:
                 self._settlement = settlement_summary
             if trades is not None:
-                self._trades = trades
+                # Newest-first from get_recent_placed_with_status(), so the cap
+                # keeps the rows anyone actually looks at.
+                if self._max_trades and len(trades) > self._max_trades:
+                    self._trades = list(trades[:self._max_trades])
+                    self._trades_truncated = True
+                else:
+                    self._trades = trades
+                    self._trades_truncated = False
 
     # ── Read side ─────────────────────────────────────────────────────
 
@@ -229,6 +251,244 @@ class DashboardState:
 
         return result
 
+    # ── Snapshot writing (producer for the standalone dashboard) ──────
+
+    def write_snapshot(self, state_dir: Path) -> Optional[Path]:
+        """Persist ``_serialize()``'s output to ``engine_state.json``, atomically.
+
+        The standalone dashboard reads this file, which is why the payload is
+        built by calling ``_serialize()`` rather than by a second serializer:
+        two serializers drift, and only one of them would be covered by the 56
+        tests that pin the v1 contract.
+
+        ``trades`` is dropped (it goes to ``open_positions.json``) and a
+        ``_meta`` block is attached so a reader can tell how old the snapshot is
+        *and* what cadence to expect — mtime alone cannot distinguish "the
+        engine is slow" from "the engine is dead".
+
+        Returns the path written, or ``None`` on failure. Never raises: a
+        dashboard write must not be able to break a scan cycle.
+        """
+        try:
+            state_dir = Path(state_dir)
+            state_dir.mkdir(parents=True, exist_ok=True)
+            with self._lock:
+                payload = self._serialize()
+                payload.pop("trades", None)
+                cycle = payload.get("cycle") or {}
+                payload["_meta"] = {
+                    "written_at_utc": datetime.now(timezone.utc).isoformat(),
+                    "cycle_number": cycle.get("cycle_number"),
+                    "pid": os.getpid(),
+                    "interval_seconds": self._interval_seconds,
+                    "max_trades": self._max_trades,
+                }
+            return _atomic_json(state_dir / "engine_state.json", payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("could not write engine_state.json: %s", exc)
+            return None
+
+    def write_open_positions(self, state_dir: Path) -> Optional[Path]:
+        """Persist the (already capped) trade rows to ``open_positions.json``."""
+        try:
+            state_dir = Path(state_dir)
+            state_dir.mkdir(parents=True, exist_ok=True)
+            with self._lock:
+                payload = {
+                    "written_at_utc": datetime.now(timezone.utc).isoformat(),
+                    "capped_at": self._max_trades or None,
+                    "truncated": self._trades_truncated,
+                    "rows": list(self._trades),
+                }
+            return _atomic_json(state_dir / "open_positions.json", payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("could not write open_positions.json: %s", exc)
+            return None
+
+    #: Scan interval, set by the engine so readers can scale staleness.
+    _interval_seconds: Optional[float] = None
+
+    #: Project root, used only so embedded mode can serve the same v2 UI.
+    _root: Optional[Path] = None
+    _state_dir: Optional[Path] = None
+
+    def set_interval_seconds(self, seconds: Optional[float]) -> None:
+        self._interval_seconds = float(seconds) if seconds else None
+
+    def set_paths(self, root: Path, state_dir: Optional[Path] = None) -> None:
+        self._root = Path(root)
+        self._state_dir = Path(state_dir) if state_dir else None
+
+    # ── v2 (embedded mode) ────────────────────────────────────────────
+
+    def v2(self, sections: Optional[list] = None) -> Dict[str, Any]:
+        """Same v2 payload as the standalone server.
+
+        Embedded mode reads the same files rather than shortcutting to its own
+        in-memory objects. That keeps one code path — and it means a laptop run
+        against a fresh checkout honestly reports "source missing at
+        data/dashboard/rollup.json" instead of inventing numbers.
+        """
+        from src import dashboard_api as _api      # noqa: PLC0415
+        from src import dashboard_sources as _src  # noqa: PLC0415
+
+        root = self._root or Path(__file__).resolve().parent.parent
+        return _api.build_v2(_src.load_all(root, self._state_dir),
+                             sections=sections)
+
+    def rollup(self) -> Dict[str, Any]:
+        from src import dashboard_sources as _src  # noqa: PLC0415
+        root = self._root or Path(__file__).resolve().parent.parent
+        payload, meta = _src.load_rollup(root, self._state_dir)
+        return {"rollup": payload, "meta": meta}
+
+    def fingerprint(self) -> str:
+        from src import dashboard_sources as _src  # noqa: PLC0415
+        root = self._root or Path(__file__).resolve().parent.parent
+        return _src.source_fingerprint(root, self._state_dir)
+
+    def healthz(self) -> Dict[str, Any]:
+        return {
+            "ok": True,
+            "dashboard_version": "v2",
+            "dashboard_mode": "embedded",
+            "engine_liveness": ("halted" if self._engine_status == "halted"
+                                else self._engine_status),
+            "sources": {},
+        }
+
+
+def _atomic_json(path: Path, payload: Dict[str, Any]) -> Path:
+    """Write JSON via tmp + ``os.replace``, preserving mode and ownership.
+
+    Same discipline as ``scripts/rotate_active_log._atomic_write``: a reader
+    must never observe a half-written file, and the file is written by the
+    ``bettingbot`` engine but read by a separate ``bettingbot`` server, so mode
+    has to survive.
+    """
+    import tempfile
+
+    try:
+        st = path.stat()
+        uid, gid, mode = st.st_uid, st.st_gid, st.st_mode & 0o777
+    except OSError:
+        uid = gid = -1
+        mode = 0o644
+
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".dash_",
+                              suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, default=str, separators=(",", ":"))
+            fh.flush()
+            os.fsync(fh.fileno())
+        if uid != -1:
+            try:
+                os.chown(tmp, uid, gid)
+            except (PermissionError, OSError):
+                pass
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+    return path
+
+
+# ── File-backed state (standalone dashboard) ──────────────────────────
+
+
+class FileBackedState:
+    """A ``DashboardState`` look-alike that reads files instead of memory.
+
+    Duck-types the only two things ``_DashboardHandler`` needs — ``to_json()``
+    and ``v2()`` — so both the embedded and standalone servers share one
+    handler, one auth path and one route table.
+
+    This is the class that makes "the dashboard still works when the engine is
+    down" true. The embedded server is a thread inside the engine process, so it
+    dies with it; this one holds no engine reference at all.
+    """
+
+    def __init__(self, root: Path, state_dir: Optional[Path] = None) -> None:
+        self._root = Path(root)
+        self._state_dir = Path(state_dir) if state_dir else None
+
+    # -- v1, byte-compatible with DashboardState.to_json() ------------
+
+    def to_json(self) -> str:
+        return json.dumps(self._v1(), default=str)
+
+    def _v1(self) -> Dict[str, Any]:
+        """The v1 payload, rehydrated from the engine's own snapshot.
+
+        Because ``engine_state.json`` *is* ``_serialize()``'s output, the v1
+        contract (``engine_status`` vocabulary, absent-until-populated
+        ``risk``/``cycle``/``pods``/``settlement``, percentages rather than
+        fractions) holds by construction rather than by a parallel
+        implementation that could drift.
+        """
+        from src import dashboard_sources as _src  # noqa: PLC0415
+
+        state, meta = _src.load_engine_state(self._root, self._state_dir)
+        rows, rows_meta = _src.load_open_positions(self._root, self._state_dir)
+
+        if state is None:
+            # Matches a fresh DashboardState exactly. This is a KNOWN soft spot:
+            # a long-dead engine reads as "starting" on v1, because the
+            # vocabulary is frozen by the 56-test contract and by
+            # src/health_check.py. The honest signal is the additive
+            # engine_state_* keys below, and /api/v2/dashboard's four-valued
+            # `liveness`. The UI renders only v2.
+            out: Dict[str, Any] = {"engine_status": "starting"}
+        else:
+            out = {k: v for k, v in state.items() if k != "_meta"}
+
+        out["trades"] = list((rows or {}).get("rows") or [])
+        out["trades_truncated"] = bool((rows or {}).get("truncated"))
+        out["engine_state_available"] = bool(meta.get("available"))
+        out["engine_state_age_seconds"] = meta.get("age_seconds")
+        out["engine_state_path"] = meta.get("path")
+        out["engine_state_reason"] = meta.get("reason")
+        out["open_positions_available"] = bool(rows_meta.get("available"))
+        out["dashboard_version"] = "v2"
+        out["dashboard_mode"] = "standalone"
+        return out
+
+    # -- v2 -----------------------------------------------------------
+
+    def v2(self, sections: Optional[list] = None) -> Dict[str, Any]:
+        from src import dashboard_api as _api      # noqa: PLC0415
+        from src import dashboard_sources as _src  # noqa: PLC0415
+        return _api.build_v2(_src.load_all(self._root, self._state_dir),
+                             sections=sections)
+
+    def rollup(self) -> Dict[str, Any]:
+        from src import dashboard_sources as _src  # noqa: PLC0415
+        payload, meta = _src.load_rollup(self._root, self._state_dir)
+        return {"rollup": payload, "meta": meta}
+
+    def fingerprint(self) -> str:
+        from src import dashboard_sources as _src  # noqa: PLC0415
+        return _src.source_fingerprint(self._root, self._state_dir)
+
+    def healthz(self) -> Dict[str, Any]:
+        payload = self.v2(sections=["now"])
+        srcs = payload.get("sources") or {}
+        return {
+            "ok": bool(srcs.get("engine_state", {}).get("available")
+                       or srcs.get("manager_status", {}).get("available")),
+            "dashboard_version": "v2",
+            "dashboard_mode": "standalone",
+            "engine_liveness": (payload.get("engine") or {}).get("liveness"),
+            "sources": {name: {"available": m.get("available"),
+                               "age_seconds": m.get("age_seconds"),
+                               "stale": m.get("stale"),
+                               "reason": m.get("reason")}
+                        for name, m in srcs.items()},
+        }
+
 
 # ── HTTP request handler ──────────────────────────────────────────────
 
@@ -271,10 +531,24 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         if self.path == "/health":
             self._respond(200, b"ok", "text/plain")
             return
+        # /healthz is the JSON sibling: same open access (scripts/deploy.sh and
+        # Caddy gate on it and have no credentials), but it reports per-source
+        # freshness so "the process is up" and "the data is current" stop being
+        # the same signal.  Deliberately 200 even when a source is stale — a
+        # dashboard that refuses to load because the collector died is strictly
+        # worse than one that tells you the collector died.
+        if self.path.split("?", 1)[0] == "/healthz":
+            self._serve_healthz()
+            return
         if not self._authorized():
             return
-        if self.path in ("/", "/index.html"):
+        route = self.path.split("?", 1)[0]
+        if route in ("/", "/index.html"):
             self._serve_html()
+        elif route == "/api/v2/dashboard":
+            self._serve_v2()
+        elif route == "/api/v2/rollup":
+            self._serve_rollup()
         elif self.path == "/api/status":
             self._serve_json()
         elif self.path == "/manager":
@@ -373,6 +647,89 @@ class _DashboardHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    # -- v2 -----------------------------------------------------------
+
+    def _query(self) -> Dict[str, str]:
+        from urllib.parse import parse_qs, urlparse  # noqa: PLC0415
+        q = parse_qs(urlparse(self.path).query)
+        return {k: v[0] for k, v in q.items() if v}
+
+    def _serve_v2(self) -> None:
+        """The primary UI feed.
+
+        ``?section=pnl,gates`` trims the payload for a phone that is only
+        looking at one tab. An ETag over every source's ``(path, mtime, size)``
+        turns a 15-second poll into a 304 for the ~14 minutes of each quarter
+        hour when nothing has changed.
+        """
+        sections = None
+        raw = self._query().get("section")
+        if raw:
+            wanted = [s.strip() for s in raw.split(",") if s.strip()]
+            bad = [s for s in wanted if s not in _V2_SECTIONS]
+            if bad:
+                self._respond(400, json.dumps({
+                    "error": "unknown section(s): {}".format(", ".join(bad)),
+                    "valid": sorted(_V2_SECTIONS),
+                }).encode("utf-8"), "application/json")
+                return
+            sections = wanted
+
+        try:
+            etag = '"{}-{}"'.format(self.state.fingerprint(),
+                                    ",".join(sections) if sections else "all")
+        except Exception:  # noqa: BLE001
+            etag = None
+
+        if etag and self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+
+        try:
+            payload = self.state.v2(sections=sections)
+        except Exception as exc:  # noqa: BLE001
+            # A rendering bug must not take the page down; the raw reason is
+            # more useful than a stack trace in the browser console.
+            logger.exception("v2 build failed")
+            self._respond(500, json.dumps({
+                "schema": 2,
+                "error": "could not build the dashboard payload",
+                "detail": "{}: {}".format(type(exc).__name__, exc),
+            }).encode("utf-8"), "application/json")
+            return
+
+        body = json.dumps(payload, default=str).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-cache")
+        if etag:
+            self.send_header("ETag", etag)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_rollup(self) -> None:
+        try:
+            payload = self.state.rollup()
+        except Exception as exc:  # noqa: BLE001
+            payload = {"error": "{}: {}".format(type(exc).__name__, exc)}
+        self._respond(200, json.dumps(payload, default=str).encode("utf-8"),
+                      "application/json")
+
+    def _serve_healthz(self) -> None:
+        try:
+            payload = self.state.healthz()
+            code = 200
+        except Exception as exc:  # noqa: BLE001
+            payload = {"ok": False,
+                       "error": "{}: {}".format(type(exc).__name__, exc)}
+            code = 503
+        self._respond(code, json.dumps(payload, default=str).encode("utf-8"),
+                      "application/json")
 
     def _respond(self, code: int, body: bytes, ctype: str) -> None:
         self.send_response(code)
@@ -510,20 +867,26 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 def _load_template() -> str:
     """Load the dashboard HTML template from disk.
 
-    Falls back to a minimal placeholder if the file is missing (e.g. during
-    testing or packaging where templates weren't bundled).
+    Prefers ``dashboard_v2.html`` and falls back to the original
+    ``dashboard.html``, so a partial deploy (new code, old templates) still
+    serves a working page rather than the placeholder. Falls back again to a
+    minimal placeholder if neither is present.
     """
-    path = _TEMPLATE_DIR / "dashboard.html"
-    try:
-        return path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        logger.warning("Dashboard template not found at %s", path)
-        return (
-            "<!DOCTYPE html><html><body>"
-            "<h1>Betting Pod Shop</h1>"
-            "<p>Dashboard template not found. Check src/templates/dashboard.html</p>"
-            "</body></html>"
-        )
+    for name in ("dashboard_v2.html", "dashboard.html"):
+        path = _TEMPLATE_DIR / name
+        try:
+            return path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+
+    logger.warning("Dashboard template not found in %s", _TEMPLATE_DIR)
+    return (
+        "<!DOCTYPE html><html><body>"
+        "<h1>BETTING POD SHOP</h1>"
+        "<p>Dashboard template not found. Check "
+        "src/templates/dashboard_v2.html</p>"
+        "</body></html>"
+    )
 
 
 _HTML_TEMPLATE = _load_template()

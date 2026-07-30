@@ -658,6 +658,8 @@ def make_cycle_callback(
     web_server: Optional["WebDashboardServer"] = None,
     trade_log_path: Optional[Path] = None,
     trade_store: Optional["TradeStore"] = None,
+    dashboard_state_dir: Optional[Path] = None,
+    interval_seconds: Optional[float] = None,
 ) -> Callable[[CycleReport], None]:
     """Create a callback that updates the aggregate risk guard and logs status.
 
@@ -669,11 +671,36 @@ def make_cycle_callback(
         web_server:      Optional WebDashboardServer.
         trade_log_path:  Path to the JSONL trade log (fallback when no store).
         trade_store:     Optional TradeStore for in-memory dashboard data.
+        dashboard_state_dir:
+            Where to persist ``engine_state.json`` and ``open_positions.json``
+            each cycle, for the standalone dashboard to read. Written even when
+            ``web_server`` is None — the standalone server must not depend on
+            the embedded one being enabled.
+        interval_seconds:
+            The scan interval, recorded in the snapshot so a reader can tell
+            "the engine is slow" from "the engine is dead". mtime alone cannot.
 
     Returns:
         Callback function matching the PodRunner callback signature.
     """
     cb_logger = logging.getLogger("main.cycle")
+
+    # One state object serves both consumers. When an embedded server is
+    # running it owns the state; otherwise a private one exists purely so the
+    # snapshot can still be serialised by the SAME code path — a second
+    # serializer would drift from the one the 56 v1 tests cover.
+    snapshot_state = None
+    if dashboard_state_dir is not None:
+        try:
+            from src.web_dashboard import DashboardState  # noqa: PLC0415
+            snapshot_state = (web_server.state if web_server is not None
+                              else DashboardState())
+            snapshot_state.set_interval_seconds(interval_seconds)
+            snapshot_state.set_paths(Path(__file__).resolve().parent.parent,
+                                     dashboard_state_dir)
+        except Exception as exc:  # noqa: BLE001
+            cb_logger.warning("dashboard snapshot disabled: %s", exc)
+            snapshot_state = None
 
     def _callback(report: CycleReport) -> None:
         guard.update_post_cycle(report)
@@ -711,13 +738,26 @@ def make_cycle_callback(
             except Exception as exc:
                 cb_logger.debug("dashboard render failed: %s", exc)
 
-        if web_server is not None:
+        if web_server is not None or snapshot_state is not None:
             try:
                 perfs  = allocator.performances if allocator else None
                 allocs = allocator.allocations  if allocator else None
 
                 if trade_store is not None:
-                    trades = trade_store.get_recent_placed_with_status()
+                    # Bounded on the way in. Before this cap the full history
+                    # was held in memory and echoed verbatim into every
+                    # /api/status response, inside the one unit on the box with
+                    # no MemoryMax.
+                    #
+                    # Ask for ONE MORE than the cap. The store honours the limit
+                    # exactly, so requesting the cap itself makes "there are
+                    # more" indistinguishable from "there are exactly this many"
+                    # — and `truncated` would have been permanently False no
+                    # matter how many open placements existed. The extra row is
+                    # the probe; DashboardState.update trims it back off.
+                    from src.web_dashboard import DashboardState as _DS  # noqa: PLC0415
+                    trades = trade_store.get_recent_placed_with_status(
+                        max_trades=_DS.DEFAULT_MAX_TRADES + 1)
                     for t in trades:
                         t["bet_team"] = _resolve_bet_team(t)
                         if not t.get("game_time"):
@@ -734,16 +774,35 @@ def make_cycle_callback(
                         trade_log_path, trades=trades
                     )
 
-                web_server.update(
-                    snapshot=snap,
-                    report=report,
-                    performances=perfs,
-                    allocations=allocs,
-                    trades=trades,
-                    settlement_summary=settlement,
-                )
+                if web_server is not None:
+                    web_server.update(
+                        snapshot=snap,
+                        report=report,
+                        performances=perfs,
+                        allocations=allocs,
+                        trades=trades,
+                        settlement_summary=settlement,
+                    )
+                elif snapshot_state is not None:
+                    snapshot_state.update(
+                        snapshot=snap,
+                        report=report,
+                        performances=perfs,
+                        allocations=allocs,
+                        trades=trades,
+                        settlement_summary=settlement,
+                    )
             except Exception as exc:
                 cb_logger.debug("web dashboard update failed: %s", exc)
+
+            # Persisted separately so a serialisation failure here can never
+            # prevent the in-memory dashboard from having been updated above.
+            if snapshot_state is not None and dashboard_state_dir is not None:
+                try:
+                    snapshot_state.write_snapshot(dashboard_state_dir)
+                    snapshot_state.write_open_positions(dashboard_state_dir)
+                except Exception as exc:  # noqa: BLE001
+                    cb_logger.warning("dashboard snapshot write failed: %s", exc)
 
     return _callback
 

@@ -246,6 +246,71 @@ def check_api_status(dashboard_url: str) -> tuple:
         )
 
 
+def check_engine_freshness(data: Dict[str, Any]) -> CheckResult:
+    """Is the engine snapshot actually current?
+
+    Why this exists: ``/api/status``'s ``engine_status`` vocabulary is frozen at
+    ``starting|running|halted`` by the v1 contract, so a standalone dashboard
+    with no snapshot at all must report ``"starting"`` — which means a
+    long-dead engine reads as merely booting. The additive
+    ``engine_state_age_seconds`` key carries the truth, and this check is what
+    turns it into a FAIL.
+
+    Skips cleanly against an embedded (in-memory) dashboard, which has no
+    snapshot file and therefore no age to report.
+    """
+    if "engine_state_available" not in data:
+        return CheckResult(
+            name="Engine freshness",
+            status=CheckStatus.SKIP,
+            message="embedded dashboard — no snapshot file to age-check",
+        )
+
+    if not data.get("engine_state_available"):
+        return CheckResult(
+            name="Engine freshness",
+            status=CheckStatus.FAIL,
+            message="no engine snapshot: {}".format(
+                data.get("engine_state_reason") or "reason not reported"),
+            detail=str(data.get("engine_state_path") or ""),
+        )
+
+    age = data.get("engine_state_age_seconds")
+    if not isinstance(age, (int, float)) or isinstance(age, bool):
+        return CheckResult(
+            name="Engine freshness",
+            status=CheckStatus.WARN,
+            message="snapshot present but its age was not reported",
+        )
+
+    interval = 300.0
+    cycle_blk = data.get("cycle") or {}
+    if isinstance(cycle_blk, dict) and isinstance(
+            cycle_blk.get("interval_seconds"), (int, float)):
+        interval = float(cycle_blk["interval_seconds"])
+    limit = interval * 3.0
+
+    if age < -60:
+        return CheckResult(
+            name="Engine freshness",
+            status=CheckStatus.WARN,
+            message="snapshot is {:.0f}s in the future — clock skew between "
+                    "the engine host and this checker".format(-age),
+        )
+    if age > limit:
+        return CheckResult(
+            name="Engine freshness",
+            status=CheckStatus.FAIL,
+            message="engine last wrote {:.1f} min ago (limit {:.0f}s)".format(
+                age / 60.0, limit),
+        )
+    return CheckResult(
+        name="Engine freshness",
+        status=CheckStatus.PASS,
+        message="snapshot {:.0f}s old".format(age),
+    )
+
+
 def check_cycle_health(data: Dict[str, Any]) -> CheckResult:
     """Check 3: Recent cycle metrics — success rate, errors, freshness."""
     cycle = data.get("cycle")
@@ -631,6 +696,8 @@ def run_health_check(
         return report
 
     # Check 3: Cycle health
+    report.checks.append(check_engine_freshness(api_data))
+
     report.checks.append(check_cycle_health(api_data))
 
     # Check 4: Pod active

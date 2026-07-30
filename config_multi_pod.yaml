@@ -644,3 +644,22 @@ paths:
 # Set to 0 to disable the cap (load everything — original behaviour).
 trade_store:
   max_load_entries: 50000
+
+# ── Dashboard ────────────────────────────────────────────────────────────────
+# The engine writes engine_state.json + open_positions.json into state_dir each
+# cycle; the standalone dashboard (betting-dashboard.service, 127.0.0.1:8081)
+# reads them. Written whether or not --web is set, so the file-backed server
+# never depends on the embedded one being enabled.
+dashboard:
+  state_dir: data/dashboard
+  # Hard cap on trade rows held in memory and echoed into /api/status. This was
+  # previously unbounded AND iterated three times per request, inside the engine
+  # process. 400 is the number of rows anyone actually scrolls.
+  max_trades: 400
+  # Browser poll interval. 15s (not the old 5s) because the payload is
+  # ETag-cached and the underlying producers run every 5 min (engine) and
+  # 15 min (collector) — polling faster than the data changes only costs battery.
+  poll_secs: 15
+  # A source older than this multiple of its expected interval is labelled stale
+  # in the UI rather than silently shown as current.
+  stale_multiplier: 3

@@ -103,6 +103,23 @@ services:
         max_silent_journal_minutes: 12   # > 2 scan cycles (300s each)
     severity: critical
 
+  # The standalone dashboard, split out of the engine 2026-07-30. Registered so
+  # its own death is visible in the daily brief — the lesson from the evmap
+  # timers, where a job that stopped producing looked healthy because nothing
+  # watched it.
+  #
+  # NO heartbeat file on purpose: this process writes nothing (the systemd unit
+  # enforces that with ReadOnlyPaths and no ReadWritePaths), so `active` from
+  # systemd IS the liveness signal. Inventing a heartbeat file would mean giving
+  # a read-only process write access purely to satisfy monitoring.
+  #
+  # severity: warn, not critical — the dashboard being down costs visibility,
+  # not money, and paging critical for it would train the alert to be ignored.
+  - id: betting-dashboard
+    kind: systemd
+    description: Standalone file-backed dashboard on 127.0.0.1:8081 behind Caddy
+    severity: warn
+
   # RETIRED 2026-07-22. P-016 (v1 and v2) both failed their pre-registered
   # gates (v1 adverse selection; v2 founding premise refuted). Kill switch
   # data/KILL_MAKER was hit 2026-07-22 01:22:40 UTC; the maker pulled all
@@ -173,6 +190,27 @@ jobs:
       glob: data/trade_logs/trade_log.archive_*.jsonl.gz
       max_stale_hours: 48
     severity: info
+
+  # Maintains data/dashboard/rollup.json — the dashboard's lifetime aggregates.
+  #
+  # max_stale_hours: 3 gives the hourly timer two misses before it alarms.
+  #
+  # ⚠ This output is the SYSTEM OF RECORD for pre-horizon history: once
+  # rotate_active_log prunes an archive (KEEP_ARCHIVES = 12), the rows it held
+  # survive only in these counters and cannot be rebuilt from disk. The job
+  # writes rollup.json.bak.gz alongside it for that reason. A stale rollup is a
+  # cosmetic problem; a LOST rollup is unrecoverable history.
+  - id: dashboard_rollup
+    host: droplet
+    schedule: "7 * * * *"
+    description: Incremental dashboard rollup (lifetime P&L, skip reasons, placement rate)
+    output:
+      file: data/dashboard/rollup.json
+      max_stale_hours: 3
+    severity: warn
+    note: >
+      systemd timer dashboard-rollup.timer, not crontab. First run must be
+      manual with --full and off a deploy window. Back this output up.
 
   - id: shadow_maker
     host: droplet

@@ -46,6 +46,12 @@ Restart=always
 RestartSec=5
 ExecStartPre=/bin/sleep 3
 
+# The SIGTERM handler stops the server from a helper thread (F2 fix in
+# src/dashboard_server.py); a clean stop takes well under a second.  If it
+# ever regresses into the old serve_forever deadlock, escalate to SIGKILL in
+# 10s instead of systemd's default 90s.
+TimeoutStopSec=10
+
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=betting-dashboard

@@ -48,6 +48,7 @@ import argparse
 import logging
 import signal
 import sys
+import threading
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import List, Optional
@@ -79,6 +80,22 @@ def build_server(root: Path, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT,
     _Handler.state = state          # type: ignore[assignment]
     _Handler.poll_ms = poll_secs * 1_000
     return ThreadingHTTPServer((host, port), _Handler)
+
+
+def request_shutdown(server: ThreadingHTTPServer) -> threading.Thread:
+    """Stop ``server`` without blocking the calling thread.
+
+    ``shutdown()`` waits for ``serve_forever()``'s poll loop to notice the
+    stop flag — but a signal handler runs on the main thread, which is the
+    thread *inside* ``serve_forever()``.  Calling ``shutdown()`` inline there
+    deadlocks: the handler waits on a loop that cannot advance until the
+    handler returns (F2 — systemctl stop hung 90s to SIGKILL, 2026-07-30).
+    Spawning it on a helper thread lets the handler return immediately, the
+    poll loop resumes, sees the flag, and exits.
+    """
+    t = threading.Thread(target=server.shutdown, daemon=True)
+    t.start()
+    return t
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -119,7 +136,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     def _shutdown(signum, _frame):  # noqa: ANN001
         logger.info("received signal %s — shutting down", signum)
-        server.shutdown()
+        request_shutdown(server)
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:

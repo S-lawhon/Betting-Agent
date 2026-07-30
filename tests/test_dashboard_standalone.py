@@ -32,7 +32,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.dashboard_server import build_server  # noqa: E402
+from src.dashboard_server import build_server, request_shutdown  # noqa: E402
 from src.web_dashboard import DashboardState, FileBackedState  # noqa: E402
 
 USER, PASSWORD = "sam", "hunter2"
@@ -410,3 +410,88 @@ def test_cap_can_be_disabled_with_zero():
 
 def test_default_cap_is_400():
     assert DashboardState.DEFAULT_MAX_TRADES == 400
+
+
+# ── F2: SIGTERM must not deadlock the serve loop ──────────────────────
+#
+# main()'s signal handler runs on the main thread — the thread inside
+# serve_forever() — so calling server.shutdown() inline there waits on a
+# poll loop that cannot advance until the handler returns.  Observed as
+# `systemctl restart betting-dashboard` hanging 90s to SIGKILL (2026-07-30).
+# The fix (request_shutdown) spawns the shutdown on a helper thread.
+
+
+def test_request_shutdown_stops_the_serve_loop_within_5s(empty_root, creds):
+    server = build_server(empty_root, host="127.0.0.1", port=0)
+    serve = threading.Thread(target=server.serve_forever, daemon=True)
+    serve.start()
+    try:
+        helper = request_shutdown(server)
+        serve.join(timeout=5)
+        assert not serve.is_alive(), "serve_forever did not exit after shutdown"
+        helper.join(timeout=5)
+        assert not helper.is_alive()
+    finally:
+        server.server_close()
+
+
+def test_request_shutdown_returns_immediately_even_from_the_serve_thread(
+        empty_root, creds):
+    # The signal-handler geometry: the caller IS the thread serve_forever()
+    # runs on.  request_shutdown must return without waiting on the loop —
+    # a blocking implementation (plain server.shutdown()) deadlocks here.
+    server = build_server(empty_root, host="127.0.0.1", port=0)
+    done = threading.Event()
+
+    def serve_then_die():
+        # Run the "handler" from within the serve thread by scheduling it via
+        # the server's own service loop: issue the shutdown request first,
+        # then enter serve_forever.  If request_shutdown blocked on the loop
+        # (which has not started yet, and never will if we block), this
+        # thread would hang exactly like the main thread did in production.
+        request_shutdown(server)
+        server.serve_forever()
+        done.set()
+
+    t = threading.Thread(target=serve_then_die, daemon=True)
+    t.start()
+    try:
+        assert done.wait(timeout=5), (
+            "serve thread wedged — request_shutdown blocked from the thread "
+            "that owns serve_forever()")
+    finally:
+        server.server_close()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
+def test_sigterm_terminates_the_process_within_5s(tmp_path):
+    # End-to-end reproduction of F2: run main() in a real process (handler on
+    # the main thread, serve_forever on the main thread), send SIGTERM, and
+    # require a prompt clean exit.  Before the fix this hung until SIGKILL.
+    import signal as _signal
+    import subprocess
+    import time
+
+    repo = Path(__file__).resolve().parent.parent
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "src.dashboard_server",
+         "--root", str(tmp_path), "--host", "127.0.0.1", "--port", "0"],
+        cwd=str(repo), stderr=subprocess.PIPE, text=True)
+    try:
+        # The boot log line means serve_forever is about to run; give the
+        # loop a beat to actually enter its poll.
+        for line in proc.stderr:
+            if "standalone dashboard on" in line:
+                break
+        time.sleep(0.2)
+        proc.send_signal(_signal.SIGTERM)
+        try:
+            rc = proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pytest.fail("dashboard did not exit within 5s of SIGTERM (F2)")
+        assert rc == 0
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        proc.stderr.close()

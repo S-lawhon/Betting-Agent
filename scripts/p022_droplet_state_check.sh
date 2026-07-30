@@ -79,8 +79,13 @@ python3 - "$LOGDIR" "$TODAY" <<'PY'
 import json, os, sys, glob
 from collections import Counter
 logdir, today = sys.argv[1], sys.argv[2]
-paths = [p for p in glob.glob(os.path.join(logdir, "**", "*p022*"), recursive=True)
+# The maker writes data/trade_logs/round_leader_fade_{quotes,fills}.jsonl
+# (round_leader_fade_maker.py) — nothing on disk matches *p022*.
+paths = [p
+         for pat in ("*round_leader_fade*", "*p022*")
+         for p in glob.glob(os.path.join(logdir, "**", pat), recursive=True)
          if p.endswith((".jsonl", ".log"))]
+paths = sorted(set(paths))
 if not paths:
     print(f"  no P-022 logs under {logdir}")
     raise SystemExit(0)
@@ -99,7 +104,7 @@ for p in paths:
                 r = json.loads(line)
             except ValueError:
                 continue
-            if today not in str(r.get("ts", "")) + str(r.get("timestamp", "")):
+            if today not in str(r.get("iso", "")) + str(r.get("timestamp", "")):
                 continue
             t = r.get("type")
             kinds[t] += 1

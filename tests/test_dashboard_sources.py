@@ -24,15 +24,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import dashboard_sources as ds  # noqa: E402
 
 UTC = timezone.utc
-NOW = datetime(2026, 7, 30, 12, 0, 0, tzinfo=UTC)
 
 
 def clock():
-    return NOW
+    """Real now — NOT a fixed instant.
+
+    The clock must never lag the mtimes of files the tests write: _meta falls
+    back to mtime for the age, and a clock behind a real mtime by >60 s trips
+    the clock-skew guard, whose reason OVERWRITES the one under test.
+    """
+    return datetime.now(UTC)
 
 
 def ago(**kw) -> str:
-    return (NOW - timedelta(**kw)).isoformat()
+    return (clock() - timedelta(**kw)).isoformat()
+
+
+def ahead(**kw) -> str:
+    return (clock() + timedelta(**kw)).isoformat()
 
 
 @pytest.fixture()
@@ -133,7 +142,7 @@ def test_future_timestamp_is_flagged_as_clock_skew(root):
     p = root / "data" / "dashboard" / "engine_state.json"
     p.write_text(json.dumps({
         "engine_status": "running",
-        "_meta": {"written_at_utc": (NOW + timedelta(hours=3)).isoformat(),
+        "_meta": {"written_at_utc": ahead(hours=3),
                   "interval_seconds": 300}}), encoding="utf-8")
     _, meta = ds.load_engine_state(root, None, clock)
     assert meta["clock_skew"] is True

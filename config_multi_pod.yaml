@@ -33,6 +33,26 @@ risk:
   min_confidence: 0.55          # minimum model confidence to trade
   initial_bankroll: 1000.0      # starting paper bankroll
 
+# ── P-001 scanner edge thresholds ───────────────────────────────────
+# Consumed by the legacy EdgeCalculator/Scanner only (P-006 etc. have
+# their own per-pod blocks). min_edge_pct/min_ev here restate the code
+# defaults that P-001 has always run at — this block existed implicitly.
+edge:
+  min_edge_pct: 0.03            # global default (all sports without an override)
+  min_ev: 0.01
+
+  # Per-sport overrides (Scanner._edge_for_sport). Added 2026-07-30 to
+  # speed up the P-001 scenario-D gate: at 3%/1% no MLB candidate cleared
+  # the bar for 4 straight days (0 of 315 unique ticker/side/day skips
+  # 07-26→07-30). At 1%/0.33%, 22 of those would have passed the edge
+  # filter and 12 the downstream clv_gate (~+3 placements/day). PAPER
+  # COLLECTION ONLY — rows log edge_pct, and p001_checkpoint.py reports
+  # the >=3% stratum separately so the original-regime read survives.
+  sport_overrides:
+    baseball_mlb:
+      min_edge_pct: 0.01
+      min_ev: 0.0033
+
 # ── New sections ────────────────────────────────────────────────────
 
 kalshi:

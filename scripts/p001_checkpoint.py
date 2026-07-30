@@ -76,6 +76,13 @@ ADMISSIBLE_HOURS = 3.0
 # tie-break and are not part of the clean forward sample.
 EPOCH = datetime(2026, 7, 26, 21, 31, 0, tzinfo=timezone.utc)
 
+#: The min_edge_pct P-001 ran at when scenario D was approved. On 2026-07-30
+#: the MLB threshold was loosened to 1% (config `edge.sport_overrides`) to
+#: speed up paper collection, so the forward sample now mixes two entry
+#: regimes. Rows log their edge_pct at placement; the >=3% stratum below IS
+#: the original population and stays separately readable.
+ORIGINAL_MIN_EDGE = 0.03
+
 _MON = {m: i + 1 for i, m in enumerate(
     ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"])}
 _TICKER_RE = re.compile(r"KXMLBGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})")
@@ -138,6 +145,7 @@ def load_placements(trade_log: Path) -> Dict[str, Dict[str, Any]]:
                     "game_time": parse_ts(rec.get("game_time")),
                     "placed_at": parse_ts(rec.get("timestamp_utc") or rec.get("timestamp")),
                     "market_id": rec.get("market_id") or rec.get("market_ticker") or "",
+                    "edge_pct": rec.get("edge_pct"),
                 }
     return out
 
@@ -224,6 +232,7 @@ def evaluate(trade_log: Path = DEFAULT_TRADE_LOG,
 
     counted: List[float] = []
     by_day: Dict[str, List[float]] = {}
+    strata: Dict[str, List[float]] = {}
     tally = {"clv_rows": 0, "joined": 0, "post_epoch": 0,
              "admissible_post_epoch": 0, "pre_epoch": 0,
              "inadmissible_post_epoch": 0, "unjoinable": 0, "not_mlb": 0}
@@ -268,6 +277,11 @@ def evaluate(trade_log: Path = DEFAULT_TRADE_LOG,
                 tally["admissible_post_epoch"] += 1
                 counted.append(float(clv))
                 by_day.setdefault(start.date().isoformat(), []).append(float(clv))
+                e = p.get("edge_pct")
+                stratum = ("edge_ge_3pct" if e is not None and float(e) >= ORIGINAL_MIN_EDGE
+                           else "edge_lt_3pct" if e is not None
+                           else "edge_unknown")
+                strata.setdefault(stratum, []).append(float(clv))
 
     n = len(counted)
     edge = statistics.fmean(counted) * 100 if counted else None   # cents
@@ -307,6 +321,18 @@ def evaluate(trade_log: Path = DEFAULT_TRADE_LOG,
         "edge_cents_net_maker": edge,
         "ci_low": lo, "ci_high": hi,
         "day_clusters": len(by_day),
+        # Entry-threshold strata. The MLB min_edge was loosened 3%→1% on
+        # 2026-07-30 for paper collection; `edge_ge_3pct` is the population
+        # scenario D was approved on, `edge_lt_3pct` exists only under the
+        # loosened regime. Read them separately before any promotion call.
+        "entry_regime_note": ("MLB min_edge_pct loosened 0.03->0.01 on "
+                              "2026-07-30 (edge.sport_overrides); strata "
+                              "split at the original 3%"),
+        "strata": {
+            k: {"n": len(v),
+                "clv_cents_net_maker": round(statistics.fmean(v) * 100, 3)}
+            for k, v in sorted(strata.items())
+        },
         "tally": tally,
         "verdict": verdict,
     }
@@ -339,6 +365,11 @@ def main(argv=None) -> int:
               if res["ci_low"] is not None else "  (CI needs >=2 day clusters)")
         print(f"  edge    : {res['edge_cents_net_maker']:+.2f}c/ct net-maker"
               f"   {res['day_clusters']} day clusters{ci}")
+    if res["strata"]:
+        print("\n  entry-threshold strata (MLB min_edge 3%->1% on 2026-07-30):")
+        for name, s in res["strata"].items():
+            print(f"    {name:14s} n={s['n']:3d}  "
+                  f"clv={s['clv_cents_net_maker']:+.2f}c/ct")
     print("\n  attrition:")
     print(f"    clv rows scanned          {t['clv_rows']}")
     print(f"    not MLB                   {t['not_mlb']}")

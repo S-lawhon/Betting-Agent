@@ -363,6 +363,7 @@ class Scanner:
         fatigue_analyzer: Optional[Any] = None,
         _now_fn: Optional[Callable[[], datetime]] = None,
         clv_gate: Optional[dict] = None,
+        sport_edge_overrides: Optional[Dict[str, Dict[str, float]]] = None,
     ) -> None:
         self._kalshi           = kalshi_client
         self._odds             = odds_client
@@ -376,6 +377,8 @@ class Scanner:
         self._min_volume       = min_market_volume
         self._fatigue          = fatigue_analyzer
         self._clv_gate         = clv_gate or {}
+        self._sport_edge_overrides = sport_edge_overrides or {}
+        self._sport_edge_cache: Dict[str, EdgeCalculator] = {}
         self._now              = _now_fn or (lambda: datetime.now(tz=timezone.utc))
         self._seen: Set[str] = set()   # session-level fingerprint dedup
         self._last_kalshi_markets: List[Dict[str, Any]] = []  # exposed for consistency checker
@@ -419,6 +422,7 @@ class Scanner:
             min_market_volume=min_market_volume,
             fatigue_analyzer=fatigue_analyzer,
             clv_gate=config.get("pods", {}).get("P-001", {}).get("clv_gate"),
+            sport_edge_overrides=config.get("edge", {}).get("sport_overrides"),
             **kwargs,
         )
 
@@ -882,10 +886,11 @@ class Scanner:
             return None  # Skip — don't trade on likely data mismatch
 
         # ── Edge evaluation ───────────────────────────────────────────────────
-        yes_result, no_result = self._edge.evaluate_both_sides(
+        edge_calc = self._edge_for_sport(sport)
+        yes_result, no_result = edge_calc.evaluate_both_sides(
             fair_yes_prob, price
         )
-        best = self._edge.best_side(fair_yes_prob, price)
+        best = edge_calc.best_side(fair_yes_prob, price)
 
         # ── Fatigue-adjusted re-evaluation (Strategy 1) ──────────────────────
         fatigue_ctx: Optional[Dict[str, Any]] = None
@@ -903,7 +908,7 @@ class Scanner:
                 if matchup_fatigue.edge_multiplier > 1.0:
                     # Re-evaluate with lowered thresholds
                     adjusted_edge = self._adjusted_edge_calc(
-                        matchup_fatigue.edge_multiplier
+                        matchup_fatigue.edge_multiplier, base=edge_calc
                     )
                     best = adjusted_edge.best_side(fair_yes_prob, price)
                     if best is not None:
@@ -1018,9 +1023,39 @@ class Scanner:
         )
         return entry
 
+    # ── Per-sport edge thresholds ────────────────────────────────────────────
+
+    def _edge_for_sport(self, sport: str) -> EdgeCalculator:
+        """
+        EdgeCalculator for this sport: the shared one, unless
+        ``edge.sport_overrides.<sport>`` supplies its own
+        ``min_edge_pct`` / ``min_ev``. Only the two entry thresholds may
+        differ — fee, Kelly and sizing caps always come from the shared
+        calculator.
+        """
+        override = self._sport_edge_overrides.get(sport)
+        if not override:
+            return self._edge
+        cached = self._sport_edge_cache.get(sport)
+        if cached is not None:
+            return cached
+        calc = EdgeCalculator(
+            fee_pct=self._edge.fee_pct,
+            kelly_fraction=self._edge.kelly_fraction,
+            base_bet_pct=self._edge.base_bet_pct,
+            max_bet_pct=self._edge.max_bet_pct,
+            high_edge_threshold=self._edge.high_edge_threshold,
+            max_edge_threshold=self._edge.max_edge_threshold,
+            min_edge_pct=float(override.get("min_edge_pct", self._edge.min_edge_pct)),
+            min_ev=float(override.get("min_ev", self._edge.min_ev)),
+        )
+        self._sport_edge_cache[sport] = calc
+        return calc
+
     # ── Fatigue-adjusted edge re-evaluation ──────────────────────────────────
 
-    def _adjusted_edge_calc(self, multiplier: float) -> EdgeCalculator:
+    def _adjusted_edge_calc(self, multiplier: float,
+                            base: Optional[EdgeCalculator] = None) -> EdgeCalculator:
         """
         Create a temporary EdgeCalculator with thresholds lowered by
         the fatigue confidence multiplier.
@@ -1028,16 +1063,19 @@ class Scanner:
         The multiplier (e.g. 1.5 for B2B) divides into min_edge_pct and
         min_ev, so a 3% edge threshold becomes 2% when the multiplier is
         1.5.  All other parameters (fee, Kelly, caps) stay the same.
+        ``base`` carries any per-sport threshold override; defaults to
+        the shared calculator.
         """
+        base = base or self._edge
         return EdgeCalculator(
-            fee_pct=self._edge.fee_pct,
-            kelly_fraction=self._edge.kelly_fraction,
-            base_bet_pct=self._edge.base_bet_pct,
-            max_bet_pct=self._edge.max_bet_pct,
-            high_edge_threshold=self._edge.high_edge_threshold,
-            max_edge_threshold=self._edge.max_edge_threshold,
-            min_edge_pct=self._edge.min_edge_pct / multiplier,
-            min_ev=self._edge.min_ev / multiplier,
+            fee_pct=base.fee_pct,
+            kelly_fraction=base.kelly_fraction,
+            base_bet_pct=base.base_bet_pct,
+            max_bet_pct=base.max_bet_pct,
+            high_edge_threshold=base.high_edge_threshold,
+            max_edge_threshold=base.max_edge_threshold,
+            min_edge_pct=base.min_edge_pct / multiplier,
+            min_ev=base.min_ev / multiplier,
         )
 
     def _make_entry(

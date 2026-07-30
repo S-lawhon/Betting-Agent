@@ -180,6 +180,15 @@ deploy of the dashboard will look hung for 90s. One-line fix exists
 existing test covers signal handling, so per the run rules it is recorded,
 not fixed. Ops-side mitigation: `TimeoutStopSec=5` in the unit.
 
+> **FIXED and DEPLOYED 2026-07-30** (commit `dashboard(F2)`). The handler now
+> spawns the shutdown on a daemon helper thread (`request_shutdown` in
+> `src/dashboard_server.py`); 3 tests cover it, including an end-to-end
+> subprocess SIGTERM reproduction that hung before the fix. Unit gained
+> `TimeoutStopSec=10` as defense in depth. Verified on the droplet:
+> `systemctl restart betting-dashboard` = 3.1s (all of it the 3s
+> `ExecStartPre` sleep; the stop is instant, journal shows "Deactivated
+> successfully" instead of SIGKILL).
+
 **F3 — PLAUSIBLE (code-read, not triggered). `roi_pct` can fabricate 0.0%.**
 `src/dashboard_api.py:518`: `roi = round(100.0 * (realized["lifetime"] or
 0.0) / gw, 3)` — if `lifetime.realized_pnl` were ever null while

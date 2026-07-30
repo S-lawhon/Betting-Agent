@@ -1,0 +1,78 @@
+# scripts/Caddyfile.dashboard.template
+# ────────────────────────────────────
+# Versioned source of truth for the dashboard's TLS + auth front door.
+#
+# WHY THIS FILE EXISTS
+# The deployed Caddy config lived ONLY on the droplet — not in the repo, not in
+# any backup. A rebuilt box had nothing to restore from, and nobody could review
+# a change to the one component that terminates TLS and holds the credential
+# hashes. That is a bus-factor-1 asset on a machine that has already had one
+# crash loop.
+#
+# This is a TEMPLATE: it contains no hostname and no credentials. Fill the
+# placeholders on the server, never in git.
+#
+#   __DASHBOARD_HOST__   e.g. dashboard.example.org
+#   __BASIC_AUTH_USER__  the login name
+#   __BCRYPT_HASH__      output of:  caddy hash-password
+#
+# Deploy:
+#   scp scripts/Caddyfile.dashboard.template root@<vps>:/etc/caddy/Caddyfile.new
+#   ssh root@<vps> 'sed -i "s|__DASHBOARD_HOST__|...|; s|__BASIC_AUTH_USER__|...|; \
+#                          s|__BCRYPT_HASH__|...|" /etc/caddy/Caddyfile.new \
+#                   && caddy validate --config /etc/caddy/Caddyfile.new --adapter caddyfile \
+#                   && mv /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile \
+#                   && systemctl reload caddy'
+#
+# DNS NOTE (this has bitten before, see HOW_TO_ADD_USERS.md): the record must
+# stay DNS-only / grey-cloud at Cloudflare. Proxying it breaks ACME renewal.
+
+__DASHBOARD_HOST__ {
+	encode zstd gzip
+
+	# Basic auth at the edge. Caddy wants bcrypt; the app's own
+	# .dashboard_auth file is plaintext and is the fallback path, so keep the
+	# two in mind as separate credential stores.
+	basic_auth {
+		__BASIC_AUTH_USER__ __BCRYPT_HASH__
+	}
+
+	# The standalone dashboard. 8081, not 8080: the engine keeps 8080 for its
+	# embedded server during the side-by-side phase, and scripts/deploy.sh
+	# health-gates on 8080/health.
+	reverse_proxy 127.0.0.1:8081 {
+		health_uri /healthz
+		health_interval 30s
+		health_timeout 5s
+	}
+
+	# A blank Caddy 502 is indistinguishable from "the whole box is gone".
+	# Say which piece is down and what to run.
+	handle_errors {
+		@down expression {err.status_code} in [502, 503, 504]
+		respond @down <<HTML
+			<!DOCTYPE html><html><head><meta charset="utf-8">
+			<meta name="viewport" content="width=device-width,initial-scale=1">
+			<title>BETTING POD SHOP — dashboard down</title></head>
+			<body style="background:#0d1117;color:#c9d1d9;font:15px/1.6 system-ui,sans-serif;padding:32px;max-width:640px;margin:0 auto">
+			<h1 style="font-size:18px;letter-spacing:.06em">BETTING POD SHOP</h1>
+			<p style="color:#f85149"><b>The dashboard process is not answering.</b></p>
+			<p>This is the <i>dashboard</i>, not the engine — trading is a separate
+			unit and is unaffected by whatever is wrong here.</p>
+			<pre style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px;overflow-x:auto">systemctl status betting-dashboard
+journalctl -u betting-dashboard -n 50 --no-pager
+systemctl restart betting-dashboard</pre>
+			<p style="color:#8b949e;font-size:13px">To check the engine independently:
+			<code>systemctl status betting-pod-shop</code></p>
+			</body></html>
+			HTML 503
+		respond "dashboard error {err.status_code}" {err.status_code}
+	}
+
+	log {
+		output file /var/log/caddy/dashboard.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

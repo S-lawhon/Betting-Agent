@@ -1,0 +1,77 @@
+[Unit]
+Description=Betting Pod Shop — Standalone Dashboard (file-backed, read-only)
+After=network-online.target
+Wants=network-online.target
+
+# WHY THIS IS A SEPARATE UNIT
+# ──────────────────────────
+# The dashboard used to run on a daemon thread INSIDE the engine
+# (betting-pod-shop.service passes --web), which meant an OOM kill,
+# Restart=on-failure's 30s gap, or a wedged scan loop took the page down with
+# the engine — precisely the moment you want to look at it.  It also put an
+# HTTP server and an unbounded trade list in the address space of the box's
+# highest-priority workload, on the one unit with no MemoryMax.
+#
+# This process reads files and holds no engine reference:
+#   data/dashboard/engine_state.json      <- engine, every cycle
+#   data/dashboard/open_positions.json    <- engine, every cycle
+#   data/dashboard/rollup.json            <- dashboard-rollup.timer
+#   manager/state/status.json             <- manager/collect.py cron
+#   data/p022_window_check/status.jsonl   <- p022_window_check
+#   data/KILL_*                           <- humans
+# So when the engine is down the page still renders, and reports it as down
+# from systemd's own view in status.json rather than inferring it from silence.
+#
+# It binds 127.0.0.1:8081, NOT 8080 — the engine keeps 8080 during the
+# side-by-side phase so scripts/deploy.sh's health gate is untouched.  Caddy
+# terminates TLS and basic auth in front of it (scripts/Caddyfile.dashboard.template).
+#
+# To install / redeploy:
+#   scp scripts/betting-dashboard.service root@129.212.176.202:/etc/systemd/system/
+#   ssh root@129.212.176.202 'systemctl daemon-reload && systemctl enable --now betting-dashboard'
+#   ssh root@129.212.176.202 'curl -s localhost:8081/healthz | head -c 400'
+
+[Service]
+Type=simple
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m src.dashboard_server \
+    --root /opt/betting-pod-shop --host 127.0.0.1 --port 8081
+
+# Restart=always, not on-failure: a dashboard that is merely missing is the
+# worst failure mode this unit has — there is nothing for it to corrupt.
+Restart=always
+RestartSec=5
+ExecStartPre=/bin/sleep 3
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=betting-dashboard
+
+# Strictly lower priority than trading: if the box gets tight, this yields
+# first.  The 2 GB droplet already runs six workloads and had a five-week OOM
+# crash loop in June 2026.
+Nice=10
+IOSchedulingClass=idle
+# It never builds a TradeStore, never loads 50k entries, and its largest read is
+# status.json (~46 KB) plus rollup.json (<1 MB).  Measured RSS is CPython
+# baseline; 192M is several times over.
+MemoryMax=192M
+
+# ── Security hardening ──────────────────────────────────────────────────────
+# NOTE the deliberate absence of ReadWritePaths: this process writes NOTHING.
+# The unit is the proof, not the docstring.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/betting-pod-shop
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

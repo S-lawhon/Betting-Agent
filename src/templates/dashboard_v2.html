@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>BETTING POD SHOP · PAPER</title>
+<!--
+  src/templates/dashboard_v2.html
+  ───────────────────────────────
+  Self-contained: no CDN, no <script src>, no external stylesheet, no web font.
+  The page reads /api/v2/dashboard only; every number it shows arrives already
+  computed by a named producer (see docs/DASHBOARD.md).
+
+  THE ONE RULE IN THIS FILE
+  ─────────────────────────
+  A value is rendered only when the payload says it is available AND the field
+  is non-null. Everything else renders "— unknown" with the source path in the
+  tooltip. There is deliberately no `|| 0` fallback anywhere in a formatter:
+  the previous dashboard fell back to `bankroll = 10000` and rendered ROI,
+  Sharpe and drawdown against a bankroll that did not exist.
+  tests/test_dashboard_template.py enforces this by static scan.
+
+  Charts follow the project's dataviz method: thin marks, solid hairline grid,
+  4px rounded data-ends, 2px surface gaps, selective direct labels, a table-view
+  twin for the line chart, and signed values that always carry an explicit
+  +/- so polarity never depends on red-vs-green alone (deuteranopia).
+-->
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel-2:#1b2230; --border:#30363d;
+  --ink:#c9d1d9; --ink-dim:#8b949e;
+  --accent:#58a6ff; --pos:#3fb950; --neg:#f85149; --warn:#d29922;
+  --track:#21324a;
+  --r:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+
+/* ── header ─────────────────────────────────────────────── */
+header{
+  position:sticky; top:0; z-index:40; background:var(--bg);
+  border-bottom:1px solid var(--border); padding:10px 16px;
+}
+.hrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:1240px;margin:0 auto}
+.brand{font-weight:600;letter-spacing:.08em;font-size:13px;white-space:nowrap}
+.brand span{color:var(--ink-dim);font-weight:400}
+.spacer{flex:1 1 auto}
+.chip{
+  font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);
+  color:var(--ink-dim);white-space:nowrap;background:var(--panel);
+}
+.chip.ok{color:var(--pos);border-color:#1d3d29}
+.chip.warn{color:var(--warn);border-color:#4a3a10}
+.chip.bad{color:var(--neg);border-color:#5c2320}
+
+/* ── paper ribbon: present on every view, in all three states ── */
+#ribbon{
+  padding:6px 16px;font-size:11.5px;letter-spacing:.09em;font-weight:600;
+  text-align:center;border-bottom:1px solid var(--border);
+}
+#ribbon.paper{background:#0f2417;color:#5fd07a;border-bottom-color:#1d3d29}
+#ribbon.unknown{background:#241d0a;color:var(--warn);border-bottom-color:#4a3a10}
+#ribbon.live{background:#2a0f0e;color:#ff8b84;border-bottom-color:#5c2320}
+#ribbon small{display:block;font-weight:400;letter-spacing:.02em;color:inherit;opacity:.8;margin-top:2px}
+
+/* ── tabs ───────────────────────────────────────────────── */
+nav{border-bottom:1px solid var(--border);background:var(--bg);position:sticky;top:41px;z-index:30}
+.tabs{display:flex;gap:2px;max-width:1240px;margin:0 auto;padding:0 10px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  appearance:none;background:none;border:0;border-bottom:2px solid transparent;
+  color:var(--ink-dim);font:inherit;font-size:12.5px;padding:10px 12px;cursor:pointer;white-space:nowrap;
+}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:6px;vertical-align:1px}
+.tab .dot.bad{background:var(--neg)} .tab .dot.warn{background:var(--warn)}
+
+main{max-width:1240px;margin:0 auto;padding:16px 16px 40px}
+main.refetching{opacity:.55;transition:opacity .12s}
+
+/* ── cards & grid ───────────────────────────────────────── */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:12px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.card.span{grid-column:1/-1}
+.ct{font-size:11px;letter-spacing:.07em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:10px;
+    display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ct .sub{text-transform:none;letter-spacing:0;font-size:11px;color:var(--ink-dim);opacity:.85}
+.cap{font-size:11.5px;color:var(--ink-dim);margin-top:8px;line-height:1.45}
+
+/* stat tiles: proportional figures (never tabular) on big values */
+.tiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.tile{background:var(--panel-2);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.tile .lbl{font-size:11px;color:var(--ink-dim);margin-bottom:6px}
+.tile .val{font-size:24px;font-weight:600;line-height:1.15;word-break:break-word}
+.tile .val.sm{font-size:17px}
+.tile .sub{font-size:11px;color:var(--ink-dim);margin-top:4px}
+.hero{font-size:44px;font-weight:600;line-height:1.05}
+
+.pos{color:var(--pos)} .neg{color:var(--neg)} .dim{color:var(--ink-dim)}
+.wv{color:var(--warn)}
+.unknown{color:var(--ink-dim);font-style:normal;border-bottom:1px dotted var(--border);cursor:help}
+
+.kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid rgba(48,54,61,.5);font-size:13px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--ink-dim)}
+.kv .v{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ── tables (reflow to cards under 520px) ───────────────── */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{text-align:right;padding:7px 8px;border-bottom:1px solid rgba(48,54,61,.55);font-variant-numeric:tabular-nums}
+th{color:var(--ink-dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;font-variant-numeric:normal}
+tbody tr:last-child td{border-bottom:0}
+.tw{overflow-x:auto}
+
+/* ── meters (gate progress) ─────────────────────────────── */
+.meter{height:6px;background:var(--track);border-radius:999px;overflow:hidden;position:relative}
+.meter>i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+.meter>i.warn{background:var(--warn)} .meter>i.neg{background:var(--neg)} .meter>i.pos{background:var(--pos)}
+/* "we could not measure this" is a hatch, never an empty bar that reads as zero */
+.meter.unmeasured{
+  background:repeating-linear-gradient(135deg,var(--track) 0 5px,transparent 5px 10px);
+  border:1px solid var(--border);height:8px;
+}
+
+/* ── gate cards ─────────────────────────────────────────── */
+.gate{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:10px}
+.gate.validating{border-left:2px solid var(--accent)}
+.gate.terminal{opacity:.62}
+.ghead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.gid{font-weight:600;font-size:13.5px}
+.gname{color:var(--ink-dim);font-size:12.5px}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:999px;border:1px solid var(--border);color:var(--ink-dim);white-space:nowrap}
+.tag.accent{color:var(--accent);border-color:#1c3f66}
+.tag.pos{color:var(--pos);border-color:#1d3d29}
+.tag.warn{color:var(--warn);border-color:#4a3a10}
+.tag.bad{color:var(--neg);border-color:#5c2320}
+.gmeta{display:grid;gap:6px 14px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));font-size:12px;margin-top:9px}
+.gmeta div{color:var(--ink-dim)}
+.gmeta b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.verdict{font-size:12.5px;margin-top:8px;padding:7px 9px;background:var(--panel-2);border-radius:6px;border-left:2px solid var(--border)}
+.verdict .vl{color:var(--ink-dim);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:2px}
+.caveat{font-size:11.5px;color:var(--warn);background:#1e1a0c;border:1px solid #4a3a10;border-radius:6px;padding:7px 9px;margin-top:8px;line-height:1.45}
+
+/* ── findings ───────────────────────────────────────────── */
+.find{border-left:2px solid var(--border);padding:8px 10px;margin-bottom:7px;background:var(--panel-2);border-radius:0 6px 6px 0}
+.find.critical{border-left-color:var(--neg)} .find.error{border-left-color:var(--neg)}
+.find.warn{border-left-color:var(--warn)} .find.action{border-left-color:var(--accent)}
+.find .ft{font-size:12.5px;font-weight:500}
+.find .fd{font-size:11.5px;color:var(--ink-dim);margin-top:3px;line-height:1.45}
+.find .fx{font-size:11.5px;color:var(--accent);margin-top:4px}
+.sev{font-size:10px;letter-spacing:.07em;text-transform:uppercase;margin-right:7px}
+.sev.critical,.sev.error{color:var(--neg)} .sev.warn{color:var(--warn)}
+.sev.action{color:var(--accent)} .sev.info{color:var(--ink-dim)}
+
+/* ── funnel: HTML bars, one hue, order carried by position ── */
+.fn{display:flex;flex-direction:column;gap:2px}      /* 2px surface gap between bars */
+.fnrow{display:grid;grid-template-columns:minmax(120px,190px) 1fr auto;gap:10px;align-items:center;font-size:12px}
+.fnlab{color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fnbar{background:transparent;height:18px;position:relative}
+.fnbar>i{
+  display:block;height:100%;max-height:24px;background:var(--accent);
+  border-radius:0 4px 4px 0;                            /* rounded data-end only */
+  min-width:2px;
+}
+.fnbar>i.zero{background:var(--border);width:2px}
+.fnbar>i.bad{background:var(--neg)}
+.fnval{font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.fndrop{font-size:11px;color:var(--neg);grid-column:2/4;margin:-1px 0 2px}
+
+/* ── ranked bars (skip reasons) — nominal: all one hue ──── */
+.rb{display:flex;flex-direction:column;gap:2px}
+.rbrow{display:grid;grid-template-columns:minmax(130px,240px) 1fr auto;gap:10px;align-items:center;font-size:12px}
+.rbbar{height:14px}
+.rbbar>i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0;min-width:2px}
+.rbname{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rbval{font-variant-numeric:tabular-nums;min-width:74px;text-align:right;color:var(--ink-dim)}
+
+/* ── charts ─────────────────────────────────────────────── */
+.chart{position:relative}
+.chart canvas{display:block;width:100%}
+#tip{
+  position:fixed;z-index:60;pointer-events:none;display:none;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:6px;
+  padding:6px 9px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.5);
+  font-variant-numeric:tabular-nums;
+}
+.spark{display:block;width:100%;height:38px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.seg button{appearance:none;background:none;border:0;color:var(--ink-dim);font:inherit;font-size:11px;padding:3px 9px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--ink)}
+
+.empty{color:var(--ink-dim);font-size:12.5px;padding:10px 0;line-height:1.5}
+.src{font-size:10.5px;color:var(--ink-dim);opacity:.7;margin-top:9px;word-break:break-word}
+iframe{width:100%;height:78vh;border:1px solid var(--border);border-radius:var(--r);background:#fff}
+
+/* ── responsive ─────────────────────────────────────────── */
+@media(max-width:640px){
+  header{padding:9px 12px}
+  main{padding:12px 12px calc(72px + env(safe-area-inset-bottom))}
+  .grid{grid-template-columns:1fr}
+  /* tab bar moves to the bottom: thumb-reachable, >=44px targets */
+  nav{position:fixed;top:auto;bottom:0;left:0;right:0;border-top:1px solid var(--border);
+      border-bottom:0;background:var(--panel);padding-bottom:env(safe-area-inset-bottom)}
+  .tabs{padding:0;justify-content:space-between}
+  .tab{flex:1 1 0;min-width:0;min-height:46px;padding:6px 2px;font-size:10.5px;
+       border-bottom:0;border-top:2px solid transparent;text-align:center}
+  .tab[aria-selected="true"]{border-bottom-color:transparent;border-top-color:var(--accent);background:var(--panel-2)}
+  .hero{font-size:34px}
+  .tile .val{font-size:21px}
+}
+@media(max-width:520px){
+  /* tables reflow to stacked key/value cards — no horizontal scroll anywhere */
+  .rfl thead{display:none}
+  .rfl tr{display:block;border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:8px;background:var(--panel-2)}
+  .rfl td{display:flex;justify-content:space-between;gap:12px;text-align:right;border:0;padding:3px 0}
+  .rfl td:first-child{font-weight:600;border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:4px}
+  .rfl td::before{content:attr(data-label);color:var(--ink-dim);font-weight:400;text-align:left;
+                  font-variant-numeric:normal;font-size:11px}
+  .rfl td:first-child::before{content:""}
+  .fnrow,.rbrow{grid-template-columns:1fr auto;grid-template-areas:"l v" "b b"}
+  .fnlab,.rbname{grid-area:l} .fnval,.rbval{grid-area:v} .fnbar,.rbbar{grid-area:b}
+  .fndrop{grid-column:1/3}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div class="brand">BETTING POD SHOP <span>· dashboard</span></div>
+    <div class="spacer"></div>
+    <span class="chip" id="chip-engine" title="Engine liveness">engine —</span>
+    <span class="chip" id="chip-fresh" title="Worst source age feeding this view">data —</span>
+  </div>
+</header>
+
+<div id="ribbon" class="unknown">MODE UNKNOWN<small id="ribbon-sub">waiting for the first poll</small></div>
+
+<nav>
+  <div class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-view="now"      aria-selected="true">Now<span class="dot" id="dot-now"></span></button>
+    <button class="tab" role="tab" data-view="gates"    aria-selected="false">Gates</button>
+    <button class="tab" role="tab" data-view="pnl"      aria-selected="false">P&amp;L</button>
+    <button class="tab" role="tab" data-view="pipeline" aria-selected="false">Pipeline<span class="dot" id="dot-pipe"></span></button>
+    <button class="tab" role="tab" data-view="ops"      aria-selected="false">Ops<span class="dot" id="dot-ops"></span></button>
+    <button class="tab" role="tab" data-view="manager"  aria-selected="false">Brief</button>
+  </div>
+</nav>
+
+<main id="main">
+
+  <!-- ══ NOW ══ -->
+  <section id="v-now">
+    <div class="grid">
+      <div class="card">
+        <div class="ct">Engine</div>
+        <div class="tile" style="background:none;border:0;padding:0">
+          <div class="val sm" id="n-live">&mdash;</div>
+          <div class="sub" id="n-live-why">&mdash;</div>
+        </div>
+        <div class="kv"><span class="k">systemd</span><span class="v" id="n-systemd">&mdash;</span></div>
+        <div class="kv"><span class="k">Last cycle</span><span class="v" id="n-cycle">&mdash;</span></div>
+        <div class="kv"><span class="k">Halted</span><span class="v" id="n-halt">&mdash;</span></div>
+        <div class="kv"><span class="k">Kill switches</span><span class="v" id="n-kill">&mdash;</span></div>
+      </div>
+      <div class="card">
+        <div class="ct">Paper P&amp;L <span class="sub">realized</span></div>
+        <div class="hero" id="n-pnl">&mdash;</div>
+        <div class="sub dim" id="n-pnl-sub" style="font-size:11px;margin-top:4px">&mdash;</div>
+        <div class="kv"><span class="k">30 days</span><span class="v" id="n-pnl30">&mdash;</span></div>
+        <div class="kv"><span class="k">7 days</span><span class="v" id="n-pnl7">&mdash;</span></div>
+        <div class="kv"><span class="k">Open exposure</span><span class="v" id="n-expo">&mdash;</span></div>
+      </div>
+      <div class="card">
+        <div class="ct">Why it is quiet <span class="sub">P-022 window checker</span></div>
+        <div id="n-silence" class="empty">&mdash;</div>
+      </div>
+    </div>
+
+    <div class="card span" style="margin-bottom:12px">
+      <div class="ct">Gate board <span class="sub" id="n-gsum"></span></div>
+      <div class="tw"><table class="rfl" id="n-gtable">
+        <thead><tr><th>Pod</th><th>Metric</th><th>Progress</th><th>State</th><th>Blocked on</th><th>Projection</th></tr></thead>
+        <tbody><tr><td colspan="6" class="empty">waiting for the first poll&hellip;</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="card span">
+      <div class="ct">Alarms <span class="sub" id="n-asum"></span></div>
+      <div id="n-alarms" class="empty">&mdash;</div>
+    </div>
+  </section>
+
+  <!-- ══ GATES ══ -->
+  <section id="v-gates" hidden>
+    <div class="card" style="margin-bottom:12px">
+      <div class="ct">What this page is</div>
+      <div class="cap" style="margin-top:0">
+        Every number here is produced by the gate's own sanctioned reader and passed through
+        unchanged. <b>Progress</b> and <b>verdict</b> are never computed by this dashboard —
+        a dashboard tile is not a verdict. A hatched bar means no reader resolved a value;
+        that is different from a reader that measured zero, and the two need opposite
+        responses (fix the instrumentation vs. wait for observations).
+      </div>
+    </div>
+    <div id="g-list"><div class="empty">waiting for the first poll&hellip;</div></div>
+  </section>
+
+  <!-- ══ P&L ══ -->
+  <section id="v-pnl" hidden>
+    <div class="card span" style="margin-bottom:12px">
+      <div class="ct">Realized paper P&amp;L
+        <span class="sub">cumulative, settlements only</span>
+        <span class="spacer" style="flex:1"></span>
+        <span class="seg" role="group" aria-label="Chart or table">
+          <button id="eq-chart" aria-pressed="true">Chart</button>
+          <button id="eq-table" aria-pressed="false">Table</button>
+        </span>
+      </div>
+      <div class="chart" id="eq-wrap"><canvas id="eq" height="200"></canvas></div>
+      <div class="tw" id="eq-tablewrap" hidden><table id="eq-rows">
+        <thead><tr><th>Day</th><th>Cumulative p$</th></tr></thead><tbody></tbody>
+      </table></div>
+      <div class="cap" id="eq-cap">&mdash;</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="ct">Realized <span class="sub">paper</span></div>
+        <div class="tiles">
+          <div class="tile"><div class="lbl">Lifetime</div><div class="val" id="p-life">&mdash;</div><div class="sub" id="p-life-sub">&mdash;</div></div>
+          <div class="tile"><div class="lbl">Settled</div><div class="val" id="p-settled">&mdash;</div><div class="sub" id="p-wl">&mdash;</div></div>
+          <div class="tile"><div class="lbl">Win rate</div><div class="val" id="p-wr">&mdash;</div><div class="sub">of resolved</div></div>
+          <div class="tile"><div class="lbl">ROI</div><div class="val" id="p-roi">&mdash;</div><div class="sub" id="p-wag">&mdash;</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Open <span class="sub">capital at risk, from the engine</span></div>
+        <div class="kv"><span class="k">Open positions</span><span class="v" id="p-open">&mdash;</span></div>
+        <div class="kv"><span class="k">Exposure</span><span class="v" id="p-expo">&mdash;</span></div>
+        <div class="kv"><span class="k">Bankroll</span><span class="v" id="p-bank">&mdash;</span></div>
+        <div class="kv"><span class="k">Today (engine)</span><span class="v" id="p-day">&mdash;</span></div>
+        <div class="kv"><span class="k">By venue</span><span class="v" id="p-venue">&mdash;</span></div>
+        <div class="cap" id="p-open-why"></div>
+      </div>
+    </div>
+
+    <div class="card span" style="margin-bottom:12px">
+      <div class="ct">Attribution by pod <span class="sub">realized, paper</span></div>
+      <div class="tw"><table class="rfl" id="p-pods">
+        <thead><tr><th>Pod</th><th>Realized p$</th><th>Settled</th><th>W/L/V</th><th>Win %</th><th>ROI %</th><th>Placed</th><th>Open</th><th>Capital p$</th></tr></thead>
+        <tbody><tr><td colspan="9" class="empty">&mdash;</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="card span">
+      <div class="ct">Closing-line value <span class="sub">cents per contract</span></div>
+      <div class="tw"><table class="rfl" id="p-clv">
+        <thead><tr><th>Pod</th><th>n</th><th>Settled</th><th>CLV gross ¢</th><th>CLV net maker ¢</th></tr></thead>
+        <tbody><tr><td colspan="5" class="empty">&mdash;</td></tr></tbody>
+      </table></div>
+      <div id="p-clv-caveats"></div>
+      <div class="cap" id="p-clv-fresh"></div>
+    </div>
+  </section>
+
+  <!-- ══ PIPELINE ══ -->
+  <section id="v-pipeline" hidden>
+    <div class="card span" style="margin-bottom:12px">
+      <div class="ct">P-022 placement funnel <span class="sub" id="f-state"></span></div>
+      <div id="f-detail" class="cap" style="margin-top:0;margin-bottom:12px">&mdash;</div>
+      <div class="fn" id="f-funnel"><div class="empty">&mdash;</div></div>
+      <div id="f-refusals" style="margin-top:12px"></div>
+      <div class="src" id="f-src"></div>
+    </div>
+
+    <div class="card span" style="margin-bottom:12px">
+      <div class="ct">Placement rate by week <span class="sub">placed &divide; (placed + skipped)</span></div>
+      <svg class="spark" id="pr-spark" viewBox="0 0 600 38" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="tw"><table class="rfl" id="pr-rows">
+        <thead><tr><th>Week</th><th>Placed</th><th>Skipped</th><th>Rate %</th><th>Settled</th></tr></thead>
+        <tbody><tr><td colspan="5" class="empty">&mdash;</td></tr></tbody>
+      </table></div>
+      <div class="src" id="pr-src"></div>
+    </div>
+
+    <div class="card span">
+      <div class="ct">Why nothing fired
+        <span class="sub" id="sk-sub"></span>
+        <span class="spacer" style="flex:1"></span>
+        <span class="seg" role="group" aria-label="Window">
+          <button id="sk-win" aria-pressed="true">30 days</button>
+          <button id="sk-life" aria-pressed="false">Lifetime</button>
+        </span>
+      </div>
+      <div class="rb" id="sk-bars"><div class="empty">&mdash;</div></div>
+      <div class="cap" id="sk-cov"></div>
+    </div>
+  </section>
+
+  <!-- ══ OPS ══ -->
+  <section id="v-ops" hidden>
+    <div class="card span" style="margin-bottom:12px">
+      <div class="ct">Sources <span class="sub">what this page is reading, and how old it is</span></div>
+      <div class="tw"><table class="rfl" id="o-sources">
+        <thead><tr><th>Source</th><th>State</th><th>Age</th><th>Path</th></tr></thead><tbody></tbody>
+      </table></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="ct">Services</div>
+        <div class="tw"><table class="rfl" id="o-svc">
+          <thead><tr><th>Unit</th><th>Active</th><th>Restarts</th><th>Heartbeat</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="ct">Jobs</div>
+        <div class="tw"><table class="rfl" id="o-jobs">
+          <thead><tr><th>Job</th><th>Schedule</th><th>Age</th><th>State</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="card span" style="margin-bottom:12px">
+      <div class="ct">All findings</div>
+      <div id="o-find" class="empty">&mdash;</div>
+    </div>
+    <div class="card span">
+      <div class="ct">Faults <span class="sub">collector probes that threw</span></div>
+      <div id="o-faults" class="empty">&mdash;</div>
+    </div>
+  </section>
+
+  <!-- ══ BRIEF ══ -->
+  <section id="v-manager" hidden>
+    <div class="card span">
+      <div class="ct">Fund manager brief <span class="sub">rendered server-side by manager/brief.py</span></div>
+      <div class="cap" style="margin-top:0;margin-bottom:10px">
+        Served verbatim from <code>/manager</code> — the same renderer the alerting path uses.
+        Duplicating it in JavaScript would let this page and the pager disagree.
+      </div>
+      <iframe id="mgr" title="Fund manager brief" src="about:blank"></iframe>
+    </div>
+  </section>
+
+</main>
+
+<div id="tip" role="tooltip"></div>
+
+<script>
+(function(){
+"use strict";
+var POLL = __POLL_MS__;
+
+/* ═══ formatting — no `|| 0` anywhere. Missing means unknown. ═══ */
+
+function isNum(v){ return typeof v === "number" && isFinite(v); }
+
+/** Render "— unknown" with provenance in the title attribute. */
+function unk(el, why){
+  if(!el) return;
+  el.textContent = "— unknown";
+  el.className = (el.className || "").replace(/\b(pos|neg|wv)\b/g,"").trim() + " unknown";
+  el.title = why ? String(why) : "no value in the payload";
+}
+function put(el, text, cls, title){
+  if(!el) return;
+  el.textContent = text;
+  el.className = (el.className || "").replace(/\b(pos|neg|dim|wv|unknown)\b/g,"").trim() + (cls ? " " + cls : "");
+  el.title = title || "";
+}
+/** Signed money. The explicit +/- is the non-color channel for polarity. */
+function money(v, unit){
+  if(!isNum(v)) return null;
+  var s = v < 0 ? "−" : "+";
+  return s + (unit || "p$") + Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function pct(v, dp){
+  if(!isNum(v)) return null;
+  return v.toFixed(dp === undefined ? 1 : dp) + "%";
+}
+function intf(v){ return isNum(v) ? Math.round(v).toLocaleString() : null; }
+/** Table cell for a count. A missing count is UNKNOWN, never "0" — the whole
+ *  point of this dashboard is that those two are different facts. */
+function numCell(v){
+  var t = intf(v);
+  return t === null ? '<span class="unknown" title="not present in the payload">—</span>' : t;
+}
+function numTxt(v){ var t = intf(v); return t === null ? "?" : t; }
+function signCls(v){ return !isNum(v) ? "dim" : (v > 0 ? "pos" : (v < 0 ? "neg" : "dim")); }
+function setMoney(el, v, why){
+  var t = money(v);
+  if(t === null){ unk(el, why); return; }
+  put(el, t, signCls(v));
+}
+function age(sec){
+  if(!isNum(sec)) return null;
+  var s = Math.abs(sec), f = sec < 0 ? "-" : "";
+  if(s < 90) return f + Math.round(s) + "s";
+  if(s < 5400) return f + Math.round(s/60) + "m";
+  if(s < 172800) return f + (s/3600).toFixed(1) + "h";
+  return f + Math.round(s/86400) + "d";
+}
+function esc(s){
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function el(id){ return document.getElementById(id); }
+function short(iso){
+  if(typeof iso !== "string" || iso.length < 10) return null;
+  return iso.slice(0,10);
+}
+
+/* ═══ state ═══ */
+var DATA = null, VIEW = "now", ETAG = null, SKIP_MODE = "windowed", EQ_MODE = "chart";
+var MGR_LOADED = false;
+
+/* ═══ ribbon — never disappears; three explicit states ═══ */
+function renderRibbon(m){
+  var r = el("ribbon"), sub = el("ribbon-sub");
+  if(!m || m.available !== true){
+    r.className = "unknown";
+    r.firstChild.nodeValue = "MODE UNKNOWN";
+    sub.textContent = (m && m.reason) ? m.reason : "cannot confirm paper mode";
+    return;
+  }
+  if(m.all_paper === true){
+    r.className = "paper";
+    r.firstChild.nodeValue = "PAPER — NO REAL CAPITAL AT RISK";
+    sub.textContent = "every value on this page is simulated";
+  } else {
+    r.className = "live";
+    r.firstChild.nodeValue = "LIVE CAPITAL";
+    var np = (m.non_paper_pods && m.non_paper_pods.length) ? m.non_paper_pods.join(", ") : "one or more pods";
+    sub.textContent = "not paper mode: " + np;
+  }
+}
+
+/* ═══ header chips ═══ */
+var LIVE_CLS = {live:"ok", stale:"warn", down:"bad", unknown:"warn"};
+function renderChips(d){
+  var e = d.engine || {}, c = el("chip-engine");
+  c.textContent = "engine " + (e.liveness || "—");
+  c.className = "chip " + (LIVE_CLS[e.liveness] || "");
+  c.title = e.liveness_reason || "";
+
+  /* worst age across the sources feeding the active view */
+  var need = {
+    now:["engine_state","manager_status","rollup","p022_window"],
+    gates:["manager_status"], pnl:["rollup","engine_state"],
+    pipeline:["rollup","p022_window"], ops:["manager_status"], manager:["manager_status"]
+  }[VIEW] || ["manager_status"];
+  var srcs = d.sources || {}, worst = null, worstName = null, missing = [];
+  need.forEach(function(n){
+    var m = srcs[n]; if(!m) return;
+    if(!m.available){ missing.push(n); return; }
+    if(isNum(m.age_seconds) && (worst === null || m.age_seconds > worst)){ worst = m.age_seconds; worstName = n; }
+  });
+  var chip = el("chip-fresh");
+  if(missing.length){
+    chip.textContent = "data " + missing.length + " source" + (missing.length>1?"s":"") + " missing";
+    chip.className = "chip bad";
+    chip.title = missing.join(", ") + " unavailable — see the Ops tab";
+  } else if(worst === null){
+    chip.textContent = "data —"; chip.className = "chip"; chip.title = "no age reported";
+  } else {
+    var stale = need.some(function(n){ return srcs[n] && srcs[n].stale; });
+    chip.textContent = "data " + age(worst);
+    chip.className = "chip " + (stale ? "warn" : "ok");
+    chip.title = "oldest source for this view: " + worstName;
+  }
+
+  var alarms = d.alarms || [];
+  var bad = alarms.filter(function(f){ return f.severity==="critical"||f.severity==="error"; }).length;
+  setDot("dot-now", bad ? "bad" : (alarms.length ? "warn" : ""));
+  setDot("dot-ops", bad ? "bad" : (alarms.length ? "warn" : ""));
+  var w = (d.pipeline && d.pipeline.p022_window) || {};
+  setDot("dot-pipe", w.alarm === true ? "bad" : "");
+}
+function setDot(id, cls){
+  var n = el(id); if(!n) return;
+  n.className = "dot" + (cls ? " " + cls : "");
+  n.style.display = cls ? "inline-block" : "none";
+}
+
+/* ═══ NOW ═══ */
+function renderNow(d){
+  var e = d.engine || {};
+  put(el("n-live"), (e.liveness || "unknown").toUpperCase(),
+      e.liveness === "live" ? "pos" : (e.liveness === "down" ? "neg" : "wv"));
+  el("n-live-why").textContent = e.liveness_reason ||
+      ("last wrote " + (age(e.age_seconds) || "—") + " ago");
+
+  var sd = e.systemd || {};
+  if(sd.view_available){
+    put(el("n-systemd"), String(sd.active) + (isNum(sd.restarts) ? " · " + sd.restarts + " restarts" : ""),
+        sd.active === "active" ? "pos" : "neg", sd.since ? "since " + sd.since : "");
+  } else unk(el("n-systemd"), "manager/state/status.json has no systemd view of betting-pod-shop");
+
+  var cy = e.cycle;
+  if(cy && isNum(cy.cycle_number)){
+    put(el("n-cycle"), "#" + intf(cy.cycle_number) + " · " + numTxt(cy.placed_count) +
+        " placed / " + numTxt(cy.skipped_count) + " skipped");
+  } else unk(el("n-cycle"), "no cycle in the engine snapshot");
+
+  var h = e.halt || {};
+  if(h.halted === true) put(el("n-halt"), "HALTED — " + (h.reason || "no reason recorded"), "neg");
+  else if(h.halted === false) put(el("n-halt"), "no", "pos");
+  else unk(el("n-halt"), "no engine snapshot");
+
+  var ks = (e.kill_switches || []).filter(function(k){ return k.present; });
+  if(!(e.kill_switches || []).length) unk(el("n-kill"), "not read");
+  else if(!ks.length) put(el("n-kill"), "none present", "pos");
+  else put(el("n-kill"), ks.map(function(k){ return k.name; }).join(", "), "wv",
+           ks.map(function(k){ return k.name + " since " + (k.mtime_utc || "?"); }).join("\n"));
+
+  /* money */
+  var p = d.pnl || {}, r = p.realized || {}, o = p.open || {};
+  setMoney(el("n-pnl"), r.lifetime, r.reason);
+  el("n-pnl-sub").textContent = isNum(r.settled)
+    ? "over " + intf(r.settled) + " settled paper positions"
+    : (r.reason || "no rollup");
+  setMoney(el("n-pnl30"), r.d30, r.reason);
+  setMoney(el("n-pnl7"), r.d7, r.reason);
+  if(isNum(o.exposure_usd)){
+    put(el("n-expo"), "p$" + o.exposure_usd.toLocaleString(undefined,{maximumFractionDigits:2}) +
+        (isNum(o.positions) ? " · " + intf(o.positions) + " open" : ""));
+  } else unk(el("n-expo"), o.reason);
+
+  /* silence explainer — the checker's own sentence, verbatim */
+  var w = (d.pipeline && d.pipeline.p022_window) || {};
+  var sil = el("n-silence");
+  if(w.available && w.detail){
+    sil.className = "";
+    sil.innerHTML = '<div><span class="tag ' + (w.alarm ? "bad" : "pos") + '">' + esc(w.state) + "</span></div>" +
+      '<div class="cap" style="margin-top:8px">' + esc(w.detail) + "</div>";
+  } else {
+    sil.className = "empty";
+    sil.textContent = w.reason || "no window-check data";
+  }
+
+  /* gate board */
+  var gs = d.gates_summary || {}, gates = (d.gates || []).filter(function(g){ return g.is_validating; });
+  el("n-gsum").textContent = gates.length
+    ? gates.length + " validating · " + (isNum(gs.n_unmeasurable) ? gs.n_unmeasurable + " unmeasurable" : "")
+    : "";
+  var tb = el("n-gtable").querySelector("tbody");
+  if(!gates.length){
+    tb.innerHTML = '<tr><td colspan="6" class="empty">' +
+      esc((d.sources && d.sources.manager_status && d.sources.manager_status.reason) ||
+          "no validating gates in the snapshot") + "</td></tr>";
+  } else {
+    tb.innerHTML = gates.map(function(g){
+      return "<tr>" +
+        '<td data-label="Pod"><b>' + esc(g.pod_id) + "</b></td>" +
+        '<td data-label="Metric">' + (g.metric ? esc(g.metric) : '<span class="unknown">—</span>') + "</td>" +
+        '<td data-label="Progress">' + progCell(g) + "</td>" +
+        '<td data-label="State">' + stateTag(g) + "</td>" +
+        '<td data-label="Blocked on">' + (g.blocked_on ? esc(g.blocked_on) : '<span class="unknown">—</span>') + "</td>" +
+        '<td data-label="Projection">' + projCell(g) + "</td>" +
+      "</tr>";
+    }).join("");
+  }
+
+  /* alarms */
+  var al = d.alarms || [];
+  el("n-asum").textContent = al.length ? al.length + " open" : "";
+  var box = el("n-alarms");
+  if(!al.length){ box.className = "empty"; box.textContent = "nothing critical, error or warn."; }
+  else {
+    box.className = "";
+    var top = al.slice(0, 4);
+    box.innerHTML = top.map(findingHTML).join("") + (al.length > top.length
+      ? '<div class="cap">' + (al.length - top.length) +
+        " further finding(s) — all of them, including info level, are on the Ops tab.</div>"
+      : "");
+  }
+}
+
+function progCell(g){
+  if(g.progress_available !== true){
+    return '<span class="unknown" title="' + esc(g.progress_reason || "") + '">unmeasured</span>';
+  }
+  var t = intf(g.progress) + (isNum(g.threshold) ? " / " + intf(g.threshold) : "");
+  return "<span>" + esc(t) + "</span>";
+}
+var STATE_TAG = {
+  "reached":"pos", "accumulating":"accent", "no observations":"warn",
+  "dormant":"warn", "stalled":"bad", "unmeasurable":"bad", "terminal":""
+};
+function stateTag(g){
+  var s = g.progress_state || "unknown";
+  return '<span class="tag ' + (STATE_TAG[s] === undefined ? "" : STATE_TAG[s]) + '">' + esc(s) + "</span>";
+}
+function projCell(g){
+  if(g.projected_resolution_utc) return esc(short(g.projected_resolution_utc));
+  if(g.resolvable_within_12m === false) return '<span class="wv">not within 12m</span>';
+  return '<span class="unknown" title="manager/throughput.py offers a projection only for settled_trades metrics">unprojectable</span>';
+}
+function findingHTML(f){
+  var sev = String(f.severity || "info");
+  return '<div class="find ' + esc(sev) + '">' +
+    '<div class="ft"><span class="sev ' + esc(sev) + '">' + esc(sev) + "</span>" + esc(f.title) +
+      (f.workstream ? ' <span class="tag">' + esc(f.workstream) + "</span>" : "") + "</div>" +
+    (f.detail ? '<div class="fd">' + esc(f.detail) + "</div>" : "") +
+    (f.fix ? '<div class="fx">fix: ' + esc(f.fix) + "</div>" : "") +
+  "</div>";
+}
+
+/* ═══ GATES ═══ */
+function renderGates(d){
+  var list = el("g-list"), gates = d.gates || [];
+  if(!gates.length){
+    list.innerHTML = '<div class="empty">' +
+      esc((d.sources && d.sources.manager_status && d.sources.manager_status.reason) ||
+          "no workstreams in the snapshot") + "</div>";
+    return;
+  }
+  list.innerHTML = gates.map(function(g){
+    var meas = g.progress_available === true;
+    var frac = (meas && isNum(g.threshold) && g.threshold > 0)
+      ? Math.max(0, Math.min(1, g.progress / g.threshold)) : null;
+    var fillCls = g.progress_state === "reached" ? "pos"
+      : (g.progress_state === "stalled" ? "neg"
+      : (g.progress_state === "no observations" ? "warn" : ""));
+
+    var meter = meas && frac !== null
+      ? '<div class="meter"><i class="' + fillCls + '" style="width:' + (frac*100).toFixed(1) + '%"></i></div>'
+      : '<div class="meter unmeasured" title="' + esc(g.progress_reason || "no threshold to measure against") + '"></div>';
+
+    return '<div class="gate ' + (g.is_validating ? "validating " : "") +
+             (String(g.stage||"").match(/killed|shelved|retired/) ? "terminal" : "") + '">' +
+      '<div class="ghead"><span class="gid">' + esc(g.pod_id) + "</span>" +
+        '<span class="gname">' + esc(g.name || "") + "</span>" +
+        (g.is_validating ? '<span class="tag accent">validating</span>' : "") +
+        '<span class="tag">' + esc(g.stage || "stage ?") + "</span>" +
+        stateTag(g) +
+        (g.blocked_on ? '<span class="tag">blocked on ' + esc(g.blocked_on) + "</span>" : "") +
+      "</div>" +
+      meter +
+      '<div class="gmeta">' +
+        "<div>progress <b>" + progCell(g) + "</b></div>" +
+        "<div>metric <b>" + (g.metric ? esc(g.metric) : '<span class="unknown">—</span>') + "</b></div>" +
+        "<div>settled 7d / 28d <b>" + (isNum(g.settled_positions_7d) ? intf(g.settled_positions_7d) : "?") +
+          " / " + (isNum(g.settled_positions_28d) ? intf(g.settled_positions_28d) : "?") + "</b></div>" +
+        "<div>rate <b>" + (isNum(g.rate_per_week) ? g.rate_per_week.toFixed(2) + "/wk" :
+          '<span class="unknown">—</span>') + "</b></div>" +
+        "<div>projection <b>" + projCell(g) + "</b></div>" +
+        "<div>stalled <b>" + (g.stalled === true ? '<span class="neg">yes</span>'
+          : (g.stalled === false ? '<span class="pos">no</span>'
+          : '<span class="unknown" title="never produced an observation">unknown</span>')) +
+          (isNum(g.stall_days_tolerated) ? ' <span class="dim">(tol ' + g.stall_days_tolerated + "d)</span>" : "") + "</b></div>" +
+        "<div>reader <b>" + (g.reader ? "<code>" + esc(g.reader) + "</code>" :
+          '<span class="unknown">none declared</span>') + "</b></div>" +
+        "<div>last settlement <b>" + (short(g.last_settlement_utc) || '<span class="unknown">never</span>') + "</b></div>" +
+      "</div>" +
+      (g.reader_verdict ? '<div class="verdict"><span class="vl">verdict, verbatim from ' +
+          esc(g.reader || "the reader") + "</span>" + esc(g.reader_verdict) +
+          (g.reader_verdict_reason ? ' <span class="dim">— ' + esc(g.reader_verdict_reason) + "</span>" : "") +
+        "</div>" : "") +
+      (g.reader_error ? '<div class="caveat">reader failed: ' + esc(g.reader_error) + "</div>" : "") +
+      (g.action_required ? '<div class="caveat">action required: ' + esc(g.action_required) + "</div>" : "") +
+      (g.caveat ? '<div class="caveat">' + esc(g.caveat) + "</div>" : "") +
+      ((g.findings || []).length ? '<div style="margin-top:9px">' +
+          g.findings.map(findingHTML).join("") + "</div>" : "") +
+    "</div>";
+  }).join("");
+}
+
+/* ═══ P&L ═══ */
+function renderPnl(d){
+  var p = d.pnl || {}, r = p.realized || {}, o = p.open || {}, eq = p.equity || {};
+
+  setMoney(el("p-life"), r.lifetime, r.reason);
+  el("p-life-sub").textContent = isNum(r.placed) ? intf(r.placed) + " placed" : (r.reason || "");
+  if(isNum(r.settled)) put(el("p-settled"), intf(r.settled)); else unk(el("p-settled"), r.reason);
+  el("p-wl").textContent = (isNum(r.wins) && isNum(r.losses))
+    ? intf(r.wins) + "W / " + intf(r.losses) + "L / " + numTxt(r.voids) + "V" : "";
+  if(isNum(r.win_pct)) put(el("p-wr"), pct(r.win_pct)); else unk(el("p-wr"), "nothing resolved yet");
+  if(isNum(r.roi_pct)) put(el("p-roi"), (r.roi_pct >= 0 ? "+" : "−") + Math.abs(r.roi_pct).toFixed(3) + "%", signCls(r.roi_pct));
+  else unk(el("p-roi"), "no wagered total");
+  el("p-wag").textContent = isNum(r.gross_wagered_usd)
+    ? "on p$" + r.gross_wagered_usd.toLocaleString(undefined,{maximumFractionDigits:0}) + " wagered" : "";
+
+  if(isNum(o.positions)) put(el("p-open"), intf(o.positions)); else unk(el("p-open"), o.reason);
+  if(isNum(o.exposure_usd)){
+    put(el("p-expo"), "p$" + o.exposure_usd.toLocaleString(undefined,{maximumFractionDigits:2}) +
+      (isNum(o.exposure_pct) ? " (" + pct(o.exposure_pct) + ")" : ""));
+  } else unk(el("p-expo"), o.reason);
+  if(isNum(o.bankroll)) put(el("p-bank"), "p$" + o.bankroll.toLocaleString(undefined,{maximumFractionDigits:2}));
+  else unk(el("p-bank"), o.reason || "bankroll is only known from the engine snapshot");
+  setMoney(el("p-day"), o.daily_pnl, o.reason);
+  var ve = o.venue_exposure || {}, vk = Object.keys(ve);
+  if(vk.length) put(el("p-venue"), vk.map(function(k){ return k + " p$" + Number(ve[k]).toFixed(0); }).join(", "));
+  else unk(el("p-venue"), o.reason || "no venue breakdown");
+  el("p-open-why").textContent = o.available ? "" : (o.reason || "");
+
+  /* equity */
+  el("eq-cap").textContent = (eq.caption || "") +
+    (isNum(eq.downsampled_from) && isNum(eq.n_points) && eq.downsampled_from > eq.n_points
+      ? "  Showing " + eq.n_points + " of " + eq.downsampled_from + " days (even stride; first and last kept)." : "") +
+    (eq.available ? "" : "  " + (eq.reason || ""));
+  drawEquity(eq);
+  var tb = el("eq-rows").querySelector("tbody");
+  tb.innerHTML = (eq.points || []).length
+    ? eq.points.map(function(pt){
+        return "<tr><td>" + esc(pt[0]) + "</td><td>" + (money(pt[1]) || "—") + "</td></tr>"; }).join("")
+    : '<tr><td colspan="2" class="empty">' + esc(eq.reason || "no data") + "</td></tr>";
+
+  /* pods */
+  var rows = p.by_pod || [], pt = el("p-pods").querySelector("tbody");
+  pt.innerHTML = rows.length ? rows.map(function(x){
+    return "<tr>" +
+      '<td data-label="Pod"><b>' + esc(x.pod_id) + "</b>" +
+        (x.name && x.name !== x.pod_id ? ' <span class="dim">' + esc(x.name) + "</span>" : "") + "</td>" +
+      '<td data-label="Realized p$" class="' + signCls(x.realized_pnl) + '">' + (money(x.realized_pnl) || '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="Settled">' + numCell(x.settled) + "</td>" +
+      '<td data-label="W/L/V">' + ((isNum(x.wins) || isNum(x.losses) || isNum(x.voids))
+          ? numTxt(x.wins) + "/" + numTxt(x.losses) + "/" + numTxt(x.voids)
+          : '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="Win %">' + (pct(x.win_pct) || '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="ROI %">' + (isNum(x.roi_pct) ? x.roi_pct.toFixed(2) : '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="Placed">' + numCell(x.placed) + "</td>" +
+      '<td data-label="Open">' + (isNum(x.open_positions) ? intf(x.open_positions) : '<span class="dim">—</span>') + "</td>" +
+      '<td data-label="Capital p$">' + (isNum(x.capital_usd) ? x.capital_usd.toFixed(2) : '<span class="dim">—</span>') + "</td>" +
+    "</tr>";
+  }).join("") : '<tr><td colspan="9" class="empty">' + esc(r.reason || "no pods") + "</td></tr>";
+
+  /* clv */
+  var clv = p.clv || {}, ct = el("p-clv").querySelector("tbody");
+  ct.innerHTML = (clv.by_pod || []).length ? clv.by_pod.map(function(c){
+    return "<tr>" +
+      '<td data-label="Pod"><b>' + esc(c.pod_id) + "</b></td>" +
+      '<td data-label="n">' + numCell(c.n) + "</td>" +
+      '<td data-label="Settled">' + numCell(c.n_settled) + "</td>" +
+      '<td data-label="CLV gross">' + (isNum(c.clv_gross_mean_c) ? c.clv_gross_mean_c.toFixed(3) : '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="CLV net maker">' + (isNum(c.clv_net_maker_mean_c) ? c.clv_net_maker_mean_c.toFixed(3) : '<span class="unknown">—</span>') + "</td>" +
+    "</tr>";
+  }).join("") : '<tr><td colspan="5" class="empty">' + esc(clv.reason || "no CLV rows") + "</td></tr>";
+  el("p-clv-caveats").innerHTML = (clv.by_pod || [])
+    .filter(function(c){ return c.caveat; })
+    .map(function(c){ return '<div class="caveat">' + esc(c.pod_id) + ": " + esc(c.caveat) + "</div>"; }).join("");
+  var lf = clv.log_freshness || {};
+  el("p-clv-fresh").textContent = lf.available
+    ? "Source log clv_log.jsonl: newest row " + (age(lf.age_seconds) || "?") + " old" +
+      (lf.stale ? " — " + (lf.reason || "stale") : "")
+    : ((clv.by_pod || []).length
+        ? "Figures above come from the rollup. The source log is not readable right now: " + (lf.reason || "")
+        : (lf.reason || ""));
+}
+
+/* equity: one series, 2px line, solid hairline grid, wash fill, endpoint dot + label */
+/** Round a raw axis step up to the nearest 1/2/5 x 10^k. */
+function niceStep(raw){
+  if(!isNum(raw) || raw <= 0) return 1;
+  var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+  var f = raw / mag;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * mag;
+}
+function drawEquity(eq){
+  var c = el("eq"), pts = (eq && eq.points) || [];
+  var cssW = c.clientWidth || 600, cssH = 200;
+  var dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(cssW * dpr); c.height = Math.round(cssH * dpr);
+  var g = c.getContext("2d");
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,cssW,cssH);
+  c._pts = pts; c._geom = null;
+  if(pts.length < 2){
+    g.fillStyle = "#8b949e"; g.font = "12px -apple-system,system-ui,sans-serif";
+    g.fillText(eq && eq.reason ? eq.reason : "not enough settled days to plot", 10, 24);
+    return;
+  }
+  var padL = 54, padR = 62, padT = 14, padB = 26;   /* padB includes the x-axis band */
+  var w = cssW - padL - padR, h = cssH - padT - padB;
+  var vals = pts.map(function(p){ return p[1]; });
+  var lo = Math.min.apply(null, vals.concat([0])), hi = Math.max.apply(null, vals.concat([0]));
+  if(hi === lo){ hi += 1; lo -= 1; }
+  var pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  /* snap the axis to clean numbers (1/2/5 x 10^k) rather than raw extremes */
+  var step = niceStep((hi - lo) / 4);
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  var X = function(i){ return padL + (w * i / (pts.length - 1)); };
+  var Y = function(v){ return padT + h - ((v - lo) / (hi - lo)) * h; };
+  c._geom = {padL:padL, padR:padR, padT:padT, padB:padB, w:w, h:h, lo:lo, hi:hi, X:X, Y:Y, cssW:cssW, cssH:cssH};
+
+  /* grid + y ticks: solid hairlines, one step off surface */
+  g.strokeStyle = "#30363d"; g.lineWidth = 1;
+  g.fillStyle = "#8b949e"; g.font = "10px -apple-system,system-ui,sans-serif"; g.textAlign = "right";
+  for(var v = lo; v <= hi + 1e-9; v += step){
+    var y = Math.round(Y(v)) + .5;
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(padL + w, y); g.stroke();
+    g.fillText((v >= 0 ? "" : "−") + Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:2}), padL - 7, y + 3);
+  }
+  /* zero baseline: the non-color channel for polarity */
+  if(lo < 0 && hi > 0){
+    var yz = Math.round(Y(0)) + .5;
+    g.strokeStyle = "#8b949e"; g.beginPath(); g.moveTo(padL, yz); g.lineTo(padL + w, yz); g.stroke();
+    g.textAlign = "left"; g.fillStyle = "#8b949e"; g.fillText("0", padL + w + 5, yz + 3);
+  }
+
+  var last = pts[pts.length - 1][1];
+  var col = last >= 0 ? "#3fb950" : "#f85149";
+  var yZero = Y(Math.max(lo, Math.min(hi, 0)));
+
+  /* Area wash, ~10%, SPLIT AT THE ZERO BASELINE: green above, red below.
+     Colouring the whole area by the final value painted early profitable
+     stretches red, which states the opposite of the data. */
+  function wash(fill, clipTop, clipBottom){
+    g.save();
+    g.beginPath(); g.rect(padL, clipTop, w, Math.max(0, clipBottom - clipTop)); g.clip();
+    g.beginPath(); g.moveTo(X(0), yZero);
+    pts.forEach(function(p,i){ g.lineTo(X(i), Y(p[1])); });
+    g.lineTo(X(pts.length-1), yZero); g.closePath();
+    g.globalAlpha = .10; g.fillStyle = fill; g.fill(); g.globalAlpha = 1;
+    g.restore();
+  }
+  wash("#3fb950", padT, yZero);            /* above zero */
+  wash("#f85149", yZero, padT + h);        /* below zero */
+
+  /* 2px line in the neutral accent. A single series must not change colour
+     mid-stroke — that reads as two series — and polarity is already carried by
+     the zero rule, the split wash and the signed endpoint label. */
+  g.beginPath(); g.lineWidth = 2; g.strokeStyle = "#58a6ff"; g.lineJoin = "round"; g.lineCap = "round";
+  pts.forEach(function(p,i){ i ? g.lineTo(X(i), Y(p[1])) : g.moveTo(X(i), Y(p[1])); });
+  g.stroke();
+
+  /* endpoint marker: >=8px with a 2px surface ring */
+  var ex = X(pts.length-1), ey = Y(last);
+  g.beginPath(); g.arc(ex, ey, 6, 0, 6.2832); g.fillStyle = "#161b22"; g.fill();
+  g.beginPath(); g.arc(ex, ey, 4, 0, 6.2832); g.fillStyle = col; g.fill();
+
+  /* selective direct labels: the endpoint only */
+  g.textAlign = "left"; g.fillStyle = "#c9d1d9"; g.font = "600 11px -apple-system,system-ui,sans-serif";
+  g.fillText((last < 0 ? "−" : "+") + Math.abs(last).toFixed(2), ex + 8, ey + 4);
+
+  /* x labels: first and last only */
+  g.fillStyle = "#8b949e"; g.font = "10px -apple-system,system-ui,sans-serif";
+  g.textAlign = "left";  g.fillText(pts[0][0], padL, cssH - 8);
+  g.textAlign = "right"; g.fillText(pts[pts.length-1][0], padL + w, cssH - 8);
+}
+
+/* crosshair + tooltip (tooltips enhance; the table view is the twin) */
+(function(){
+  var c = el("eq"), tip = el("tip");
+  function near(evt){
+    var geom = c._geom, pts = c._pts;
+    if(!geom || !pts || pts.length < 2) return null;
+    var rect = c.getBoundingClientRect();
+    var x = evt.clientX - rect.left;
+    var i = Math.round((x - geom.padL) / geom.w * (pts.length - 1));
+    if(i < 0) i = 0; if(i > pts.length - 1) i = pts.length - 1;
+    return {i:i, p:pts[i], geom:geom, rect:rect};
+  }
+  function show(evt){
+    var n = near(evt);
+    if(!n){ tip.style.display = "none"; return; }
+    drawEquity({points:c._pts, caption:""});
+    var g = c.getContext("2d"), gx = n.geom.X(n.i);
+    g.strokeStyle = "#8b949e"; g.lineWidth = 1; g.beginPath();
+    g.moveTo(Math.round(gx)+.5, n.geom.padT); g.lineTo(Math.round(gx)+.5, n.geom.padT + n.geom.h); g.stroke();
+    tip.style.display = "block";
+    tip.textContent = n.p[0] + "  " + (money(n.p[1]) || "—");
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.min(window.innerWidth - tw - 8, Math.max(8, n.rect.left + gx - tw/2)) + "px";
+    tip.style.top  = Math.max(8, n.rect.top - th - 8) + "px";
+  }
+  c.addEventListener("mousemove", show);
+  c.addEventListener("touchstart", function(e){ if(e.touches[0]) show(e.touches[0]); }, {passive:true});
+  c.addEventListener("touchmove",  function(e){ if(e.touches[0]) show(e.touches[0]); }, {passive:true});
+  function hide(){ tip.style.display = "none"; if(DATA) drawEquity((DATA.pnl||{}).equity||{}); }
+  c.addEventListener("mouseleave", hide);
+  c.addEventListener("touchend", hide);
+})();
+
+/* ═══ PIPELINE ═══ */
+var FUNNEL_HELP = {
+  markets_listed:"markets the exchange listed",
+  close_resolved:"close time resolved from the external schedule",
+  inside_window:"inside the placement window",
+  priced:"had a usable price",
+  in_band:"price inside the configured band",
+  passes_every_screen:"passed every screen",
+  quoted_since_window_open:"actually quoted",
+  candidates_without_quote:"candidates that should have quoted and did not"
+};
+function renderPipeline(d){
+  var pl = d.pipeline || {}, w = pl.p022_window || {};
+  el("f-state").textContent = w.available ? (w.state || "") : "";
+  el("f-detail").textContent = w.available ? (w.detail || "") : (w.reason || "no window-check data");
+  el("f-src").textContent = "source: " + (w.source || "");
+
+  var f = w.funnel || [], box = el("f-funnel");
+  var nums = f.map(function(s){ return s[1]; }).filter(isNum);
+  var max = nums.length ? Math.max.apply(null, nums) : null;
+  if(max === null){
+    box.innerHTML = '<div class="empty">' + esc(w.reason || "no funnel in the payload") + "</div>";
+  } else {
+    /* find the single largest drop — label that one only */
+    var worst = -1, worstDrop = 0;
+    for(var i = 1; i < f.length - 1; i++){
+      if(isNum(f[i-1][1]) && isNum(f[i][1])){
+        var dr = f[i-1][1] - f[i][1];
+        if(dr > worstDrop){ worstDrop = dr; worst = i; }
+      }
+    }
+    box.innerHTML = f.map(function(s, idx){
+      var name = s[0], v = s[1];
+      var pctw = (isNum(v) && max > 0) ? (v / max * 100) : 0;
+      /* candidates_without_quote is a DEFECT count, not a funnel stage: it means
+         "these passed every screen and still were not quoted". It wears a status
+         colour because it means bad, and only when it is non-zero. */
+      var isDefect = (name === "candidates_without_quote");
+      var barCls = !isNum(v) ? "zero" : (v === 0 ? "zero" : (isDefect ? "bad" : ""));
+      var bar = '<i class="' + barCls + '" style="' +
+        (isNum(v) && v !== 0 ? "width:" + pctw.toFixed(2) + "%" : "") + '"></i>';
+      var drop = (idx === worst && worstDrop > 0)
+        ? '<div class="fndrop">↓ ' + intf(worstDrop) + " lost here — the funnel's biggest drop</div>" : "";
+      return drop +
+        '<div class="fnrow" title="' + esc(FUNNEL_HELP[name] || name) + '">' +
+          '<div class="fnlab">' + esc(name.replace(/_/g," ")) + "</div>" +
+          '<div class="fnbar">' + bar + "</div>" +
+          '<div class="fnval">' + (isNum(v) ? intf(v) : '<span class="unknown">—</span>') + "</div>" +
+        "</div>";
+    }).join("");
+  }
+
+  var ref = w.screen_refusals || {}, rk = Object.keys(ref);
+  el("f-refusals").innerHTML = rk.length
+    ? '<div class="ct" style="margin-bottom:6px">Screen refusals</div>' +
+      rk.map(function(k){ return '<div class="kv"><span class="k">' + esc(k) +
+        '</span><span class="v">' + esc(ref[k]) + "</span></div>"; }).join("")
+    : "";
+
+  /* placement rate */
+  var pr = pl.placement || {}, weeks = pr.by_week || [];
+  el("pr-src").textContent = "source: " + (pr.source || "");
+  drawSpark(weeks);
+  var tb = el("pr-rows").querySelector("tbody");
+  var shown = weeks.slice().reverse().slice(0, 12);
+  tb.innerHTML = weeks.length ? shown.map(function(x){
+    return "<tr>" +
+      '<td data-label="Week">' + esc(x.week) + "</td>" +
+      '<td data-label="Placed">' + numCell(x.placed) + "</td>" +
+      '<td data-label="Skipped">' + numCell(x.skipped) + "</td>" +
+      '<td data-label="Rate %">' + (isNum(x.placement_rate_pct) ? x.placement_rate_pct.toFixed(3) : '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="Settled">' + numCell(x.settled) + "</td>" +
+    "</tr>";
+  }).join("") + (weeks.length > shown.length
+      ? '<tr><td colspan="5" class="empty">showing the most recent ' + shown.length +
+        " of " + weeks.length + " weeks; the full series is in /api/v2/rollup.</td></tr>"
+      : "")
+    : '<tr><td colspan="5" class="empty">' + esc(pr.reason || "no weekly data") + "</td></tr>";
+
+  renderSkip(d);
+}
+
+function drawSpark(weeks){
+  var svg = el("pr-spark");
+  var vals = weeks.map(function(w){ return w.placement_rate_pct; }).filter(isNum);
+  if(vals.length < 2){ svg.innerHTML = ""; return; }
+  var W = 600, H = 38, lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if(hi === lo){ hi += 1; lo -= 1; }
+  var pts = [], n = vals.length;
+  for(var i = 0; i < n; i++){
+    pts.push((W * i / (n - 1)).toFixed(1) + "," + (H - 4 - (vals[i] - lo) / (hi - lo) * (H - 10)).toFixed(1));
+  }
+  var lastX = W, lastY = (H - 4 - (vals[n-1] - lo) / (hi - lo) * (H - 10));
+  /* history in the de-emphasis hue, the current period in the accent */
+  svg.innerHTML =
+    '<polyline fill="none" stroke="#8b949e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="' +
+      pts.slice(0, n-1).join(" ") + '"></polyline>' +
+    '<polyline fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" points="' +
+      pts.slice(n-2).join(" ") + '"></polyline>' +
+    '<circle cx="' + (lastX - 3) + '" cy="' + lastY.toFixed(1) + '" r="3.5" fill="#58a6ff" stroke="#161b22" stroke-width="2"></circle>';
+}
+
+function renderSkip(d){
+  var sk = ((d.pipeline || {}).skip_reasons) || {};
+  var rows = SKIP_MODE === "windowed" ? (sk.windowed || []) : (sk.lifetime || []);
+  el("sk-win").setAttribute("aria-pressed", SKIP_MODE === "windowed" ? "true" : "false");
+  el("sk-life").setAttribute("aria-pressed", SKIP_MODE === "windowed" ? "false" : "true");
+  var lifeTotal = (sk.lifetime || []).reduce(function(a,b){ return a + (isNum(b[1]) ? b[1] : 0); }, 0);
+  el("sk-sub").textContent = SKIP_MODE === "windowed"
+    ? "last " + numTxt(sk.window_days) + " days · " + numTxt(sk.days_in_window) +
+      " days retained · lifetime total " + lifeTotal.toLocaleString()
+    : "all time · dominated by whatever config was live months ago";
+
+  var box = el("sk-bars");
+  if(!rows.length){
+    box.innerHTML = '<div class="empty">' + esc(sk.reason ||
+      (SKIP_MODE === "windowed" ? "no skip rows in the window" : "no skip rows")) + "</div>";
+  } else {
+    var top = rows.slice(0, 12);
+    var max = Math.max.apply(null, top.map(function(r){ return isNum(r[1]) ? r[1] : 0; }));
+    var total = rows.reduce(function(a,b){ return a + (isNum(b[1]) ? b[1] : 0); }, 0);
+    box.innerHTML = top.map(function(r){
+      var wpc = max > 0 ? (r[1] / max * 100) : 0;
+      var share = total > 0 ? (r[1] / total * 100) : null;
+      return '<div class="rbrow">' +
+        '<div class="rbname" title="' + esc(r[0]) + '">' + esc(r[0]) + "</div>" +
+        '<div class="rbbar"><i style="width:' + wpc.toFixed(2) + '%"></i></div>' +
+        '<div class="rbval">' + intf(r[1]) + (share !== null ? " · " + share.toFixed(1) + "%" : "") + "</div>" +
+      "</div>";
+    }).join("") + (rows.length > 12
+      ? '<div class="cap">' + (rows.length - 12) + " further reason(s) not shown; the full set is in /api/v2/rollup.</div>"
+      : "");
+  }
+  var cov = sk.coverage || {};
+  el("sk-cov").textContent = isNum(cov.rows_total)
+    ? "Coverage: " + intf(cov.rows_with_skip_reason) + " of " + intf(cov.rows_total) +
+      " log rows carry a skip_reason" +
+      (isNum(cov.rows_missing_pod_id) && cov.rows_missing_pod_id > 0
+        ? "; " + intf(cov.rows_missing_pod_id) + " rows had no pod_id and were attributed to P-001 per TradeLogSchema defaults" : "") +
+      (isNum(cov.rows_unparseable) && cov.rows_unparseable > 0
+        ? "; " + intf(cov.rows_unparseable) + " unparseable rows skipped" : "")
+    : (sk.reason || "");
+}
+
+/* ═══ OPS ═══ */
+function renderOps(d){
+  var srcs = d.sources || {};
+  el("o-sources").querySelector("tbody").innerHTML = Object.keys(srcs).map(function(k){
+    var m = srcs[k];
+    var state = !m.available ? '<span class="neg">missing</span>'
+      : (m.clock_skew ? '<span class="neg">clock skew</span>'
+      : (m.stale ? '<span class="wv">stale</span>' : '<span class="pos">ok</span>'));
+    return "<tr>" +
+      '<td data-label="Source"><b>' + esc(k) + "</b></td>" +
+      '<td data-label="State">' + state + "</td>" +
+      '<td data-label="Age">' + (age(m.age_seconds) || '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="Path"><code style="font-size:11px">' + esc(m.path || "") + "</code>" +
+        (m.reason ? '<div class="fd">' + esc(m.reason) + "</div>" : "") + "</td>" +
+    "</tr>";
+  }).join("");
+
+  var ops = d.ops || {};
+  el("o-svc").querySelector("tbody").innerHTML = (ops.services || []).length
+    ? ops.services.map(function(s){
+        var hb = s.heartbeat || {};
+        return "<tr>" +
+          '<td data-label="Unit"><b>' + esc(s.id) + "</b></td>" +
+          '<td data-label="Active" class="' + (s.active === "active" ? "pos" : "neg") + '">' + esc(s.active) + "</td>" +
+          '<td data-label="Restarts">' + (isNum(s.restarts) ? s.restarts : '<span class="unknown">—</span>') + "</td>" +
+          '<td data-label="Heartbeat">' + (isNum(hb.age_minutes) ? hb.age_minutes.toFixed(1) + "m" : '<span class="dim">none</span>') + "</td>" +
+        "</tr>";
+      }).join("")
+    : '<tr><td colspan="4" class="empty">' + esc(ops.reason || "no services") + "</td></tr>";
+
+  el("o-jobs").querySelector("tbody").innerHTML = (ops.jobs || []).length
+    ? ops.jobs.map(function(j){
+        var st = j.stale ? '<span class="wv">stale</span>'
+          : (j.state === "uncheckable" ? '<span class="unknown" title="' + esc(j.uncheckable_reason || "") + '">uncheckable</span>'
+          : '<span class="pos">ok</span>');
+        return "<tr>" +
+          '<td data-label="Job"><b>' + esc(j.id) + "</b></td>" +
+          '<td data-label="Schedule"><code style="font-size:11px">' + esc(j.schedule || "") + "</code></td>" +
+          '<td data-label="Age">' + (isNum(j.content_age_hours) ? j.content_age_hours.toFixed(1) + "h"
+            : (isNum(j.age_hours) ? j.age_hours.toFixed(1) + "h" : '<span class="unknown">—</span>')) + "</td>" +
+          '<td data-label="State">' + st + "</td>" +
+        "</tr>";
+      }).join("")
+    : '<tr><td colspan="4" class="empty">' + esc(ops.reason || "no jobs") + "</td></tr>";
+
+  var fi = ops.findings || [], fb = el("o-find");
+  if(!fi.length){ fb.className = "empty"; fb.textContent = ops.reason || "no findings"; }
+  else { fb.className = ""; fb.innerHTML = fi.map(findingHTML).join(""); }
+
+  var fa = ops.faults || [], fab = el("o-faults");
+  if(!fa.length){ fab.className = "empty"; fab.textContent = "none"; }
+  else {
+    fab.className = "";
+    fab.innerHTML = fa.map(function(x){
+      return '<div class="find warn"><div class="ft">' + esc(x.probe || "probe") + "</div>" +
+             '<div class="fd">' + esc(x.error || "") + "</div></div>";
+    }).join("");
+  }
+}
+
+/* ═══ views ═══ */
+var VIEWS = ["now","gates","pnl","pipeline","ops","manager"];
+function show(v){
+  VIEW = v;
+  VIEWS.forEach(function(n){
+    var s = el("v-" + n); if(s) s.hidden = (n !== v);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(b){
+    b.setAttribute("aria-selected", b.dataset.view === v ? "true" : "false");
+  });
+  if(v === "manager" && !MGR_LOADED){ el("mgr").src = "/manager"; MGR_LOADED = true; }
+  if(DATA){ renderChips(DATA); if(v === "pnl") drawEquity((DATA.pnl||{}).equity||{}); }
+  try{ history.replaceState(null, "", "#" + v); }catch(e){}
+}
+Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(b){
+  b.addEventListener("click", function(){ show(b.dataset.view); });
+});
+el("sk-win").addEventListener("click", function(){ SKIP_MODE = "windowed"; if(DATA) renderSkip(DATA); });
+el("sk-life").addEventListener("click", function(){ SKIP_MODE = "lifetime"; if(DATA) renderSkip(DATA); });
+el("eq-chart").addEventListener("click", function(){ setEq("chart"); });
+el("eq-table").addEventListener("click", function(){ setEq("table"); });
+function setEq(m){
+  EQ_MODE = m;
+  el("eq-wrap").hidden = (m !== "chart");
+  el("eq-tablewrap").hidden = (m === "chart");
+  el("eq-chart").setAttribute("aria-pressed", m === "chart" ? "true" : "false");
+  el("eq-table").setAttribute("aria-pressed", m === "table" ? "true" : "false");
+  if(m === "chart" && DATA) drawEquity((DATA.pnl||{}).equity||{});
+}
+
+/* ═══ poll ═══ */
+function render(d){
+  DATA = d;
+  renderRibbon(d.mode);
+  renderChips(d);
+  renderNow(d);
+  renderGates(d);
+  renderPnl(d);
+  renderPipeline(d);
+  renderOps(d);
+  if(VIEW === "pnl" && EQ_MODE === "chart") drawEquity((d.pnl||{}).equity||{});
+}
+
+var polling = false;
+function poll(){
+  if(polling) return;
+  polling = true;
+  var main = el("main");
+  if(DATA) main.classList.add("refetching");
+  var headers = {};
+  if(ETAG) headers["If-None-Match"] = ETAG;
+  fetch("/api/v2/dashboard", {headers:headers, cache:"no-store"}).then(function(res){
+    if(res.status === 304){ return null; }
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    ETAG = res.headers.get("ETag");
+    return res.json();
+  }).then(function(d){
+    if(d) render(d);
+    el("chip-fresh").classList.remove("bad");
+  }).catch(function(err){
+    var chip = el("chip-fresh");
+    chip.textContent = "data unreachable";
+    chip.className = "chip bad";
+    chip.title = "the dashboard API did not respond: " + err;
+  }).then(function(){
+    polling = false;
+    main.classList.remove("refetching");
+  });
+}
+
+var timer = null;
+function startTimer(){ stopTimer(); timer = setInterval(poll, POLL); }
+function stopTimer(){ if(timer){ clearInterval(timer); timer = null; } }
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden) stopTimer(); else { poll(); startTimer(); }
+});
+window.addEventListener("resize", function(){
+  if(DATA && VIEW === "pnl" && EQ_MODE === "chart") drawEquity((DATA.pnl||{}).equity||{});
+});
+
+var initial = (location.hash || "").replace("#","");
+show(VIEWS.indexOf(initial) >= 0 ? initial : "now");
+poll();
+startTimer();
+})();
+</script>
+</body>
+</html>

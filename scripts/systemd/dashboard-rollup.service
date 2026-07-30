@@ -1,0 +1,56 @@
+[Unit]
+Description=Betting Pod Shop — Dashboard lifetime rollup (incremental)
+# Runs scripts/build_dashboard_rollup.py, which maintains
+# data/dashboard/rollup.json: lifetime P&L by day, per-pod attribution,
+# skip-reason histograms, weekly placement rate, CLV means.
+#
+# It exists because lifetime numbers CANNOT be read on demand:
+# rotate_active_log.py caps the active log at 50 MB and rewrites it to hold only
+# still-open PLACED rows, keeping 12 gzipped archives (~1.5 days live).  And the
+# 15-minute alerting collector survives only because of its hard 24h early exit
+# inside an 80 MB budget — putting a lifetime scan on that path would sit an
+# unbounded read on the thing that pages when production is down.
+#
+# ⚠ rollup.json is the SYSTEM OF RECORD for pre-horizon history.  Once an
+# archive is pruned, its rows survive only in these counters and are not
+# derivable from disk.  --backup writes rollup.json.bak.gz; keep it.
+#
+# Install:
+#   scp scripts/systemd/dashboard-rollup.{service,timer} root@129.212.176.202:/etc/systemd/system/
+#   ssh root@129.212.176.202 'systemctl daemon-reload && systemctl enable --now dashboard-rollup.timer'
+# FIRST RUN MUST BE MANUAL and off a deploy window — a full backfill streams
+# every surviving archive:
+#   nice -n 19 ionice -c3 /opt/betting-pod-shop/venv/bin/python \
+#       -m scripts.build_dashboard_rollup --root /opt/betting-pod-shop --full
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.build_dashboard_rollup \
+    --root /opt/betting-pod-shop --backup
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dashboard-rollup
+
+# Lowest priority of anything on the box. It re-reads the active log in full
+# every run (by design — byte offsets into a file that rotation rewrites are
+# not a safe checkpoint), so it must never compete with trading for IO.
+Nice=15
+IOSchedulingClass=idle
+# Counters only: O(pods x days), streamed, never a TradeStore.
+MemoryMax=256M
+TimeoutStartSec=900
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/dashboard
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

@@ -30,6 +30,23 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=betting-pod-shop
 
+# ── Memory ──────────────────────────────────────────────────────────────────
+# This was the ONLY unit on the 2 GB box without a cap, and it is the one that
+# OOM-crash-looped for five weeks in June 2026. Every other unit here sets one
+# (256M–512M); the engine is the priority workload so it gets the largest share,
+# but "largest" is not "unbounded".
+#
+# Deliberately NO Nice/IOSchedulingClass here: unlike the collectors, the engine
+# must not yield — it is the thing everything else exists to serve.
+#
+# 640M is a starting ceiling, not a measurement. Tighten it after a week of:
+#   systemctl show -p MemoryPeak betting-pod-shop
+# Two defences keep real usage well under it: trade_store's
+# max_load_entries: 50000, and the dashboard's 400-row trade cap — which also
+# removed the unbounded list that used to be serialised into every HTTP response
+# from inside this process.
+MemoryMax=640M
+
 # ── Security hardening ──────────────────────────────────────────────────────
 NoNewPrivileges=true
 ProtectSystem=strict

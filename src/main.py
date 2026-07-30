@@ -157,6 +157,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         dash_renderer = DashboardRenderer(use_color=True, width=80)
         logger.info("Dashboard mode enabled")
 
+    # The snapshot the standalone dashboard reads. Deliberately independent of
+    # --web: the file-backed server must keep working when the embedded one is
+    # off, which is the whole point of splitting them.
+    _sd = getattr(args, "dashboard_state_dir", "data/dashboard")
+    dashboard_state_dir: Optional[Path] = Path(_sd) if _sd else None
+
     web_server: Optional[WebDashboardServer] = None
     if getattr(args, "web", False):
         web_server = WebDashboardServer(
@@ -181,6 +187,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         web_server=web_server,
         trade_log_path=trade_log_path,
         trade_store=trade_store,
+        dashboard_state_dir=dashboard_state_dir,
+        interval_seconds=getattr(args, "interval", None),
     )
 
     try:

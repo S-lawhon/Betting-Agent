@@ -13,7 +13,6 @@ rather than a claim in a docstring.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -43,19 +42,6 @@ def ago(**kw) -> str:
 
 def ahead(**kw) -> str:
     return (clock() + timedelta(**kw)).isoformat()
-
-
-def backdate(p: Path) -> None:
-    """Pin ``p``'s mtime to the frozen NOW.
-
-    Tests whose file carries no parseable content timestamp fall back to the
-    real mtime — which, against the frozen ``clock()``, reads as minutes-to-
-    hours in the FUTURE once the wall clock passes 12:00 UTC, and the
-    clock-skew reason overwrites the one under test.  (These tests passed
-    every morning and failed every afternoon.)
-    """
-    ts = NOW.timestamp()
-    os.utime(p, (ts, ts))
 
 
 @pytest.fixture()
@@ -105,7 +91,6 @@ def test_unreadable_bodies_never_raise(root, name, pathfn, body):
 def test_oversize_file_is_refused_not_loaded(root):
     p = root / "manager" / "state" / "status.json"
     p.write_text("{}", encoding="utf-8")
-    backdate(p)
     payload, meta = ds.load_json_file(p, max_bytes=1, clock=clock)
     assert payload is None
     assert meta["available"] is False
@@ -251,7 +236,6 @@ def test_p022_missing_names_the_checker(root):
 def test_p022_all_rows_unparseable(root):
     p = root / "data" / "p022_window_check" / "status.jsonl"
     p.write_text("nope\nalso nope\n", encoding="utf-8")
-    backdate(p)
     row, meta = ds.tail_p022_window(root, clock)
     assert row is None
     assert meta["available"] is False

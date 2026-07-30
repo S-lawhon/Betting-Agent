@@ -539,9 +539,35 @@ pods:
       # Size screen (added 2026-07-30, R5 house rule): refuse to place a NEW
       # quote off a book with fewer than this many contracts at the top of the
       # reference side(s) — spread says nothing (a 152,862-contract bid and a
-      # 1-contract bid both pass "spread <= 2c"). A TIGHTENING of the quoted
-      # population, allowed at any time under §8; resting quotes are untouched.
-      min_top_size: 100
+      # 1-contract bid both pass "spread <= 2c"). Resting quotes are untouched.
+      #
+      # DISABLED 2026-07-30 by Sam's decision, hours before the POI26 window.
+      # The comment above used to read "A TIGHTENING of the quoted population,
+      # allowed at any time under §8." That is wrong, and the document that
+      # governs this gate says so by name. P022_ONESIDED_PREREGISTRATION
+      # _2026-07-29.md §8: "the pod has no size or depth screen ... Adding one
+      # is an §8.1 change and is not part of this registration." Its §2 pins
+      # "No depth screen" among the unchanged parameters. §8.1's reset is about
+      # POPULATION IDENTITY, not generosity — a narrowing is not exempt.
+      #
+      # It is also the wrong screen. On the AIGWO26 census the in-band books
+      # split DISJOINTLY: the 10 it keeps carry 801-1,122 contracts ahead of
+      # the quote, the 14 it refuses carry 12-13 (one at 320). A fill needs a
+      # YES-taker print strictly THROUGH the quote, so the screen keeps the
+      # books ~65x harder to fill and discards the reachable ones — the exact
+      # bimodality the pre-registration flagged as unaddressed BY DESIGN. The
+      # threshold is irrelevant: 20, 50, 100 and 500 all give the same
+      # partition, because top_ask_qty here is either 1 or 800+.
+      #
+      # 0 disables (tested). Observability from 8aa1607 is unaffected: QUOTE
+      # rows still carry book_side + raw yes_bid/yes_ask/bid_qty/ask_qty, which
+      # is what will settle this from real fills. If a screen is wanted later
+      # it is a P-022b registration needing a fill estimate first (P-017A's
+      # standing rule), and it must gate on size_ahead_of_quote, never
+      # top_ask_qty — those differ by a median 12x on exactly these books.
+      # See research/REPORT_P022_Size_Screen_Section8_2026-07-30.md and
+      # golf_quirks_research/screen_vs_size_ahead.py.
+      min_top_size: 0
     risk:
       # §7 caps, as PERCENTAGES of bankroll. They were fixed dollars ($5/$50/$150
       # equivalents) which matched the rule only by coincidence at a $1,000

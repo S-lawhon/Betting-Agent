@@ -178,6 +178,41 @@ class TestAgainstShippedState(TestCase):
         self.assertEqual([], missing, "pod workstreams with no tier: {}".format(missing))
 
 
+class TestRunChecksDefaultRegistry(TestCase):
+    """run_checks must load the real registry when none is passed.
+
+    The 2026-07-30 dashboard showed 'P-001/P-014/P-015/P-017 is in pods.active
+    but has no registry entry' while every entry existed: no caller (brief,
+    alert, either dashboard) passed a registry, and the old `registry or {}`
+    default reconciled pods.active against an empty workstream map.
+    """
+
+    def test_default_run_sees_the_shipped_registry(self):
+        import yaml
+        with open("config_multi_pod.yaml") as fh:
+            cfg = yaml.safe_load(fh)
+        active = (cfg.get("pods") or {}).get("active") or []
+        findings = checks.run_checks(_snap(active))
+        unregistered = {f.key for f in findings
+                        if f.key.startswith("registry.unregistered.")}
+        self.assertEqual(set(), unregistered,
+                         "active pods flagged unregistered despite entries "
+                         "existing — the registry default is broken again")
+
+    def test_unreadable_registry_is_loud_but_fabricates_nothing(self):
+        import unittest.mock as mock
+        with mock.patch.object(checks, "load_registry", return_value=None):
+            findings = checks.run_checks(_snap(["P-001"]))
+        keys = _keys(findings)
+        self.assertIn("registry.unreadable", keys)
+        self.assertNotIn("registry.unregistered.P-001", keys)
+
+    def test_explicit_empty_registry_still_reconciles_as_empty(self):
+        """{} stays a real answer — only None means 'load the default'."""
+        findings = checks.run_checks(_snap(["P-001"]), registry={})
+        self.assertIn("registry.unregistered.P-001", _keys(findings))
+
+
 class TestGamesWindowStaleness(TestCase):
     """The maker is correctly silent before first pitch — don't cry wolf.
 

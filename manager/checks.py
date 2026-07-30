@@ -965,15 +965,40 @@ def check_staleness(snap: Dict[str, Any]) -> List[Finding]:
 
 def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
                local_config_fp: Optional[Dict[str, Any]] = None) -> List[Finding]:
-    registry = registry or {}
     findings: List[Finding] = []
+    # Every production caller (brief, alert, both dashboards) omits `registry`,
+    # and the old `registry or {}` default made check_registry_reconciliation
+    # compare pods.active against an EMPTY workstream map — so every active pod
+    # fired "is in pods.active but has no registry entry" despite the entries
+    # existing (the four standing dashboard alarms of 2026-07-30). Load the
+    # real registry by default; a caller passing an explicit dict keeps it.
+    reconcilable = True
+    if registry is None:
+        registry = load_registry()
+        if registry is None:
+            findings.append(Finding(
+                key="registry.unreadable",
+                severity="warn",
+                title="manager/registry.yaml could not be loaded",
+                detail="Registry reconciliation was SKIPPED this run — the "
+                       "trading-vs-registered cross-checks had no registry to "
+                       "compare against. This is not an all-clear: an active "
+                       "pod could be unregistered right now and nothing would "
+                       "say so until the file loads again.",
+                fix="python3 -c \"import yaml; "
+                    "yaml.safe_load(open('manager/registry.yaml'))\""))
+            registry = {}
+            # Reconciling against {} is what produced the false alarms above:
+            # a registry we FAILED TO READ must not be reported as empty.
+            reconcilable = False
     findings += check_staleness(snap)
     findings += check_services(snap)
     findings += check_invariants(snap)
     findings += check_config_drift(snap, local_config_fp)
     findings += check_jobs(snap)
     findings += check_gates(snap, registry)
-    findings += check_registry_reconciliation(snap, registry)
+    if reconcilable:
+        findings += check_registry_reconciliation(snap, registry)
     findings += check_errors(snap)
     findings += check_throughput(snap)
     findings += check_p022_window(snap)
@@ -987,6 +1012,23 @@ def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
 def load_status(path: Optional[Path] = None) -> Dict[str, Any]:
     path = path or (HERE / "state" / "status.json")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_registry(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """The manager registry, or None if it cannot be read.
+
+    None and {} are different answers on purpose: {} means "reconcile against
+    an empty registry" (every active pod flags as unregistered), None means
+    "there is no registry to reconcile against" — run_checks reports the
+    latter as its own finding instead of fabricating per-pod errors.
+    """
+    path = path or (HERE / "registry.yaml")
+    try:
+        import yaml  # noqa: PLC0415 — optional here; only collect.py requires it
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 — missing file, bad YAML, no pyyaml: all None
+        return None
+    return data if isinstance(data, dict) else None
 
 
 if __name__ == "__main__":

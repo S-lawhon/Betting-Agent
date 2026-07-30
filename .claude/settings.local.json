@@ -68,7 +68,10 @@
       "WebFetch(domain:unabated.com)",
       "Bash(git fetch *)",
       "Bash(echo \"exit=$?\")",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new root@143.198.162.120 'echo OK; hostname; uptime')",
+      "Bash(bash scripts/check_research_committed.sh)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

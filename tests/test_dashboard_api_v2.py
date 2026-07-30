@@ -470,6 +470,61 @@ def test_pnl_open_reason_falls_back_when_the_source_gave_none():
     assert "not zero" in o["reason"]
 
 
+ENGINE_RISK_STATE = {
+    "engine_status": "running",
+    "_meta": {"written_at_utc": "2026-07-30T11:59:00+00:00"},
+    "risk": {"open_positions": 3, "total_exposure_usd": 120.0,
+             "total_exposure_pct": 12.0, "bankroll": 1000.0,
+             "daily_pnl": -4.0, "venue_exposure": {"kalshi": 120.0}},
+}
+
+
+def test_pnl_open_degrades_when_systemd_says_the_engine_is_down():
+    """F1: a readable snapshot from a stopped engine must not read as live.
+
+    Fresh engine_state file, but systemd reports the unit inactive — the exact
+    state reproduced 2026-07-30 ~14:01Z, when bankroll still returned 1000.0
+    with available:true.
+    """
+    st = status(services=[{"id": "betting-pod-shop", "active": "inactive",
+                           "since": None, "restarts": 0,
+                           "severity": "critical", "heartbeat": None}])
+    p = api.build_v2(src(engine_state=ENGINE_RISK_STATE, manager_status=st,
+                         sources=sources(engine_state=meta(),
+                                         manager_status=meta())))
+    assert p["engine"]["liveness"] == "down"
+    o = p["pnl"]["open"]
+    assert o["available"] is False
+    assert o["bankroll"] is None, "a stopped engine's bankroll is not current"
+    assert o["positions"] is None and o["exposure_usd"] is None
+    assert "down" in o["reason"]
+    assert "2026-07-30T11:59:00+00:00" in o["reason"]
+    assert o["last_known"]["bankroll"] == pytest.approx(1000.0)
+    assert o["last_known"]["written_at_utc"] == "2026-07-30T11:59:00+00:00"
+
+
+def test_pnl_open_degrades_when_the_snapshot_is_stale():
+    p = api.build_v2(src(engine_state=ENGINE_RISK_STATE, manager_status=status(),
+                         sources=sources(engine_state=meta(age=7200.0),
+                                         manager_status=meta())))
+    assert p["engine"]["liveness"] == "stale"
+    o = p["pnl"]["open"]
+    assert o["available"] is False and o["bankroll"] is None
+    assert "stale" in o["reason"]
+    assert o["last_known"]["positions"] == 3
+
+
+def test_pnl_open_is_current_while_the_engine_is_live():
+    p = api.build_v2(src(engine_state=ENGINE_RISK_STATE, manager_status=status(),
+                         sources=sources(engine_state=meta(),
+                                         manager_status=meta())))
+    assert p["engine"]["liveness"] == "live"
+    o = p["pnl"]["open"]
+    assert o["available"] is True
+    assert o["bankroll"] == pytest.approx(1000.0)
+    assert o["last_known"] is None
+
+
 def test_pnl_realized_windows_and_derived_rates():
     r = api.build_v2(src(rollup=ROLLUP,
                          sources=sources(rollup=meta())))["pnl"]["realized"]

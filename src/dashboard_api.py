@@ -482,7 +482,8 @@ def _window_sum(daily: List[List[Any]], days: int,
     return round(total, 4) if seen else 0.0
 
 
-def _pnl(src: Dict[str, Any]) -> Dict[str, Any]:
+def _pnl(src: Dict[str, Any],
+         engine: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     sources = _d(src.get("sources"))
     rollup = _d(src.get("rollup"))
     state = _d(src.get("engine_state"))
@@ -526,18 +527,37 @@ def _pnl(src: Dict[str, Any]) -> Dict[str, Any]:
         realized["reason"] = _reason(sources, "rollup")
 
     # ---- open exposure: engine only. Never back-derive a bankroll. ----
+    # F1 (research/RUN_SUMMARY_2026-07-30): a readable snapshot is not a live
+    # engine. With betting-pod-shop stopped, the last-written file still parses
+    # and this block used to serve its bankroll as current truth. Exposure and
+    # bankroll are only current while the engine is; when liveness says "down"
+    # or "stale", the block degrades and the old numbers move to last_known.
     risk = _d(state.get("risk"))
+    liveness = _d(engine if engine is not None else _engine(src)).get("liveness")
     if _available(sources, "engine_state") and risk:
-        open_block = {
-            "available": True,
+        current = {
             "positions": _num(risk.get("open_positions")),
             "exposure_usd": _num(risk.get("total_exposure_usd")),
             "exposure_pct": _num(risk.get("total_exposure_pct")),
             "bankroll": _num(risk.get("bankroll")),
             "daily_pnl": _num(risk.get("daily_pnl")),
             "venue_exposure": _d(risk.get("venue_exposure")),
-            "reason": None,
         }
+        if liveness in ("down", "stale"):
+            written = _d(state.get("_meta")).get("written_at_utc")
+            open_block = {
+                "available": False, "positions": None, "exposure_usd": None,
+                "exposure_pct": None, "bankroll": None, "daily_pnl": None,
+                "venue_exposure": {},
+                "reason": "{} — last-known values as of {}".format(
+                    "engine is down" if liveness == "down"
+                    else "engine snapshot is stale",
+                    written or "an unknown time"),
+                "last_known": dict(current, written_at_utc=written),
+            }
+        else:
+            open_block = dict(current, available=True, reason=None,
+                              last_known=None)
     else:
         open_block = {
             "available": False, "positions": None, "exposure_usd": None,
@@ -546,6 +566,7 @@ def _pnl(src: Dict[str, Any]) -> Dict[str, Any]:
             "reason": (_reason(sources, "engine_state")
                        or "no engine snapshot — open exposure is unknown, "
                           "not zero"),
+            "last_known": None,
         }
 
     # ---- equity curve: realized only, and labelled as such ----
@@ -931,7 +952,7 @@ def build_v2(src: Dict[str, Any],
         payload["gates"] = gates
         payload["gates_summary"] = gsummary
     if "pnl" in want or "now" in want:
-        payload["pnl"] = _pnl(src)
+        payload["pnl"] = _pnl(src, payload["engine"])
     if "pipeline" in want or "now" in want:
         payload["pipeline"] = _pipeline(src)
     if "ops" in want or "now" in want:

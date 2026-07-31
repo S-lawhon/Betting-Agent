@@ -255,6 +255,99 @@ def last_quote_per_ticker(path: Path) -> Dict[str, float]:
     return out
 
 
+def resting_quotes_from_log(quotes_path: Path,
+                            fills_path: Path) -> Dict[str, Dict[str, Any]]:
+    """Reconstruct the pod's LIVE resting quotes: `ticker -> {event, coll, ts}`.
+
+    `rebuild_from_log()` restores FILLS only, so on 2026-07-30 the detector's
+    engine saw $9.25 of ROC26 exposure while the pod held ~$49.50 — the caps
+    looked wide open, late-band names read as "candidates with cap room", and
+    a healthy cap-bound pod paged CRITICAL. This replay closes that gap:
+
+      * QUOTE places/re-prices a resting quote; PULL removes it.
+      * RESTART resets everything — a restarted process holds no quotes in
+        memory (only fills survive its rebuild). Markers are written by the
+        runner at startup; logs from before the marker existed replay from
+        the top, which matches a process that has not restarted since.
+      * FILL rows at/after the quote's own timestamp consume its qty (the
+        filled part is already counted by `rebuild_from_log`); SETTLE rows
+        drop the ticker entirely (`_maybe_settle` sets `done`, releasing it).
+        An UNFILLED book writes no SETTLE rows, so `_maybe_settle` also pulls
+        its resting quote through the log (PULL, reason "settled") — logs from
+        before that existed overstate exposure until the next RESTART marker.
+
+    Collateral is worst-case, `qty × (1 − ask)`, exactly what the pod's
+    exposure accessors charge for a resting sell-YES quote.
+    """
+    resting: Dict[str, Dict[str, Any]] = {}
+    try:
+        with open(quotes_path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                kind = rec.get("type")
+                if kind == "RESTART":
+                    resting.clear()
+                    continue
+                tk = rec.get("ticker")
+                if not tk:
+                    continue
+                if kind == "QUOTE":
+                    try:
+                        resting[tk] = {
+                            "event": rec.get("event") or "",
+                            "ask": float(rec.get("ask")),
+                            "qty": float(rec.get("size")),
+                            "ts": float(rec.get("ts")),
+                        }
+                    except (TypeError, ValueError):
+                        continue
+                elif kind == "PULL":
+                    resting.pop(tk, None)
+    except OSError:
+        return {}
+
+    # Fills consume resting qty; settlement releases the book outright.
+    try:
+        with open(fills_path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                tk = rec.get("ticker")
+                if not tk or tk not in resting:
+                    continue
+                kind = rec.get("type")
+                if kind == "SETTLE":
+                    resting.pop(tk, None)
+                elif kind == "FILL":
+                    try:
+                        ts, qty = float(rec.get("ts")), float(rec.get("qty"))
+                    except (TypeError, ValueError):
+                        continue
+                    if ts >= resting[tk]["ts"]:
+                        resting[tk]["qty"] -= qty
+    except OSError:
+        pass
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for tk, q in resting.items():
+        if q["qty"] <= 0:
+            continue                      # fully consumed -> nothing rests
+        out[tk] = {"event": q["event"], "ts": q["ts"],
+                   "coll": q["qty"] * max(1.0 - q["ask"], 0.0)}
+    return out
+
+
 def screen_after_band(engine: RoundLeaderFadeMakerEngine, ticker: str,
                       event_code: str, mid: float,
                       pending_event: float = 0.0, pending_total: float = 0.0):
@@ -346,6 +439,17 @@ def assess(engine: RoundLeaderFadeMakerEngine,
     except Exception as exc:                           # noqa: BLE001
         rebuild_error = f"{type(exc).__name__}: {exc}"
 
+    # The rebuild restores fills only. The pod's RESTING quotes also consume
+    # its caps (§7 binds on exposure), and missing them is how a cap-bound pod
+    # paged CRITICAL on 2026-07-30: the detector computed ~$40 of ROC26 room
+    # that did not exist. Replayed from the pod's own logs, seeded into the
+    # same pending_* mechanism the greedy walk below already uses.
+    resting = resting_quotes_from_log(engine.quotes_log, engine.fills_log)
+    resting_by_event: Dict[str, float] = {}
+    for q in resting.values():
+        resting_by_event[q["event"]] = (
+            resting_by_event.get(q["event"], 0.0) + q["coll"])
+
     markets: List[Dict[str, Any]] = []
     discovery_errors: Dict[str, str] = {}
     for s in engine.series:
@@ -421,8 +525,10 @@ def assess(engine: RoundLeaderFadeMakerEngine,
 
     n_priced = n_in_band = n_candidates = n_quoted = 0
     pulls = 0
-    # Aggregate cap is across tournaments, so this accumulates across events.
-    pending_total = 0.0
+    # Aggregate cap is across tournaments, so this accumulates across events —
+    # and it STARTS at the pod's live resting exposure (every event, in window
+    # or not: an out-of-window round's resting quotes still hold the cap).
+    pending_total = sum(q["coll"] for q in resting.values())
     missing: List[str] = []
     refusals: Dict[str, int] = {}
     for e in in_window:
@@ -436,7 +542,12 @@ def assess(engine: RoundLeaderFadeMakerEngine,
         # expect quotes on the names the cap dropped. Sorting also makes a
         # `max_book_pulls` truncation a correct PREFIX of the pod's allocation
         # rather than an arbitrary subset of it.
-        pending_event = 0.0
+        #
+        # Seeded with the event's live resting quotes for the same reason the
+        # aggregate is: the per-tournament cap spans every round of the
+        # tournament, so R1 quotes resting through settlement consume the room
+        # R2's late-band names are asking about.
+        pending_event = resting_by_event.get(e["event_code"], 0.0)
         for tk in sorted(e["tickers"]):
             if pulls >= max_book_pulls:
                 break
@@ -453,6 +564,18 @@ def assess(engine: RoundLeaderFadeMakerEngine,
                 continue
             e["n_in_band"] += 1
             n_in_band += 1
+            ts = quote_ts.get(tk)
+            if ts is not None and ts >= e["window_open_epoch"]:
+                # The pod already answered this name — screening it again
+                # would double it: its live resting collateral is in the
+                # pending_* seed, and the seed cannot grant the own-quote
+                # exclusion the pod's re-price path gets (the detector's
+                # engine holds no quote object to exclude).
+                e["n_candidates"] += 1
+                n_candidates += 1
+                e["n_quoted"] += 1
+                n_quoted += 1
+                continue
             ok, why, _size, _px = screen_after_band(
                 engine, tk, e["event_code"], mid,
                 pending_event=pending_event, pending_total=pending_total)
@@ -466,11 +589,7 @@ def assess(engine: RoundLeaderFadeMakerEngine,
                 continue
             e["n_candidates"] += 1
             n_candidates += 1
-            ts = quote_ts.get(tk)
-            if ts is not None and ts >= e["window_open_epoch"]:
-                e["n_quoted"] += 1
-                n_quoted += 1
-            elif e["window_open_for_s"] >= grace_s:
+            if e["window_open_for_s"] >= grace_s:
                 # Only counts as missing once the pod has had a rediscover
                 # pass to see it. Before that, silence is scheduling.
                 e["candidates_without_quote"].append(tk)
@@ -578,6 +697,15 @@ def assess(engine: RoundLeaderFadeMakerEngine,
         "funnel": funnel,
         "screen_refusals": refusals,
         "candidates_without_quote": missing,
+        # The pod's live resting quotes, replayed from its own logs. This is
+        # the exposure the caps actually bind against; without it the 2026-07-30
+        # false CRITICAL was undiagnosable from this file alone.
+        "resting_exposure": {
+            "total": round(sum(q["coll"] for q in resting.values()), 2),
+            "by_event": {k: round(v, 2)
+                         for k, v in sorted(resting_by_event.items())},
+            "n_tickers": len(resting),
+        },
         "discovery_errors": discovery_errors,
         "rebuild_error": rebuild_error,
         "n_events": len(events),

@@ -1096,3 +1096,84 @@ def test_min_top_size_comes_from_config(tmp_path):
     eng2 = P.from_config({"risk": {"initial_bankroll": 4000.0}},
                          risk_guard=None, schedule=FakeSchedule())
     assert eng2.min_top_size == 100.0, "default must be the registered 100"
+
+
+# ── cap refusals are VISIBLE (2026-07-30: MBRE/RGER skipped in silence) ──
+#
+# `_pull` writes a PULL row only when a quote was resting, so a name the caps
+# refused BEFORE its first quote left no trace at all. That silence is
+# indistinguishable from the dead-pod failure the window detector pages on,
+# and diagnosing it took an investigation the log should have answered.
+
+def _rows(tmp_path, type_):
+    path = tmp_path / "round_leader_fade_quotes.jsonl"
+    if not path.exists():
+        return []
+    return [r for r in (json.loads(ln) for ln in
+                        path.read_text().splitlines() if ln.strip())
+            if r.get("type") == type_]
+
+
+def test_cap_refusal_before_first_quote_writes_one_refused_row(tmp_path):
+    # 0.05% of $1,000 = $0.50 tournament cap -> sizes to zero, never quotes.
+    eng = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE - 18 * 3600),
+                      bankroll=1000.0, pct_per_tournament=0.0005,
+                      pct_per_name=1.0, pct_total=1.0)
+    eng.discover()
+    eng.cycle()
+    eng.cycle()          # second cycle: same refusal, must NOT log again
+    refused = _rows(tmp_path, "REFUSED")
+    assert len(refused) == 1, refused
+    assert refused[0]["reason"] == "cap_sized_to_zero"
+    assert refused[0]["ticker"] == TICKER
+    # the room figures are recorded so the refusal is adjudicable from the log
+    assert "room_event" in refused[0]
+    assert _rows(tmp_path, "PULL") == [], "no quote rested, nothing to pull"
+
+
+def test_refusal_episode_clears_when_the_name_is_quoted(tmp_path):
+    eng = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE - 18 * 3600),
+                      bankroll=1000.0, pct_per_tournament=0.0005,
+                      pct_per_name=1.0, pct_total=1.0)
+    eng.discover()
+    eng.cycle()
+    assert len(_rows(tmp_path, "REFUSED")) == 1
+    # cap raised -> the name quotes, which ends the refusal episode
+    eng.max_collateral_per_tournament = 50.0
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is not None
+    # cap cut again -> the RESTING quote is pulled (PULL row carries the
+    # reason), and the pull marks the episode as already logged
+    eng.max_collateral_per_tournament = 0.5
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is None
+    assert len(_rows(tmp_path, "PULL")) == 1
+    assert len(_rows(tmp_path, "REFUSED")) == 1, \
+        "a refusal already told by the PULL row must not also write REFUSED"
+
+
+def test_mark_restart_writes_a_marker_row(tmp_path):
+    eng = make_engine(tmp_path, FakeKalshi(), Clock(CLOSE - 18 * 3600))
+    eng.mark_restart(restored_fills=3)
+    rows = _rows(tmp_path, "RESTART")
+    assert len(rows) == 1
+    assert rows[0]["restored_fills"] == 3
+
+
+def test_settling_an_unfilled_book_pulls_its_quote_through_the_log(tmp_path):
+    """An unfilled book writes no SETTLE rows (they are per-fill), so without
+    an explicit PULL its resting quote looks live forever to any log replay —
+    the window detector's resting-exposure reconstruction overstated AIGWO26
+    by ~3x the tournament cap this way on 2026-07-30."""
+    clock = Clock(CLOSE - 18 * 3600)
+    eng = make_engine(tmp_path, FakeKalshi(), clock)
+    eng.discover()
+    eng.cycle()
+    assert eng.books[TICKER].ask_quote is not None
+    assert eng.books[TICKER].fills == []
+    _settle_result(eng, clock, {"result": "no"})
+    assert eng.books[TICKER].done
+    pulls = _rows(tmp_path, "PULL")
+    assert len(pulls) == 1
+    assert pulls[0]["ticker"] == TICKER
+    assert pulls[0]["reason"] == "settled"

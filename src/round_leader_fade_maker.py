@@ -260,6 +260,14 @@ class RoundLeaderFadeMakerEngine:
         # written once per episode rather than every cycle. Cleared when the
         # book thickens, so a re-thinning is visible again.
         self._thin_refused: set = set()
+        # Same idea for cap/risk refusals. Before 2026-07-30 a name the caps
+        # refused BEFORE its first quote left no trace at all — `_pull` logs
+        # only when a quote was resting — so MBRE/RGER entering the ROC26 band
+        # after the tournament cap filled were skipped in a silence
+        # indistinguishable from the dead-pod failure the window detector
+        # pages on. Cleared when the name gets a quote, so a later refusal
+        # episode is visible again.
+        self._cap_refused: set = set()
         self.kill_file = Path(kill_file)
         self.risk_guard = risk_guard
         self._now = _now_fn or time.time
@@ -745,7 +753,9 @@ class RoundLeaderFadeMakerEngine:
                           - book.collateral)
         room_name_ct = self.max_contracts_per_name - book.sold
         if room_name_coll <= 0 or room_name_ct <= 0:
-            self._pull(book, "cap_per_name")
+            self._refuse(book, "cap_per_name", {
+                "room_name_coll": round(room_name_coll, 4),
+                "room_name_ct": room_name_ct})
             return
         room_event = (self.max_collateral_per_tournament
                       - (self.tournament_exposure(book.event_code)
@@ -753,7 +763,9 @@ class RoundLeaderFadeMakerEngine:
         room_total = (self.max_total_collateral
                       - (self.total_exposure() - own_quote_coll))
         if room_event <= 0 or room_total <= 0:
-            self._pull(book, "cap_collateral")
+            self._refuse(book, "cap_collateral", {
+                "room_event": round(room_event, 4),
+                "room_total": round(room_total, 4)})
             return
 
         quote_px = round(mid + self.quote_offset, 2)
@@ -768,7 +780,11 @@ class RoundLeaderFadeMakerEngine:
                    room_total / per_ct_coll)
         size = float(int(size))            # whole contracts
         if size <= 0:
-            self._pull(book, "cap_sized_to_zero")
+            self._refuse(book, "cap_sized_to_zero", {
+                "room_event": round(room_event, 4),
+                "room_total": round(room_total, 4),
+                "room_name_coll": round(room_name_coll, 4),
+                "quote_px": quote_px})
             return
 
         prev = book.ask_quote
@@ -783,9 +799,12 @@ class RoundLeaderFadeMakerEngine:
             # idempotent-by-market_id and a bare quote figure would replace,
             # and so erase, the exposure of everything already filled here.
             if not self._reserve(book, book.collateral + size * per_ct_coll):
-                self._pull(book, "aggregate_risk")
+                self._refuse(book, "aggregate_risk", {
+                    "requested_coll": round(
+                        book.collateral + size * per_ct_coll, 4)})
                 return
             book.ask_quote = MakerQuote(quote_px, size, now, mid)
+            self._cap_refused.discard(book.ticker)
             self._write(self.quotes_log, {
                 "type": "QUOTE", "pod_id": "P-022", "ticker": book.ticker,
                 "event": book.event_code, "ask": quote_px, "mid": mid,
@@ -857,6 +876,43 @@ class RoundLeaderFadeMakerEngine:
             if (book is None or book.done
                     or (book.ask_quote is None and book.collateral <= 0)):
                 self._release(ticker)
+
+    def _refuse(self, book: MarketBook, reason: str,
+                detail: Optional[Dict[str, Any]] = None) -> None:
+        """Refuse to (re)quote for a cap/risk reason, VISIBLY.
+
+        `_pull` writes a PULL row only when a quote was resting, so a name
+        refused before its first quote used to leave no trace. Once per
+        episode (until the name next gets a quote), a REFUSED row records the
+        reason and the room figures behind it, mirroring the thin_book
+        pattern. Logging only — the refusal itself is unchanged.
+        """
+        already = book.ticker in self._cap_refused
+        had_quote = book.ask_quote is not None
+        self._pull(book, reason)
+        self._cap_refused.add(book.ticker)
+        if had_quote or already:
+            # the PULL row (or an earlier REFUSED row) already tells the story
+            return
+        self._write(self.quotes_log, {
+            "type": "REFUSED", "pod_id": "P-022", "ticker": book.ticker,
+            "event": book.event_code, "reason": reason, **(detail or {}),
+        })
+
+    def mark_restart(self, restored_fills: int = 0) -> None:
+        """Write a RESTART marker to the quotes log. Called by the RUNNER only.
+
+        A restart empties this process's resting quotes (only fills survive via
+        `rebuild_from_log`), so any log replay that reconstructs live resting
+        exposure must reset at this marker. The window detector's
+        `resting_quotes_from_log` is that replay. Never call this from a
+        read-only consumer — a detector writing markers would reset the replay
+        it depends on.
+        """
+        self._write(self.quotes_log, {
+            "type": "RESTART", "pod_id": "P-022",
+            "restored_fills": restored_fills,
+        })
 
     def _pull(self, book: MarketBook, reason: str) -> None:
         if book.ask_quote is not None:
@@ -982,7 +1038,14 @@ class RoundLeaderFadeMakerEngine:
                 "qty": fill.qty, "maker_fee_per_contract": fee, "pnl_usd": pnl,
             })
         book.done = True
-        book.ask_quote = None
+        # The resting quote must leave the LOG, not just memory: an UNFILLED
+        # book writes no SETTLE rows (they are per-fill), and the window
+        # detector replays the quotes log to reconstruct live resting
+        # exposure — without this PULL a settled round's quotes look resting
+        # forever and the replay overstates every cap. `_pull` no-ops when
+        # nothing rests, and books with fills also drop out of the replay via
+        # their SETTLE rows, so this is belt-and-braces for those.
+        self._pull(book, "settled")
         # Settled: this market owes nothing further. Release rather than
         # ``close_position`` — see the note on the daily-loss halt in
         # ``from_config``.

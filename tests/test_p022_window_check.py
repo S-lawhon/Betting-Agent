@@ -336,3 +336,92 @@ def test_unresolved_schedule_alarms_rather_than_looking_healthy():
     assert r["alarm"] is True
     assert r["n_unresolved_events"] == 1
     assert r["n_resolved_events"] == 0
+
+
+# ── resting-quote exposure (the 2026-07-30 false CRITICAL) ───────────
+#
+# The detector's engine is rebuilt from the FILLS log, so the pod's resting
+# quotes were invisible to its cap arithmetic: it computed ~$40 of ROC26 room
+# that did not exist, called two late-band names "candidates with cap room",
+# and paged CRITICAL on a pod that was correctly cap-bound.
+
+import json as _json
+
+
+def _write_rows(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a") as fh:
+        for r in rows:
+            fh.write(_json.dumps(r) + "\n")
+
+
+def test_resting_quotes_replay_semantics(tmp_path):
+    q = tmp_path / "round_leader_fade_quotes.jsonl"
+    f = tmp_path / "round_leader_fade_fills.jsonl"
+    _write_rows(q, [
+        {"type": "QUOTE", "ticker": "T-A", "event": "EV", "ask": 0.05,
+         "size": 5, "ts": 100.0},
+        {"type": "QUOTE", "ticker": "T-B", "event": "EV", "ask": 0.05,
+         "size": 5, "ts": 101.0},
+        {"type": "PULL", "ticker": "T-B", "ts": 102.0},
+        {"type": "RESTART", "ts": 103.0},              # process restarted:
+        {"type": "QUOTE", "ticker": "T-C", "event": "EV", "ask": 0.05,
+         "size": 5, "ts": 104.0},                      # only quotes after the
+        {"type": "QUOTE", "ticker": "T-D", "event": "EV", "ask": 0.10,
+         "size": 4, "ts": 105.0},                      # marker are in memory
+        {"type": "QUOTE", "ticker": "T-E", "event": "EV", "ask": 0.05,
+         "size": 5, "ts": 106.0},
+    ])
+    _write_rows(f, [
+        # T-D fully consumed by fills at/after its quote ts -> nothing rests
+        {"type": "FILL", "ticker": "T-D", "qty": 4, "ts": 106.0},
+        # T-E settled -> book released outright
+        {"type": "SETTLE", "ticker": "T-E", "ts": 107.0},
+        # a fill from BEFORE the current quote belongs to an older quote
+        {"type": "FILL", "ticker": "T-C", "qty": 5, "ts": 50.0},
+    ])
+    out = wc.resting_quotes_from_log(q, f)
+    assert set(out) == {"T-C"}, out
+    assert abs(out["T-C"]["coll"] - 5 * 0.95) < 1e-9
+
+
+def test_pod_resting_quotes_consume_the_cap_so_late_names_are_refused_not_missing():
+    """THE regression: the pod's own resting quotes fill the tournament cap,
+    so a name entering the band later is a CAP REFUSAL (§7 working), not a
+    missing quote. Before the replay was added this paged CRITICAL."""
+    close = NOW + 18 * 3600
+    eng = _engine(_market(close, NOW - 2 * 86400, n=3), mid=0.06,
+                  bankroll=1000.0)             # $50/tournament cap
+    # 11 resting quotes on OTHER names of the same tournament: 11 x $4.75 =
+    # $52.25 held, exactly the live 2026-07-30 ROC26 shape (R1 + earlier R2).
+    _write_rows(eng.quotes_log, [
+        {"type": "QUOTE", "ticker": f"{EVENT}-Q{i}", "event": "ROC26",
+         "ask": 0.05, "size": 5, "ts": NOW - 3600.0} for i in range(11)])
+    r = _assess(eng)
+    assert r["state"] == "WINDOW_OPEN_NO_CANDIDATE"
+    assert r["alarm"] is False
+    assert r["candidates_without_quote"] == []
+    assert r["screen_refusals"] == {"cap_collateral": 3}
+    assert abs(r["resting_exposure"]["total"] - 52.25) < 1e-6
+    assert r["resting_exposure"]["by_event"] == {"ROC26": 52.25}
+
+
+def test_a_quoted_name_is_not_rescreened_against_its_own_resting_collateral():
+    """A name the pod already quoted must count as QUOTED even when the seeded
+    resting exposure (which includes its own quote) would fail the screens —
+    otherwise every healthy cap-bound tournament reads as NO_CANDIDATE."""
+    close = NOW + 18 * 3600
+    window_open = close - 24 * 3600
+    eng = _engine(_market(close, NOW - 2 * 86400, n=3), mid=0.06,
+                  bankroll=1000.0)
+    _write_rows(eng.quotes_log, [
+        {"type": "QUOTE", "ticker": f"{EVENT}-N{i}", "event": "ROC26",
+         "ask": 0.08, "size": 5, "ts": window_open + 60.0} for i in range(3)]
+        + [{"type": "QUOTE", "ticker": f"{EVENT}-Q{i}", "event": "ROC26",
+            "ask": 0.05, "size": 5, "ts": NOW - 3600.0} for i in range(9)])
+    r = _assess(eng,
+                quote_ts={f"{EVENT}-N{i}": window_open + 60 for i in range(3)})
+    assert r["state"] == "QUOTED"
+    assert r["alarm"] is False
+    assert r["funnel"]["quoted_since_window_open"] == 3
+    assert r["funnel"]["passes_every_screen"] == 3

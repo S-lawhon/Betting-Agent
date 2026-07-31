@@ -51,6 +51,11 @@ def main() -> None:
     restored = engine.rebuild_from_log()
     if restored:
         logger.info("P-022: restored %d unsettled fill(s) from the log", restored)
+    # A restart drops this process's resting quotes (only fills survive the
+    # rebuild), so mark the log: the window detector replays QUOTE/PULL rows
+    # to reconstruct live resting exposure and must reset here. Runner-only —
+    # the detector reads this log and must never write to it.
+    engine.mark_restart(restored)
 
     logger.info("P-022 round-leader fade-maker starting (paper). Ctrl-C to stop.")
     last_discover = 0.0

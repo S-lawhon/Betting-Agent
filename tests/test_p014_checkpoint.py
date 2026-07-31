@@ -3,19 +3,25 @@ tests/test_p014_checkpoint.py
 ─────────────────────────────
 Tests for the P-014 gate reader (`scripts/p014_checkpoint.py`).
 
-P-014's gate declared `metric: settled_trades`, `source: trade_log`,
-`threshold: 500` and **no reader**, so `_gate_progress` returned None by
-construction and 345 settled rows were unstatable from a sanctioned number.
+The rule is LOCKED (research/P014_DECISION_RULE.md, 2026-07-31, option (a)),
+so unlike the pre-lock version of this file — which asserted the reader must
+NEVER emit a verdict — these tests assert the reader implements exactly the
+locked §4 schedule and the locked §3 clustering, and nothing else:
 
-The property that matters most here is unusual, so it is asserted hardest:
-**this reader must never emit a verdict.** P-014 has no pre-registered decision
-rule — no kill line, no promotion condition, no hard-kill z — and a reader that
-prints an edge next to a threshold is how criteria get decided after the fact.
-P-013 cost $2,094 exactly that way.
+* the statistic is fee-net ¢/contract, contract-weighted WITHIN a game,
+  EQUAL weight per game ACROSS games;
+* n (progress) counts admissible settled rows — a row with no readable
+  price/side/stake/event SHRINKS n, it is never defaulted;
+* `venue_prob` is the YES price, so a NO position's entry is `1 − venue_prob`
+  (verified against booked pnl_usd on the droplet, 2026-07-31);
+* scalar results are partial payouts at settlement_value_dollars, never void;
+* HARD KILL (z ≤ −2) fires at any n; NO DECISION below 500; at 500+:
+  KILL if edge ≤ 0, PASS if z ≥ 2, else CONTINUE; at 900+ with z < 2: KILL.
 """
 import gzip
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -28,14 +34,24 @@ cp = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(cp)
 
 
-def _row(fp, outcome="WIN", venue_prob=0.275, pod="P-014", pnl=5.69):
-    """The exact shape P-014 writes: fill_price is NULL, entry is venue_prob."""
-    return {
-        "fingerprint": fp, "pod_id": pod, "market_id": "KXMLBGAME-A",
+def _row(fp, outcome="WIN", venue_prob=0.5, pod="P-014", side="YES",
+         stake=50.0, event=None, result=None, sv=None):
+    """The exact shape P-014 writes: fill_price is NULL, entry is venue_prob
+    (the YES price), stake in position_size_usd, game in `event`."""
+    r = {
+        "fingerprint": fp, "pod_id": pod,
+        "market_id": f"KXMLBGAME-{fp}", "market_ticker": f"KXMLBGAME-{fp}",
         "outcome": outcome, "fill_price": None, "venue_prob": venue_prob,
-        "kalshi_prob": venue_prob, "fair_prob": 0.343, "pnl_usd": pnl,
+        "kalshi_prob": venue_prob, "fair_prob": 0.343, "pnl_usd": 5.69,
+        "side": side, "position_size_usd": stake,
+        "event": event if event is not None else f"game-{fp}",
         "settled_at_utc": "2026-07-25T19:35:22.063209+00:00",
     }
+    if result is not None:
+        r["result"] = result
+    if sv is not None:
+        r["settlement_value_dollars"] = sv
+    return r
 
 
 def _write(path: Path, rows, gz=False):
@@ -51,46 +67,141 @@ def _logs(tmp_path):
     return [str(tmp_path / p) for p in cp.DEFAULT_LOGS]
 
 
-# ── the reader must never judge ──────────────────────────────────────
-
-def test_verdict_is_no_decision_at_every_n():
-    """No pre-registered rule exists, so no n can produce a verdict — not even
-    an n past the 500 threshold."""
-    for n in (0, 1, 345, 499, 500, 5000):
-        r = cp.evaluate([_row(str(i)) for i in range(min(n, 600))])
-        assert r["verdict"] == "NO DECISION", n
-        assert "no pre-registered decision rule" in r["reason"]
+def _mix(n_win, n_loss):
+    """n_win + n_loss rows at p=0.5, one game each: WIN → +48¢, LOSS → −52¢
+    per contract fee-net (fee at 0.5 rounds up to 2¢)."""
+    rows = [_row(f"w{i}", "WIN") for i in range(n_win)]
+    rows += [_row(f"l{i}", "LOSS") for i in range(n_loss)]
+    return rows
 
 
-def test_evaluate_never_returns_an_edge_or_a_z():
-    """The gate statistic must not leak into the default output, because that
-    output is what the manager quotes in the daily brief."""
-    r = cp.evaluate([_row(str(i), "WIN" if i % 2 else "LOSS") for i in range(50)])
-    for banned in ("edge", "z", "hit", "breakeven", "pnl_usd"):
-        assert banned not in r, banned
+# ── the fill economics (§2, §4) ──────────────────────────────────────
+
+def test_yes_fill_pnl_is_fee_net_at_the_traded_price():
+    pr = cp.fill_pnl(_row("a", "WIN", venue_prob=0.5, stake=50.0))
+    assert abs(pr["pnl_ct"] - 0.48) < 1e-12          # 1 − 0.5 − 0.02
+    assert abs(pr["contracts"] - 100.0) < 1e-9       # 50 / 0.5
+    pr = cp.fill_pnl(_row("b", "LOSS", venue_prob=0.5))
+    assert abs(pr["pnl_ct"] - (-0.52)) < 1e-12       # 0 − 0.5 − 0.02
 
 
-def test_action_required_names_the_missing_rule():
-    r = cp.evaluate([_row("a")])
-    assert r["rule_document"] is None
-    assert "before n reaches 500" in r["action_required"].lower()
-    assert "P-013" in r["action_required"]
+def test_no_side_prices_at_one_minus_venue_prob():
+    """venue_prob is the YES price. A NO win at yes-price 0.505 costs 0.495
+    and pays $1 — the convention verified against booked pnl_usd."""
+    pr = cp.fill_pnl(_row("a", "WIN", venue_prob=0.505, side="NO", stake=71.43))
+    assert abs(pr["pnl_ct"] - (1.0 - 0.495 - 0.02)) < 1e-12
+    assert abs(pr["contracts"] - 71.43 / 0.495) < 1e-9
 
 
-def test_economics_are_available_but_only_on_request():
-    rows = [_row(str(i), "WIN" if i < 30 else "LOSS", venue_prob=0.275)
-            for i in range(50)]
-    e = cp.economics(rows)
-    assert e["n"] == 50 and e["wins"] == 30
-    assert abs(e["hit"] - 0.60) < 1e-12
-    assert "edge" in e and "z" in e
+def test_scalar_is_a_partial_payout_never_void():
+    """§2: result='scalar' settles at settlement_value_dollars (YES gets sv,
+    NO gets 1−sv) and is never excluded."""
+    pr = cp.fill_pnl(_row("a", "WIN", venue_prob=0.3, result="scalar", sv=0.4))
+    assert abs(pr["pnl_ct"] - (0.4 - 0.3 - 0.02)) < 1e-12
+    pr = cp.fill_pnl(_row("b", "LOSS", venue_prob=0.3, side="NO",
+                          result="scalar", sv=0.4))
+    assert abs(pr["pnl_ct"] - (0.6 - 0.7 - 0.02)) < 1e-12
+
+
+def test_scalar_without_a_value_is_excluded_never_defaulted():
+    assert cp.fill_pnl(_row("a", "WIN", result="scalar")) is None
+
+
+def test_missing_side_or_stake_is_excluded_never_defaulted():
+    bad = _row("a")
+    bad["side"] = None
+    assert cp.fill_pnl(bad) is None
+    bad = _row("b")
+    bad["position_size_usd"] = None
+    assert cp.fill_pnl(bad) is None
+
+
+# ── clustering (§3) ──────────────────────────────────────────────────
+
+def test_games_enter_with_equal_weight():
+    """One game with 4 winning fills counts the same as a game with 1 losing
+    fill — the P-017M phantom-edge lesson, hard-coded."""
+    rows = [_row(f"a{i}", "WIN", event="G1") for i in range(4)]
+    rows += [_row("b", "LOSS", event="G2"), _row("c", "LOSS", event="G3")]
+    s = cp.cluster_by_game(rows)
+    assert s["games"] == 3
+    # mean(+48, −52, −52), NOT the row-mean (which would be +14.67)
+    assert abs(s["edge_cents_per_contract"] - (48 - 52 - 52) / 3) < 1e-9
+
+
+def test_within_game_mean_is_contract_weighted():
+    rows = [_row("a", "WIN", stake=50.0, event="G1"),     # 100 cts, +0.48
+            _row("b", "LOSS", stake=25.0, event="G1")]    # 50 cts, −0.52
+    s = cp.cluster_by_game(rows)
+    assert s["games"] == 1
+    expect = 100.0 * (0.48 * 100 - 0.52 * 50) / 150
+    assert abs(s["edge_cents_per_contract"] - expect) < 1e-9
+
+
+def test_unpriced_rows_shrink_n(tmp_path):
+    """§2: n_unpriced must be reported and n SHRUNK, never papered over."""
+    bad = _row("b")
+    for k in ("fill_price", "venue_prob", "kalshi_prob"):
+        bad[k] = None
+    _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_row("a"), bad])
+    r = cp.evaluate(cp.load_terminal(_logs(tmp_path)))
+    assert r["progress"] == 1 and r["n_unpriced"] == 1
+
+
+# ── the decision schedule (§4, §7) ───────────────────────────────────
+
+def test_no_decision_below_500():
+    r = cp.evaluate(_mix(5, 5))
+    assert r["verdict"] == "NO DECISION"
+    assert "underpowered" in r["reason"]
+
+
+def test_hard_kill_fires_at_any_n():
+    r = cp.evaluate(_mix(5, 45))          # edge −42¢, z ≈ −9.9 at n=50
+    assert r["verdict"] == "HARD KILL"
+    assert r["z"] <= -2.0
+
+
+def test_kill_at_500_when_edge_not_positive():
+    r = cp.evaluate(_mix(250, 250))       # edge = −2¢ at n=500
+    assert r["progress"] == 500
+    assert r["verdict"] == "KILL"
+    assert r["edge_cents_per_contract"] <= 0
+
+
+def test_pass_at_500_needs_z_at_least_2():
+    r = cp.evaluate(_mix(400, 100))       # edge +28¢, z ≈ 15.7
+    assert r["verdict"] == "PASS"
+    assert "NOT live money" in r["reason"]
+
+
+def test_continue_is_the_single_extension():
+    r = cp.evaluate(_mix(270, 230))       # edge +2¢, z ≈ 0.9
+    assert r["verdict"] == "CONTINUE"
+    assert "P-014b" in r["reason"]
+
+
+def test_kill_at_900_when_the_extension_is_spent():
+    r = cp.evaluate(_mix(480, 430))       # n=910, edge +0.75¢, z ≈ 0.45
+    assert r["progress"] >= cp.EXTENSION_N
+    assert r["verdict"] == "KILL"
+    assert "extension" in r["reason"]
+
+
+def test_verdicts_match_a_hand_computed_statistic():
+    """The z the reader prints must be the §4 formula, not an approximation."""
+    r = cp.evaluate(_mix(270, 230))
+    xs = [48.0] * 270 + [-52.0] * 230
+    mean = sum(xs) / len(xs)
+    sd = math.sqrt(sum((v - mean) ** 2 for v in xs) / (len(xs) - 1))
+    assert abs(r["edge_cents_per_contract"] - mean) < 1e-9
+    assert abs(r["se_cents"] - sd / math.sqrt(len(xs))) < 1e-9
+    assert abs(r["z"] - mean / (sd / math.sqrt(len(xs)))) < 1e-9
 
 
 # ── counting ─────────────────────────────────────────────────────────
 
 def test_progress_excludes_voids_and_reports_both(tmp_path):
-    """The rule does not say whether VOIDs count. House convention excludes
-    them; the with-VOID figure is surfaced so the ambiguity stays visible."""
     _write(tmp_path / "data/trade_logs/trade_log.jsonl",
            [_row("w", "WIN"), _row("l", "LOSS"), _row("v", "VOID")])
     r = cp.evaluate(cp.load_terminal(_logs(tmp_path)))
@@ -127,11 +238,9 @@ def test_unsettled_rows_are_ignored(tmp_path):
     assert cp.evaluate(cp.load_terminal(_logs(tmp_path)))["progress"] == 1
 
 
-# ── pricing ──────────────────────────────────────────────────────────
+# ── pricing primitives ───────────────────────────────────────────────
 
 def test_entry_price_falls_back_to_venue_prob_because_fill_price_is_null():
-    """345 of 345 live rows carry `fill_price: null`. A reader that assumed
-    fill_price would price nothing at all."""
     assert cp.entry_price(_row("a", venue_prob=0.275)) == 0.275
 
 
@@ -145,39 +254,22 @@ def test_entry_price_is_never_fabricated():
     assert cp.entry_price({"venue_prob": "nonsense"}) is None
 
 
-def test_unpriced_settled_rows_are_counted(tmp_path):
-    bad = _row("b")
-    for k in ("fill_price", "venue_prob", "kalshi_prob"):
-        bad[k] = None
-    _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_row("a"), bad])
-    r = cp.evaluate(cp.load_terminal(_logs(tmp_path)))
-    assert r["progress"] == 2 and r["n_unpriced"] == 1
-
-
 # ── shape the manager depends on ─────────────────────────────────────
 
-def test_json_output_carries_progress_and_threshold(tmp_path, capsys):
+def test_json_output_carries_progress_threshold_and_the_rule(tmp_path, capsys):
     _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_row("a"), _row("b")])
     cp.main(["--json"] + sum([["--log", p] for p in _logs(tmp_path)], []))
     out = json.loads(capsys.readouterr().out)
     assert out["progress"] == 2 and out["threshold"] == 500
-    assert out["verdict"] == "NO DECISION"
-    assert "economics" not in out
+    assert out["verdict"] == "NO DECISION"          # n < 500
+    assert out["rule_document"] == "research/P014_DECISION_RULE.md"
+    assert out["locked_date"] == "2026-07-31"
+    assert "edge_cents_per_contract" in out and "z" in out
 
 
-def test_unblind_adds_economics_and_only_then(tmp_path, capsys):
-    _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_row("a"), _row("b")])
-    logs = sum([["--log", p] for p in _logs(tmp_path)], [])
-    cp.main(["--json", "--unblind"] + logs)
-    out = json.loads(capsys.readouterr().out)
-    assert "economics" in out and out["economics"]["n"] == 2
-    assert out["verdict"] == "NO DECISION", "unblinding must not create a verdict"
-
-
-def test_human_output_warns_when_unblinded(tmp_path, capsys):
+def test_human_output_names_the_locked_rule(tmp_path, capsys):
     _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_row("a")])
-    logs = sum([["--log", p] for p in _logs(tmp_path)], [])
-    cp.main(["--unblind"] + logs)
+    cp.main(sum([["--log", p] for p in _logs(tmp_path)], []))
     text = capsys.readouterr().out
-    assert "UNBLINDED" in text and "P-013" in text
-    assert "ACTION REQUIRED" in text
+    assert "LOCKED 2026-07-31" in text
+    assert "VERDICT: NO DECISION" in text

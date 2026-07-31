@@ -612,19 +612,50 @@ workstreams:
     tier: validating
     blocked_on: time
     summary: INCONCLUSIVE — not significant but excellently calibrated. Hold, do not scale.
+    # ---- PRE-REGISTERED AND LOCKED 2026-07-31. DO NOT RENEGOTIATE. ----
+    # Written blind at n=331 (2026-07-29); locked by Sam, option (a), with the
+    # §0 contamination (a raw 96W/99L count seen once) recorded rather than
+    # re-derived. Statistic: fee-net, game-clustered mean edge in ¢/contract —
+    # contract-weighted within a game, EQUAL weight per game across games.
+    # n counts admissible settled rows; the statistic is computed on games.
     gate:
+      locked: true
+      locked_date: 2026-07-31
+      doc: research/P014_DECISION_RULE.md
+      # `doc:` is the registry convention (P-015 et al); `rule_document:` is the
+      # field scripts/check_gate_instrumentation.py check 4 actually resolves.
+      # Carried as both until the other gates are reconciled.
+      rule_document: research/P014_DECISION_RULE.md
       question: Does the calibration edge become statistically significant with more n?
       metric: settled_trades
       source: p014_checkpoint
-      reader: scripts/p014_checkpoint.py
+      reader: scripts/p014_checkpoint.py   # the ONLY sanctioned way to read results
       threshold: 500
       current_key: pods.P-014.settled
-      # NO PRE-REGISTERED DECISION RULE EXISTS. There is no P014_DECISION_RULE.md,
-      # so this gate has a threshold but no kill line, no promotion condition and
-      # no hard-kill z. The reader counts progress and deliberately returns
-      # NO DECISION at every n; writing the rule after reading the economics is
-      # the P-013 failure mode. Write it blind, before n reaches 500.
-      rule_status: MISSING — must be written before n reaches 500
+      rule_status: LOCKED 2026-07-31 — research/P014_DECISION_RULE.md
+      # Transcription of the locked §4 schedule, for machines. The doc governs.
+      rules:
+        - if: "z <= -2.0"
+          at_any_n: true
+          verdict: HARD_KILL
+          severity: critical
+        - if: "n < 500"
+          verdict: NO_DECISION
+          note: Underpowered. Do not act. Silence is not confirmation.
+        - if: "n >= 500 and edge <= 0"
+          verdict: KILL
+          severity: warn
+        - if: "n >= 500 and edge > 0 and z >= 2.0"
+          verdict: PASS
+          note: Authorises more paper + a written promotion proposal. NOT live money.
+          severity: warn
+        - if: "n >= 500 and edge > 0 and z < 2.0"
+          verdict: CONTINUE
+          note: Single extension to n=900 at byte-identical parameters.
+        - if: "n >= 900 and z < 2.0"
+          verdict: KILL
+          note: The extension is spent. No second extension.
+          severity: warn
 
   - id: P-015
     name: Tennis Qualifier Favorite

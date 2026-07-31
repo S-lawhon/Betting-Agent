@@ -1,6 +1,7 @@
 # P-014 — Pre-Registered Decision Rule
 
-**Written 2026-07-29 at n = 331 of 500, BLIND. Not yet locked — see §0.**
+**Written 2026-07-29 at n = 331 of 500, BLIND. LOCKED 2026-07-31 by Sam,
+option (a) — see §9. §2–§8 are frozen.**
 
 `scripts/p014_checkpoint.py` is the **only sanctioned reader** of P-014's
 results. A P&L chart, a dashboard tile, an eyeballed jsonl tail, or a
@@ -391,23 +392,26 @@ arrives and makes it feel like a small ask.
 
 ---
 
-## 9. Status: NOT LOCKED — Sam's signature required
+## 9. Status: LOCKED 2026-07-31
 
-> **DECISION (Sam):** ______________________________________________
+> **DECISION (Sam): (a) — lock this document as written, recording the §0
+> contamination.**
 >
+> Given by Sam on 2026-07-31 in a Claude Code session ("Lock it as written —
+> option (a)"), after reading §0 and §9 in full. Recorded by the session.
+> The options as presented were:
 > *(a) Lock this document as written, recording the §0 contamination.*
 > *(b) Have §4's thresholds re-derived by a session that has seen nothing,
 >     then lock.*
 > *(c) Something else.*
 
-Until one of those is answered, `scripts/p014_checkpoint.py` continues to
-return `NO DECISION — no pre-registered rule exists`, which is the correct
-behaviour and not a bug.
+The three follow-ups were executed the same day, in order:
 
-**When it is locked**, three things follow, in this order:
-
-1. set `rule_status` in `manager/registry.yaml` from
-   `MISSING — must be written before n reaches 500` to this file's path;
-2. update `scripts/p014_checkpoint.py` to implement §3's game clustering and
-   §4's schedule — **it does not compute a clustered statistic today**;
-3. record the lock date here, and never edit §2–§8 again.
+1. `rule_status` in `manager/registry.yaml` now points at this file, and the
+   gate block carries `locked: true, locked_date: 2026-07-31` plus a
+   machine-readable transcription of §4's schedule;
+2. `scripts/p014_checkpoint.py` implements §2's admissibility, §3's game
+   clustering and §4's schedule, and prints the gate statistic openly —
+   `--unblind` is no longer a gate, because the rule now exists;
+3. the lock date is recorded here. **§2–§8 are frozen and must never be
+   edited again.**

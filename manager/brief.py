@@ -96,12 +96,18 @@ def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any
     if maker.get("available"):
         fills = maker.get("fills_clean") or 0
         thresh = maker.get("threshold") or 500
+        closed = maker.get("gate_status") == "CLOSED"
         gates.append({
             "id": "P-016",
-            "label": "Live Maker — fills toward gate",
+            "label": ("Live Maker — gate CLOSED" if closed
+                      else "Live Maker — fills toward gate"),
+            "resolved": closed,
+            "resolved_on": maker.get("resolved_on"),
+            "verdict": maker.get("gate_verdict"),
             "current": fills, "threshold": thresh,
             "pct": min(100.0, 100.0 * fills / max(1, thresh)),
-            "note": "markout mean {} | ex-best-day {}".format(
+            "note": "{}markout mean {} | ex-best-day {}".format(
+                "final sample: " if closed else "",
                 maker.get("markout_mean"), maker.get("markout_mean_ex_best_day")),
         })
     cp = (snap.get("p015") or {}).get("checkpoint") or {}
@@ -251,8 +257,13 @@ def render_markdown(b: Dict[str, Any]) -> str:
         for g in b["gates"]:
             L.append("**{} — {}**".format(g["id"], g["label"]))
             L.append("")
-            L.append("`{} {}/{}  ({:.0f}%)`".format(
-                _pct_bar(g["pct"]), g["current"], g["threshold"], g["pct"]))
+            if g.get("resolved"):
+                L.append("`CLOSED {} — verdict {}  ({}/{} final sample)`".format(
+                    g.get("resolved_on") or "?", g.get("verdict") or "?",
+                    g["current"], g["threshold"]))
+            else:
+                L.append("`{} {}/{}  ({:.0f}%)`".format(
+                    _pct_bar(g["pct"]), g["current"], g["threshold"], g["pct"]))
             if g.get("note"):
                 L.append("")
                 L.append("_{}_".format(g["note"]))
@@ -406,8 +417,13 @@ def render_html(b: Dict[str, Any]) -> str:
         for g in b["gates"]:
             P.append("<div class='card'><b>{} — {}</b><br>".format(
                 e(g["id"]), e(g["label"])))
-            P.append("<span class='bar'>{} {}/{} ({:.0f}%)</span>".format(
-                e(_pct_bar(g["pct"])), g["current"], g["threshold"], g["pct"]))
+            if g.get("resolved"):
+                P.append("<span class='bar'>CLOSED {} — verdict {} ({}/{} final sample)</span>".format(
+                    e(str(g.get("resolved_on") or "?")), e(str(g.get("verdict") or "?")),
+                    g["current"], g["threshold"]))
+            else:
+                P.append("<span class='bar'>{} {}/{} ({:.0f}%)</span>".format(
+                    e(_pct_bar(g["pct"])), g["current"], g["threshold"], g["pct"]))
             if g.get("note"):
                 P.append("<br><span class='dim'>{}</span>".format(e(str(g["note"]))))
             P.append("</div>")

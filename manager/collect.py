@@ -613,6 +613,16 @@ class Collector:
             "threshold": gate.get("threshold", 500),
             "available": path.exists(),
         }
+        # A CLOSED gate is a resolved question, not a pending one. The fill
+        # log outlives the verdict on purpose (nothing gets deleted), so
+        # "the file exists" must not read as "the gate is still counting" —
+        # that is exactly how a KILLed pod spent a week on the dashboard as
+        # a 100% progress bar. Surface the closure; renderers branch on it.
+        if str(gate.get("status") or "").upper() == "CLOSED":
+            result["gate_status"] = "CLOSED"
+            result["resolved_on"] = (
+                str(gate.get("resolved_on")) if gate.get("resolved_on") else None)
+            result["gate_verdict"] = gate.get("verdict")
         if not path.exists():
             return result
 

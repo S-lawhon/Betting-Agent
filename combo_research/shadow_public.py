@@ -54,8 +54,42 @@ LOG_MIN_PX, LOG_MAX_PX = 0.02, 0.75
 MAX_NEW_PER_SWEEP = 400               # bound a sweep; leg lookups dominate cost
 DISCOVERY_INTERVAL = 45.0             # s between new-market sweeps
 RESOLVE_INTERVAL = 300.0              # s between trade-resolution sweeps
-RESOLVE_MAX_AGE_H = 48.0              # stop chasing a combo after this long
+RESOLVE_BATCH = 600                   # rows per resolve sweep; exactly 1 call each
+RESOLVE_MIN_AGE_H = 40.0              # check a combo ONCE, after its trading life
 LEG_CACHE_TTL = 20.0                  # s; leg books move, but not every call
+# Warn on the IN-ZONE due backlog only. Out-of-zone rows are deliberately
+# starved — they get whatever capacity is left after the gate's own sample is
+# served — so a warning on the total backlog would be permanently on, and a
+# permanently-on warning is an ignored one. In-zone inflow is ~55k/day against
+# ~108k/day of resolve capacity, so a sustained in-zone backlog this size means
+# resolution is genuinely losing to discovery.
+BACKLOG_WARN = 25_000
+
+# Resolution priority.
+#
+# Measured 2026-07-31: discovery outran resolution ~3:1, the unresolved backlog
+# reached 546,370, and every traded row in the Gate 0 sample came from a single
+# 6-hour window — the first six hours of the tape. Nothing errored; the log
+# printed "resolved 400 combos" every cycle while the resolved frontier stayed
+# pinned near the start. Two causes, both fixed here:
+#
+#   1. Rows were re-polled every sweep while young and untraded, so a scarce API
+#      budget went on repeat checks. /markets/trades returns the FULL history —
+#      including for markets that have since settled, confirmed by >48h-old rows
+#      still resolving traded=1 — so one check after the combo's life is over
+#      captures the first trade exactly as well, at one call per row instead of
+#      many.
+#   2. Strict oldest-first spent ~3/4 of those calls on rows the gate never
+#      reads. In-zone rows are prioritised now.
+#
+# The band below is a deliberate SUPERSET of the gate zone on BOTH pricing
+# bases. The stored in_zone column mixes an independence-based rule (rows logged
+# before the copula landed) with a copula-based one, and the gate read re-derives
+# membership uniformly offline (gate0_zone_recompute.py) — so prioritising on the
+# narrow stored flag would truncate the very sample the gate recomputes. Copula
+# runs ~+3c above independence, hence the widened edges.
+PRIORITY_SQL = ("n_legs BETWEEN 2 AND 4"
+                " AND COALESCE(copula_price, indep_price, -1) BETWEEN 0.07 AND 0.40")
 
 log = logging.getLogger("shadow")
 
@@ -162,6 +196,17 @@ def fnum(x: Any) -> Optional[float]:
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def iso_at(ts: float) -> str:
+    """A wall-clock instant in the SAME format seen_ts is stored in.
+
+    Resolution selects on ``seen_ts <= ?``, which is a string comparison in
+    SQLite — it is only correct because every timestamp is written by now_iso()
+    in one UTC ISO-8601 format. Do not mix in a differently-formatted or
+    non-UTC timestamp here.
+    """
+    return datetime.fromtimestamp(ts, timezone.utc).isoformat()
 
 
 def parse_iso(ts: Optional[str]) -> Optional[float]:
@@ -468,17 +513,35 @@ def discover(con: sqlite3.Connection, pub: Public, pricer: LegPricer) -> int:
     return added
 
 
-def resolve(con: sqlite3.Connection, pub: Public) -> int:
-    """For combos we logged, find out whether they traded and at what price."""
-    cutoff = time.time() - RESOLVE_MAX_AGE_H * 3600
-    rows = con.execute(
+def _due(con: sqlite3.Connection, before_iso: str, limit: int,
+         priority: bool) -> List[Tuple[str, str]]:
+    """Oldest unresolved rows past the min age, inside/outside the priority band."""
+    if limit <= 0:
+        return []
+    neg = "" if priority else "NOT "
+    return con.execute(
         "SELECT market_ticker, seen_ts FROM combo WHERE resolved=0"
-        " ORDER BY seen_ts LIMIT 400").fetchall()
-    done = 0
+        " AND seen_ts <= ?"
+        f" AND {neg}({PRIORITY_SQL})"
+        " ORDER BY seen_ts LIMIT ?", (before_iso, limit)).fetchall()
+
+
+def resolve(con: sqlite3.Connection, pub: Public) -> int:
+    """For combos we logged, find out whether they traded and at what price.
+
+    One call per combo, taken once the combo is past ``RESOLVE_MIN_AGE_H`` so
+    its trading life is over, in-zone rows first. A row is marked resolved on
+    that single check whether or not it traded — it is never re-polled.
+    """
+    before = iso_at(time.time() - RESOLVE_MIN_AGE_H * 3600)
+    rows = _due(con, before, RESOLVE_BATCH, True)
+    n_priority = len(rows)
+    rows = rows + _due(con, before, RESOLVE_BATCH - n_priority, False)
+
+    done = traded_n = 0
     for tkr, seen_ts in rows:
         d = pub.get("/markets/trades", {"ticker": tkr, "limit": 500})
         trades = (d or {}).get("trades", []) or []
-        age_old = (parse_iso(seen_ts) or time.time()) < cutoff
         if trades:
             trades.sort(key=lambda t: t.get("created_time") or "")
             first = trades[0]
@@ -502,15 +565,34 @@ def resolve(con: sqlite3.Connection, pub: Public) -> int:
                 (first.get("created_time"), px, fnum(first.get("count")),
                  first.get("taker_side"), len(trades), vwap, now_iso(), tkr))
             done += 1
-        elif age_old:
+            traded_n += 1
+        else:
+            # Past its trading life with no prints: settled untraded. Never
+            # re-polled — /markets/trades would return the same empty history.
             con.execute(
                 "UPDATE combo SET resolved=1, traded=0, last_check_ts=?"
                 " WHERE market_ticker=?", (now_iso(), tkr))
             done += 1
-        else:
-            con.execute("UPDATE combo SET last_check_ts=? WHERE market_ticker=?",
-                        (now_iso(), tkr))
     con.commit()
+
+    # Report the backlog, not just the batch. The starvation this fix addresses
+    # hid for two days behind a log line that only ever said "resolved 400".
+    due_zone = con.execute(
+        f"SELECT COUNT(*) FROM combo WHERE resolved=0 AND seen_ts <= ?"
+        f" AND ({PRIORITY_SQL})", (before,)).fetchone()[0]
+    due_all = con.execute(
+        "SELECT COUNT(*) FROM combo WHERE resolved=0 AND seen_ts <= ?",
+        (before,)).fetchone()[0]
+    pending = con.execute(
+        "SELECT COUNT(*) FROM combo WHERE resolved=0").fetchone()[0]
+    log.info("resolve: checked %d (%d in-zone), traded %d; due %d in-zone / %d "
+             "total; unresolved %d", len(rows), n_priority, traded_n,
+             due_zone, due_all, pending)
+    if due_zone > BACKLOG_WARN:
+        log.warning("resolve is LOSING GROUND on the gate sample: %d IN-ZONE rows "
+                    "are past %.0fh and still unresolved. Discovery is outrunning "
+                    "resolution; the Gate 0 sample stops growing when this climbs.",
+                    due_zone, RESOLVE_MIN_AGE_H)
     return done
 
 
@@ -527,7 +609,7 @@ def report(con: sqlite3.Connection) -> None:
         print(f"trade rate among resolved: {100.0*trd/res:.1f}%")
         print(f"  ^ BIASED UPWARD until the tape matures: a combo that trades "
               f"resolves immediately,\n    while an untraded one only resolves "
-              f"after {RESOLVE_MAX_AGE_H:.0f}h. Ignore this figure until the "
+              f"after {RESOLVE_MIN_AGE_H:.0f}h. Ignore this figure until the "
               f"run is older than that.")
 
     rows = con.execute(
@@ -656,9 +738,7 @@ def _run(con: sqlite3.Connection, a) -> int:
 
         if time.monotonic() - last_resolve > RESOLVE_INTERVAL:
             try:
-                d = resolve(con, pub)
-                if d:
-                    log.info("resolved %d combos", d)
+                resolve(con, pub)      # logs its own batch + backlog detail
                 last_resolve = time.monotonic()
             except sqlite3.Error as exc:
                 log.error("db error in resolve: %s", exc)

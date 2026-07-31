@@ -282,41 +282,54 @@ jobs:
   # as a failure, because that is the half of the 139 that an exit code could
   # never have seen.
   # ---------------------------------------------------------------------------
-  # P-029 Phase 0 — on its OWN VPS (143.198.162.120), not the droplet and not
-  # the Mac. Both collectors report these `uncheckable` by design: the paths
-  # live on a third host, and a plain stat() from here would report "missing"
-  # with total confidence for a logger that is collecting fine. That is the
-  # same false negative the Mac-hosted evmap jobs used to produce for weeks.
+  # P-029 Phase 0 — the JOBS run on their OWN VPS (143.198.162.120), not the
+  # droplet and not the Mac, and neither collector can stat that box. Until
+  # 2026-07-30 these entries were declared `host: p029` and reported
+  # `uncheckable` (INFO) forever — an admitted gap, but chatter that measured
+  # nothing.
   #
-  # These entries therefore do NOT measure P-029 — they make its absence from
-  # this registry impossible, which is the failure P-022 demonstrated (active
-  # and doing nothing for three days, with no monitoring entry to have an
-  # opinion). The MEASUREMENT is the `p029-daily-health-check` scheduled task
-  # on the Mac, which SSHes to the box. Once the P-029 host can be reached by
-  # a collector, drop the `host:` override and these become real checks.
+  # Now they measure a HEARTBEAT instead of the job's own output. The
+  # `p029-daily-health-check` scheduled task on the Mac runs
+  # scripts/p029_health_check.py, which SSHes to the box, verifies each job
+  # where it actually runs (shadow unit active + sqlite fresh <2h on-box;
+  # newest archive file <30h and unit not failed), appends a row to
+  # data/p029_heartbeat/<id>.jsonl ONLY when the check passes, and rsyncs the
+  # dir to the droplet. `host: droplet` below describes where the measured
+  # EVIDENCE lives, not where the job runs. Deploys don't clobber it
+  # (deploy.sh excludes data/).
+  #
+  # A stale heartbeat therefore means: the on-box check FAILED, the daily task
+  # did not run, or the push broke — all of which deserve the warn this fires.
+  # Do not "fix" a stale heartbeat by touching the file; run the script.
   #
   # Deliberately NOT in `services:` above — check_services shells out to a
   # LOCAL systemctl, so a p029-shadow entry there would resolve to "not-found"
   # on the droplet and page CRITICAL every 15 minutes for a healthy unit.
   - id: p029_shadow
-    host: p029
-    schedule: continuous (p029-shadow.service, Restart=always)
-    description: P-029 Phase 0 public shadow logger — combo margin tape for Gate 0
+    host: droplet
+    schedule: continuous (p029-shadow.service on the P-029 VPS, Restart=always)
+    description: >-
+      P-029 Phase 0 public shadow logger — combo margin tape for Gate 0
+      (measured via daily SSH heartbeat, scripts/p029_health_check.py)
     output:
-      file: /var/lib/p029/shadow.sqlite
-      max_stale_hours: 2
+      file: data/p029_heartbeat/p029_shadow.jsonl
+      max_stale_hours: 30
     severity: warn
     note: >
-      Single-instance guarded via a SQLite lock: a second copy refuses to start,
-      and a stalled logger still reports systemd-active. Freshness of the DB is
-      the only real liveness signal. A gap in the tape CANNOT be backfilled.
+      Heartbeat cadence is DAILY, so the on-box 2h-freshness rule lives in
+      scripts/p029_health_check.py, not in max_stale_hours here. Single-instance
+      guarded via a SQLite lock: a second copy refuses to start, and a stalled
+      logger still reports systemd-active. Freshness of the DB is the only real
+      liveness signal. A gap in the tape CANNOT be backfilled.
 
   - id: p029_archive
-    host: p029
-    schedule: "*-*-* 09:30 UTC (p029-archive.timer, RandomizedDelaySec=600)"
-    description: P-029 settled-combo archiver — Kalshi purges these after ~3 months
+    host: droplet
+    schedule: "*-*-* 09:30 UTC (p029-archive.timer on the P-029 VPS, RandomizedDelaySec=600)"
+    description: >-
+      P-029 settled-combo archiver — Kalshi purges these after ~3 months
+      (measured via daily SSH heartbeat, scripts/p029_health_check.py)
     output:
-      file: /var/lib/p029/archive/
+      file: data/p029_heartbeat/p029_archive.jsonl
       max_stale_hours: 30
     severity: warn
     note: >

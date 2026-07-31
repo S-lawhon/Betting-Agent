@@ -680,6 +680,9 @@ class _DashboardHandler(BaseHTTPRequestHandler):
             etag = '"{}-{}"'.format(self.state.fingerprint(),
                                     ",".join(sections) if sections else "all")
         except Exception:  # noqa: BLE001
+            # Serving without an ETag just costs 304s, but do it loudly — a
+            # silently absent header is indistinguishable from a client bug.
+            logger.exception("source fingerprint failed; serving without ETag")
             etag = None
 
         if etag and self.headers.get("If-None-Match") == etag:

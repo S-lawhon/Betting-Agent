@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from base64 import b64encode
@@ -109,11 +110,36 @@ class Server:
             req.add_header("Authorization", AUTH)
         for k, v in (headers or {}).items():
             req.add_header(k, v)
-        try:
-            with urllib.request.urlopen(req, timeout=10) as r:
-                return r.status, r.read().decode("utf-8"), dict(r.headers)
-        except urllib.error.HTTPError as e:
-            return e.code, e.read().decode("utf-8"), dict(e.headers)
+        # One retry on connection-level errors only (never on HTTP statuses):
+        # under a loaded host — e.g. two full suites running head-to-head —
+        # the very first connect can lose the race with the serve_forever
+        # thread or hit transient port pressure.  2026-07-31 flake.
+        for attempt in (0, 1):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    return r.status, r.read().decode("utf-8"), dict(r.headers)
+            except urllib.error.HTTPError as e:
+                return e.code, e.read().decode("utf-8"), dict(e.headers)
+            except urllib.error.URLError:
+                if attempt:
+                    raise
+                time.sleep(0.5)
+
+    def etag(self, path="/api/v2/dashboard"):
+        """Fetch and return the ETag, failing loudly if it is missing.
+
+        The handler silently omits the header when ``fingerprint()`` raises,
+        and error responses never carry one — indexing ``headers["ETag"]``
+        directly turns either into a bare KeyError with no clue what the
+        server actually said.
+        """
+        code, body, headers = self.get(path)
+        assert code == 200, \
+            "GET {} returned {}: {}".format(path, code, body[:300])
+        assert "ETag" in headers, \
+            "200 response with no ETag header on {} (fingerprint() raised " \
+            "server-side?): {}".format(path, body[:300])
+        return headers["ETag"]
 
     def close(self):
         self.httpd.shutdown()
@@ -342,16 +368,16 @@ def test_etag_revalidation_returns_304(server):
 
 
 def test_etag_changes_when_a_source_changes(server, full_root):
-    first = server.get("/api/v2/dashboard")[2]["ETag"]
+    first = server.etag()
     p = full_root / "data" / "dashboard" / "rollup.json"
     p.write_text('{"schema":2,"lifetime":{"realized_pnl":1.0}}')
     os.utime(p, (0, 0))     # force a distinct mtime
-    assert server.get("/api/v2/dashboard")[2]["ETag"] != first
+    assert server.etag() != first
 
 
 def test_etag_is_scoped_per_section(server):
-    a = server.get("/api/v2/dashboard")[2]["ETag"]
-    b = server.get("/api/v2/dashboard?section=pnl")[2]["ETag"]
+    a = server.etag()
+    b = server.etag("/api/v2/dashboard?section=pnl")
     assert a != b, "a section-scoped 304 must not serve a full payload"
 
 

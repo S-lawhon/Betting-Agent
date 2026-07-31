@@ -94,6 +94,9 @@ def test_voids_count_as_observations_of_throughput(tmp_path):
 def test_projects_resolution_for_a_position_counting_gate(tmp_path):
     rows = [_settle("P-014", "2026-07-%02d" % d, "M%d" % (d * 10 + i))
             for d in range(1, 29) for i in range(2)]        # 2/day for 28 days
+    # An older row so the pod's lifetime spans the whole 28d window and the
+    # denominator clamps at 28 exactly.
+    rows.append(_settle("P-014", "2026-06-01", "OLD"))
     _write(tmp_path, "trade_log.jsonl", rows)
     snap = {"p014": {}}
     recs = gate_throughput(tmp_path, snap,
@@ -101,6 +104,7 @@ def test_projects_resolution_for_a_position_counting_gate(tmp_path):
                                      progress=444),
                            now=NOW)
     r = recs[0]
+    assert r["rate_window_days"] == 28.0
     assert r["rate_per_week"] == 56 / 4.0          # 28d window / 4
     assert r["weeks_to_threshold"] == 4.0          # (500-444)/14
     assert r["resolvable_within_12m"] is True
@@ -108,16 +112,51 @@ def test_projects_resolution_for_a_position_counting_gate(tmp_path):
 
 def test_a_gate_that_cannot_resolve_in_12_months_is_flagged(tmp_path):
     _write(tmp_path, "trade_log.jsonl",
-           [_settle("P-015", "2026-07-26", "A"),
+           [_settle("P-015", "2026-06-26", "A"),
             _settle("P-015", "2026-07-26", "B")])
     recs = gate_throughput(tmp_path, {},
                            _registry("P-015", "settled_trades", 120,
                                      progress=2),
                            now=NOW)
     r = recs[0]
-    assert r["rate_per_week"] == 0.5
-    assert r["weeks_to_threshold"] == 236.0
+    # Only one settle falls inside the 28d window; lifetime spans it fully.
+    assert r["rate_per_week"] == 0.25
+    assert r["weeks_to_threshold"] == 472.0
     assert r["resolvable_within_12m"] is False
+
+
+def test_rate_denominator_is_the_pods_own_lifetime_not_a_flat_month(tmp_path):
+    """The 2026-07-30 P-015 false alarm: 5 settles divided by a flat 4-week
+    window read 1.25/week for a pod that had existed 10 days, projecting
+    resolution in 2028 off ~18 days of nonexistence."""
+    first = (NOW - timedelta(days=10)).strftime("%Y-%m-%d")
+    _write(tmp_path, "trade_log.jsonl",
+           [{"pod_id": "P-015", "action": "PLACED", "market_id": "P0",
+             "timestamp_utc": f"{first}T12:00:00+00:00"}] +
+           [_settle("P-015", (NOW - timedelta(days=3)).strftime("%Y-%m-%d"),
+                    "M%d" % i) for i in range(5)])
+    recs = gate_throughput(tmp_path, {},
+                           _registry("P-015", "settled_trades", 120,
+                                     progress=5),
+                           now=NOW)
+    r = recs[0]
+    assert r["rate_window_days"] == 10.0
+    assert r["rate_per_week"] == 3.5               # 5 / (10/7), not 5/4
+    assert r["weeks_to_threshold"] == round((120 - 5) / 3.5, 1)
+    assert r["resolvable_within_12m"] is True
+
+
+def test_rate_denominator_is_floored_at_a_week(tmp_path):
+    """A pod that is days old must not project off an explosive rate."""
+    day = (NOW - timedelta(days=2)).strftime("%Y-%m-%d")
+    _write(tmp_path, "trade_log.jsonl",
+           [_settle("P-015", day, "M%d" % i) for i in range(3)])
+    recs = gate_throughput(tmp_path, {},
+                           _registry("P-015", "settled_trades", 120,
+                                     progress=3),
+                           now=NOW)
+    assert recs[0]["rate_window_days"] == 7.0
+    assert recs[0]["rate_per_week"] == 3.0         # 3 / (7/7)
 
 
 def test_unmeasurable_progress_yields_no_projection(tmp_path):

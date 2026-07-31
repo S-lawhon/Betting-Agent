@@ -136,6 +136,30 @@ def observations_by_day(root: Path) -> Dict[str, Dict[str, int]]:
     return {k: dict(v) for k, v in out.items()}
 
 
+def first_activity_by_pod(root: Path) -> Dict[str, str]:
+    """pod_id -> earliest YYYY-MM-DD the pod wrote ANY trade-log row.
+
+    The rate denominator must not include weeks before the pod existed.
+    P-015 shipped 2026-07-20, first traded 2026-07-24, and was read at
+    1.25/week (5 settles / a flat 4-week window) when the honest figure over
+    its own lifetime was ~3.5-5/week — the inertness alarm fired off ~18 days
+    of nonexistence. Placement rows count as activity, not just settlements:
+    a pod that places and waits is alive, and its clock starts then.
+    """
+    out: Dict[str, str] = {}
+    for rec in _rows(_trade_log_paths(root)):
+        pod = rec.get("pod_id") or rec.get("pod")
+        if not pod:
+            continue
+        day = _day(rec.get("timestamp_utc") or rec.get("iso")
+                   or rec.get("settled_at_utc") or rec.get("settled_at"))
+        if not day:
+            continue
+        if pod not in out or day < out[pod]:
+            out[pod] = day
+    return out
+
+
 def _window_count(by_day: Dict[str, int], now: datetime, days: int) -> int:
     lo = (now - timedelta(days=days)).strftime("%Y-%m-%d")
     return sum(n for d, n in by_day.items() if d >= lo)
@@ -158,6 +182,7 @@ def gate_throughput(root: Path, snap: Dict[str, Any],
 
     now = now or datetime.now(UTC)
     by_pod = observations_by_day(root)
+    first_act = first_activity_by_pod(root)
     out: List[Dict[str, Any]] = []
 
     for ws in registry.get("workstreams", []) or []:
@@ -205,9 +230,25 @@ def gate_throughput(root: Path, snap: Dict[str, Any],
         # reader's own history, which does not exist yet.
         unit_is_positions = gate.get("metric") == "settled_trades"
         rate = None
+        # Denominator: the pod's own observed lifetime, capped at the 28d
+        # window. A flat /4.0 divided P-015's 5 settles across ~18 days the
+        # pod did not exist and projected resolution in 2028 off an artefact.
+        # Floored at 7d so a pod that is days old does not project off an
+        # explosive rate in the other direction.
+        window_days = 28.0
+        first = first_act.get(pod)
+        if first:
+            try:
+                age = (now - datetime.strptime(first, "%Y-%m-%d")
+                       .replace(tzinfo=UTC)).days
+            except ValueError:
+                age = None
+            if age is not None:
+                window_days = max(7.0, min(28.0, float(age)))
+        rec["rate_window_days"] = window_days
         if unit_is_positions and rec["settled_positions_28d"] > 0:
-            rate = rec["settled_positions_28d"] / 4.0
-        rec["rate_per_week"] = rate
+            rate = rec["settled_positions_28d"] / (window_days / 7.0)
+        rec["rate_per_week"] = round(rate, 2) if rate is not None else None
 
         if (rate and isinstance(progress, (int, float))
                 and isinstance(threshold, (int, float)) and progress < threshold):

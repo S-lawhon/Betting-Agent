@@ -443,6 +443,16 @@ pods:
       min_lead_minutes: 10       # pre-match only; no in-play entries
     risk:
       max_open_positions: 6      # loss profile is -94c tail; don't stack a session
+      # Slam qualifying weeks run ~100+ matches over 5 days with many
+      # concurrent heavy favorites; the base cap plus settlement latency
+      # would throttle exactly the volume spike the 120-trade gate is
+      # counting on. The raised cap applies ONLY inside these UTC date
+      # windows (inclusive). Hand-listed on purpose — Kalshi carries no
+      # field that marks a slam; add future slam windows when the calendar
+      # is confirmed. (Sam, 2026-07-30)
+      slam_max_open_positions: 10
+      slam_windows:
+        - ["2026-08-17", "2026-08-22"]   # US Open qualifying (registry milestone Aug 17-21, +1d spillover)
       depth_haircut: 0.5         # assume we get at most half the displayed ask size
     api:
       timeout: 15.0

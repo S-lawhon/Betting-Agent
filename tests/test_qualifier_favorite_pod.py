@@ -176,6 +176,76 @@ class TestScan(unittest.TestCase):
             pod.on_settlement(placed[0].market_id)
             self.assertEqual(pod._open_count, 1)
 
+    def test_slam_window_raises_the_cap(self):
+        """Inside a configured slam window the concurrency cap is the slam
+        cap; the base cap would throttle the US Open qualifying spike the
+        120-trade gate is counting on. _NOW is 2026-07-20."""
+        with tempfile.TemporaryDirectory() as td:
+            markets = [
+                _market(ticker=f"KXATPMATCH-26JUL21M{i}-A{i}")
+                for i in range(5)
+            ]
+            pod = _make_pod(markets, td, max_open_positions=2,
+                            slam_max_open_positions=4,
+                            slam_windows=[["2026-07-19", "2026-07-21"]])
+            results = pod.scan_once()
+            self.assertEqual(len(self._placed(results)), 4)
+            self.assertEqual(
+                len([r for r in results if r.action == "SKIPPED_RISK"]), 1)
+
+    def test_outside_slam_window_base_cap_holds(self):
+        with tempfile.TemporaryDirectory() as td:
+            markets = [
+                _market(ticker=f"KXATPMATCH-26JUL21M{i}-A{i}")
+                for i in range(5)
+            ]
+            pod = _make_pod(markets, td, max_open_positions=2,
+                            slam_max_open_positions=4,
+                            slam_windows=[["2026-08-17", "2026-08-22"]])
+            self.assertEqual(len(self._placed(pod.scan_once())), 2)
+
+    def test_malformed_slam_window_degrades_to_base_cap(self):
+        """A bad config line must not take the pod down or widen the cap."""
+        with tempfile.TemporaryDirectory() as td:
+            markets = [
+                _market(ticker=f"KXATPMATCH-26JUL21M{i}-A{i}")
+                for i in range(3)
+            ]
+            pod = _make_pod(markets, td, max_open_positions=2,
+                            slam_max_open_positions=4,
+                            slam_windows=[["not-a-date", "2026-07-21"],
+                                          ["2026-07-22", "2026-07-19"],
+                                          "garbage"])
+            self.assertEqual(pod.slam_windows, [])
+            self.assertEqual(len(self._placed(pod.scan_once())), 2)
+
+    def test_slam_cap_unset_means_windows_change_nothing(self):
+        with tempfile.TemporaryDirectory() as td:
+            markets = [
+                _market(ticker=f"KXATPMATCH-26JUL21M{i}-A{i}")
+                for i in range(3)
+            ]
+            pod = _make_pod(markets, td, max_open_positions=2,
+                            slam_windows=[["2026-07-19", "2026-07-21"]])
+            self.assertEqual(len(self._placed(pod.scan_once())), 2)
+
+    def test_from_config_parses_slam_cap(self):
+        cfg = {"pods": {"P-015": {
+            "risk": {"max_open_positions": 6,
+                     "slam_max_open_positions": 10,
+                     "slam_windows": [["2026-08-17", "2026-08-22"]]},
+        }}}
+        pod = QualifierFavoritePod.from_config(
+            cfg, kalshi_tennis_client=_FakeClient(),
+            risk_manager=_FakeRiskManager())
+        self.assertEqual(pod.max_open_positions, 6)
+        self.assertEqual(pod.slam_max_open_positions, 10)
+        self.assertEqual(pod.slam_windows, [("2026-08-17", "2026-08-22")])
+        in_window = datetime(2026, 8, 18, 12, 0, tzinfo=timezone.utc)
+        outside = datetime(2026, 8, 25, 12, 0, tzinfo=timezone.utc)
+        self.assertEqual(pod._effective_max_open(in_window), 10)
+        self.assertEqual(pod._effective_max_open(outside), 6)
+
     def test_wta_size_mult(self):
         with tempfile.TemporaryDirectory() as td:
             atp = _market()

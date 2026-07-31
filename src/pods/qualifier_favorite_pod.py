@@ -97,6 +97,8 @@ class QualifierFavoritePod(BasePod):
         include_wta: bool = True,
         wta_size_mult: float = 0.5,
         max_open_positions: int = 6,
+        slam_max_open_positions: Optional[int] = None,
+        slam_windows: Optional[List[Any]] = None,
         depth_haircut: float = 0.5,
         min_lead_minutes: float = 10.0,
         _now_fn: Optional[Callable[[], datetime]] = None,
@@ -123,9 +125,61 @@ class QualifierFavoritePod(BasePod):
         self.include_wta = include_wta
         self.wta_size_mult = wta_size_mult
         self.max_open_positions = max_open_positions
+        # Unset → the elevated cap equals the base cap, i.e. windows change
+        # nothing until both knobs are configured.
+        self.slam_max_open_positions = (int(slam_max_open_positions)
+                                        if slam_max_open_positions
+                                        else max_open_positions)
+        self.slam_windows = self._normalize_windows(slam_windows or [])
         self.depth_haircut = depth_haircut
         self.min_lead_minutes = min_lead_minutes
         self._open_count = 0
+
+    @staticmethod
+    def _normalize_windows(raw: List[Any]) -> List[tuple]:
+        """Validate configured slam windows into (start, end) date-string pairs.
+
+        Accepts ["YYYY-MM-DD", "YYYY-MM-DD"] pairs or {start:, end:} dicts.
+        A malformed or inverted window is dropped with a warning rather than
+        raised: a bad config line must degrade to the base cap, never take
+        the pod down or silently widen it.
+        """
+        out: List[tuple] = []
+        for w in raw:
+            if isinstance(w, dict):
+                start, end = w.get("start"), w.get("end")
+            elif isinstance(w, (list, tuple)) and len(w) == 2:
+                start, end = w
+            else:
+                logger.warning("P-015: ignoring malformed slam window %r", w)
+                continue
+            try:
+                s = datetime.strptime(str(start), "%Y-%m-%d")
+                e = datetime.strptime(str(end), "%Y-%m-%d")
+            except (TypeError, ValueError):
+                logger.warning("P-015: ignoring malformed slam window %r", w)
+                continue
+            if s > e:
+                logger.warning("P-015: ignoring inverted slam window %r", w)
+                continue
+            out.append((str(start), str(end)))
+        return out
+
+    def _effective_max_open(self, now: datetime) -> int:
+        """Concurrency cap for this scan — raised inside a slam qual window.
+
+        Slam qualifying runs ~100+ matches over 5 days with many concurrent
+        heavy favorites; the base cap plus settlement latency would throttle
+        exactly the volume spike the 120-trade gate is counting on. Kalshi
+        carries no field that marks a slam, so the windows are hand-listed
+        UTC dates (inclusive) in config. Outside every window the base cap
+        holds.
+        """
+        day = now.strftime("%Y-%m-%d")
+        for start, end in self.slam_windows:
+            if start <= day <= end:
+                return self.slam_max_open_positions
+        return self.max_open_positions
 
     # ── BasePod interface ────────────────────────────────────────────
 
@@ -206,10 +260,11 @@ class QualifierFavoritePod(BasePod):
         if self.is_duplicate(fp) or self.has_open_position(ticker):
             return None
 
-        if self._open_count >= self.max_open_positions:
+        cap = self._effective_max_open(now)
+        if self._open_count >= cap:
             return self._log_skip(
                 m, tour, ask, fair_prob, "SKIPPED_RISK",
-                f"max_open_positions {self.max_open_positions} reached",
+                f"max_open_positions {cap} reached",
             )
 
         # sizing: Kelly for a binary buy at price a with win prob p is
@@ -360,6 +415,10 @@ class QualifierFavoritePod(BasePod):
             include_wta=bool(strat.get("include_wta", True)),
             wta_size_mult=float(strat.get("wta_size_mult", 0.5)),
             max_open_positions=int(risk.get("max_open_positions", 6)),
+            slam_max_open_positions=(
+                int(risk["slam_max_open_positions"])
+                if risk.get("slam_max_open_positions") else None),
+            slam_windows=risk.get("slam_windows"),
             depth_haircut=float(risk.get("depth_haircut", 0.5)),
             min_lead_minutes=float(strat.get("min_lead_minutes", 10.0)),
             _now_fn=overrides.get("_now_fn"),

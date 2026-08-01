@@ -1038,6 +1038,10 @@ class Collector:
                 "name": ws.get("name"),
                 "stage": ws.get("stage"),
                 "blocked_on": ws.get("blocked_on", "nothing"),
+                # YAML parses a bare 2026-09-10 into a date object; str() it so
+                # the snapshot stays JSON-round-trippable either way.
+                "recheck_after": (str(ws["recheck_after"])
+                                  if ws.get("recheck_after") else None),
                 "summary": (ws.get("summary") or "").strip(),
                 "action_required": (ws.get("action_required") or "").strip() or None,
                 "gate": ws.get("gate"),

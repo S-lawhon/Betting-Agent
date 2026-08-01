@@ -17,7 +17,7 @@ protects nothing. When in doubt, demote.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -48,6 +48,16 @@ class Finding:
 
     def __repr__(self) -> str:
         return "<{} {}>".format(self.severity, self.key)
+
+
+def _parse_date(value: Any) -> Optional[date]:
+    """A bare YAML date, already stringified by the collector."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
 
 
 def _parse(ts: Optional[str]) -> Optional[datetime]:
@@ -672,8 +682,31 @@ def check_registry_reconciliation(snap: Dict[str, Any],
 def check_workstreams(snap: Dict[str, Any]) -> List[Finding]:
     """The 'what needs me' list. Driven entirely by registry blocked_on."""
     out: List[Finding] = []
+    today = datetime.now(UTC).date()
     for ws in snap.get("workstreams", []):
         wid, blocked = ws.get("id"), ws.get("blocked_on")
+
+        # `recheck_after` was documentation only until 2026-08-01: three
+        # workstreams carried one and NO code read the field, so a date that
+        # came due passed in silence. That is the same shape as a `monitor`
+        # step with no monitor — the note is written, and nothing opens it.
+        # Firing as `action` puts it on the "what needs me" list, which is
+        # where a due recheck belongs; before the date it stays invisible.
+        due = _parse_date(ws.get("recheck_after"))
+        if due and due <= today:
+            overdue = (today - due).days
+            out.append(Finding(
+                key="ws.{}.recheck_due".format(wid),
+                severity="action",
+                title="{} — recheck due {}{}".format(
+                    wid, ws.get("recheck_after"),
+                    " ({}d overdue)".format(overdue) if overdue else " (today)"),
+                detail=(ws.get("action_required")
+                        or "registry.yaml set recheck_after for this workstream; "
+                           "the date has arrived. Re-read its gate and either act, "
+                           "move the date, or change blocked_on."),
+                workstream=wid,
+                value=ws.get("recheck_after")))
 
         if blocked == "human" and ws.get("action_required"):
             out.append(Finding(

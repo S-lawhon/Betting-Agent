@@ -1421,11 +1421,68 @@ workstreams:
       monitoring. Ships typed schemas and a stateful registry so new strategy
       ideas can be promoted, demoted, or retired without inventing a new
       contract each time.
+      LIVE since 2026-08-01 as systemd `betting-strategy-agents` (queue worker,
+      60s poll). First strategy carried end to end the same day:
+      op_20260801_001 (KXRANKLISTFF* dead-heat) registered -> integrity FAIL ->
+      retired, all three artifacts committed under research/.
     note: >
       This is infrastructure, not a trading pod. Its job is to keep the
       opportunity factory itself auditable and recursive so the research ->
       validate -> production -> monitor loop can keep generating the next
       candidate.
+      The daemon is a RECORDER: nothing invokes the six subagents, so a running
+      service does not mean the loop is advancing. Read `registry_size` and
+      `state_counts` in the heartbeat, not just the unit state.
+      Still unexercised: strategy-spec, strategy-validator, strategy-monitor.
+      The cheapest way to test them is to run the factory over a strategy whose
+      answer is already known (P-022, live with a Phase-2 GREEN-LIGHT on the
+      record) and see whether the validator independently agrees.
+
+  - id: R-FANTASY-DEADHEAT
+    name: NFL fantasy dead-heat (op_20260801_002)
+    stage: research
+    owner_dir: research/opportunities
+    # `measurement`, not `time`: nothing is accruing. The blocker is that the
+    # PRODUCT may not exist on a tradeable cadence — KXNFLFANTASYMOST has
+    # exactly ONE event in its whole history (Super Bowl LX, already purged)
+    # and zero regular-season instances. September tells us whether there is
+    # anything here at all; until then no sample can accumulate.
+    blocked_on: measurement
+    recheck_after: 2026-09-10
+    action_required: >
+      Re-query GET /events?series_ticker=KXNFLFANTASYMOST now that the NFL
+      regular season has started. If it lists weekly per-game events, re-run
+      strategy-scout with live market data (rules_primary, candidate list,
+      yes_bid/yes_ask) to size the tie-rate edge empirically. If it lists
+      nothing, or only marquee games, retire op_20260801_002 — a handful of
+      events a year cannot support a pod or a backtest.
+    summary: >
+      Successor to op_20260801_001, which was retired 2026-08-01 after an
+      integrity FAIL: that card assumed weekly rank-threshold markets, but
+      KXRANKLISTFF* are season-long single-#1-rank contracts closing 2027-02-01.
+      op_20260801_002 targets a structurally different product —
+      KXNFLFANTASYMOST, per-game "player with the most fantasy points",
+      mutually exclusive (MECNET), same shape as the golf round-leader family
+      P-022 harvests. Confidence 0.15, next_step `monitor`, deliberately NOT
+      specced.
+      VERIFIED LIVE: fee_type quadratic (maker-free) both in the fixture and on
+      the API; contract_terms_url resolves to NFLFANTASY.pdf, text-identical to
+      RANKLIST.pdf.
+      NOT VERIFIED: the RANKLIST $1/n dead-heat clause is CONDITIONAL on the
+      publisher having no official tiebreak, and whether ESPN publishes one for
+      game-level fantasy points is UNMEASURED — WebFetch could not reach their
+      pages across two separate agent runs.
+    gate:
+      question: >
+        Does KXNFLFANTASYMOST list on a recurring weekly cadence, and is the
+        exact-tie rate at ESPN's hundredth-of-a-point precision large enough
+        that the $1/n haircut clears one $0.01 tick?
+      decision: >
+        Not yet pre-registered — there is no sample to pre-register against.
+        Write the decision rule only once cadence is confirmed, and write it
+        BEFORE pulling prices. Note the standing prior: this repo has killed
+        several structural-tie theses (P-023 MIXED, P-026, P-027, satellites
+        A/C) that were mechanically real but smaller than one tick.
 
   - id: R-TENNIS
     name: Tennis Research / P-015b lower tour

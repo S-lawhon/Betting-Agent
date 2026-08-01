@@ -1,0 +1,101 @@
+{
+  "strategy_id": "op_20260801_001",
+  "checked_at": "2026-08-01T21:15:00Z",
+  "status": "fail",
+  "contract_terms": {
+    "passed": false,
+    "series_checked": ["KXRANKLISTFFQB", "KXRANKLISTFFRB", "KXRANKLISTFFWR", "KXRANKLISTFFTE", "KXRANKLISTFFK", "KXRANKLISTFFDST"],
+    "contract_terms_url_live": "https://assets.kalshi.com/contract_terms/RANKLIST.pdf",
+    "url_identical_across_all_six_series": true,
+    "url_source": "GET https://api.elections.kalshi.com/trade-api/v2/series/<ticker>, fetched live 2026-08-01, one call per series (not assumed from ticker name, per rule_ambiguities item 1)",
+    "pdf_fetched_and_read_directly": true,
+    "pdf_read_method": "WebFetch on the PDF saved and re-read via the Read tool (page-by-page text), not a summarized quote",
+    "dead_heat_clause_verbatim": "Tied rankings shall be resolved using the publisher's official tie-breaking methodology; if none exists, all tied entities share the highest rank among them. If multiple candidates are tied for a given rank, then their Contracts will resolve to $1/(the number of candidates tied), rounded down. If a tie results in a ranking being skipped (e.g. two candidates tie for the #1 position, and the next rank listed is for #3), then a market on a given candidate being #2 will resolve to No.",
+    "clause_is_conditional": true,
+    "condition_text": "The publisher's OWN official tie-breaking methodology is applied first; the $1/n pro-rata split only fires if none exists and a genuine tie survives. This is the same conditional structure CLAUDE.md documents for KXLEADER* (LEAGUELEADER.pdf) — every prior write-up of this ticker family stated the split unconditionally, and this card would repeat that error if left unchecked.",
+    "source_agency_generic_pdf_text": "Placeholder list of news organizations (unfilled template boilerplate) — the PDF itself does not name the per-series publisher",
+    "source_agency_actual": "ESPN Fantasy (https://www.espn.com/fantasy/football/) — from each series' live settlement_sources field",
+    "espn_official_tiebreak_status": "UNRESOLVED. Could not confirm or rule out an ESPN-published tiebreak methodology for its season fantasy-points leaderboard. Four WebFetch attempts against espn.com/fantasy/football pages and support.espn.com returned 404, 403, or JS-rendered empty content with no leaderboard/methodology text retrievable. Per instructions, this is UNMEASURED, not resolved in the strategy's favor — the clause's live/dormant status is unknown.",
+    "strike_structure_finding": "Single-rank, #1-ONLY strikes ('Top QB'/'Top RB'/etc. = rank 1 exclusively). Verified via GET /trade-api/v2/markets?series_ticker=KXRANKLISTFFQB and ...FFRB — every sampled market's rules_primary reads \"If <Player> is the #1 scoring <POS> on ESPN Fantasy Football PPR <Position> Rankings in the 2026-2027 regular season, then the market resolves to Yes.\" No cap_strike/floor_strike or range ('top 12') strikes were present in either series sampled. This answers rule_ambiguities item 3: NOT a range/threshold strike.",
+    "cadence_finding_critical": "Markets are SEASON-LONG, not weekly. GET /trade-api/v2/events?series_ticker=KXRANKLISTFFQB returns exactly two events: KXRANKLISTFFQB-27 ('2026-27 regular season', close_time 2027-02-01T06:00:00Z) and KXRANKLISTFFQB-26FEB ('2025 Season ... through Feb 2026', already past-due today). No weekly event or market ticker was found for any of the six series.",
+    "card_thesis_mismatch": "The opportunity card's premises ('weekly fantasy-football rank markets', 'a market pricing a rank threshold') are contradicted by the live product on both axes: cadence is full-season, not weekly; strikes are single #1-rank, not a threshold/range. Possible source of the confusion: a genuinely different, unrelated template ('NFLFANTASY', ticker KXNFLFANTASYMOST) also exists in satellites_research/data/templates.json (line ~16711) and was NOT fetched or verified in this review — flagged only as a plausible mix-up, not asserted as fact.",
+    "position_accountability_level": "$25,000 per strike, per Member (RANKLIST.pdf, verbatim) — answers rule_ambiguities item 4.",
+    "minimum_tick": "$0.01",
+    "local_corroboration": "satellites_research/contract_terms/GOLDENGLOBESNOM.txt (cached 2026-07-26 census) is textually identical to the RANKLIST.pdf fetched live today for the FF series, confirming this generic RANKLIST rulebook — not a hand-typed transcription error — genuinely governs both the Golden Globes nomination markets and KXRANKLISTFF*."
+  },
+  "settlement_mapping": {
+    "passed": false,
+    "generic_exchange_rule": "CLAUDE.md, verified project-wide: result=\"scalar\" is a PARTIAL PAYOUT, never VOID; YES receives settlement_value_dollars, NO receives 1-it.",
+    "family_specific_settled_example_found": false,
+    "evidence": "Queried GET /trade-api/v2/markets?event_ticker=KXRANKLISTFFQB-26FEB, the only past-dated event in this family ('2025 Season Top QB, before Feb 2026', which should already have resolved). Returned an EMPTY markets array (event shell only) — the same purge-after-settlement pattern satellites_research/REPORT_Satellites_2026-07.md documented for KXGGAFILM/AMAS/BILLBOARDAWARDS. No settled KXRANKLISTFF* market of any position could be located to directly inspect result/settlement_value_dollars.",
+    "settler_code_exists": false,
+    "settler_code_evidence": "grep -r RANKLIST src/ returns zero pod or settler files. The generic Settler's pod_ids tuple (per CLAUDE.md's P-014-orphan note) does not include this family; no dedicated settler analogous to src/kalshi_golf_settler.py exists for KXRANKLISTFF*.",
+    "trade_store_outcome_compatibility": "The repo's WIN/LOSS/VOID outcome enum (hard-coded across trade_store, engine, aggregate_risk, capital_allocator per CLAUDE.md) can in principle represent a $1/n scalar payout as WIN or LOSS by sign of realized P&L, matching the golf precedent — but this has never been implemented or tested for this series family.",
+    "conclusion": "The settlement mechanism is understood in the abstract (exchange-wide pattern) but UNVERIFIED for KXRANKLISTFF* specifically — no live/settled instance exists to confirm field behavior on this family, and no code implements the mapping. Unmeasured, not a pass."
+  },
+  "fee_mapping": {
+    "passed": true,
+    "live_fee_type": {
+      "KXRANKLISTFFQB": "quadratic",
+      "KXRANKLISTFFRB": "quadratic",
+      "KXRANKLISTFFWR": "quadratic",
+      "KXRANKLISTFFTE": "quadratic",
+      "KXRANKLISTFFK": "quadratic",
+      "KXRANKLISTFFDST": "quadratic"
+    },
+    "live_fee_type_source": "GET https://api.elections.kalshi.com/trade-api/v2/series/<ticker>, fetched live 2026-08-01, one call per series",
+    "fixture_check": "All 6 tickers present in src/fixtures/kalshi_series_fees.json under 'all_series' (lines 8419-8424) and ABSENT from 'maker_fee_series' (lines 6-152) -> src/kalshi_fees.py::series_maker_charges_fee() returns False for all six -> maker fee $0.",
+    "fixture_freshness": "generated_at_utc 2026-07-27T16:48:05Z (fixture header), 5 days before this check; no drift detected between fixture and live API for these 6 tickers.",
+    "matching_mode": "Exact ticker match per src/kalshi_fees.py (CLAUDE.md-mandated — no prefix logic). These series tickers contain no hyphen, so no leading-segment ambiguity applies.",
+    "taker_fee": "Unaffected by series classification: 0.07*P*(1-P), standard.",
+    "conclusion": "The card's fee claim ('Maker fee is $0 because none of these series is in maker_fee_series') is VERIFIED TRUE against both the live API and the generated fixture."
+  },
+  "api_field_reliability": {
+    "passed": false,
+    "close_time_check": "Live close_time for sampled QB/RB markets = 2027-02-01T06:00:00Z, a specific date plausibly tied to actual end-of-regular-season, not the generic ~2-week-out placeholder CLAUDE.md documents for other series. However per CLAUDE.md's open-market close_time gotcha, close_time is REWRITTEN to the true value only at the moment a market actually closes — these markets are ~6 months from closing, so this field's reliability cannot be independently confirmed until then; treated as unmeasured for now, not assumed reliable.",
+    "result_and_settlement_value_dollars_fields": "Documented exchange-wide (CLAUDE.md, satellites_research) to carry a genuine scalar partial payout post-settlement, but UNTESTED for this family specifically — see settlement_mapping; no settled instance exists to inspect.",
+    "event_shell_purge_risk": "KXRANKLISTFFQB-26FEB (the one past-dated event) returns zero markets from the LIST endpoint despite the event itself existing, matching the documented Kalshi purge-after-settlement pattern (satellites_research/REPORT_Satellites_2026-07.md, section on GLOBES/AMAS/BILLBOARDAWARDS). This means even once these markets settle, historical field verification via LIST endpoints may become impossible after some retention window — the same caveat as the golf settled-market LIST-nulling gotcha in CLAUDE.md.",
+    "webfetch_limitation": "ESPN's own fantasy pages (espn.com/fantasy/football/*, fantasy.espn.com, support.espn.com) are JS-rendered or blocked; 4 separate WebFetch attempts returned 404, 403, or template-only HTML with no leaderboard/tiebreak text retrievable. The settlement SOURCE's own documentation could not be independently read. This is an evidence gap, not a negative finding, but it blocks confirmation of rule_ambiguities item 2.",
+    "conclusion": "Field behavior is plausible but unconfirmed for this family; no live test against a real settled or near-settled instance was possible. Unmeasured, not a pass."
+  },
+  "external_schedule_dependency": {
+    "required": false,
+    "reasoning": "The card's thesis is a rules-based mispricing argument (dead-heat clause vs. market pricing), not a timing-dependent entry strategy like P-022's golf round-close problem. The determining event (ESPN's fantasy-points ranking) is itself the contract's settlement source, already captured by settlement_sources, not a separate external feed the strategy must resolve. Caveat: if a future spec adds season-end-relative entry/exit timing, an external NFL regular-season-end schedule would become a required dependency at that gate — noted for the next reviewer, not treated as a current blocker since no such spec exists (strategy state is still 'idea')."
+  },
+  "blocking_issues": [
+    "Card premise mismatch: the opportunity claims 'weekly fantasy-football rank markets' pricing 'a rank threshold', but live KXRANKLISTFFQB/RB/WR/TE/K/DST markets are SEASON-LONG (2026-27 regular season, close ~2027-02-01) with single #1-rank strikes only — no weekly market or range/threshold strike exists for any of the six series as of 2026-08-01.",
+    "Dead-heat clause conditionality unresolved: RANKLIST.pdf's $1/n split fires only if ESPN Fantasy (the Source Agency) has NO official tie-breaking methodology for its season points leaderboard. This could not be confirmed or denied — ESPN's live pages were unreachable via WebFetch. Per CLAUDE.md's identical KXLEADER precedent, treating an unverified conditional split as live overstates the thesis; here it cannot even be classified.",
+    "No settled KXRANKLISTFF* market instance exists to inspect (the one past-dated event, KXRANKLISTFFQB-26FEB, returns an empty markets array — event shell only), so the scalar/partial-payout settlement mechanism, while well-established exchange-wide, is unverified for this specific series family.",
+    "No settler or settlement-mapping code exists in the repo for this series family (grep for RANKLIST in src/ returns nothing outside the fee fixture); the strategy has no path from Kalshi's result/settlement_value_dollars fields to the trade_store WIN/LOSS/VOID outcome model.",
+    "Base-rate plausibility of the triggering event (an exact tie for the #1 full-season PPR points slot, which accrues to hundredths of a point over 17 games) has not been estimated or backtested at all — the closest repo precedent (satellites_research Study A, award 'tie' strikes) found the analogous dead-heat event essentially never occurs at modern base rates and KILLed that strategy on that basis; no equivalent check has been run here."
+  ],
+  "provenance": {
+    "created_by": "integrity-reviewer-agent",
+    "code_commit": "716a38a",
+    "artifact_path": "research/integrity/op_20260801_001_integrity_2026-08-01.json",
+    "dataset_hash": null,
+    "gate_path": null,
+    "gate_hash": null,
+    "session_id": null
+  },
+  "extra": {
+    "repo_files_consulted": [
+      "CLAUDE.md",
+      "src/strategy_orchestration.py",
+      "src/kalshi_fees.py",
+      "src/fixtures/kalshi_series_fees.json",
+      "satellites_research/REPORT_Satellites_2026-07.md",
+      "satellites_research/contract_terms/GOLDENGLOBESNOM.txt",
+      "satellites_research/data/templates.json"
+    ],
+    "live_endpoints_consulted": [
+      "GET https://api.elections.kalshi.com/trade-api/v2/series/KXRANKLISTFFQB (and FFRB/FFWR/FFTE/FFK/FFDST)",
+      "GET https://assets.kalshi.com/contract_terms/RANKLIST.pdf",
+      "GET https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXRANKLISTFFQB",
+      "GET https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXRANKLISTFFRB",
+      "GET https://api.elections.kalshi.com/trade-api/v2/events?series_ticker=KXRANKLISTFFQB",
+      "GET https://api.elections.kalshi.com/trade-api/v2/markets?event_ticker=KXRANKLISTFFQB-26FEB"
+    ],
+    "overall_assessment": "Two of four mandatory mappings pass (fee_mapping only, cleanly verified). contract_terms, settlement_mapping, and api_field_reliability all fail or are unmeasured, and the card's own factual premise (weekly cadence, threshold strike) does not match the live product. This is a clean FAIL at the integrity gate, consistent with prior satellites_research findings on the sibling GOLDENGLOBESNOM/RANKLIST template family."
+  }
+}

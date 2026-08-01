@@ -44,6 +44,15 @@ is judged on output freshness, never on exit code.
 Plus `/manager` and `/api/manager` routes on the existing dashboard, and the
 `fund-manager` agent in `.claude/agents/`.
 
+The recursive strategy loop now has its own live worker:
+
+- `scripts/run_strategy_agents.py` consumes JSON requests from
+  `data/strategy_agents/queue/<role>/`
+- `scripts/strategy_agent_submit.py` writes requests into that queue
+- `data/strategy_agents/registry.json` is the persisted strategy registry
+- `data/strategy_agents/heartbeat.jsonl` is the service heartbeat the manager
+  watches
+
 ## Daily use
 
 ```bash

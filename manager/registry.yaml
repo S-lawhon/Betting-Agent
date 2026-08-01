@@ -120,6 +120,17 @@ services:
     description: Standalone file-backed dashboard on 127.0.0.1:8081 behind Caddy
     severity: warn
 
+  # Recursive strategy agent loop: queue-based worker that persists the
+  # registry and emits a heartbeat on every pass. This is the operational
+  # surface for the new strategy factory runtime, not a trading process.
+  - id: betting-strategy-agents
+    kind: systemd
+    description: Recursive strategy agents (queue-driven registry worker)
+    heartbeat:
+      file: data/strategy_agents/heartbeat.jsonl
+      max_stale_minutes: 30
+    severity: warn
+
   # RETIRED 2026-07-22. P-016 (v1 and v2) both failed their pre-registered
   # gates (v1 adverse selection; v2 founding premise refuted). Kill switch
   # data/KILL_MAKER was hit 2026-07-22 01:22:40 UTC; the maker pulled all

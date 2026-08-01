@@ -17,9 +17,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 import json
+import tempfile
 
 UTC = timezone.utc
 
@@ -559,11 +561,23 @@ class StrategyRegistry:
     def dump(self, path: Path) -> None:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2, sort_keys=True))
+        payload = json.dumps(self.to_dict(), indent=2, sort_keys=True)
+        with tempfile.NamedTemporaryFile("w", delete=False, dir=str(path.parent),
+                                         prefix=path.name + ".", suffix=".tmp") as fh:
+            fh.write(payload)
+            tmp_path = Path(fh.name)
+        os.replace(tmp_path, path)
 
     @classmethod
     def load(cls, path: Path) -> "StrategyRegistry":
         return cls.from_dict(json.loads(Path(path).read_text()))
+
+    @classmethod
+    def load_or_empty(cls, path: Path) -> "StrategyRegistry":
+        path = Path(path)
+        if not path.exists():
+            return cls()
+        return cls.load(path)
 
     def _transition(self, record: StrategyRecord, to_state: str, actor: str,
                     kind: str, payload: Dict[str, Any]) -> None:

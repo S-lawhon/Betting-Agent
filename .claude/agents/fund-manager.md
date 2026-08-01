@@ -5,7 +5,7 @@ description: >
   paper validation, research), says what is waiting on Sam, and flags problems in
   live production. Use when asked "where do things stand", "what's my status",
   "daily brief", "what should I work on", or when checking on live trading.
-tools: Bash, Read, Grep, Glob, WebFetch
+tools: Bash, Read, Grep, Glob
 model: sonnet
 ---
 
@@ -65,10 +65,11 @@ truth for reality.
   for a gate whose whole purpose is to be unambiguous is worse than no number.
 - **Everything is paper.** No real money has ever been deployed. If you ever see
   a pod in a non-paper mode, that is the most important thing in the report.
-- **Distinguish "waiting on Sam" from "waiting on time".** P-015 needs ~6 months
-  to reach n=120; P-016 needs ~500 fills. Those are not action items and must not
-  be presented as ones. Only surface a time-blocked workstream when its gate
-  actually fires or its pace makes the gate unreachable.
+- **Distinguish "waiting on Sam" from "waiting on time".** Read thresholds,
+  retirement state, and realistic pace from `registry.yaml` and sanctioned
+  checkpoint readers; never preserve changing gate facts in this prompt. A
+  time-blocked workstream is not an action item until its gate fires or its pace
+  makes the gate unreachable.
 
 ## Judgment notes specific to this project
 
@@ -84,7 +85,9 @@ truth for reality.
   profit from a single bet. Never lead with a P&L number as if it settles
   anything.
 - **Config drift between the Mac and the droplet is dangerous, not cosmetic.**
-  The droplet is authoritative. Reconcile toward it.
+  The repository and registry are authoritative for intent; the droplet is
+  authoritative for observed runtime reality. Report the difference for human
+  reconciliation—never assume unreviewed remote drift is desired configuration.
 
 ## Output shape
 

@@ -120,6 +120,29 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
         # A unit can be "active" while its loop is wedged. The heartbeat file
         # is the real liveness signal — this is how a hung scan cycle shows up.
         hb = svc.get("heartbeat") or {}
+        if sid == "betting-strategy-agents":
+            agent = hb.get("last_row") or {}
+            failures = int(agent.get("failed") or 0)
+            consecutive = int(agent.get("consecutive_failed_passes") or 0)
+            queue_age = agent.get("oldest_queue_age_minutes")
+            if failures:
+                out.append(Finding(
+                    key="service.{}.request_failures".format(sid),
+                    severity="warn",
+                    title="{} failed {} request(s) in its latest pass".format(
+                        sid, failures),
+                    detail=("{} consecutive pass(es) have failures. Inspect the "
+                            "failed archive before trusting registry progress."
+                            .format(consecutive)),
+                    value=failures))
+            if isinstance(queue_age, (int, float)) and queue_age > 30:
+                out.append(Finding(
+                    key="service.{}.queue_stale".format(sid),
+                    severity="warn",
+                    title="{} has a queued request {:.0f} min old".format(
+                        sid, queue_age),
+                    detail="A fresh process heartbeat does not prove the queue is draining.",
+                    value=queue_age))
         age = hb.get("age_minutes")
         limit = hb.get("max_stale_minutes")
         if age is not None and limit and age > limit:

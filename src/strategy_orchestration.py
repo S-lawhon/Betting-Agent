@@ -15,8 +15,10 @@ variants.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+import fcntl
 import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -50,6 +52,15 @@ ALLOWED_TRANSITIONS = {
 REPORT_STATUSES = {"pass", "warn", "fail"}
 PROMOTION_DECISIONS = {"promote", "hold", "demote", "retire"}
 MONITORING_STATUSES = {"ok", "warn", "degraded", "retired"}
+GO_NO_GO_DECISIONS = {"go", "hold", "no_go"}
+LIVE_STATES = {"live_small", "live_scaled"}
+AUTOMATIC_MONITORING_TARGETS = {"degraded", "retired"}
+PROMOTION_TARGET = {
+    "validated": "paper_live",
+    "paper_live": "live_small",
+    "live_small": "live_scaled",
+    "degraded": "paper_live",
+}
 
 
 class StrategyError(ValueError):
@@ -62,6 +73,10 @@ class StrategyNotFoundError(StrategyError):
 
 class StrategyTransitionError(StrategyError):
     """Raised when a state transition is not allowed."""
+
+
+class StrategyConflictError(StrategyError):
+    """Raised when a stale registry writer would overwrite newer state."""
 
 
 def _utc_now() -> str:
@@ -94,6 +109,41 @@ def _require_fraction(name: str, value: float) -> float:
     if not 0.0 <= value <= 1.0:
         raise StrategyError("{} must be in [0, 1]".format(name))
     return value
+
+
+def _require_keys(name: str, value: Dict[str, Any], keys: Iterable[str]) -> None:
+    missing = [key for key in keys if key not in value]
+    if missing:
+        raise StrategyError("{} missing required keys: {}".format(
+            name, ", ".join(missing)))
+
+
+@dataclass(frozen=True)
+class ArtifactProvenance:
+    """Evidence needed to reproduce an agent-produced strategy artifact."""
+
+    created_by: str
+    code_commit: str
+    artifact_path: str
+    dataset_hash: Optional[str] = None
+    gate_path: Optional[str] = None
+    gate_hash: Optional[str] = None
+    session_id: Optional[str] = None
+
+    def complete(self, *, dataset: bool = False, gate: bool = False) -> bool:
+        base = bool(self.created_by and self.code_commit and self.artifact_path)
+        return (base and (not dataset or bool(self.dataset_hash))
+                and (not gate or bool(self.gate_path and self.gate_hash)))
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, Any]) -> "ArtifactProvenance":
+        return cls(**payload)
+
+
+def _provenance(payload: Any) -> Optional[ArtifactProvenance]:
+    if payload is None or isinstance(payload, ArtifactProvenance):
+        return payload
+    return ArtifactProvenance.from_dict(_ensure_dict(payload))
 
 
 @dataclass(frozen=True)
@@ -158,10 +208,16 @@ class StrategySpec:
     risk_limits: Dict[str, Any]
     null_hypothesis: str
     alternative_hypothesis: str
+    provenance: Optional[ArtifactProvenance] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _require_state(self.state)
+        _require_keys("entry_logic", self.entry_logic, ("type",))
+        _require_keys("exit_logic", self.exit_logic, ("type",))
+        _require_keys("fair_value_model", self.fair_value_model, ("type",))
+        _require_keys("fee_model", self.fee_model, ("venue",))
+        _require_keys("risk_limits", self.risk_limits, ("max_usd_at_risk",))
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -173,7 +229,7 @@ class StrategySpec:
         filtered = {
             k: v for k, v in payload.items()
             if k in known and k not in {"entry_logic", "exit_logic", "fair_value_model",
-                                        "fee_model", "risk_limits", "extra"}
+                                        "fee_model", "risk_limits", "provenance", "extra"}
         }
         return cls(
             **filtered,
@@ -182,6 +238,7 @@ class StrategySpec:
             fair_value_model=_ensure_dict(payload.get("fair_value_model")),
             fee_model=_ensure_dict(payload.get("fee_model")),
             risk_limits=_ensure_dict(payload.get("risk_limits")),
+            provenance=_provenance(payload.get("provenance")),
             extra=_ensure_dict(payload.get("extra")) | extra,
         )
 
@@ -197,10 +254,32 @@ class IntegrityReport:
     api_field_reliability: Dict[str, Any]
     external_schedule_dependency: Dict[str, Any]
     blocking_issues: List[str] = field(default_factory=list)
+    provenance: Optional[ArtifactProvenance] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _require_status(self.status, REPORT_STATUSES, "integrity status")
+
+    def passes(self) -> bool:
+        """A label alone is never enough to clear the integrity gate."""
+        mandatory = (
+            self.contract_terms,
+            self.settlement_mapping,
+            self.fee_mapping,
+            self.api_field_reliability,
+        )
+        schedule_ok = (
+            not self.external_schedule_dependency.get("required", False)
+            or self.external_schedule_dependency.get("available") is True
+        )
+        return (
+            self.status == "pass"
+            and not self.blocking_issues
+            and all(check.get("passed") is True for check in mandatory)
+            and schedule_ok
+            and self.provenance is not None
+            and self.provenance.complete()
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -214,7 +293,7 @@ class IntegrityReport:
             if k in known and k not in {
                 "contract_terms", "settlement_mapping", "fee_mapping",
                 "api_field_reliability", "external_schedule_dependency",
-                "blocking_issues", "extra",
+                "blocking_issues", "provenance", "extra",
             }
         }
         return cls(
@@ -227,6 +306,7 @@ class IntegrityReport:
                 payload.get("external_schedule_dependency")
             ),
             blocking_issues=_ensure_list(payload.get("blocking_issues")),
+            provenance=_provenance(payload.get("provenance")),
             extra=_ensure_dict(payload.get("extra")) | extra,
         )
 
@@ -243,13 +323,20 @@ class ValidationReport:
     stress_tests: Dict[str, Any]
     capacity: Dict[str, Any]
     go_no_go: str
+    provenance: Optional[ArtifactProvenance] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _require_status(self.status, REPORT_STATUSES, "validation status")
+        _require_status(self.go_no_go, GO_NO_GO_DECISIONS, "go/no-go decision")
+        _require_keys("sample_size", self.sample_size, ("events", "trades"))
+        _require_keys("performance", self.performance, ("net_edge", "clv"))
+        _require_keys("uncertainty", self.uncertainty, ("ci_lower", "ci_upper"))
 
     def passes(self) -> bool:
-        return self.status == "pass" and self.go_no_go == "go"
+        return (self.status == "pass" and self.go_no_go == "go"
+                and self.provenance is not None
+                and self.provenance.complete(dataset=True, gate=True))
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -262,7 +349,7 @@ class ValidationReport:
             k: v for k, v in payload.items()
             if k in known and k not in {
                 "sample_size", "performance", "uncertainty",
-                "stress_tests", "capacity", "extra",
+                "stress_tests", "capacity", "provenance", "extra",
             }
         }
         return cls(
@@ -272,6 +359,7 @@ class ValidationReport:
             uncertainty=_ensure_dict(payload.get("uncertainty")),
             stress_tests=_ensure_dict(payload.get("stress_tests")),
             capacity=_ensure_dict(payload.get("capacity")),
+            provenance=_provenance(payload.get("provenance")),
             extra=_ensure_dict(payload.get("extra")) | extra,
         )
 
@@ -287,6 +375,8 @@ class PromotionDecision:
     required_conditions: List[str]
     owner_agent: str
     review_window_days: int
+    approval_ref: Optional[str] = None
+    provenance: Optional[ArtifactProvenance] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -295,6 +385,19 @@ class PromotionDecision:
         _require_status(self.decision, PROMOTION_DECISIONS, "promotion decision")
         if self.decision == "hold" and self.from_state != self.to_state:
             raise StrategyError("hold decisions must not change state")
+        if self.decision == "retire" and self.to_state != "retired":
+            raise StrategyError("retire decisions must target retired")
+        if self.decision == "demote" and self.to_state not in {"degraded", "retired"}:
+            raise StrategyError("demote decisions must target degraded or retired")
+        if self.decision == "promote" and self.to_state in {"degraded", "retired"}:
+            raise StrategyError("promote decisions cannot target a conservative state")
+        if (self.decision == "promote"
+                and PROMOTION_TARGET.get(self.from_state) != self.to_state):
+            raise StrategyError(
+                "promote decision must target the next authorized state"
+            )
+        if self.decision == "promote" and self.to_state in LIVE_STATES and not self.approval_ref:
+            raise StrategyError("promotion into a live state requires approval_ref")
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -305,12 +408,15 @@ class PromotionDecision:
         extra = {k: v for k, v in payload.items() if k not in known}
         filtered = {
             k: v for k, v in payload.items()
-            if k in known and k not in {"rationale", "required_conditions", "extra"}
+            if k in known and k not in {
+                "rationale", "required_conditions", "provenance", "extra"
+            }
         }
         return cls(
             **filtered,
             rationale=_ensure_list(payload.get("rationale")),
             required_conditions=_ensure_list(payload.get("required_conditions")),
+            provenance=_provenance(payload.get("provenance")),
             extra=_ensure_dict(payload.get("extra")) | extra,
         )
 
@@ -330,6 +436,7 @@ class MonitoringReport:
     guardrail_breaches: List[str] = field(default_factory=list)
     recommended_state: Optional[str] = None
     notes: Optional[str] = None
+    provenance: Optional[ArtifactProvenance] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -348,13 +455,14 @@ class MonitoringReport:
         filtered = {
             k: v for k, v in payload.items()
             if k in known and k not in {"fill_quality", "drift_signals",
-                                        "guardrail_breaches", "extra"}
+                                        "guardrail_breaches", "provenance", "extra"}
         }
         return cls(
             **filtered,
             fill_quality=_ensure_dict(payload.get("fill_quality")),
             drift_signals=_ensure_list(payload.get("drift_signals")),
             guardrail_breaches=_ensure_list(payload.get("guardrail_breaches")),
+            provenance=_provenance(payload.get("provenance")),
             extra=_ensure_dict(payload.get("extra")) | extra,
         )
 
@@ -429,8 +537,9 @@ class StrategyRecord:
 class StrategyRegistry:
     """In-memory registry for the recursive strategy factory."""
 
-    def __init__(self) -> None:
+    def __init__(self, revision: int = 0) -> None:
         self._records: Dict[str, StrategyRecord] = {}
+        self.revision = int(revision)
 
     def __contains__(self, strategy_id: str) -> bool:
         return strategy_id in self._records
@@ -451,7 +560,7 @@ class StrategyRegistry:
     def register_opportunity(self, card: OpportunityCard) -> StrategyRecord:
         if card.id in self._records:
             raise StrategyError("strategy already exists: {}".format(card.id))
-        record = StrategyRecord(opportunity=card)
+        record = StrategyRecord(opportunity=OpportunityCard.from_dict(card.to_dict()))
         self._records[card.id] = record
         self._append_event(
             record, kind="opportunity_registered", from_state="idea",
@@ -464,7 +573,17 @@ class StrategyRegistry:
         record = self.get(strategy_id)
         if spec.opportunity_id != strategy_id:
             raise StrategyError("spec/opportunity mismatch: {}".format(strategy_id))
-        record.spec = spec
+        if spec.state != "spec":
+            raise StrategyError("attached spec must declare state=spec")
+        if record.spec is not None:
+            raise StrategyTransitionError(
+                "strategy already has a spec; create a new opportunity/strategy variant"
+            )
+        for other in self._records.values():
+            if other is not record and other.spec and other.spec.id == spec.id:
+                raise StrategyError("strategy spec id already exists: {}".format(spec.id))
+        self._assert_transition(record, "spec")
+        record.spec = StrategySpec.from_dict(spec.to_dict())
         self._transition(record, "spec", actor=actor, kind="spec_attached",
                          payload=spec.to_dict())
         return record
@@ -472,9 +591,8 @@ class StrategyRegistry:
     def record_integrity(self, strategy_id: str, report: IntegrityReport,
                          actor: str = "integrity") -> StrategyRecord:
         record = self.get(strategy_id)
-        if report.strategy_id != strategy_id:
-            raise StrategyError("integrity report mismatch: {}".format(strategy_id))
-        record.integrity = report
+        self._require_artifact_identity(record, report.strategy_id)
+        record.integrity = IntegrityReport.from_dict(report.to_dict())
         self._append_event(
             record, kind="integrity_recorded", from_state=record.state,
             to_state=record.state, actor=actor, payload=report.to_dict(),
@@ -484,13 +602,14 @@ class StrategyRegistry:
     def record_validation(self, strategy_id: str, report: ValidationReport,
                           actor: str = "validation") -> StrategyRecord:
         record = self.get(strategy_id)
-        if report.strategy_id != strategy_id:
-            raise StrategyError("validation report mismatch: {}".format(strategy_id))
-        if record.integrity is None or record.integrity.status != "pass":
+        self._require_artifact_identity(record, report.strategy_id)
+        if record.integrity is None or not record.integrity.passes():
             raise StrategyTransitionError(
                 "strategy {} cannot validate before integrity passes".format(strategy_id)
             )
-        record.validation = report
+        if report.passes():
+            self._assert_transition(record, "validated")
+        record.validation = ValidationReport.from_dict(report.to_dict())
         if report.passes():
             self._transition(record, "validated", actor=actor,
                              kind="validation_passed", payload=report.to_dict())
@@ -504,14 +623,15 @@ class StrategyRegistry:
     def record_promotion(self, strategy_id: str, decision: PromotionDecision,
                          actor: str = "promotion") -> StrategyRecord:
         record = self.get(strategy_id)
-        if decision.strategy_id != strategy_id:
-            raise StrategyError("promotion decision mismatch: {}".format(strategy_id))
+        self._require_artifact_identity(record, decision.strategy_id)
         if record.state != decision.from_state:
             raise StrategyTransitionError(
                 "decision from_state {} does not match current state {}".format(
                     decision.from_state, record.state)
             )
-        record.promotion = decision
+        if decision.decision in {"promote", "demote", "retire"}:
+            self._assert_transition(record, decision.to_state)
+        record.promotion = PromotionDecision.from_dict(decision.to_dict())
         if decision.decision == "promote" or decision.decision in {"demote", "retire"}:
             self._transition(record, decision.to_state, actor=actor,
                              kind="promotion_{}".format(decision.decision),
@@ -526,34 +646,57 @@ class StrategyRegistry:
     def record_monitoring(self, strategy_id: str, report: MonitoringReport,
                           actor: str = "monitor") -> StrategyRecord:
         record = self.get(strategy_id)
-        if report.strategy_id != strategy_id:
-            raise StrategyError("monitoring report mismatch: {}".format(strategy_id))
-        record.monitoring.append(report)
+        self._require_artifact_identity(record, report.strategy_id)
+        if report.state != record.state:
+            raise StrategyTransitionError(
+                "monitoring state {} does not match current state {}".format(
+                    report.state, record.state)
+            )
+        auto_transition = (
+            report.recommended_state in AUTOMATIC_MONITORING_TARGETS
+            and report.recommended_state != record.state
+        )
+        if auto_transition:
+            self._assert_transition(record, report.recommended_state)
+        record.monitoring.append(MonitoringReport.from_dict(report.to_dict()))
         self._append_event(
             record, kind="monitoring_recorded", from_state=record.state,
             to_state=record.state, actor=actor, payload=report.to_dict(),
         )
-        if report.recommended_state and report.recommended_state != record.state:
+        if auto_transition:
             self._transition(
                 record, report.recommended_state, actor=actor,
                 kind="monitoring_transition", payload=report.to_dict(),
+            )
+        elif report.recommended_state and report.recommended_state != record.state:
+            self._append_event(
+                record, kind="promotion_requested", from_state=record.state,
+                to_state=record.state, actor=actor, payload=report.to_dict(),
             )
         return record
 
     def transition(self, strategy_id: str, to_state: str,
                    actor: str = "system", kind: str = "state_transition",
                    payload: Optional[Dict[str, Any]] = None) -> StrategyRecord:
+        if to_state not in AUTOMATIC_MONITORING_TARGETS:
+            raise StrategyTransitionError(
+                "direct transitions may only degrade or retire; use a typed artifact "
+                "and human-approved PromotionDecision for upward movement"
+            )
         record = self.get(strategy_id)
         self._transition(record, to_state, actor=actor, kind=kind,
                          payload=payload or {})
         return record
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"records": {sid: rec.to_dict() for sid, rec in self._records.items()}}
+        return {
+            "revision": self.revision,
+            "records": {sid: rec.to_dict() for sid, rec in self._records.items()},
+        }
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "StrategyRegistry":
-        registry = cls()
+        registry = cls(revision=int(payload.get("revision", 0)))
         for sid, rec in (payload.get("records") or {}).items():
             registry._records[sid] = StrategyRecord.from_dict(rec)
         return registry
@@ -561,12 +704,32 @@ class StrategyRegistry:
     def dump(self, path: Path) -> None:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        payload = json.dumps(self.to_dict(), indent=2, sort_keys=True)
-        with tempfile.NamedTemporaryFile("w", delete=False, dir=str(path.parent),
-                                         prefix=path.name + ".", suffix=".tmp") as fh:
-            fh.write(payload)
-            tmp_path = Path(fh.name)
-        os.replace(tmp_path, path)
+        lock_path = path.with_name(path.name + ".lock")
+        with lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            disk_revision = 0
+            if path.exists():
+                disk_payload = json.loads(path.read_text(encoding="utf-8"))
+                disk_revision = int(disk_payload.get("revision", 0))
+            if disk_revision != self.revision:
+                raise StrategyConflictError(
+                    "stale registry revision {} (disk is {})".format(
+                        self.revision, disk_revision)
+                )
+            next_revision = self.revision + 1
+            serialized = self.to_dict()
+            serialized["revision"] = next_revision
+            payload = json.dumps(serialized, indent=2, sort_keys=True)
+            with tempfile.NamedTemporaryFile(
+                    "w", delete=False, dir=str(path.parent),
+                    prefix=path.name + ".", suffix=".tmp", encoding="utf-8") as fh:
+                fh.write(payload)
+                fh.flush()
+                os.fsync(fh.fileno())
+                tmp_path = Path(fh.name)
+            os.replace(tmp_path, path)
+            self.revision = next_revision
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     @classmethod
     def load(cls, path: Path) -> "StrategyRegistry":
@@ -588,16 +751,31 @@ class StrategyRegistry:
                 actor=actor, payload=payload,
             )
             return
-        allowed = ALLOWED_TRANSITIONS.get(record.state, set())
-        if to_state not in allowed:
-            raise StrategyTransitionError(
-                "illegal transition {} -> {}".format(record.state, to_state)
-            )
+        self._assert_transition(record, to_state)
         self._append_event(
             record, kind=kind, from_state=record.state, to_state=to_state,
             actor=actor, payload=payload,
         )
         record.state = to_state
+
+    def _assert_transition(self, record: StrategyRecord, to_state: str) -> None:
+        to_state = _require_state(to_state)
+        if to_state == record.state:
+            return
+        if to_state not in ALLOWED_TRANSITIONS.get(record.state, set()):
+            raise StrategyTransitionError(
+                "illegal transition {} -> {}".format(record.state, to_state)
+            )
+
+    @staticmethod
+    def _require_artifact_identity(record: StrategyRecord, artifact_id: str) -> None:
+        expected = record.spec.id if record.spec else record.opportunity.id
+        if artifact_id != expected:
+            raise StrategyError(
+                "artifact strategy_id {} does not match canonical id {}".format(
+                    artifact_id, expected
+                )
+            )
 
     def _append_event(self, record: StrategyRecord, kind: str, from_state: str,
                       to_state: str, actor: str, payload: Dict[str, Any]) -> None:
@@ -608,6 +786,6 @@ class StrategyRegistry:
             from_state=from_state,
             to_state=to_state,
             actor=actor,
-            payload=_ensure_dict(payload),
+            payload=deepcopy(_ensure_dict(payload)),
         )
         record.events.append(event)

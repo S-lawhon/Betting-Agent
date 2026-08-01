@@ -17,12 +17,13 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
+import os
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from src.strategy_orchestration import (
     IntegrityReport,
@@ -38,16 +39,15 @@ from src.strategy_orchestration import (
 logger = logging.getLogger(__name__)
 UTC = timezone.utc
 
-ROLES = ("scout", "integrity", "validation", "promotion", "monitoring")
-REQUEST_TYPES = {
+ROLE_BY_TYPE = {
     "opportunity": "scout",
-    "spec": "integrity",
-    "integrity": "validation",
-    "validation": "promotion",
-    "promotion": "monitoring",
+    "spec": "spec",
+    "integrity": "integrity",
+    "validation": "validation",
+    "promotion": "promotion",
     "monitoring": "monitoring",
-    "transition": "monitoring",
 }
+ROLES = tuple(ROLE_BY_TYPE.values())
 
 
 def _utc_now() -> str:
@@ -71,6 +71,8 @@ class AgentSummary:
     failed: int
     registry_size: int
     state_counts: Dict[str, int]
+    queue_depth: int
+    oldest_queue_age_minutes: Optional[float]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -79,6 +81,8 @@ class AgentSummary:
             "failed": self.failed,
             "registry_size": self.registry_size,
             "state_counts": self.state_counts,
+            "queue_depth": self.queue_depth,
+            "oldest_queue_age_minutes": self.oldest_queue_age_minutes,
         }
 
 
@@ -90,6 +94,7 @@ class StrategyAgentRuntime:
         processed_dir: Optional[Path] = None,
         heartbeat_path: Optional[Path] = None,
         poll_interval_s: float = 60.0,
+        heartbeat_max_bytes: int = 5_000_000,
         clock: Optional[Any] = None,
     ) -> None:
         self.registry_path = Path(registry_path)
@@ -99,6 +104,7 @@ class StrategyAgentRuntime:
             heartbeat_path or self.queue_dir.parent / "heartbeat.jsonl"
         )
         self.poll_interval_s = float(poll_interval_s)
+        self.heartbeat_max_bytes = int(heartbeat_max_bytes)
         self._clock = clock or (lambda: datetime.now(UTC))
 
     def run_once(self) -> AgentSummary:
@@ -112,20 +118,30 @@ class StrategyAgentRuntime:
 
         for request_path in self._iter_requests():
             processed += 1
+            raw_request = ""
             try:
-                request = json.loads(request_path.read_text())
-                self._apply_request(registry, request)
+                raw_request = request_path.read_text(encoding="utf-8")
+                request = json.loads(raw_request)
+                role = request_path.parent.name
+                self._apply_request(registry, request, role=role)
                 registry.dump(self.registry_path)
-                self._archive_request(request_path, "done", request)
+                self._archive_request(request_path, "done", request, raw_request)
                 succeeded += 1
             except Exception as exc:  # noqa: BLE001 - surface the failure
                 failed += 1
-                self._archive_request(
-                    request_path,
-                    "failed",
-                    {"error": f"{type(exc).__name__}: {exc}"},
-                )
                 logger.exception("strategy-agent request failed: %s", request_path)
+                try:
+                    self._archive_request(
+                        request_path,
+                        "failed",
+                        {"error": f"{type(exc).__name__}: {exc}"},
+                        raw_request,
+                    )
+                except Exception:  # noqa: BLE001 - preserve loop + heartbeat
+                    logger.exception("could not archive failed request: %s", request_path)
+                # A rejected operation must not influence later requests in the
+                # same pass, even if a future mutation path regresses atomicity.
+                registry = StrategyRegistry.load_or_empty(self.registry_path)
 
         if processed == 0:
             # Still refresh the on-disk registry so a missing file becomes
@@ -138,6 +154,8 @@ class StrategyAgentRuntime:
             failed=failed,
             registry_size=len(registry.values()),
             state_counts=self._state_counts(registry),
+            queue_depth=len(self._iter_requests()),
+            oldest_queue_age_minutes=self._oldest_queue_age_minutes(),
         )
         self._append_heartbeat(summary)
         return summary
@@ -159,15 +177,21 @@ class StrategyAgentRuntime:
             paths.extend(sorted(role_dir.glob("*.json")))
         return paths
 
-    def _apply_request(self, registry: StrategyRegistry, request: Dict[str, Any]) -> None:
+    def _apply_request(self, registry: StrategyRegistry, request: Dict[str, Any],
+                       role: str) -> None:
         kind = str(request.get("type") or "").strip().lower()
         strategy_id = str(request.get("strategy_id") or request.get("id") or "").strip()
-        actor = str(request.get("actor") or request.get("source_agent") or kind or "system")
         payload = request.get("payload") or {}
         if not kind:
             raise ValueError("request missing type")
-        if kind not in REQUEST_TYPES:
+        if kind not in ROLE_BY_TYPE:
             raise ValueError(f"unsupported request type: {kind}")
+        expected_role = ROLE_BY_TYPE[kind]
+        if role != expected_role:
+            raise ValueError(
+                f"request type {kind} belongs to {expected_role}, not {role}"
+            )
+        actor = role  # authority comes from the inbox, never caller-controlled JSON
 
         if kind == "opportunity":
             card = OpportunityCard.from_dict(payload)
@@ -175,6 +199,8 @@ class StrategyAgentRuntime:
                 strategy_id = card.id
             if card.id != strategy_id:
                 raise ValueError("request id does not match opportunity id")
+            if card.source_agent != actor:
+                raise ValueError("opportunity source_agent must match scout inbox")
             registry.register_opportunity(card)
             return
 
@@ -195,21 +221,11 @@ class StrategyAgentRuntime:
         elif kind == "monitoring":
             registry.record_monitoring(strategy_id, MonitoringReport.from_dict(payload),
                                        actor=actor)
-        elif kind == "transition":
-            to_state = str(payload.get("to_state") or "").strip()
-            if not to_state:
-                raise ValueError("transition request missing payload.to_state")
-            registry.transition(
-                strategy_id,
-                to_state,
-                actor=actor,
-                kind=str(payload.get("kind") or "state_transition"),
-                payload=payload,
-            )
         else:
             raise ValueError(f"unsupported request type: {kind}")
 
-    def _archive_request(self, request_path: Path, status: str, result: Dict[str, Any]) -> None:
+    def _archive_request(self, request_path: Path, status: str,
+                         result: Dict[str, Any], raw_request: str) -> None:
         rel = request_path.name
         dest_dir = self.processed_dir / request_path.parent.name
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -218,13 +234,33 @@ class StrategyAgentRuntime:
         payload = {
             "status": status,
             "processed_at": _utc_now(),
-            "request": json.loads(request_path.read_text()),
+            "request": self._decode_for_archive(raw_request),
             "result": result,
         }
-        dest.write_text(json.dumps(payload, indent=2, sort_keys=True, default=_jsonable))
+        serialized = json.dumps(payload, indent=2, sort_keys=True, default=_jsonable)
+        with tempfile.NamedTemporaryFile(
+                "w", delete=False, dir=str(dest_dir), prefix=".archive-",
+                suffix=".tmp", encoding="utf-8") as fh:
+            fh.write(serialized)
+            fh.flush()
+            os.fsync(fh.fileno())
+            tmp_path = Path(fh.name)
+        os.replace(tmp_path, dest)
         request_path.unlink()
 
+    @staticmethod
+    def _decode_for_archive(raw_request: str) -> Any:
+        try:
+            return json.loads(raw_request)
+        except (TypeError, json.JSONDecodeError):
+            return {"raw": raw_request}
+
     def _append_heartbeat(self, summary: AgentSummary) -> None:
+        previous = self._last_heartbeat()
+        consecutive_failed = (
+            int(previous.get("consecutive_failed_passes", 0)) + 1
+            if summary.failed else 0
+        )
         row = {
             "timestamp_utc": _utc_now(),
             "registry": str(self.registry_path),
@@ -234,10 +270,35 @@ class StrategyAgentRuntime:
             "failed": summary.failed,
             "registry_size": summary.registry_size,
             "state_counts": summary.state_counts,
+            "queue_depth": summary.queue_depth,
+            "oldest_queue_age_minutes": summary.oldest_queue_age_minutes,
+            "consecutive_failed_passes": consecutive_failed,
         }
         self.heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+        if (self.heartbeat_path.exists()
+                and self.heartbeat_path.stat().st_size >= self.heartbeat_max_bytes):
+            rotated = self.heartbeat_path.with_suffix(
+                self.heartbeat_path.suffix + ".1"
+            )
+            os.replace(self.heartbeat_path, rotated)
         with self.heartbeat_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, sort_keys=True) + "\n")
+
+    def _last_heartbeat(self) -> Dict[str, Any]:
+        if not self.heartbeat_path.exists():
+            return {}
+        try:
+            lines = self.heartbeat_path.read_text(encoding="utf-8").splitlines()
+            return json.loads(lines[-1]) if lines else {}
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def _oldest_queue_age_minutes(self) -> Optional[float]:
+        requests = self._iter_requests()
+        if not requests:
+            return None
+        oldest_mtime = min(path.stat().st_mtime for path in requests)
+        return round(max(0.0, time.time() - oldest_mtime) / 60.0, 1)
 
     def _state_counts(self, registry: StrategyRegistry) -> Dict[str, int]:
         counts: Dict[str, int] = {}

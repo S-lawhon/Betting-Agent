@@ -129,6 +129,7 @@ services:
     heartbeat:
       file: data/strategy_agents/heartbeat.jsonl
       max_stale_minutes: 30
+      inspect_last_row: true
     severity: warn
 
   # RETIRED 2026-07-22. P-016 (v1 and v2) both failed their pre-registered

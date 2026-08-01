@@ -15,19 +15,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 
-ROLE_BY_TYPE = {
-    "opportunity": "scout",
-    "spec": "integrity",
-    "integrity": "validation",
-    "validation": "validation",
-    "promotion": "promotion",
-    "monitoring": "monitoring",
-    "transition": "monitoring",
-}
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.strategy_agent_runtime import ROLE_BY_TYPE  # noqa: E402
 
 
 def _utc_now() -> str:
@@ -43,7 +38,6 @@ def main() -> int:
     ap.add_argument("--type", required=True,
                     choices=sorted(ROLE_BY_TYPE.keys()))
     ap.add_argument("--strategy-id", default=None)
-    ap.add_argument("--actor", default=None)
     ap.add_argument("--payload-file", default=None)
     ap.add_argument("--payload-json", default=None,
                     help="raw JSON object; defaults to stdin if omitted")
@@ -69,14 +63,23 @@ def main() -> int:
     request = {
         "type": args.type,
         "strategy_id": strategy_id,
-        "actor": args.actor or args.type,
+        "actor": role,
         "submitted_at": _utc_now(),
         "payload": payload,
     }
 
     stamp = _utc_now().replace(":", "").replace("-", "")
     out = target_dir / f"{stamp}_{_sanitize(strategy_id)}_{args.type}.json"
-    out.write_text(json.dumps(request, indent=2, sort_keys=True))
+    serialized = json.dumps(request, indent=2, sort_keys=True)
+    with tempfile.NamedTemporaryFile(
+            "w", delete=False, dir=str(target_dir), prefix=".submit-",
+            suffix=".tmp", encoding="utf-8") as fh:
+        fh.write(serialized)
+        fh.flush()
+        os.fsync(fh.fileno())
+        tmp_path = Path(fh.name)
+    os.replace(tmp_path, out)
+    out.chmod(0o600)
     print(out)
     return 0
 

@@ -323,6 +323,8 @@ class Collector:
                     "last_row_ts": iso(row_ts(last)) if last else None,
                     "only_during": hb.get("only_during"),
                 }
+                if hb.get("inspect_last_row"):
+                    rec["heartbeat"]["last_row"] = last
                 halt_cfg = hb.get("halt_signal")
                 if halt_cfg:
                     rec["heartbeat"]["halt"] = self._halt_state(sid, halt_cfg)

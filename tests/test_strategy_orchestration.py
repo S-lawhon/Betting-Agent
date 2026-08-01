@@ -14,15 +14,29 @@ from unittest import TestCase
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.strategy_orchestration import (  # noqa: E402
+    ArtifactProvenance,
     IntegrityReport,
     MonitoringReport,
     OpportunityCard,
     PromotionDecision,
     StrategyRegistry,
+    StrategyConflictError,
+    StrategyError,
     StrategySpec,
     StrategyTransitionError,
     ValidationReport,
 )
+
+
+def _provenance(*, gate: bool = False) -> ArtifactProvenance:
+    return ArtifactProvenance(
+        created_by="test-agent",
+        code_commit="abc123",
+        artifact_path="research/report.md",
+        dataset_hash="sha256:data" if gate else None,
+        gate_path="research/LOCKED_RULE.md" if gate else None,
+        gate_hash="sha256:gate" if gate else None,
+    )
 
 
 def _card() -> OpportunityCard:
@@ -62,7 +76,7 @@ def _spec() -> StrategySpec:
 
 def _integrity() -> IntegrityReport:
     return IntegrityReport(
-        strategy_id="op_20260801_001",
+        strategy_id="strat_20260801_001",
         checked_at="2026-08-01T16:45:00Z",
         status="pass",
         contract_terms={"passed": True},
@@ -71,12 +85,13 @@ def _integrity() -> IntegrityReport:
         api_field_reliability={"passed": True},
         external_schedule_dependency={"required": True, "available": True},
         blocking_issues=[],
+        provenance=_provenance(),
     )
 
 
 def _validation() -> ValidationReport:
     return ValidationReport(
-        strategy_id="op_20260801_001",
+        strategy_id="strat_20260801_001",
         run_id="val_20260801_001",
         checked_at="2026-08-01T17:10:00Z",
         status="pass",
@@ -86,6 +101,7 @@ def _validation() -> ValidationReport:
         stress_tests={"low_liquidity": "pass"},
         capacity={"estimated_daily_usd": 1500},
         go_no_go="go",
+        provenance=_provenance(gate=True),
     )
 
 
@@ -99,7 +115,7 @@ class TestStrategyRegistry(TestCase):
         reg.record_promotion(
             "op_20260801_001",
             PromotionDecision(
-                strategy_id="op_20260801_001",
+                strategy_id="strat_20260801_001",
                 decision_at="2026-08-01T17:30:00Z",
                 from_state="validated",
                 to_state="paper_live",
@@ -113,7 +129,7 @@ class TestStrategyRegistry(TestCase):
         reg.record_monitoring(
             "op_20260801_001",
             MonitoringReport(
-                strategy_id="op_20260801_001",
+                strategy_id="strat_20260801_001",
                 observed_at="2026-08-01T18:00:00Z",
                 state="paper_live",
                 window="24h",
@@ -129,7 +145,9 @@ class TestStrategyRegistry(TestCase):
             )
         )
 
-        self.assertEqual(reg.get("op_20260801_001").state, "live_small")
+        self.assertEqual(reg.get("op_20260801_001").state, "paper_live")
+        self.assertEqual(reg.get("op_20260801_001").events[-1].kind,
+                         "promotion_requested")
 
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "registry.json"
@@ -137,7 +155,7 @@ class TestStrategyRegistry(TestCase):
             loaded = StrategyRegistry.load(path)
 
         record = loaded.get("op_20260801_001")
-        self.assertEqual(record.state, "live_small")
+        self.assertEqual(record.state, "paper_live")
         self.assertEqual(record.opportunity.extra["priority"], "high")
         self.assertEqual(len(record.events), len(reg.get("op_20260801_001").events))
         self.assertEqual(len(record.monitoring), 1)
@@ -158,7 +176,7 @@ class TestStrategyRegistry(TestCase):
     def test_hold_decision_must_keep_state(self):
         with self.assertRaises(ValueError):
             PromotionDecision(
-                strategy_id="op_20260801_001",
+                strategy_id="strat_20260801_001",
                 decision_at="2026-08-01T17:30:00Z",
                 from_state="validated",
                 to_state="paper_live",
@@ -168,3 +186,45 @@ class TestStrategyRegistry(TestCase):
                 owner_agent="promotion",
                 review_window_days=14,
             )
+
+    def test_live_promotion_requires_human_approval_reference(self):
+        with self.assertRaises(StrategyError):
+            PromotionDecision(
+                strategy_id="strat_20260801_001",
+                decision_at="2026-08-01T17:30:00Z",
+                from_state="paper_live",
+                to_state="live_small",
+                decision="promote",
+                rationale=["paper gate passed"],
+                required_conditions=[],
+                owner_agent="promotion",
+                review_window_days=14,
+            )
+
+    def test_integrity_label_cannot_override_failed_mapping(self):
+        report = _integrity()
+        payload = report.to_dict()
+        payload["fee_mapping"] = {"passed": False}
+        self.assertFalse(IntegrityReport.from_dict(payload).passes())
+
+    def test_failed_spec_transition_does_not_mutate_record(self):
+        reg = StrategyRegistry()
+        reg.register_opportunity(_card())
+        reg.attach_spec("op_20260801_001", _spec())
+        original = reg.get("op_20260801_001").to_dict()
+        with self.assertRaises(StrategyTransitionError):
+            reg.attach_spec("op_20260801_001", _spec())
+        self.assertEqual(reg.get("op_20260801_001").to_dict(), original)
+
+    def test_stale_registry_writer_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "registry.json"
+            first = StrategyRegistry()
+            first.register_opportunity(_card())
+            first.dump(path)
+            writer_a = StrategyRegistry.load(path)
+            writer_b = StrategyRegistry.load(path)
+            writer_a.attach_spec("op_20260801_001", _spec())
+            writer_a.dump(path)
+            with self.assertRaises(StrategyConflictError):
+                writer_b.dump(path)

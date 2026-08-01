@@ -44,7 +44,9 @@ is judged on output freshness, never on exit code.
 Plus `/manager` and `/api/manager` routes on the existing dashboard, and the
 `fund-manager` agent in `.claude/agents/`.
 
-The recursive strategy loop now has its own live worker:
+The recursive strategy workflow now has scoped Claude role definitions in
+`.claude/agents/` and a deterministic queue worker. The worker does not generate
+research or make model decisions; it validates and persists agent-produced JSON:
 
 - `scripts/run_strategy_agents.py` consumes JSON requests from
   `data/strategy_agents/queue/<role>/`

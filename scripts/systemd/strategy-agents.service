@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=bettingbot
 Group=bettingbot
+UMask=0077
 WorkingDirectory=/opt/betting-pod-shop
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_strategy_agents

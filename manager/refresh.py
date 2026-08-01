@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -68,17 +69,20 @@ def main() -> int:
         print("[refresh] remote: " + (res.stdout.strip() or "ok"))
 
     dest = STATE / "status.json"
+    staged = STATE / ".status.json.fetching"
     res = run(["scp", "-o", "ConnectTimeout=20", "-o", "BatchMode=yes",
                "{}:{}/state/status.json".format(args.host, REMOTE_MANAGER),
-               str(dest)])
+               str(staged)])
     if res.returncode != 0:
         sys.stderr.write("[refresh] scp FAILED:\n{}\n".format(res.stderr.strip()))
+        staged.unlink(missing_ok=True)
         return 1
 
     try:
-        snap = json.loads(dest.read_text(encoding="utf-8"))
+        snap = json.loads(staged.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         sys.stderr.write("[refresh] fetched snapshot is unreadable: {}\n".format(exc))
+        staged.unlink(missing_ok=True)
         return 1
 
     # The remote collector cannot see /Users/samlawhon/... — Mac-hosted jobs
@@ -91,8 +95,8 @@ def main() -> int:
         snap = collect.merge_local_jobs(snap)
         n_after = sum(1 for j in snap.get("jobs", [])
                       if j.get("state") == "uncheckable")
-        dest.write_text(json.dumps(snap, indent=2, default=collect.jsonable),
-                        encoding="utf-8")
+        staged.write_text(json.dumps(snap, indent=2, default=collect.jsonable),
+                          encoding="utf-8")
         print("[refresh] local jobs measured on this Mac: {} of {} filled in"
               .format(n_before - n_after, n_before))
         if n_after:
@@ -103,6 +107,10 @@ def main() -> int:
         sys.stderr.write(
             "[refresh] local job merge failed ({}: {}); Mac-hosted jobs stay "
             "UNCHECKABLE in this snapshot.\n".format(type(exc).__name__, exc))
+
+    # The previous known-good snapshot remains intact until the fetched and
+    # locally-augmented replacement has parsed successfully.
+    os.replace(staged, dest)
 
     collected = snap.get("collected_at", "?")
     age = ""

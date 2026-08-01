@@ -1,0 +1,32 @@
+[Unit]
+Description=Betting Pod Shop — Recursive strategy agents
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bettingbot
+Group=bettingbot
+UMask=0077
+WorkingDirectory=/opt/betting-pod-shop
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_strategy_agents
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=betting-strategy-agents
+Nice=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/strategy_agents
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

@@ -694,7 +694,8 @@ function progCell(g){
 }
 var STATE_TAG = {
   "reached":"pos", "accumulating":"accent", "no observations":"warn",
-  "dormant":"warn", "stalled":"bad", "unmeasurable":"bad", "terminal":""
+  "dormant":"warn", "activity unknown":"warn", "stalled":"bad",
+  "unmeasurable":"bad", "terminal":""
 };
 function stateTag(g){
   var s = g.progress_state || "unknown";
@@ -749,7 +750,8 @@ function renderGates(d){
       '<div class="gmeta">' +
         "<div>progress <b>" + progCell(g) + "</b></div>" +
         "<div>metric <b>" + (g.metric ? esc(g.metric) : '<span class="unknown">—</span>') + "</b></div>" +
-        "<div>settled 7d / 28d <b>" + (isNum(g.settled_positions_7d) ? intf(g.settled_positions_7d) : "?") +
+        "<div>settled " + esc(g.observation_unit || "positions") + " 7d / 28d <b>" +
+          (isNum(g.settled_positions_7d) ? intf(g.settled_positions_7d) : "?") +
           " / " + (isNum(g.settled_positions_28d) ? intf(g.settled_positions_28d) : "?") + "</b></div>" +
         "<div>rate <b>" + (isNum(g.rate_per_week) ? g.rate_per_week.toFixed(2) + "/wk" :
           '<span class="unknown">—</span>') + "</b></div>" +

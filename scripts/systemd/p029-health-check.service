@@ -1,0 +1,39 @@
+# P-029 heartbeat health check
+#
+# Moved off the Mac 2026-08-01. The original runner was a scheduled task on
+# the Mac, and cron-on-a-laptop has the same two failure modes it always has
+# (see evmap-weather-sheet.service): it does not run while the machine is
+# asleep, and nothing distinguishes "did not run" from "ran and failed". On
+# 2026-08-01 both p029 heartbeats went 35h stale purely because the Mac was
+# asleep at the scheduled hour — the P-029 box itself was (presumably) fine,
+# but the monitoring was blind either way.
+#
+# This unit runs scripts/p029_health_check.py ON the droplet: SSH-probe the
+# P-029 box, append a heartbeat row per PASSING check directly into
+# data/p029_heartbeat/ (the dir the fund-manager collector already reads), no
+# rsync leg. --no-push is load-bearing: the push target IS this droplet, and
+# an SSH-to-self would fail and mark every otherwise-good run failed.
+#
+# Runs as root, not bettingbot: bettingbot is a --no-create-home system user
+# with nowhere to keep an SSH identity, and the probe key + known_hosts live
+# in /root/.ssh (installed by scripts/setup_p029_health_timer.sh). The key is
+# dedicated to this probe and carries `restrict` on the P-029 side.
+#
+# A failing check exits 1, so a real on-box problem shows as a FAILED unit in
+# journalctl — but the alarm of record is heartbeat staleness in the daily
+# brief, which also catches this timer itself dying.
+[Unit]
+Description=Betting Pod Shop — P-029 VPS heartbeat health check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/betting-pod-shop
+Environment=PYTHONUNBUFFERED=1
+Environment=P029_HEALTH_SSH_KEY=/root/.ssh/p029_probe
+ExecStart=/opt/betting-pod-shop/venv/bin/python /opt/betting-pod-shop/scripts/p029_health_check.py --no-push
+# One SSH round-trip with its own 15s connect / 120s run timeouts; a hung
+# probe must become a failed run, not an eternally-activating unit.
+TimeoutStartSec=300
+Nice=10

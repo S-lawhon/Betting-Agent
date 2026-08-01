@@ -312,12 +312,10 @@ def _progress_state(*, stage: str, progress: Optional[float],
         return "stalled"
     if progress == 0:
         return "no observations"
-    if settled_28d is None or settled_28d == 0:
-        # Historical progress but nothing in the last 28 days — or no 28-day
-        # figure at all. "accumulating" would be a claim the data does not
-        # support: a gate with 3 observations and a dry month is not on its way
-        # to 24, and saying so is the difference between a board you can trust
-        # and one that always looks fine.
+    if settled_28d is None:
+        return "activity unknown"
+    if settled_28d == 0:
+        # Historical progress but a genuinely measured dry month.
         return "dormant"
     return "accumulating"
 
@@ -424,6 +422,8 @@ def _gates(src: Dict[str, Any],
 
             "settled_positions_7d": _num(rec.get("settled_positions_7d")),
             "settled_positions_28d": settled_28d,
+            "observation_unit": rec.get("observation_unit") or "positions",
+            "activity_available": rec.get("activity_available"),
             "last_settlement_utc": rec.get("last_settlement_utc"),
             "days_since_last_settlement":
                 _num(rec.get("days_since_last_settlement")),

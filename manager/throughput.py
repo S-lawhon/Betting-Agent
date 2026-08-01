@@ -169,6 +169,32 @@ def _last_observation(by_day: Dict[str, int]) -> Optional[str]:
     return max(by_day) if by_day else None
 
 
+def checkpoint_observations_by_day(
+        snap: Dict[str, Any], pod: str, progress: Optional[float]
+) -> Optional[Dict[str, int]]:
+    """Gate-unit observations emitted by a sanctioned checkpoint reader.
+
+    ``None`` means the reader did not provide a complete dated series. It must
+    never be collapsed to zero, which would falsely assert a measured dry spell.
+    """
+    block = snap.get(pod.lower().replace("-", "")) or {}
+    checkpoint = block.get("checkpoint") or {}
+    observations = checkpoint.get("tournament_observations")
+    if not isinstance(observations, list):
+        return None
+    eligible = [row for row in observations
+                if isinstance(row, dict) and row.get("eligible") is True]
+    if isinstance(progress, (int, float)) and len(eligible) != int(progress):
+        return None
+    out: collections.Counter = collections.Counter()
+    for row in eligible:
+        day = _day(row.get("settled_at_utc"))
+        if not day:
+            return None
+        out[day] += 1
+    return dict(out)
+
+
 def gate_throughput(root: Path, snap: Dict[str, Any],
                     registry: Dict[str, Any],
                     now: Optional[datetime] = None) -> List[Dict[str, Any]]:
@@ -192,7 +218,14 @@ def gate_throughput(root: Path, snap: Dict[str, Any],
             continue
         threshold = gate.get("threshold")
         progress = _gate_progress(snap, pod, gate)
-        by_day = by_pod.get(pod, {})
+        by_day: Optional[Dict[str, int]] = by_pod.get(pod, {})
+        observation_unit = "positions"
+        if pod == "P-022" and gate.get("metric") == "settled_tournaments":
+            by_day = checkpoint_observations_by_day(snap, pod, progress)
+            observation_unit = "tournaments"
+
+        count_7d = _window_count(by_day, now, 7) if by_day is not None else None
+        count_28d = _window_count(by_day, now, 28) if by_day is not None else None
 
         rec: Dict[str, Any] = {
             "id": pod,
@@ -202,14 +235,22 @@ def gate_throughput(root: Path, snap: Dict[str, Any],
             # A projection built on a stale progress number is worse than no
             # projection, because it looks like measurement.
             "progress": progress,
-            "settled_positions_7d": _window_count(by_day, now, 7),
-            "settled_positions_28d": _window_count(by_day, now, 28),
-            "last_settlement_utc": _last_observation(by_day),
+            # Legacy field names retained for dashboard API compatibility. The
+            # accompanying unit says what they actually count.
+            "settled_positions_7d": count_7d,
+            "settled_positions_28d": count_28d,
+            "observation_unit": observation_unit,
+            "activity_available": by_day is not None,
+            "last_settlement_utc": (_last_observation(by_day)
+                                    if by_day is not None else None),
             "stall_days_tolerated": STALL_DAYS.get(pod),
         }
 
         last = rec["last_settlement_utc"]
-        if last:
+        if by_day is None:
+            rec["days_since_last_settlement"] = None
+            rec["stalled"] = None
+        elif last:
             try:
                 gap = (now - datetime.strptime(last, "%Y-%m-%d").replace(tzinfo=UTC)).days
             except ValueError:
@@ -226,8 +267,10 @@ def gate_throughput(root: Path, snap: Dict[str, Any],
         # For the position-counting gates (P-014, P-015) the settled-position
         # rate IS the gate's unit. For the tournament-counting gates (P-017,
         # P-022) and for P-001's admissibility filter it is NOT, so no
-        # projection is offered rather than a wrong one — those need their
-        # reader's own history, which does not exist yet.
+        # position-based projection is offered rather than a wrong one. P-022's
+        # checkpoint now supplies its own dated tournament series for recent
+        # activity/stall detection; projecting tournament cadence is deliberately
+        # a separate decision.
         unit_is_positions = gate.get("metric") == "settled_trades"
         rate = None
         # Denominator: the pod's own observed lifetime, capped at the 28d
@@ -246,7 +289,8 @@ def gate_throughput(root: Path, snap: Dict[str, Any],
             if age is not None:
                 window_days = max(7.0, min(28.0, float(age)))
         rec["rate_window_days"] = window_days
-        if unit_is_positions and rec["settled_positions_28d"] > 0:
+        if (unit_is_positions and isinstance(rec["settled_positions_28d"], int)
+                and rec["settled_positions_28d"] > 0):
             rate = rec["settled_positions_28d"] / (window_days / 7.0)
         rec["rate_per_week"] = round(rate, 2) if rate is not None else None
 

@@ -44,6 +44,17 @@ is judged on output freshness, never on exit code.
 Plus `/manager` and `/api/manager` routes on the existing dashboard, and the
 `fund-manager` agent in `.claude/agents/`.
 
+The recursive strategy workflow now has scoped Claude role definitions in
+`.claude/agents/` and a deterministic queue worker. The worker does not generate
+research or make model decisions; it validates and persists agent-produced JSON:
+
+- `scripts/run_strategy_agents.py` consumes JSON requests from
+  `data/strategy_agents/queue/<role>/`
+- `scripts/strategy_agent_submit.py` writes requests into that queue
+- `data/strategy_agents/registry.json` is the persisted strategy registry
+- `data/strategy_agents/heartbeat.jsonl` is the service heartbeat the manager
+  watches
+
 ## Daily use
 
 ```bash

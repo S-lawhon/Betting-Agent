@@ -1,0 +1,24 @@
+# P-029 heartbeat health check (timer)
+#
+# 13:15 UTC on purpose: the P-029 archiver fires 09:30 UTC (+600s randomized
+# delay) and a good run takes ~3h, so by 13:15 a healthy box has today's
+# archive file minutes old, and a run that FAILED outright is caught today via
+# `archive_unit == failed`. The one case that waits until tomorrow is a run
+# still wedged inside its own TimeoutStartSec=6h at probe time — acceptable,
+# since the 30h staleness rule catches it on the next pass. The shadow check
+# (<2h sqlite age) is time-of-day independent.
+#
+# Persistent=true: a droplet does not sleep, but a reboot or maintenance
+# window must not silently drop a run — that silence costing 35h of blindness
+# is why this timer exists at all.
+[Unit]
+Description=Betting Pod Shop — P-029 VPS heartbeat health check (timer)
+
+[Timer]
+OnCalendar=*-*-* 13:15:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=p029-health-check.service
+
+[Install]
+WantedBy=timers.target

@@ -282,14 +282,27 @@ def test_historical_progress_with_a_dry_month_is_dormant_not_accumulating():
     assert g["progress_state"] == "dormant"
 
 
-def test_unknown_28d_activity_is_dormant_not_accumulating():
+def test_unknown_28d_activity_is_explicitly_unknown_not_dormant():
     st = status(workstreams=[ws()],
                 throughput={"available": True,
                             "records": [rec(progress=3, stalled=False,
                                             settled_positions_28d=None)]})
     g = api.build_v2(src(manager_status=st,
                         sources=sources(manager_status=meta())))["gates"][0]
-    assert g["progress_state"] == "dormant"
+    assert g["progress_state"] == "activity unknown"
+
+
+def test_recent_checkpoint_tournament_activity_is_accumulating():
+    st = status(workstreams=[ws()],
+                throughput={"available": True,
+                            "records": [rec(progress=2,
+                                            settled_positions_28d=2,
+                                            observation_unit="tournaments",
+                                            stalled=False)]})
+    g = api.build_v2(src(manager_status=st,
+                        sources=sources(manager_status=meta())))["gates"][0]
+    assert g["progress_state"] == "accumulating"
+    assert g["observation_unit"] == "tournaments"
 
 
 def test_stalled_true_is_stalled():

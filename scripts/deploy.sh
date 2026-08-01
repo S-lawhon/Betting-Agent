@@ -69,6 +69,41 @@ echo "==> Sync complete."
 echo "==> Fixing file ownership ..."
 ssh "${REMOTE_USER}@${SERVER_IP}" "chown -R bettingbot:bettingbot ${REMOTE_DIR}"
 
+# ── Report systemd unit drift ─────────────────────────────────────────
+# rsync ships scripts/systemd/ but nothing installs it, so the unit file in
+# the repo and the unit systemd is actually running can disagree indefinitely
+# and silently. That is how betting-strategy-agents ended up with an [Install]
+# section on the droplet that was missing from git (2026-08-01). Installing
+# automatically is deliberately NOT done here — restarting units is not this
+# script's job — but the difference is now impossible to miss.
+echo ""
+echo "==> Checking systemd unit drift ..."
+unit_drift=$(ssh "${REMOTE_USER}@${SERVER_IP}" "
+  for f in ${REMOTE_DIR}/scripts/systemd/*.service ${REMOTE_DIR}/scripts/systemd/*.timer; do
+    [ -e \"\$f\" ] || continue
+    n=\$(basename \"\$f\")
+    if [ ! -e \"/etc/systemd/system/\$n\" ]; then
+      echo \"    NOT INSTALLED   \$n\"
+    elif ! cmp -s \"\$f\" \"/etc/systemd/system/\$n\"; then
+      echo \"    DIFFERS         \$n\"
+    fi
+  done
+" || true)
+
+if [[ -n "$unit_drift" ]]; then
+  echo "$unit_drift"
+  echo ""
+  echo "    The repo and /etc/systemd/system disagree. Nothing was installed."
+  echo "    To install one:  ssh ${REMOTE_USER}@${SERVER_IP} \\"
+  echo "      'cp ${REMOTE_DIR}/scripts/systemd/UNIT /etc/systemd/system/ &&"
+  echo "       systemctl daemon-reload && systemctl enable --now UNIT'"
+  echo ""
+  echo "    NOTE: a unit named in manager/registry.yaml but not installed now"
+  echo "    reports as a WARN, not a CRITICAL page — but it is still unmonitored."
+else
+  echo "    All repo units match what is installed in /etc/systemd/system."
+fi
+
 # ── Post-deploy: restart + health check ───────────────────────────────
 if [[ "$RESTART" == "restart" ]]; then
   echo ""

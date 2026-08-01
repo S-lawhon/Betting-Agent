@@ -304,6 +304,7 @@ class Collector:
                 "id": sid,
                 "description": svc.get("description", ""),
                 "severity": svc.get("severity", "warn"),
+                "load": None,
                 "active": None,
                 "since": None,
                 "restarts": None,
@@ -323,6 +324,8 @@ class Collector:
                     "last_row_ts": iso(row_ts(last)) if last else None,
                     "only_during": hb.get("only_during"),
                 }
+                if hb.get("inspect_last_row"):
+                    rec["heartbeat"]["last_row"] = last
                 halt_cfg = hb.get("halt_signal")
                 if halt_cfg:
                     rec["heartbeat"]["halt"] = self._halt_state(sid, halt_cfg)
@@ -382,7 +385,8 @@ class Collector:
         try:
             res = subprocess.run(
                 ["systemctl", "show", unit, "--no-page",
-                 "--property=ActiveState,SubState,NRestarts,ExecMainStartTimestamp"],
+                 "--property=LoadState,ActiveState,SubState,NRestarts,"
+                 "ExecMainStartTimestamp"],
                 capture_output=True, text=True, timeout=15,
             )
             props = {}
@@ -394,6 +398,11 @@ class Collector:
             if started:
                 uptime = round((now() - started).total_seconds() / 60.0, 1)
             return {
+                # LoadState separates "the unit file is not on this host" from
+                # "the service died". systemctl reports ActiveState=inactive for
+                # BOTH, so without this a registry entry deployed ahead of its
+                # unit install pages a CRITICAL that no restart can clear.
+                "load": props.get("LoadState"),
                 "active": props.get("ActiveState"),
                 "sub": props.get("SubState"),
                 "restarts": int(props.get("NRestarts") or 0),

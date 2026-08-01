@@ -103,6 +103,20 @@ def test_rounds_of_one_event_pool_into_a_single_observation(tmp_path):
     r = cp.evaluate(cp.load_settled([path]))
     assert r["T"] == 2
     assert set(r["tournaments"]) == {"ROC26", "AIG26"}
+    assert {o["event"] for o in r["tournament_observations"]
+            if o["eligible"]} == {"ROC26", "AIG26"}
+
+
+def test_tournament_observation_uses_latest_round_settlement(tmp_path):
+    first = _settle("f1", "KXPGAR1LEAD-ROC26-A", "ROC26", "no", 0.0, 0.06, 5)
+    second = _settle("f2", "KXPGAR2LEAD-ROC26-B", "ROC26", "no", 0.0, 0.06, 5)
+    first["iso"] = "2026-07-27T00:00:00Z"
+    second["iso"] = "2026-07-29T12:00:00Z"
+    r = cp.evaluate(cp.load_settled([_write(tmp_path, [first, second])]))
+    assert r["tournament_observations"] == [{
+        "event": "ROC26", "settled_at_utc": "2026-07-29T12:00:00Z",
+        "eligible": True,
+    }]
 
 
 def test_within_tournament_is_contract_weighted(tmp_path):
@@ -215,6 +229,11 @@ def test_breached_tournament_is_excluded_from_T(tmp_path):
     assert r["T"] == 1
     assert list(r["tournaments"]) == ["COPC26"]
     assert r["excluded"] == {"ISPH26": ["per_name"]}
+    excluded = [o for o in r["tournament_observations"] if not o["eligible"]]
+    assert excluded == [{
+        "event": "ISPH26", "settled_at_utc": "2026-07-27T00:00:00Z",
+        "eligible": False, "exclusion_reasons": ["per_name"],
+    }]
 
 
 def test_breach_excludes_every_round_of_that_tournament(tmp_path):

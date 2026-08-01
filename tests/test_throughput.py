@@ -205,9 +205,14 @@ def test_silence_within_the_event_cadence_is_not_a_stall(tmp_path):
 
 def test_silence_beyond_the_event_cadence_is_a_stall(tmp_path):
     day = (NOW - timedelta(days=30)).strftime("%Y-%m-%d")
-    _write(tmp_path, "trade_log.jsonl", [_settle("P-022", day, "A")])
-    recs = gate_throughput(tmp_path, {},
-                           _registry("P-022", "settled_tournaments", 14), now=NOW)
+    snap = {"p022": {"checkpoint": {
+        "tournament_observations": [
+            {"event": "A", "settled_at_utc": day + "T12:00:00Z",
+             "eligible": True}],
+    }}}
+    recs = gate_throughput(
+        tmp_path, snap,
+        _registry("P-022", "settled_tournaments", 14, progress=1), now=NOW)
     assert recs[0]["stalled"] is True
     assert recs[0]["days_since_last_settlement"] == 30
 
@@ -216,8 +221,10 @@ def test_a_gate_that_has_never_produced_is_unknown_not_healthy(tmp_path):
     """P-022 has never settled anything. That is not 'no stall' — it is the
     absence of evidence either way, and it must not read as health."""
     _write(tmp_path, "trade_log.jsonl", [])
-    recs = gate_throughput(tmp_path, {},
-                           _registry("P-022", "settled_tournaments", 14), now=NOW)
+    snap = {"p022": {"checkpoint": {"tournament_observations": []}}}
+    recs = gate_throughput(tmp_path, snap,
+                           _registry("P-022", "settled_tournaments", 14,
+                                     progress=0), now=NOW)
     assert recs[0]["stalled"] is None
     assert recs[0]["last_settlement_utc"] is None
 
@@ -231,12 +238,46 @@ def test_only_validating_workstreams_are_measured(tmp_path):
 
 
 def test_summarize_counts_the_things_worth_alarming_on(tmp_path):
-    _write(tmp_path, "trade_log.jsonl", [
-        _settle("P-022", (NOW - timedelta(days=30)).strftime("%Y-%m-%d"), "A")])
-    recs = gate_throughput(tmp_path, {},
-                           _registry("P-022", "settled_tournaments", 14), now=NOW)
+    day = (NOW - timedelta(days=30)).strftime("%Y-%m-%d")
+    snap = {"p022": {"checkpoint": {"tournament_observations": [
+        {"event": "A", "settled_at_utc": day + "T12:00:00Z",
+         "eligible": True}]}}}
+    recs = gate_throughput(
+        tmp_path, snap,
+        _registry("P-022", "settled_tournaments", 14, progress=1), now=NOW)
     s = summarize(recs)
     assert s["n_gates"] == 1 and s["n_stalled"] == 1 and s["n_zero_28d"] == 1
+
+
+def test_p022_recent_activity_comes_from_checkpoint_tournaments(tmp_path):
+    snap = {"p022": {"checkpoint": {
+        "tournament_observations": [
+            {"event": "A", "settled_at_utc": "2026-07-25T12:00:00Z",
+             "eligible": True},
+            {"event": "B", "settled_at_utc": "2026-07-26T12:00:00Z",
+             "eligible": True},
+            {"event": "X", "settled_at_utc": "2026-07-26T12:00:00Z",
+             "eligible": False},
+        ]}}}
+    rec = gate_throughput(
+        tmp_path, snap,
+        _registry("P-022", "settled_tournaments", 24, progress=2), now=NOW)[0]
+    assert rec["settled_positions_7d"] == 2
+    assert rec["settled_positions_28d"] == 2
+    assert rec["observation_unit"] == "tournaments"
+    assert rec["last_settlement_utc"] == "2026-07-26"
+    assert rec["stalled"] is False
+
+
+def test_p022_missing_observation_timestamps_are_unknown_not_zero(tmp_path):
+    snap = {"p022": {"checkpoint": {"tournament_observations": [
+        {"event": "A", "settled_at_utc": None, "eligible": True}]}}}
+    rec = gate_throughput(
+        tmp_path, snap,
+        _registry("P-022", "settled_tournaments", 24, progress=1), now=NOW)[0]
+    assert rec["settled_positions_28d"] is None
+    assert rec["activity_available"] is False
+    assert rec["stalled"] is None
 
 
 # ── the probe must work in the way it is actually INVOKED ────────────

@@ -107,6 +107,27 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
         if active == "n/a":
             continue  # not a systemd host; nothing to say
 
+        # A unit that is not installed reports ActiveState=inactive, exactly
+        # like one that crashed — so the down-check below cannot tell them
+        # apart, and a registry entry that ships ahead of its unit install
+        # pages CRITICAL for something no restart will fix. That happened to
+        # betting-strategy-agents on 2026-08-01: the deploy carried the
+        # registry entry, the unit was installed 13 minutes later, and the
+        # alerter paged in between. LoadState is the discriminator.
+        if svc.get("load") == "not-found":
+            out.append(Finding(
+                key="service.{}.not_installed".format(sid),
+                severity="warn",
+                title="{} is in registry.yaml but not installed on the host".format(sid),
+                detail=("No unit file is loaded. This is a deploy that ran ahead "
+                        "of its install step, not a service that died — nothing "
+                        "is down that was ever up."),
+                fix=("ssh root@129.212.176.202 'cp /opt/betting-pod-shop/scripts/"
+                     "systemd/{0}.service /etc/systemd/system/ && systemctl "
+                     "daemon-reload && systemctl enable --now {0}'".format(sid)),
+                value="not-found"))
+            continue
+
         if active not in ("active", None):
             out.append(Finding(
                 key="service.{}.down".format(sid),
@@ -120,6 +141,29 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
         # A unit can be "active" while its loop is wedged. The heartbeat file
         # is the real liveness signal — this is how a hung scan cycle shows up.
         hb = svc.get("heartbeat") or {}
+        if sid == "betting-strategy-agents":
+            agent = hb.get("last_row") or {}
+            failures = int(agent.get("failed") or 0)
+            consecutive = int(agent.get("consecutive_failed_passes") or 0)
+            queue_age = agent.get("oldest_queue_age_minutes")
+            if failures:
+                out.append(Finding(
+                    key="service.{}.request_failures".format(sid),
+                    severity="warn",
+                    title="{} failed {} request(s) in its latest pass".format(
+                        sid, failures),
+                    detail=("{} consecutive pass(es) have failures. Inspect the "
+                            "failed archive before trusting registry progress."
+                            .format(consecutive)),
+                    value=failures))
+            if isinstance(queue_age, (int, float)) and queue_age > 30:
+                out.append(Finding(
+                    key="service.{}.queue_stale".format(sid),
+                    severity="warn",
+                    title="{} has a queued request {:.0f} min old".format(
+                        sid, queue_age),
+                    detail="A fresh process heartbeat does not prove the queue is draining.",
+                    value=queue_age))
         age = hb.get("age_minutes")
         limit = hb.get("max_stale_minutes")
         if age is not None and limit and age > limit:

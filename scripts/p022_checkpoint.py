@@ -71,6 +71,7 @@ import json
 import math
 import statistics
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -283,6 +284,25 @@ def per_contract_cents(rec: Dict[str, Any]) -> float:
     return 100.0 * float(rec.get("pnl_usd") or 0) / contracts
 
 
+def _latest_settlement(rows: List[Dict[str, Any]]) -> Optional[str]:
+    """Latest valid settlement timestamp for one tournament, normalized UTC."""
+    parsed = []
+    for rec in rows:
+        raw = rec.get("settled_at_utc") or rec.get("settled_at") or rec.get("iso")
+        if not isinstance(raw, str):
+            continue
+        try:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            parsed.append(dt.astimezone(timezone.utc))
+        except ValueError:
+            continue
+    if not parsed:
+        return None
+    return max(parsed).isoformat().replace("+00:00", "Z")
+
+
 def evaluate(trades: List[Dict[str, Any]],
              breached: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
     breached = breached or {}
@@ -290,10 +310,13 @@ def evaluate(trades: List[Dict[str, Any]],
         return {"T": 0, "progress": 0, "threshold": MIN_T_DECISION,
                 "n_contracts": 0, "verdict": "NO DECISION",
                 "reason": "no settled P-022 trades yet",
-                "tournaments": {}, "excluded": {}}
+                "tournaments": {}, "tournament_observations": [],
+                "excluded": {}}
 
     # within-tournament: contract-weighted mean ¢/ct
     buckets: Dict[str, List] = {}
+    bucket_records: Dict[str, List[Dict[str, Any]]] = {}
+    excluded_records: Dict[str, List[Dict[str, Any]]] = {}
     excluded: Dict[str, List[str]] = {}
     for rec in trades:
         key = tournament_key(rec)
@@ -302,17 +325,25 @@ def evaluate(trades: List[Dict[str, Any]],
         # the rule governs, so it cannot contribute to T or to the edge.
         if key in breached:
             excluded[key] = breached[key]
+            excluded_records.setdefault(key, []).append(rec)
             continue
         extra = rec.get("extra") or {}
         cts = float(extra.get("contracts") or rec.get("contracts") or 0) or 1.0
         buckets.setdefault(key, []).append((per_contract_cents(rec), cts))
+        bucket_records.setdefault(key, []).append(rec)
 
     if not buckets:
         return {"T": 0, "progress": 0, "threshold": MIN_T_DECISION,
                 "n_contracts": 0, "verdict": "NO DECISION",
                 "reason": (f"every settled tournament ({len(excluded)}) is "
                            "excluded under §7 for a cap breach"),
-                "tournaments": {}, "excluded": excluded}
+                "tournaments": {},
+                "tournament_observations": [
+                    {"event": key, "settled_at_utc": _latest_settlement(rows),
+                     "eligible": False, "exclusion_reasons": excluded[key]}
+                    for key, rows in sorted(excluded_records.items())
+                ],
+                "excluded": excluded}
     trades = [r for r in trades if tournament_key(r) not in breached]
 
     per_t = {}
@@ -331,6 +362,15 @@ def evaluate(trades: List[Dict[str, Any]],
     z = edge / se if se and not math.isnan(se) and se > 0 else 0.0
     pnl = sum(float(r.get("pnl_usd") or 0) for r in trades)
     positive = sum(1 for x in xs if x > 0)
+    observations = [
+        {"event": key, "settled_at_utc": _latest_settlement(rows),
+         "eligible": True}
+        for key, rows in sorted(bucket_records.items())
+    ] + [
+        {"event": key, "settled_at_utc": _latest_settlement(rows),
+         "eligible": False, "exclusion_reasons": excluded[key]}
+        for key, rows in sorted(excluded_records.items())
+    ]
 
     if not math.isnan(z) and z <= HARD_KILL_Z:
         verdict, reason = "HARD KILL", f"significantly negative (z={z:.2f})"
@@ -362,7 +402,8 @@ def evaluate(trades: List[Dict[str, Any]],
             "n_contracts": n_contracts, "edge_cents": edge,
             "sd_cents": sd, "se_cents": se, "z": z, "pnl_usd": pnl,
             "tournaments_positive": positive,
-            "tournaments": per_t, "verdict": verdict, "reason": reason,
+            "tournaments": per_t, "tournament_observations": observations,
+            "verdict": verdict, "reason": reason,
             "excluded": excluded}
 
 

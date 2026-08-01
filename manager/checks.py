@@ -107,6 +107,27 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
         if active == "n/a":
             continue  # not a systemd host; nothing to say
 
+        # A unit that is not installed reports ActiveState=inactive, exactly
+        # like one that crashed — so the down-check below cannot tell them
+        # apart, and a registry entry that ships ahead of its unit install
+        # pages CRITICAL for something no restart will fix. That happened to
+        # betting-strategy-agents on 2026-08-01: the deploy carried the
+        # registry entry, the unit was installed 13 minutes later, and the
+        # alerter paged in between. LoadState is the discriminator.
+        if svc.get("load") == "not-found":
+            out.append(Finding(
+                key="service.{}.not_installed".format(sid),
+                severity="warn",
+                title="{} is in registry.yaml but not installed on the host".format(sid),
+                detail=("No unit file is loaded. This is a deploy that ran ahead "
+                        "of its install step, not a service that died — nothing "
+                        "is down that was ever up."),
+                fix=("ssh root@129.212.176.202 'cp /opt/betting-pod-shop/scripts/"
+                     "systemd/{0}.service /etc/systemd/system/ && systemctl "
+                     "daemon-reload && systemctl enable --now {0}'".format(sid)),
+                value="not-found"))
+            continue
+
         if active not in ("active", None):
             out.append(Finding(
                 key="service.{}.down".format(sid),

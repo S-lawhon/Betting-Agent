@@ -308,6 +308,57 @@ them. P-029 uses subaccount 1.
 **Cowork cannot SSH** — port 22 is blocked outbound from the sandbox. Package VPS work as
 self-contained scripts for Sam to run (the DigitalOcean web console works when no key is installed).
 
+## Recursive strategy factory — the OTHER agent system (live 2026-08-01)
+
+Separate from the pods. Six subagents in `.claude/agents/` move an idea through
+`idea → spec → validated → paper_live → live_small → live_scaled` (+ `degraded`,
+`retired`): `strategy-scout` → `-spec` → `-integrity` → `-validator` →
+`-promotion` → `-monitor`. Each returns ONE typed JSON artifact defined in
+`src/strategy_orchestration.py`; none can do the next one's job. `fund-manager`
+is unrelated to this chain — it reports on the fund from `manager/`.
+
+- **The Python enforces it, not the prompts.** `ALLOWED_TRANSITIONS` rejects
+  illegal moves; `registry.transition()` permits ONLY `degraded`/`retired`
+  directly; promotion into `live_small`/`live_scaled` raises without a human
+  `approval_ref`; validation raises unless integrity passed first. Every
+  mutation appends a `StrategyEvent` and persists via flock + revision check +
+  `os.replace` (stale writer → `StrategyConflictError`).
+- **Runs as systemd `betting-strategy-agents`** on the droplet (queue worker,
+  60s poll, no network). Submit with `python3 -m scripts.strategy_agent_submit
+  --type <t> --payload-file <f>`; state lives in `data/strategy_agents/`
+  (registry.json, heartbeat.jsonl, queue/<role>/, processed/).
+- **Authority comes from WHICH INBOX the file lands in** — `actor = role`, never
+  from caller-controlled JSON, and a `type` that doesn't match its inbox is
+  rejected. Do not add a field that lets a payload name its own actor.
+- **The daemon is a RECORDER, not an invoker.** Nothing spawns the subagents;
+  a human pipes their JSON into the queue. "The service is running" does not
+  mean the loop is advancing — check `registry_size` in the heartbeat.
+- The registry is **empty** as of 2026-08-01. `OpportunityCard` is proven
+  end-to-end; `IntegrityReport`/`ValidationReport` (mandatory mappings, dataset
+  + gate hashes, provenance) have never been filled by an agent — that is the
+  open question, and it decides whether automation glue is worth writing.
+
+### Deploying a NEW systemd unit (learned the hard way, 2026-08-01)
+
+- **`deploy.sh` rsyncs `scripts/systemd/` but installs nothing** and never runs
+  `daemon-reload`, so the repo unit and the running unit drift silently. The
+  deploy now PRINTS the drift after each sync; installing is still manual and
+  deliberate.
+- **`install -d -o X -g X` only chowns the LEAF directory** it creates, not the
+  parents it makes along the way. The worker came up `active`, could not create
+  its lockfile in a root-owned parent, and crash-looped 10 times while
+  `systemctl is-active` still said `active` (Restart=always keeps flipping it
+  back). Follow any `install -d` with an explicit `chown -R`.
+- **A unit file with no `[Install]` section cannot be `systemctl enable`d** and
+  will not survive a reboot. `ProtectSystem=strict` + `ReadWritePaths=` also
+  fails the unit (226/NAMESPACE) if the path does not exist — and `deploy.sh`
+  excludes `data/`, so it never will. Create the directories first.
+- **Adding the service to `manager/registry.yaml` ARMS a check.** Ship the
+  registry entry and the unit install together, or the collector sees an
+  uninstalled unit. `collect._systemd` now reads `LoadState` so `not-found`
+  warns ("in registry, not installed") instead of paging CRITICAL like a dead
+  service — but the window still leaves it unmonitored.
+
 ## Canonical docs
 
 `PROJECT_PLAN_Kalshi_Sports_v2.md` (current mission) · `PROJECT_STATUS.md` (state) ·

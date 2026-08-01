@@ -1,0 +1,28 @@
+{
+  "strategy_id": "op_20260801_001",
+  "decision_at": "2026-08-01T21:47:00Z",
+  "from_state": "idea",
+  "to_state": "retired",
+  "decision": "retire",
+  "rationale": [
+    "Integrity report (research/integrity/op_20260801_001_integrity_2026-08-01.json) is a clean FAIL: status=fail, 5 blocking issues, passes()=False. Only 1 of 4 mandatory mappings passed (fee_mapping — quadratic, $0 maker fee, verified live and against the fixture); contract_terms, settlement_mapping, and api_field_reliability all failed or were unmeasured.",
+    "Card premise mismatch is dispositive, not a spec gap: the opportunity claims 'weekly fantasy-football rank markets' pricing 'a rank threshold', but live GET /markets on all six KXRANKLISTFF* series (QB/RB/WR/TE/K/DST) show SEASON-LONG markets (2026-27 regular season, close ~2027-02-01) with single #1-rank strikes only. No weekly market, no range/threshold strike, exists for any of the six series as of 2026-08-01. The strategy as described does not correspond to any tradeable product on the exchange.",
+    "The dead-heat $1/n clause the thesis depends on is CONDITIONAL, not guaranteed: RANKLIST.pdf (verbatim, fetched live) pays $1/n only if the Source Agency (ESPN Fantasy) has no official tie-breaking methodology for its season points leaderboard. Four live WebFetch attempts against ESPN could not confirm or rule out an ESPN tiebreak procedure. Per CLAUDE.md's identical KXLEADER/LEAGUELEADER.pdf precedent, treating an unverified conditional split as live overstates the edge; here the clause's live/dormant status could not even be classified.",
+    "No settled KXRANKLISTFF* market instance exists to inspect — the one past-dated event (KXRANKLISTFFQB-26FEB) returns an empty markets array (event-shell purge pattern, consistent with satellites_research/REPORT_Satellites_2026-07.md on GLOBES/AMAS/BILLBOARDAWARDS) — so the scalar/partial-payout settlement mechanism, while established exchange-wide (CLAUDE.md), is unverified for this specific family, and no settler code exists in src/ for it (grep RANKLIST returns nothing outside the fee fixture).",
+    "Base-rate plausibility of the triggering event (an exact tie for #1 full-season PPR points, accrued to hundredths over 17 games) has never been estimated or backtested. The closest repo precedent, satellites_research Study A on award-template dead-heat strikes, found the analogous tie event essentially never occurs at modern base rates and killed that strategy on that basis; no equivalent check exists here, and the underlying event is season-long rather than round-scoped, which only widens the sample the tie would have to survive across.",
+    "This is a wrong-hypothesis failure, not a fixable spec gap: two independent axes of the card's factual premise (cadence, strike structure) are contradicted by the live product, and the mechanism the edge depends on (a conditional dead-heat clause) could not be confirmed live. Per CLAUDE.md, killing a strategy at a gate is the system working, not a failure; holding here would only delay an outcome the evidence already settles."
+  ],
+  "required_conditions": [],
+  "owner_agent": "promotion-reviewer",
+  "review_window_days": 0,
+  "approval_ref": null,
+  "provenance": {
+    "created_by": "promotion-reviewer",
+    "code_commit": "71c05b1",
+    "artifact_path": "research/decisions/op_20260801_001_promotion_2026-08-01.json"
+  },
+  "extra": {
+    "note_for_future_reviewers": "satellites_research/data/templates.json (~line 16711) contains a distinct, unrelated 'NFLFANTASY' template (ticker KXNFLFANTASYMOST) that was NOT fetched or verified by the integrity review and was flagged only as a plausible source of the original card's confusion, not asserted as the correct product. If a future scout intends to re-propose a weekly/threshold fantasy-rank idea, it should be registered as a NEW opportunity against that ticker specifically, with its own contract_terms fetch — not a revival of op_20260801_001, which is closed against KXRANKLISTFF* as documented.",
+    "timestamp_correction": "decision_at was returned by the promotion agent as 2026-08-01T20:25:00Z because the invoking prompt capped it at 20:30:00Z — a ceiling that had already passed when the agent ran (verified wall clock at persist time: 2026-08-01T21:49Z, Mac and droplet agreeing within 1s). Corrected to 21:47:00Z, the actual completion time of the review. The agent's judgement and evidence are unmodified; only the timestamp was fixed, and only because the error originated in the prompt rather than in the review."
+  }
+}

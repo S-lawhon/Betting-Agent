@@ -120,6 +120,17 @@ services:
     description: Standalone file-backed dashboard on 127.0.0.1:8081 behind Caddy
     severity: warn
 
+  # Recursive strategy agent loop: queue-based worker that persists the
+  # registry and emits a heartbeat on every pass. This is the operational
+  # surface for the new strategy factory runtime, not a trading process.
+  - id: betting-strategy-agents
+    kind: systemd
+    description: Recursive strategy agents (queue-driven registry worker)
+    heartbeat:
+      file: data/strategy_agents/heartbeat.jsonl
+      max_stale_minutes: 30
+    severity: warn
+
   # RETIRED 2026-07-22. P-016 (v1 and v2) both failed their pre-registered
   # gates (v1 adverse selection; v2 founding premise refuted). Kill switch
   # data/KILL_MAKER was hit 2026-07-22 01:22:40 UTC; the maker pulled all
@@ -1390,6 +1401,23 @@ workstreams:
       - id: inplay-basis
         blocked_on: data
         text: Log in-play Kalshi-vs-Polymarket basis for a few weeks.
+
+  - id: R-RECURSIVE-STRATEGY
+    name: Recursive Strategy Factory
+    stage: build
+    owner_dir: src
+    blocked_on: nothing
+    summary: >
+      Production strategy-orchestration layer for the recursive loop:
+      opportunity discovery -> spec -> integrity -> validation -> promotion ->
+      monitoring. Ships typed schemas and a stateful registry so new strategy
+      ideas can be promoted, demoted, or retired without inventing a new
+      contract each time.
+    note: >
+      This is infrastructure, not a trading pod. Its job is to keep the
+      opportunity factory itself auditable and recursive so the research ->
+      validate -> production -> monitor loop can keep generating the next
+      candidate.
 
   - id: R-TENNIS
     name: Tennis Research / P-015b lower tour

@@ -1391,6 +1391,23 @@ workstreams:
         blocked_on: data
         text: Log in-play Kalshi-vs-Polymarket basis for a few weeks.
 
+  - id: R-RECURSIVE-STRATEGY
+    name: Recursive Strategy Factory
+    stage: build
+    owner_dir: src
+    blocked_on: nothing
+    summary: >
+      Production strategy-orchestration layer for the recursive loop:
+      opportunity discovery -> spec -> integrity -> validation -> promotion ->
+      monitoring. Ships typed schemas and a stateful registry so new strategy
+      ideas can be promoted, demoted, or retired without inventing a new
+      contract each time.
+    note: >
+      This is infrastructure, not a trading pod. Its job is to keep the
+      opportunity factory itself auditable and recursive so the research ->
+      validate -> production -> monitor loop can keep generating the next
+      candidate.
+
   - id: R-TENNIS
     name: Tennis Research / P-015b lower tour
     stage: research

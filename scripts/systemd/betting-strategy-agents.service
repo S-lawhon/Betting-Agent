@@ -16,7 +16,7 @@ RestartSec=5
 TimeoutStopSec=30
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=strategy-agents
+SyslogIdentifier=betting-strategy-agents
 Nice=10
 NoNewPrivileges=true
 ProtectSystem=strict
@@ -27,3 +27,6 @@ RestrictAddressFamilies=AF_UNIX
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

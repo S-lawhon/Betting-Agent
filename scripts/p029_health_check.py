@@ -17,13 +17,24 @@ the check failed, this script did not run, or the push broke — every one of
 which deserves a look. The registry entries for p029_shadow / p029_archive
 point at these files with max_stale_hours: 30.
 
-Run daily by the ``p029-daily-health-check`` scheduled task; safe to run by
-hand any time:
+WHERE IT RUNS (changed 2026-08-01): the primary runner is now the DROPLET —
+``p029-health-check.timer`` (scripts/systemd/), daily 13:15 UTC, invoking this
+script with ``--no-push`` so the heartbeats land directly in the project data
+dir the collector reads. The original runner was a scheduled task on the Mac,
+and on 2026-08-01 both heartbeats went 35h stale for no reason other than the
+Mac being asleep at the scheduled hour — the exact failure mode that moved the
+evmap jobs onto droplet timers (see scripts/systemd/evmap-weather-sheet.timer).
+The droplet reaches the P-029 box with its own key; ``P029_HEALTH_SSH_KEY`` /
+``P029_HEALTH_HOST`` override the Mac-centric defaults (the systemd unit sets
+the key). One-time setup: ``bash scripts/setup_p029_health_timer.sh`` from the
+Mac.
 
-    python3 scripts/p029_health_check.py            # check + push
+Still safe to run by hand from the Mac any time:
+
+    python3 scripts/p029_health_check.py            # check + push to droplet
     python3 scripts/p029_health_check.py --no-push  # check, write local only
 
-Exit 0 only when every check passed and the push succeeded.
+Exit 0 only when every check passed and the push (if any) succeeded.
 """
 from __future__ import annotations
 
@@ -35,8 +46,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-P029_HOST = "root@143.198.162.120"
-P029_KEY = os.path.expanduser("~/.ssh/betting_deploy")
+# Env overrides exist for the droplet timer, whose key is not the Mac's
+# deploy key. An empty env value falls through to the default on purpose —
+# systemd `Environment=` typos produce empty strings more often than absent.
+P029_HOST = os.environ.get("P029_HEALTH_HOST") or "root@143.198.162.120"
+P029_KEY = (os.environ.get("P029_HEALTH_SSH_KEY")
+            or os.path.expanduser("~/.ssh/betting_deploy"))
 DROPLET_HOST = "root@129.212.176.202"
 DROPLET_DIR = "/opt/betting-pod-shop/data/p029_heartbeat/"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

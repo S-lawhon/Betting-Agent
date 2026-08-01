@@ -72,3 +72,39 @@ def test_heartbeat_row_carries_timestamp_utc(tmp_path):
     # collect.py must parse it and derive a content age.
     from manager.collect import last_json_row, row_ts
     assert row_ts(last_json_row(path)) is not None
+
+
+def test_env_overrides_host_and_key(monkeypatch):
+    # The droplet timer's whole identity rests on these: its key is not the
+    # Mac's, so a regression back to hard-coded paths silently breaks every
+    # droplet run (BatchMode ssh fails, no heartbeat, staleness fires).
+    import importlib
+    import scripts.p029_health_check as hc
+    monkeypatch.setenv("P029_HEALTH_HOST", "probe@203.0.113.9")
+    monkeypatch.setenv("P029_HEALTH_SSH_KEY", "/root/.ssh/p029_probe")
+    try:
+        mod = importlib.reload(hc)
+        assert mod.P029_HOST == "probe@203.0.113.9"
+        assert mod.P029_KEY == "/root/.ssh/p029_probe"
+        # Empty string must fall through to the default — systemd
+        # `Environment=` typos produce empty values, not absent ones.
+        monkeypatch.setenv("P029_HEALTH_HOST", "")
+        assert importlib.reload(hc).P029_HOST == "root@143.198.162.120"
+    finally:
+        monkeypatch.delenv("P029_HEALTH_HOST", raising=False)
+        monkeypatch.delenv("P029_HEALTH_SSH_KEY", raising=False)
+        importlib.reload(hc)
+
+
+def test_droplet_unit_files_stay_wired():
+    # --no-push is load-bearing on the droplet (the push target IS the
+    # droplet; ssh-to-self fails and marks every good run failed), and the
+    # env key line is what points the probe at its own identity.
+    from pathlib import Path
+    sysd = Path(__file__).resolve().parent.parent / "scripts" / "systemd"
+    service = (sysd / "p029-health-check.service").read_text()
+    assert "--no-push" in service
+    assert "Environment=P029_HEALTH_SSH_KEY=" in service
+    timer = (sysd / "p029-health-check.timer").read_text()
+    assert "Persistent=true" in timer          # reboot must not drop a run
+    assert "Unit=p029-health-check.service" in timer

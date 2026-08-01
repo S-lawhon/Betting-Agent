@@ -10,7 +10,9 @@
       "WebFetch(domain:kalshi.com)",
       "WebFetch(domain:arxiv.org)",
       "WebFetch(domain:baseballsavant.mlb.com)",
-      "WebFetch(domain:datagolf.com)"
+      "WebFetch(domain:datagolf.com)",
+      "Bash(ls -la /Users/samlawhon/.claude/agents/ 2>/dev/null)",
+      "Read(//Users/samlawhon/.claude/**)"
     ]
   }
 }

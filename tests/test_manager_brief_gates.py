@@ -175,6 +175,13 @@ def research_snap() -> dict:
                        "hypothetical_positive_paths": 1,
                        "actionable_paths": 0},
             "last_24h": {"snapshots": 288, "matched_events": 24},
+            "analytics": {
+                "quote_completeness": .875,
+                "qualifying_path_observations": 5,
+                "episodes": {"persistent_count": 2,
+                             "median_duration_seconds": 300},
+                "net_edge_usd": {"p95": .041},
+            },
         },
         "collector_health": {
             "status": "degraded", "academic_feed_items_raw": 0,
@@ -198,6 +205,8 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "8 pending" in text
         assert "Gemini/Kalshi research: healthy" in text
         assert "settlement terms unverified" in text
+        assert "87.5% quote completeness" in text
+        assert "2 persistent episodes" in text
         assert "strategy-scout" in text
         assert "worker claims/start state are tracked" in text.lower()
         assert "model invocation is not tracked" in text.lower()

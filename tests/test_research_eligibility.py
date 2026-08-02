@@ -13,6 +13,10 @@ class TestEligibilityRegistry(TestCase):
         audit = registry.audit(as_of=date(2026, 8, 1))
         self.assertGreaterEqual(audit["venue_count"], 7)
         self.assertEqual(audit["execution_approved"], 0)
+        for venue in ("prophetx", "novig", "underdog_predict"):
+            decision = registry.decision(venue, as_of=date(2026, 8, 2))
+            self.assertTrue(decision.research_allowed)
+            self.assertFalse(decision.execution_allowed)
 
     def test_unknown_venue_is_never_executable(self):
         registry = EligibilityRegistry({"defaults": {}, "venues": []})

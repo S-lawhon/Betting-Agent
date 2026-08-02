@@ -1,0 +1,11 @@
+[Unit]
+Description=Betting Pod Shop — daily settlement document monitor
+
+[Timer]
+OnCalendar=*-*-* 02:55:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=settlement-registry.service
+
+[Install]
+WantedBy=timers.target

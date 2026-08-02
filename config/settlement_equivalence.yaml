@@ -1,0 +1,72 @@
+schema_version: 1
+updated_at: 2026-08-02
+defaults:
+  fail_closed_status: unverified
+
+documents:
+  - id: gemini_baseball1
+    venue: gemini
+    role: contract_terms
+    url: https://assets.gemini.com/predictions/terms_and_conditions/BASEBALL1_5d604da0-a923-418c-b609-bfbb52fb0792.pdf
+    expected_sha256: 4fd1e17ad82d14a9085f3c30377bee8da9e207319285078bee7d622fea64b68c
+  - id: kalshi_mlbgame
+    venue: kalshi
+    role: contract_terms
+    url: https://assets.kalshi.com/contract_terms/MLBGAME.pdf
+    expected_sha256: c08ab9be0b9c9869be07e75674a84def8e0f017d4bb301da3898b25c33fd892b
+  - id: prophetx_mlb_mainline_20260722
+    venue: prophetx
+    role: contract_terms
+    url: https://www.cftc.gov/filings/orgrules/rules0709269263.pdf
+    expected_sha256: ad8c4d01fc58e49807fc0fe7b3f48f5e805e469d9b794dd969d6758b1bf5ac4e
+  - id: prophetx_rulebook_v1
+    venue: prophetx
+    role: exchange_rulebook
+    url: https://www.cftc.gov/filings/documents/2025/orgdcmprophxexhibgm251205.pdf
+    expected_sha256: 178d04d7408b493c28ed7961eeeec7c2cdaebd2d25b48c015bb206685e6b0ea7
+
+policies:
+  - id: gemini_kalshi_mlb_moneyline
+    venues: [gemini, kalshi]
+    market_family: mlb_moneyline
+    document_ids: [gemini_baseball1, kalshi_mlbgame]
+    decision: not_equivalent
+    reviewed_at: 2026-08-02
+    rationale: >-
+      The ordinary winner and extra-innings payoff align, but postponement,
+      cancellation, shortened-game, and discretionary review outcomes do not.
+      A complementary position therefore retains basis risk and is not an
+      arbitrage.
+    dimensions:
+      underlying_event: equivalent
+      binary_payout: equivalent
+      extra_innings: equivalent
+      settlement_sources: compatible
+      postponement: different
+      cancellation: different
+      shortened_game: different
+      discretionary_review: different
+    approval: null
+  - id: prophetx_kalshi_mlb_moneyline
+    venues: [prophetx, kalshi]
+    market_family: mlb_moneyline
+    document_ids:
+      - prophetx_mlb_mainline_20260722
+      - prophetx_rulebook_v1
+      - kalshi_mlbgame
+    decision: not_equivalent
+    reviewed_at: 2026-08-02
+    rationale: >-
+      ProphetX voids games not starting on the scheduled local calendar day and
+      uses a 36-hour suspended-game rule, while Kalshi can remain open or settle
+      at fair value under different windows. Measure as basis, never as a lock.
+    dimensions:
+      underlying_event: equivalent
+      binary_payout: equivalent
+      extra_innings: equivalent
+      settlement_sources: compatible
+      postponement: different
+      cancellation: different
+      suspended_game: different
+      error_trade_review: different
+    approval: null

@@ -213,7 +213,9 @@ def normalize_kalshi_events(events: Iterable[Dict[str, Any]]) -> Tuple[List[Dict
 
 
 def match_events(gemini: Iterable[Dict[str, Any]],
-                 kalshi: Iterable[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+                 kalshi: Iterable[Dict[str, Any]],
+                 terms_policy: Optional[Dict[str, Any]] = None
+                 ) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     """Exact-match unique event keys; reject duplicated/ambiguous keys."""
     indexes: List[Dict[Tuple[str, Tuple[str, ...]], List[Dict[str, Any]]]] = []
     for rows in (gemini, kalshi):
@@ -229,12 +231,17 @@ def match_events(gemini: Iterable[Dict[str, Any]],
         if len(left) != 1 or len(right) != 1:
             counts["ambiguous_keys"] += 1
             continue
+        policy = terms_policy or {
+            "id": "gemini_kalshi_mlb_moneyline", "status": TERMS_STATUS,
+            "reason": TERMS_REASON, "actionable_allowed": False,
+        }
         matches.append({
             "match_key": f"{key[0]}|{'|'.join(key[1])}",
             "date_et": key[0], "teams": list(key[1]),
             "gemini": left[0], "kalshi": right[0],
-            "terms_equivalence": TERMS_STATUS,
-            "terms_reason": TERMS_REASON,
+            "terms_policy_id": policy.get("id"),
+            "terms_equivalence": policy.get("status", TERMS_STATUS),
+            "terms_reason": policy.get("reason", TERMS_REASON),
         })
     counts["matched"] = len(matches)
     return matches, counts
@@ -254,7 +261,8 @@ def evaluate_match(match: Dict[str, Any], *, contracts: int = 1,
     paths: List[Dict[str, Any]] = []
     blockers = []
     if match.get("terms_equivalence") != "verified":
-        blockers.append("terms_unverified")
+        blockers.append("terms_" + str(
+            match.get("terms_equivalence") or "unverified"))
     if quote_skew_seconds > max_quote_skew_seconds:
         blockers.append("quote_skew")
     for gemini_team in teams:

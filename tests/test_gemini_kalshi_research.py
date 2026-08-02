@@ -91,6 +91,21 @@ def test_positive_dislocation_is_not_actionable_without_terms_approval():
     assert "terms_unverified" in path["blockers"]
 
 
+def test_explicit_non_equivalence_is_visible_in_blocker():
+    gemini, _ = normalize_gemini_events([_gemini()])
+    kalshi, _ = normalize_kalshi_events([_kalshi()])
+    matches, _ = match_events(gemini, kalshi, terms_policy={
+        "id": "reviewed", "status": "not_equivalent",
+        "reason": "void rules differ", "actionable_allowed": False,
+    })
+
+    evaluated = evaluate_match(matches[0])
+
+    assert evaluated["terms_equivalence"] == "not_equivalent"
+    assert all("terms_not_equivalent" in path["blockers"]
+               for path in evaluated["paths"])
+
+
 def test_verified_terms_and_synchronized_positive_quotes_can_be_actionable():
     match = deepcopy(_match())
     match["terms_equivalence"] = "verified"

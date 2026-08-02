@@ -79,15 +79,62 @@ venues:
     name: ProphetX LLC
     regulator: CFTC
     regulatory_class: designated_contract_market
-    status: pending_review
+    status: reference_only
     research_allowed: true
     execution_allowed: false
-    rationale: Read-only research is permitted by project policy; execution is
-      not approved and API response shapes remain unverified in this repository.
+    rationale: Read-only research is permitted through ProphetX's approved API,
+      but this repository is still blocked on credentials and live response-shape
+      reconciliation. Execution remains unapproved.
+    automated_collection_allowed: true
+    collection_state: blocked_api_credentials
     evidence:
       - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations
-      - https://www.prophetx.co/lobby/t-c/market-participant-agreement
-    verified_at: 2026-08-01
+      - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/58754
+      - https://www.cftc.gov/filings/orgrules/rules0709269263.pdf
+    verified_at: 2026-08-02
+    expires_at: 2026-09-01
+    products: []
+
+  - id: novig
+    name: Novig Sweeps LLC
+    regulator: none_exchange
+    regulatory_class: sweepstakes_sports_trading
+    status: reference_only
+    research_allowed: true
+    execution_allowed: false
+    automated_collection_allowed: false
+    collection_state: excluded_automation_prohibited
+    rationale: >-
+      Novig states that Texas is eligible, but its Sweepstakes Rules prohibit
+      automated or systematic participation. No automated adapter or execution
+      path may be built without written institutional/API authorization and a
+      fresh legal review.
+    evidence:
+      - https://support.novig.us/en/articles/10336088-where-can-i-play-novig
+      - https://support.novig.us/en/articles/8295648-sweepstakes-rules
+    verified_at: 2026-08-02
+    expires_at: 2026-09-01
+    products: []
+
+  - id: underdog_predict
+    name: Underdog Predict
+    regulator: CFTC_intermediary
+    regulatory_class: fcm_frontend_to_third_party_exchanges
+    status: reference_only
+    research_allowed: true
+    execution_allowed: false
+    automated_collection_allowed: false
+    collection_state: excluded_no_approved_api
+    rationale: >-
+      Prediction Picks are available in Texas but route accounts to underlying
+      exchanges such as Kalshi or Crypto.com/Nadex, so Underdog is not reliably
+      an independent price venue. Its terms prohibit automated access except via
+      an approved API, and no approved market-data API is configured.
+    evidence:
+      - https://help.underdogsports.com/en/articles/14127517-eligible-states-for-prediction-picks
+      - https://help.underdogsports.com/en/articles/14127507-what-are-prediction-picks
+      - https://legal.underdogsports.com/
+    verified_at: 2026-08-02
     expires_at: 2026-09-01
     products: []
 

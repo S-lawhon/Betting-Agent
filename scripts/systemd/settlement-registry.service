@@ -1,0 +1,26 @@
+[Unit]
+Description=Betting Pod Shop — authoritative settlement document monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.refresh_settlement_registry
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=settlement-registry
+Nice=15
+MemoryMax=256M
+TimeoutStartSec=180
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/settlement_registry
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

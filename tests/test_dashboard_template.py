@@ -89,6 +89,8 @@ def test_the_unknown_helpers_exist(html):
 def test_crossvenue_research_has_a_dashboard_surface(html):
     assert 'id="r-crossvenue"' in html
     assert "r.crossvenue_pilot" in html
+    assert "quote completeness" in html
+    assert "persistent episodes" in html
 
 
 def test_isnum_rejects_non_finite(html):

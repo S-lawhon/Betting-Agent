@@ -38,13 +38,17 @@ def test_collect_persists_snapshot_observation_and_metrics(tmp_path):
     assert result["matching"]["matched"] == 1
     latest = json.loads((tmp_path / "latest.json").read_text())
     metrics = json.loads((tmp_path / "metrics.json").read_text())
+    analytics = json.loads((tmp_path / "analytics.json").read_text())
     observations = list((tmp_path / "observations").glob("*.jsonl"))
     runs = list((tmp_path / "runs").glob("*.jsonl"))
     assert latest["mode"] == "read_only_research"
     assert metrics["terms_equivalence"] == "unverified"
+    assert metrics["terms_policy"]["registry_status"] == "missing"
     assert metrics["latest"]["actionable_paths"] == 0
     assert len(observations) == 1
     assert len(observations[0].read_text().splitlines()) == 1
     assert len(runs) == 1
     assert metrics["last_24h"]["snapshots"] == 1
     assert metrics["last_24h"]["healthy_snapshots"] == 1
+    assert analytics["path_observations"] == 2
+    assert metrics["analytics"]["depth_status"] == "unavailable"

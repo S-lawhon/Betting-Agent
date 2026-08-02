@@ -1185,7 +1185,9 @@ function renderResearchPipeline(r){
       numTxt(x.reviewed) + " reviewed · " + numTxt(x.advanced) + " advanced" +
       (isNum(x.cost_per_advanced_usd) ? " · $" + x.cost_per_advanced_usd.toFixed(2) + " per advance" : "")
     : "X pilot cost/yield will appear after the first measured run.";
-  var cv = r.crossvenue_pilot || {}, cvLatest = cv.latest || {}, cvDay = cv.last_24h || {};
+  var cv = r.crossvenue_pilot || {}, cvLatest = cv.latest || {}, cvDay = cv.last_24h || {},
+      cvAnalytics = cv.analytics || {}, cvEpisodes = cvAnalytics.episodes || {},
+      cvEdge = cvAnalytics.net_edge_usd || {};
   el("r-crossvenue").textContent = cv.generated_at
     ? "Gemini/Kalshi research: " + (cv.status || "unknown") +
       " · " + numTxt(cvLatest.matched_events) + " matched now · " +
@@ -1193,7 +1195,16 @@ function renderResearchPipeline(r){
       numTxt(cvLatest.actionable_paths) + " actionable · " +
       numTxt(cvDay.snapshots) + " snapshots / " +
       numTxt(cvDay.matched_events) + " matched observations in 24h · terms " +
-      (cv.terms_equivalence || "unknown")
+      (cv.terms_equivalence || "unknown") + " · 14d quote completeness " +
+      (isNum(cvAnalytics.quote_completeness) ?
+        (100 * cvAnalytics.quote_completeness).toFixed(1) + "%" : "—") +
+      " · " + numTxt(cvAnalytics.qualifying_path_observations) +
+      " paths ≥3¢ · " + numTxt(cvEpisodes.persistent_count) +
+      " persistent episodes · median duration " +
+      (isNum(cvEpisodes.median_duration_seconds) ?
+        Math.round(cvEpisodes.median_duration_seconds) + "s" : "—") +
+      " · p95 edge " +
+      (isNum(cvEdge.p95) ? "$" + cvEdge.p95.toFixed(3) : "—")
     : "Gemini/Kalshi research metrics will appear after the first snapshot.";
 }
 

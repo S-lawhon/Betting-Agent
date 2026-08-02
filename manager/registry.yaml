@@ -168,8 +168,20 @@ jobs:
     note: >
       Public data only; no credentials or execution capability. A fresh metrics
       file proves quote collection and exact matching ran. Settlement terms are
-      intentionally unverified, so hypothetical positive paths remain
-      non-actionable until a reviewed equivalence policy approves them.
+      fail closed. Hypothetical positive paths remain non-actionable unless a
+      reviewed, current equivalence policy explicitly approves them.
+
+  - id: settlement_registry
+    host: droplet
+    schedule: "daily at 02:55 UTC (systemd timer)"
+    description: Authoritative settlement document hash and policy monitor
+    output:
+      file: data/settlement_registry/manifest.json
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      Downloads and archives pinned venue rule documents. Missing or changed
+      documents invalidate equivalence policies and block actionable status.
 
   - id: market_census
     host: droplet

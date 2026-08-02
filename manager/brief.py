@@ -354,17 +354,31 @@ def render_markdown(b: Dict[str, Any]) -> str:
         if crossvenue.get("generated_at"):
             latest = crossvenue.get("latest") or {}
             day = crossvenue.get("last_24h") or {}
+            analytics = crossvenue.get("analytics") or {}
+            episodes = analytics.get("episodes") or {}
+            edge = analytics.get("net_edge_usd") or {}
+            completeness = analytics.get("quote_completeness")
+            completeness_text = ("{:.1f}%".format(completeness * 100)
+                                 if isinstance(completeness, (int, float))
+                                 else "unknown")
             L.append("")
             L.append("Gemini/Kalshi research: {} — {} matched now, {} hypothetical "
                      "positive paths, {} actionable; {} snapshots and {} matched observations in "
-                     "24h; settlement terms {}.".format(
+                     "24h; settlement terms {}. 14d: {} quote completeness, "
+                     "{} paths at least 3c, {} persistent episodes, median "
+                     "duration {}s, p95 edge {}.".format(
                          crossvenue.get("status") or "unknown",
                          _metric(latest.get("matched_events")),
                          _metric(latest.get("hypothetical_positive_paths")),
                          _metric(latest.get("actionable_paths")),
                          _metric(day.get("snapshots")),
                          _metric(day.get("matched_events")),
-                         crossvenue.get("terms_equivalence") or "unknown"))
+                         crossvenue.get("terms_equivalence") or "unknown",
+                         completeness_text,
+                         _metric(analytics.get("qualifying_path_observations")),
+                         _metric(episodes.get("persistent_count")),
+                         _metric(episodes.get("median_duration_seconds")),
+                         _metric(edge.get("p95"))))
     L.append("")
 
     if b["gates"]:
@@ -618,16 +632,30 @@ def render_html(b: Dict[str, Any]) -> str:
         if crossvenue.get("generated_at"):
             latest = crossvenue.get("latest") or {}
             day = crossvenue.get("last_24h") or {}
+            analytics = crossvenue.get("analytics") or {}
+            episodes = analytics.get("episodes") or {}
+            edge = analytics.get("net_edge_usd") or {}
+            completeness = analytics.get("quote_completeness")
+            completeness_text = ("{:.1f}%".format(completeness * 100)
+                                 if isinstance(completeness, (int, float))
+                                 else "unknown")
             P.append("<div class='dim'>Gemini/Kalshi research: {} — {} matched now, "
                      "{} hypothetical positive paths, {} actionable; {} snapshots and {} matched "
-                     "observations in 24h; settlement terms {}.</div>".format(
+                     "observations in 24h; settlement terms {}. 14d: {} quote "
+                     "completeness, {} paths at least 3c, {} persistent episodes, "
+                     "median duration {}s, p95 edge {}.</div>".format(
                          e(str(crossvenue.get("status") or "unknown")),
                          e(_metric(latest.get("matched_events"))),
                          e(_metric(latest.get("hypothetical_positive_paths"))),
                          e(_metric(latest.get("actionable_paths"))),
                          e(_metric(day.get("snapshots"))),
                          e(_metric(day.get("matched_events"))),
-                         e(str(crossvenue.get("terms_equivalence") or "unknown"))))
+                         e(str(crossvenue.get("terms_equivalence") or "unknown")),
+                         e(completeness_text),
+                         e(_metric(analytics.get("qualifying_path_observations"))),
+                         e(_metric(episodes.get("persistent_count"))),
+                         e(_metric(episodes.get("median_duration_seconds"))),
+                         e(_metric(edge.get("p95")))))
 
     if b["gates"]:
         P.append("<h2>Gate progress</h2>")

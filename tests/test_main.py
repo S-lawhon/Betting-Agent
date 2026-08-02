@@ -395,6 +395,88 @@ class TestMain(unittest.TestCase):
         _write_yaml(path, content)
         return path
 
+    # ── shadow mode reaches the DEPLOYED entry point ─────────────────
+    # The unit runs `python -m src.main --loop ... ` with no --mode, so
+    # main() (not cli.main) is what production executes. main() used to
+    # call from_config(config) with no mode, and from_config fails closed
+    # — so the droplet came up ENFORCING while the config said shadow,
+    # and the only sign was one ERROR line in the journal.
+
+    @patch("src.main.PodRunner")
+    @patch("src.main.CapitalAllocator")
+    @patch("src.main.AggregateRiskGuard")
+    @patch("src.main.build_venue_clients", return_value={})
+    @patch("src.main.build_shared_deps", return_value={})
+    def test_absent_mode_flag_resolves_to_paper(
+        self, mock_deps, mock_clients, mock_guard_cls, mock_alloc_cls,
+        mock_runner_cls,
+    ):
+        mock_guard = MagicMock()
+        mock_guard.check_pre_cycle.return_value = True
+        mock_guard.snapshot.return_value = MagicMock(
+            total_exposure_pct=0.0, daily_pnl=0.0, halted=False,
+            halt_reason=None, open_positions=0,
+        )
+        mock_guard_cls.from_config.return_value = mock_guard
+        mock_alloc_cls.from_config.return_value = MagicMock()
+        mock_runner = MagicMock()
+        mock_runner.pods = [MagicMock(pod_id="P-001")]
+        mock_runner.run_once.return_value = _make_report()
+        mock_runner_cls.from_config.return_value = mock_runner
+
+        with tempfile.TemporaryDirectory() as td:
+            cfg_path = self._make_config_file(
+                td, "risk:\n  initial_bankroll: 10000\n")
+            main(["--config", cfg_path, "--once"])
+
+        _, kwargs = mock_guard_cls.from_config.call_args
+        self.assertEqual(kwargs.get("mode"), "paper")
+
+    @patch("src.main.PodRunner")
+    @patch("src.main.CapitalAllocator")
+    @patch("src.main.AggregateRiskGuard")
+    @patch("src.main.build_venue_clients", return_value={})
+    @patch("src.main.build_shared_deps", return_value={})
+    def test_explicit_live_mode_is_passed_through(
+        self, mock_deps, mock_clients, mock_guard_cls, mock_alloc_cls,
+        mock_runner_cls,
+    ):
+        mock_guard = MagicMock()
+        mock_guard.check_pre_cycle.return_value = True
+        mock_guard.snapshot.return_value = MagicMock(
+            total_exposure_pct=0.0, daily_pnl=0.0, halted=False,
+            halt_reason=None, open_positions=0,
+        )
+        mock_guard_cls.from_config.return_value = mock_guard
+        mock_alloc_cls.from_config.return_value = MagicMock()
+        mock_runner = MagicMock()
+        mock_runner.pods = [MagicMock(pod_id="P-001")]
+        mock_runner.run_once.return_value = _make_report()
+        mock_runner_cls.from_config.return_value = mock_runner
+
+        with tempfile.TemporaryDirectory() as td:
+            cfg_path = self._make_config_file(
+                td, "risk:\n  initial_bankroll: 10000\n")
+            main(["--config", cfg_path, "--once", "--mode", "live"])
+
+        _, kwargs = mock_guard_cls.from_config.call_args
+        self.assertEqual(kwargs.get("mode"), "live")
+
+    def test_main_and_cli_construct_the_guard_identically(self):
+        """Two entry points build the guard; they must not drift.
+
+        cli.py was fixed first and main.py was missed, which is exactly
+        the failure this asserts against.
+        """
+        import inspect
+        from src import cli as _cli
+        for mod, fn in ((_cli, _cli.main), (sys.modules["src.main"], main)):
+            src_text = inspect.getsource(fn)
+            self.assertIn("args.mode or \"paper\"", src_text,
+                          "%s does not resolve the paper default" % mod.__name__)
+            self.assertIn("AggregateRiskGuard.from_config(config, mode=", src_text,
+                          "%s does not pass mode to the guard" % mod.__name__)
+
     @patch("src.main.PodRunner")
     @patch("src.main.CapitalAllocator")
     @patch("src.main.AggregateRiskGuard")

@@ -118,7 +118,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     shared = build_shared_deps(config, clients)
 
     allocator = CapitalAllocator.from_config(config)
-    guard = AggregateRiskGuard.from_config(config)
+    # Shadow mode (aggregate_risk.enforce: false) is honoured only for a
+    # paper process; from_config fails closed on any other mode.
+    #
+    # `--mode` defaults to None and this engine is paper unless the flag
+    # says otherwise (BasePod defaults to mode="paper", going live needs
+    # --mode live), so None resolves to "paper" here. The deployed unit
+    # runs `python -m src.main --loop --interval 300 --web --no-browser`
+    # with no --mode, which is exactly the case that must resolve to
+    # paper — passing mode=None here left the guard ENFORCING on the
+    # droplet even though the config asked for shadow.
+    #
+    # This duplicates cli.py's construction: `python -m src.main` runs
+    # THIS function, not cli.main, so fixing only cli.py fixed nothing in
+    # production. Keep the two in sync (tests/test_main.py asserts it).
+    engine_mode = args.mode or "paper"
+    guard = AggregateRiskGuard.from_config(config, mode=engine_mode)
     shared["aggregate_risk"] = guard
 
     trade_log_path = Path(

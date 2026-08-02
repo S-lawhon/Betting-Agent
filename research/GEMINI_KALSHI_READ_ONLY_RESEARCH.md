@@ -12,6 +12,8 @@ Events are matched only when all of the following are true:
 - Kalshi identifies it as a `KXMLBGAME` event.
 - Both venues resolve to exactly two recognized MLB teams.
 - The normalized team set and Eastern calendar date are identical.
+- Scheduled starts agree within 15 minutes. A wider difference is rejected as
+  a schedule mismatch rather than risking a wrong game or doubleheader match.
 - The event key is unique on both venues.
 
 Anything ambiguous is rejected rather than fuzzy matched.
@@ -49,6 +51,17 @@ are recorded.
 - `data/gemini_crossvenue/analytics.json`: replayed 14-day quote completeness,
   edge distributions, persistence episodes, quote skew, and per-leg slippage
   scenarios.
+- `data/gemini_crossvenue/research_cases.sqlite3`: lifetime, idempotent research
+  case index. Stable case IDs are derived from the venue pair, event,
+  direction, and first observation. Raw JSONL remains the source tape.
+- `data/gemini_crossvenue/research_cases.json`: dashboard/email summary with
+  24-hour and 7-day rankings, active/closed counts, single-snapshot share,
+  threshold calibration, and settlement-basis classification.
+- `data/gemini_crossvenue/settlement_basis_evidence.json`: daily join of cases
+  to public MLB schedule outcomes, including schedule coverage and the observed
+  settlement-exception incidence lower bound.
+- `data/gemini_crossvenue/settlement_evidence/YYYY-MM-DD.json`: cached schedule
+  evidence for reproducible incidence updates. Terminal dates are not refetched.
 - `data/settlement_registry/manifest.json`: latest rule-document hashes,
   archive locations, registry health, and evaluated policy state.
 
@@ -69,6 +82,35 @@ warning only when a persistent episode was observed within the last 15 minutes;
 old episodes cannot keep paging. Every signal carries
 `trade_allowed=false`—the alert asks for investigation and never overrides the
 settlement or eligibility gates.
+
+Qualifying observations are segmented into research cases. A case closes only
+when the tape observes an edge below the threshold or the observation gap
+exceeds 450 seconds; duration is always labeled as a lower bound. Replaying the
+same tape is idempotent. Rankings are lexicographic and transparent:
+schedule alignment, pregame phase, persistence, survival after one cent of
+slippage per leg, maximum net edge, and observed duration. Calibration replays
+thresholds from one through five cents without changing the live three-cent
+definition.
+
+Settlement basis is attached to every case using the versioned policy
+dimensions. The ledger does not infer how often a void/postponement rule would
+have changed an outcome from quote data alone; historical incidence remains
+explicitly `unmeasured` until event-outcome evidence is joined.
+
+`crossvenue-settlement-evidence.timer` performs that outcome join daily. It
+recognizes schedule-level postponement, suspension, and cancellation evidence.
+Its exception rate is deliberately labeled a lower bound: an ordinary MLB
+`Final` status does not prove that a game was not shortened and cannot reveal a
+venue's discretionary review. Same-team/date doubleheaders are left ambiguous
+instead of guessing which game belongs to a case. API failures retain prior
+evidence and mark the refresh degraded.
+
+Each case is also classified as `pre_scheduled_start`,
+`after_scheduled_start`, or `unknown`, using the earlier of the two venue start
+times. Venue start times more than 15 minutes apart are marked mismatched. The
+ranking prefers schedule-aligned pregame cases; after-start divergence remains
+valuable research evidence but is more likely to reflect live-state or stale
+quote differences than a pregame basis opportunity.
 
 The `venue_pipeline` block reports onboarding state for additional venues
 without reading or exposing credentials. It distinguishes collecting, blocked,

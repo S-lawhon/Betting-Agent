@@ -24,7 +24,10 @@ from src.gemini_kalshi_research import (  # noqa: E402
     evaluate_match, match_events, normalize_gemini_events,
     normalize_kalshi_events,
 )
-from src.dislocation_analytics import analyze_directory  # noqa: E402
+from src.dislocation_analytics import analyze, load_observations  # noqa: E402
+from src.dislocation_cases import (  # noqa: E402
+    CaseLedger, build_cases, calibrate_thresholds, settlement_basis,
+)
 from src.crossvenue_research import (  # noqa: E402
     evaluate_pair_signals, load_venue_pipeline,
 )
@@ -235,11 +238,49 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
     }])
     day_metrics = _history_24h(output_dir / "observations", captured_at)
     day_metrics.update(_run_history_24h(output_dir / "runs", captured_at))
-    analytics = analyze_directory(
-        output_dir / "observations", now=captured_at, window_days=14,
-        threshold_usd=0.03)
+    observation_rows = load_observations(
+        output_dir / "observations", now=captured_at, window_days=14)
+    analytics = analyze(
+        observation_rows, window_days=14, threshold_usd=0.03)
     _write_atomic(output_dir / "analytics.json", {
         "generated_at": _iso(captured_at), **analytics})
+    pair_id = "gemini_kalshi_mlb_moneyline"
+    cases = build_cases(
+        observation_rows, pair_id=pair_id, policy=terms_policy,
+        now=captured_at, threshold_usd=0.03)
+    ledger = CaseLedger(output_dir / "research_cases.sqlite3")
+    try:
+        ledger.upsert(cases, updated_at=captured_at)
+        case_metrics = ledger.summary(pair_id, now=captured_at)
+    finally:
+        ledger.close()
+    case_metrics.update({
+        "generated_at": _iso(captured_at),
+        "window_days_replayed": 14,
+        "threshold_usd": 0.03,
+        "cases_replayed": len(cases),
+        "settlement_basis": settlement_basis(terms_policy),
+        "threshold_calibration": calibrate_thresholds(
+            observation_rows, pair_id=pair_id, policy=terms_policy,
+            now=captured_at),
+        "source_tape": "data/gemini_crossvenue/observations/*.jsonl",
+        "ledger": "data/gemini_crossvenue/research_cases.sqlite3",
+    })
+    evidence_path = output_dir / "settlement_basis_evidence.json"
+    try:
+        outcome_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        if not isinstance(outcome_evidence, dict):
+            raise ValueError("evidence payload is not an object")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        outcome_evidence = {
+            "status": "unavailable",
+            "reason": str(exc),
+            "interpretation": (
+                "No observed settlement-outcome evidence is available yet; "
+                "contract-basis risks remain unmeasured."),
+        }
+    case_metrics["outcome_evidence"] = outcome_evidence
+    _write_atomic(output_dir / "research_cases.json", case_metrics)
     metrics = {
         "schema_version": 1, "mode": "read_only_research",
         "scope": "mlb_moneyline", "status": current["status"],
@@ -258,11 +299,12 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
         },
         "last_24h": day_metrics,
         "analytics": analytics,
+        "research_cases": case_metrics,
         "venue_pipeline": load_venue_pipeline(venue_config),
         "source": "data/gemini_crossvenue/latest.json",
     }
     metrics["research_signals"] = evaluate_pair_signals(
-        "gemini_kalshi_mlb_moneyline", metrics)
+        pair_id, metrics)
     _write_atomic(output_dir / "metrics.json", metrics)
     return current
 

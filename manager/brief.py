@@ -372,6 +372,9 @@ def render_markdown(b: Dict[str, Any]) -> str:
             signal_count = len(signals) if isinstance(signals, list) else None
             venue_summary = ((crossvenue.get("venue_pipeline") or {})
                              .get("summary") or {})
+            cases = crossvenue.get("research_cases") or {}
+            basis = cases.get("settlement_basis") or {}
+            evidence = cases.get("outcome_evidence") or {}
             completeness = analytics.get("quote_completeness")
             completeness_text = ("{:.1f}%".format(completeness * 100)
                                  if isinstance(completeness, (int, float))
@@ -398,6 +401,52 @@ def render_markdown(b: Dict[str, Any]) -> str:
                          _metric(venue_summary.get("collecting")),
                          _metric(venue_summary.get("blocked")),
                          _metric(venue_summary.get("excluded"))))
+            risk_dimensions = basis.get("risk_dimensions")
+            risk_text = (", ".join(risk_dimensions)
+                         if isinstance(risk_dimensions, list) else "unknown")
+            L.append("Case ledger: {} lifetime, {} in 24h, {} in 7d, {} active; "
+                     "single-snapshot share {}; settlement-basis risks: {}; "
+                     "phase pre/after/unknown {}/{}/{}."
+                     .format(
+                         _metric(cases.get("lifetime_cases")),
+                         _metric(cases.get("cases_last_24h")),
+                         _metric(cases.get("cases_last_7d")),
+                         _metric(cases.get("active_cases")),
+                         ("{:.1f}%".format(cases["single_snapshot_share"] * 100)
+                         if isinstance(cases.get("single_snapshot_share"),
+                                        (int, float)) else "unknown"),
+                         risk_text or "none",
+                         _metric((cases.get("market_phase") or {}).get(
+                             "pre_scheduled_start")),
+                         _metric((cases.get("market_phase") or {}).get(
+                             "after_scheduled_start")),
+                         _metric((cases.get("market_phase") or {}).get("unknown"))))
+            exception_rate = evidence.get("observed_exception_rate_lower_bound")
+            exception_text = (
+                "{:.1f}%".format(exception_rate * 100)
+                if isinstance(exception_rate, (int, float)) else "unmeasured")
+            L.append("Outcome evidence: {} schedule coverage, {} resolved; "
+                     "observed settlement exception lower bound {} ({} cases)."
+                     .format(
+                         ("{:.1f}%".format(evidence["schedule_coverage"] * 100)
+                          if isinstance(evidence.get("schedule_coverage"),
+                                        (int, float)) else "unmeasured"),
+                         _metric(evidence.get("resolved_schedule_cases")),
+                         exception_text,
+                         _metric(evidence.get("observed_exception_cases"))))
+            top_cases = cases.get("top_last_24h") or []
+            if top_cases:
+                top = top_cases[0]
+                L.append("Top 24h case: {} — max edge {}, duration {}, {} "
+                         "observations, status {}, phase {}, schedule {} "
+                         "(research only).".format(
+                             top.get("case_id") or "unknown",
+                             _usd(top.get("max_net_edge_usd")),
+                             _seconds(top.get("duration_seconds_lower_bound")),
+                             _metric(top.get("observations")),
+                             top.get("status") or "unknown",
+                             top.get("market_phase") or "unknown",
+                             top.get("schedule_alignment_status") or "unknown"))
     L.append("")
 
     if b["gates"]:
@@ -658,6 +707,9 @@ def render_html(b: Dict[str, Any]) -> str:
             signal_count = len(signals) if isinstance(signals, list) else None
             venue_summary = ((crossvenue.get("venue_pipeline") or {})
                              .get("summary") or {})
+            cases = crossvenue.get("research_cases") or {}
+            basis = cases.get("settlement_basis") or {}
+            evidence = cases.get("outcome_evidence") or {}
             completeness = analytics.get("quote_completeness")
             completeness_text = ("{:.1f}%".format(completeness * 100)
                                  if isinstance(completeness, (int, float))
@@ -684,6 +736,55 @@ def render_html(b: Dict[str, Any]) -> str:
                          e(_metric(venue_summary.get("collecting"))),
                          e(_metric(venue_summary.get("blocked"))),
                          e(_metric(venue_summary.get("excluded")))))
+            risk_dimensions = basis.get("risk_dimensions")
+            risk_text = (", ".join(risk_dimensions)
+                         if isinstance(risk_dimensions, list) else "unknown")
+            singleton_text = (
+                "{:.1f}%".format(cases["single_snapshot_share"] * 100)
+                if isinstance(cases.get("single_snapshot_share"), (int, float))
+                else "unknown")
+            P.append("<div class='dim'>Case ledger: {} lifetime, {} in 24h, "
+                     "{} in 7d, {} active; single-snapshot share {}; "
+                     "settlement-basis risks: {}; phase pre/after/unknown "
+                     "{}/{}/{}.</div>".format(
+                         e(_metric(cases.get("lifetime_cases"))),
+                         e(_metric(cases.get("cases_last_24h"))),
+                         e(_metric(cases.get("cases_last_7d"))),
+                         e(_metric(cases.get("active_cases"))),
+                         e(singleton_text), e(risk_text or "none"),
+                         e(_metric((cases.get("market_phase") or {}).get(
+                             "pre_scheduled_start"))),
+                         e(_metric((cases.get("market_phase") or {}).get(
+                             "after_scheduled_start"))),
+                         e(_metric((cases.get("market_phase") or {}).get("unknown")))))
+            exception_rate = evidence.get("observed_exception_rate_lower_bound")
+            exception_text = (
+                "{:.1f}%".format(exception_rate * 100)
+                if isinstance(exception_rate, (int, float)) else "unmeasured")
+            coverage_text = (
+                "{:.1f}%".format(evidence["schedule_coverage"] * 100)
+                if isinstance(evidence.get("schedule_coverage"), (int, float))
+                else "unmeasured")
+            P.append("<div class='dim'>Outcome evidence: {} schedule coverage, "
+                     "{} resolved; observed settlement exception lower bound "
+                     "{} ({} cases).</div>".format(
+                         e(coverage_text),
+                         e(_metric(evidence.get("resolved_schedule_cases"))),
+                         e(exception_text),
+                         e(_metric(evidence.get("observed_exception_cases")))))
+            top_cases = cases.get("top_last_24h") or []
+            if top_cases:
+                top = top_cases[0]
+                P.append("<div class='dim'>Top 24h case: {} — max edge {}, "
+                         "duration {}, {} observations, status {}, phase {}, "
+                         "schedule {} (research only).</div>".format(
+                             e(str(top.get("case_id") or "unknown")),
+                             e(_usd(top.get("max_net_edge_usd"))),
+                             e(_seconds(top.get("duration_seconds_lower_bound"))),
+                             e(_metric(top.get("observations"))),
+                             e(str(top.get("status") or "unknown")),
+                             e(str(top.get("market_phase") or "unknown")),
+                             e(str(top.get("schedule_alignment_status") or "unknown"))))
 
     if b["gates"]:
         P.append("<h2>Gate progress</h2>")

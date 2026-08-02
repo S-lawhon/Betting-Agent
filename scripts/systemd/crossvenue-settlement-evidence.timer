@@ -1,0 +1,11 @@
+[Unit]
+Description=Betting Pod Shop — daily cross-venue settlement-basis evidence
+
+[Timer]
+OnCalendar=*-*-* 11:15:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=crossvenue-settlement-evidence.service
+
+[Install]
+WantedBy=timers.target

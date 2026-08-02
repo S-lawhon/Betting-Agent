@@ -186,6 +186,31 @@ def research_snap() -> dict:
             "venue_pipeline": {"summary": {
                 "collecting": 0, "blocked": 1, "excluded": 2,
             }},
+            "research_cases": {
+                "lifetime_cases": 4, "cases_last_24h": 1,
+                "cases_last_7d": 3, "active_cases": 1,
+                "single_snapshot_share": .5,
+                "market_phase": {
+                    "pre_scheduled_start": 1,
+                    "after_scheduled_start": 2, "unknown": 1,
+                },
+                "settlement_basis": {
+                    "risk_dimensions": ["postponement", "shortened_game"],
+                },
+                "outcome_evidence": {
+                    "schedule_coverage": .75,
+                    "resolved_schedule_cases": 2,
+                    "observed_exception_cases": 1,
+                    "observed_exception_rate_lower_bound": .5,
+                },
+                "top_last_24h": [{
+                    "case_id": "CV-example", "max_net_edge_usd": .04,
+                    "duration_seconds_lower_bound": 300,
+                    "observations": 2, "status": "active",
+                    "market_phase": "pre_scheduled_start",
+                    "schedule_alignment_status": "aligned",
+                }],
+            },
         },
         "collector_health": {
             "status": "degraded", "academic_feed_items_raw": 0,
@@ -213,6 +238,14 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "2 persistent episodes" in text
         assert "0 research alerts" in text
         assert "0 collecting, 1 blocked, 2 excluded" in text
+        assert "Case ledger: 4 lifetime, 1 in 24h, 3 in 7d, 1 active" in text
+        assert "single-snapshot share 50.0%" in text
+        assert "postponement, shortened_game" in text
+        assert "Top 24h case: CV-example" in text
+        assert "phase pre/after/unknown 1/2/1" in text
+        assert "phase pre_scheduled_start, schedule aligned" in text
+        assert "Outcome evidence: 75.0% schedule coverage, 2 resolved" in text
+        assert "observed settlement exception lower bound 50.0% (1 cases)" in text
         assert "strategy-scout" in text
         assert "worker claims/start state are tracked" in text.lower()
         assert "model invocation is not tracked" in text.lower()

@@ -6,7 +6,7 @@ from src.gemini_kalshi_research import (
 )
 
 
-def _gemini(start="2026-08-02T17:40:00-04:00", event_id="gem-1"):
+def _gemini(start="2026-08-02T13:40:00-04:00", event_id="gem-1"):
     return {
         "eventId": event_id, "title": "Pittsburgh at Cincinnati",
         "startTime": start,
@@ -48,9 +48,12 @@ def test_normalizes_aliases_and_exact_event():
     matches, counts = match_events(gemini, kalshi)
 
     assert not rejected_g and not rejected_k
-    assert counts == {"shared_keys": 1, "ambiguous_keys": 0, "matched": 1}
+    assert counts == {"shared_keys": 1, "ambiguous_keys": 0,
+                      "schedule_mismatches": 0, "matched": 1}
     assert matches[0]["terms_equivalence"] == "unverified"
     assert matches[0]["teams"] == ["pirates", "reds"]
+    assert matches[0]["gemini"]["scheduled_start_at"] == "2026-08-02T17:40:00Z"
+    assert matches[0]["kalshi"]["scheduled_start_at"] == "2026-08-02T17:40:00Z"
 
 
 def test_same_teams_on_different_dates_do_not_match():
@@ -61,6 +64,17 @@ def test_same_teams_on_different_dates_do_not_match():
 
     assert matches == []
     assert counts["shared_keys"] == 0
+
+
+def test_same_teams_and_date_with_different_start_times_do_not_match():
+    gemini, _ = normalize_gemini_events([
+        _gemini(start="2026-08-02T17:40:00-04:00")])
+    kalshi, _ = normalize_kalshi_events([_kalshi()])
+
+    matches, counts = match_events(gemini, kalshi)
+
+    assert matches == []
+    assert counts["schedule_mismatches"] == 1
 
 
 def test_duplicate_event_key_is_rejected_as_ambiguous():

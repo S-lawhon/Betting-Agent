@@ -93,6 +93,11 @@ def test_crossvenue_research_has_a_dashboard_surface(html):
     assert "persistent episodes" in html
     assert "research alerts" in html
     assert "venue expansion" in html
+    assert 'id="r-cases"' in html
+    assert "cv.research_cases" in html
+    assert "Settlement basis" in html
+    assert "observed exception lower bound" in html
+    assert "cvCases.outcome_evidence" in html
 
 
 def test_isnum_rejects_non_finite(html):

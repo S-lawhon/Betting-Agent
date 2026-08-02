@@ -171,6 +171,19 @@ jobs:
       fail closed. Hypothetical positive paths remain non-actionable unless a
       reviewed, current equivalence policy explicitly approves them.
 
+  - id: crossvenue_settlement_evidence
+    host: droplet
+    schedule: "daily at 11:15 UTC (systemd timer)"
+    description: MLB outcome evidence for cross-venue settlement-basis incidence
+    output:
+      file: data/gemini_crossvenue/settlement_basis_evidence.json
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      Joins dislocation cases to public MLB schedule outcomes. The observed
+      exception rate is a lower bound: an ordinary Final status cannot rule out
+      shortened-game treatment or discretionary venue review.
+
   - id: settlement_registry
     host: droplet
     schedule: "daily at 02:55 UTC (systemd timer)"

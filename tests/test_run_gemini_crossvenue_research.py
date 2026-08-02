@@ -7,7 +7,7 @@ class _Gemini:
     def active_prediction_events(self):
         return [{
             "eventId": "gem-1", "title": "Pittsburgh at Cincinnati",
-            "startTime": "2026-08-02T17:40:00-04:00",
+            "startTime": "2026-08-02T13:40:00-04:00",
             "sportsMarket": {"sport": "baseball", "type": "moneyline"},
             "contracts": [
                 {"contractId": "pit", "title": "Pirates", "bid": .05, "ask": .06},
@@ -39,6 +39,7 @@ def test_collect_persists_snapshot_observation_and_metrics(tmp_path):
     latest = json.loads((tmp_path / "latest.json").read_text())
     metrics = json.loads((tmp_path / "metrics.json").read_text())
     analytics = json.loads((tmp_path / "analytics.json").read_text())
+    cases = json.loads((tmp_path / "research_cases.json").read_text())
     observations = list((tmp_path / "observations").glob("*.jsonl"))
     runs = list((tmp_path / "runs").glob("*.jsonl"))
     assert latest["mode"] == "read_only_research"
@@ -56,3 +57,9 @@ def test_collect_persists_snapshot_observation_and_metrics(tmp_path):
         "settlement_health"]
     assert metrics["venue_pipeline"]["summary"]["blocked"] == 1
     assert metrics["venue_pipeline"]["summary"]["excluded"] == 2
+    assert (tmp_path / "research_cases.sqlite3").exists()
+    assert cases["lifetime_cases"] == 0
+    assert cases["settlement_basis"]["status"] == "unverified"
+    assert cases["outcome_evidence"]["status"] == "unavailable"
+    assert len(cases["threshold_calibration"]) == 5
+    assert metrics["research_cases"] == cases

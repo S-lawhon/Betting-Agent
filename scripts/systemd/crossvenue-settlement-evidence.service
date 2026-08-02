@@ -1,0 +1,26 @@
+[Unit]
+Description=Betting Pod Shop — cross-venue settlement-basis evidence refresh
+After=network-online.target gemini-crossvenue-research.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.update_crossvenue_settlement_evidence
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=crossvenue-settlement-evidence
+Nice=15
+MemoryMax=256M
+TimeoutStartSec=300
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/gemini_crossvenue
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

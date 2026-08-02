@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -106,7 +106,27 @@ def _iso_date(value: Any) -> Optional[str]:
     return parsed.astimezone(EASTERN).date().isoformat()
 
 
+def _iso_datetime(value: Any) -> Optional[str]:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=EASTERN)
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def _kalshi_date(ticker: str) -> Optional[str]:
+    parsed = _kalshi_datetime(ticker)
+    if not parsed:
+        return None
+    return datetime.fromisoformat(parsed.replace("Z", "+00:00")).astimezone(
+        EASTERN).date().isoformat()
+
+
+def _kalshi_datetime(ticker: str) -> Optional[str]:
     match = re.search(r"-(\d{2})([A-Z]{3})(\d{2})(\d{4})", ticker.upper())
     if not match:
         return None
@@ -114,7 +134,8 @@ def _kalshi_date(ticker: str) -> Optional[str]:
         parsed = datetime.strptime("".join(match.groups()), "%y%b%d%H%M")
     except ValueError:
         return None
-    return parsed.replace(tzinfo=EASTERN).date().isoformat()
+    return parsed.replace(tzinfo=EASTERN).astimezone(
+        timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _contract_label(contract: Dict[str, Any]) -> Any:
@@ -161,13 +182,15 @@ def normalize_gemini_events(events: Iterable[Dict[str, Any]]) -> Tuple[List[Dict
         if len(outcomes) != 2:
             reasons["not_two_resolved_outcomes"] += 1
             continue
-        date = _iso_date(_first(event, "startTime", "start_time"))
+        start_value = _first(event, "startTime", "start_time")
+        date = _iso_date(start_value)
         if not date:
             reasons["missing_start_date"] += 1
             continue
         normalized.append({
             "venue": "gemini", "event_id": str(_first(event, "id", "eventId") or ""),
             "title": str(_first(event, "title", "name") or ""), "date_et": date,
+            "scheduled_start_at": _iso_datetime(start_value),
             "teams": sorted(outcomes), "outcomes": outcomes,
         })
     return normalized, dict(reasons)
@@ -207,6 +230,7 @@ def normalize_kalshi_events(events: Iterable[Dict[str, Any]]) -> Tuple[List[Dict
         normalized.append({
             "venue": "kalshi", "event_id": event_ticker,
             "title": str(event.get("title") or ""), "date_et": date,
+            "scheduled_start_at": _kalshi_datetime(event_ticker),
             "teams": sorted(outcomes), "outcomes": outcomes,
         })
     return normalized, dict(reasons)
@@ -214,7 +238,8 @@ def normalize_kalshi_events(events: Iterable[Dict[str, Any]]) -> Tuple[List[Dict
 
 def match_events(gemini: Iterable[Dict[str, Any]],
                  kalshi: Iterable[Dict[str, Any]],
-                 terms_policy: Optional[Dict[str, Any]] = None
+                 terms_policy: Optional[Dict[str, Any]] = None,
+                 max_start_difference_seconds: float = 900.0
                  ) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     """Exact-match unique event keys; reject duplicated/ambiguous keys."""
     indexes: List[Dict[Tuple[str, Tuple[str, ...]], List[Dict[str, Any]]]] = []
@@ -225,12 +250,21 @@ def match_events(gemini: Iterable[Dict[str, Any]],
         indexes.append(index)
     keys = set(indexes[0]) & set(indexes[1])
     matches: List[Dict[str, Any]] = []
-    counts = {"shared_keys": len(keys), "ambiguous_keys": 0, "matched": 0}
+    counts = {"shared_keys": len(keys), "ambiguous_keys": 0,
+              "schedule_mismatches": 0, "matched": 0}
     for key in sorted(keys):
         left, right = indexes[0][key], indexes[1][key]
         if len(left) != 1 or len(right) != 1:
             counts["ambiguous_keys"] += 1
             continue
+        left_start = _iso_datetime(left[0].get("scheduled_start_at"))
+        right_start = _iso_datetime(right[0].get("scheduled_start_at"))
+        if left_start and right_start:
+            left_dt = datetime.fromisoformat(left_start.replace("Z", "+00:00"))
+            right_dt = datetime.fromisoformat(right_start.replace("Z", "+00:00"))
+            if abs((left_dt - right_dt).total_seconds()) > max_start_difference_seconds:
+                counts["schedule_mismatches"] += 1
+                continue
         policy = terms_policy or {
             "id": "gemini_kalshi_mlb_moneyline", "status": TERMS_STATUS,
             "reason": TERMS_REASON, "actionable_allowed": False,

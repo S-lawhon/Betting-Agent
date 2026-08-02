@@ -9,6 +9,81 @@ from scripts.run_research_triage import main
 
 
 class TestRunResearchTriage(TestCase):
+    def test_quarantine_reclaims_same_day_capacity_for_valid_replacement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = root / "triage.yaml"
+            config.write_text("""portfolio:
+  max_dispatches_per_utc_day: 1
+  max_research_minutes_per_utc_day: 60
+  lane_concentration_cap: 1.0
+""")
+            memory = root / "memory.yaml"
+            memory.write_text("hypotheses: []\n")
+            assignments = root / "assignments"
+            sources = root / "sources"
+            dispositions = root / "dispositions"
+            for path in (assignments, sources, dispositions):
+                path.mkdir()
+            (assignments / "batch.json").write_text(json.dumps({"assignments": [
+                {"id": "a1", "source_item_id": "s1", "score": 80,
+                 "lane": "new_products", "title": "Resolved market",
+                 "source_type": "venue_market", "source_name": "Venue",
+                 "legal_decisions": [], "assignment": {"agent": "strategy-scout"}},
+                {"id": "a2", "source_item_id": "s2", "score": 70,
+                 "lane": "literature", "title": "Calibration model paper",
+                 "source_type": "paper", "source_name": "arXiv",
+                 "legal_decisions": [], "assignment": {"agent": "literature-scout"}},
+            ]}))
+            source1 = {
+                "id": "s1", "source_type": "venue_market", "source_name": "Venue",
+                "external_id": "m1", "title": "Resolved market", "summary": "",
+                "url": "https://example.test/m1", "published_at": None,
+                "retrieved_at": "2026-08-02T12:00:00Z", "content_hash": "h1",
+                "topics": [], "venue_ids": [], "product_family": "sports",
+                "reliability": "primary", "rights": "metadata_and_link",
+                "metadata": {"status": "RESOLVED"},
+            }
+            source2 = dict(source1) | {
+                "id": "s2", "source_type": "paper", "source_name": "arXiv",
+                "external_id": "p1", "title": "Calibration model paper",
+                "url": "https://arxiv.org/abs/p1", "content_hash": "h2",
+                "metadata": {}, "product_family": "*",
+            }
+            (sources / "batch.json").write_text(json.dumps({"items": [source1, source2]}))
+            output = root / "output"
+            pending = output / "dispatches/strategy-scout/a1.json"
+            pending.parent.mkdir(parents=True)
+            pending.write_text(json.dumps({
+                "id": "d1", "assignment_id": "a1", "source_item_id": "s1",
+                "assigned_agent": "strategy-scout", "created_at": "2026-08-02T13:00:00Z",
+                "research_budget_minutes": 30,
+                "assignment": {"lane": "new_products"},
+            }))
+            (output / "ledger.json").write_text(json.dumps({
+                "dispatched_assignment_ids": ["a1"],
+                "daily_allocations": {"2026-08-02": {
+                    "dispatches": 1, "minutes": 30,
+                    "by_lane": {"new_products": 1},
+                }},
+            }))
+            args = [
+                "--config", str(config), "--research-memory", str(memory),
+                "--assignments-dir", str(assignments),
+                "--source-batches-dir", str(sources),
+                "--dispositions-dir", str(dispositions),
+                "--strategy-registry", str(root / "missing.json"),
+                "--output-dir", str(output), "--now", "2026-08-02T14:00:00Z",
+            ]
+            self.assertEqual(main(args), 0)
+            self.assertTrue((output / "dispatches/literature-scout/a2.json").exists())
+            manifest = json.loads((output / "latest_manifest.json").read_text())
+            self.assertEqual(manifest["quarantine_capacity_reclaimed"]["dispatches"], 1)
+            self.assertEqual(manifest["dispatched"], 1)
+            self.assertEqual(main(args), 0)
+            manifest = json.loads((output / "latest_manifest.json").read_text())
+            self.assertEqual(manifest["quarantine_capacity_reclaimed"]["dispatches"], 0)
+
     def test_runner_writes_agent_queues_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

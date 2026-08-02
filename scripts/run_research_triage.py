@@ -156,6 +156,65 @@ def _quarantine_invalid_dispatches(
     return quarantined
 
 
+def _reconcile_quarantined_allocations(
+    output_dir: Path,
+    ledger: Dict[str, Any],
+    *,
+    now: datetime,
+) -> tuple:
+    """Return same-day capacity consumed by packets now in quarantine.
+
+    The durable reclaimed-ID set makes repeated triage runs idempotent. Older
+    quarantines remain historical evidence and never alter today's budget.
+    """
+    updated = dict(ledger)
+    allocations = {
+        str(key): dict(value) for key, value in
+        (updated.get("daily_allocations") or {}).items()
+        if isinstance(value, dict)
+    }
+    day = now.date().isoformat()
+    today = dict(allocations.get(day) or {})
+    lanes = {
+        str(key): int(value) for key, value in
+        (today.get("by_lane") or {}).items()
+    }
+    reclaimed_ids = set(
+        updated.get("reclaimed_quarantined_assignment_ids") or [])
+    reclaimed_now: List[str] = []
+    minutes = 0
+    for path in sorted((output_dir / "dispatch_quarantine").glob("*/*.json")):
+        payload = _read_json(path, {})
+        assignment_id = str(payload.get("assignment_id") or path.stem)
+        if assignment_id in reclaimed_ids:
+            continue
+        created_at = _parse_now(payload.get("created_at")) if payload.get(
+            "created_at") else None
+        if not created_at or created_at.date().isoformat() != day:
+            continue
+        reclaimed_ids.add(assignment_id)
+        reclaimed_now.append(assignment_id)
+        budget = int(payload.get("research_budget_minutes") or 0)
+        minutes += budget
+        lane = str((payload.get("assignment") or {}).get("lane") or "")
+        if lane and lane in lanes:
+            lanes[lane] = max(0, lanes[lane] - 1)
+    if reclaimed_now:
+        today["dispatches"] = max(
+            0, int(today.get("dispatches") or 0) - len(reclaimed_now))
+        today["minutes"] = max(0, int(today.get("minutes") or 0) - minutes)
+        today["by_lane"] = {key: value for key, value in sorted(lanes.items())
+                            if value > 0}
+        allocations[day] = today
+    updated["daily_allocations"] = dict(sorted(allocations.items()))
+    updated["reclaimed_quarantined_assignment_ids"] = sorted(reclaimed_ids)
+    return updated, {
+        "assignment_ids": sorted(reclaimed_now),
+        "dispatches": len(reclaimed_now),
+        "minutes": minutes,
+    }
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path,
@@ -192,10 +251,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.output_dir, source_items_by_id=source_items, now=now,
         memory_rules=memory_rules)
     ledger_path = args.output_dir / "ledger.json"
+    previous_ledger, reclaimed = _reconcile_quarantined_allocations(
+        args.output_dir, _read_json(ledger_path, {}), now=now)
     ledger, manifest, packets = triage_assignments(
         assignments,
         source_items_by_id=source_items,
-        previous_ledger=_read_json(ledger_path, {}),
+        previous_ledger=previous_ledger,
         reviewed_assignment_ids=reviewed,
         opportunity_assignment_ids=opportunities,
         redispatch_assignment_ids=due_deferrals,
@@ -214,6 +275,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     manifest["dispatches_archived_completed"] = archived_completed
     manifest["dispatches_quarantined_quality"] = len(quarantined)
     manifest["quarantined_assignment_ids"] = dict(sorted(quarantined.items()))
+    manifest["quarantine_capacity_reclaimed"] = reclaimed
+    ledger["reclaimed_quarantined_assignment_ids"] = previous_ledger.get(
+        "reclaimed_quarantined_assignment_ids") or []
 
     _write_atomic(ledger_path, ledger)
     _write_atomic(args.output_dir / "latest_manifest.json", manifest)

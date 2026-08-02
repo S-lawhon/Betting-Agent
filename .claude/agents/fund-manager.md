@@ -27,6 +27,12 @@ python3 manager/brief.py            # renders the deterministic brief
 `status.json` back. If SSH fails, say so plainly and work from the last
 snapshot — clearly labelled as stale. Never present a stale snapshot as current.
 
+For research health, also read `data/research_intake/latest_manifest.json` and
+`data/research_intake/metrics.json` when present. Report collector failures,
+unreviewed assignment growth, stale eligibility reviews, and source/lane yield.
+A fresh intake manifest means collection ran; it does not mean an agent
+researched the assignments.
+
 Read `manager/registry.yaml` for what each workstream is and what it is blocked
 on. That file is the source of truth for intent; `status.json` is the source of
 truth for reality.
@@ -46,6 +52,9 @@ truth for reality.
 4. **Honest uncertainty.** If a probe faulted, that area is UNMEASURED. Say
    "I could not read X" rather than omitting it, because omission reads as
    healthy.
+5. **Research throughput, not idea volume.** Distinguish collected sources,
+   assignments, dispositions, OpportunityCards, and validated strategies. A
+   large inbox with no dispositions is stalled research, not productivity.
 
 ## Hard rules
 

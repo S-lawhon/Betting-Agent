@@ -1,0 +1,55 @@
+schema_version: 1
+
+collectors:
+  kalshi_census:
+    enabled: true
+    inbox_glob: data/market_census/scout_inbox/*.json
+
+  cftc:
+    enabled: true
+    kinds: [products, rules, organizations]
+
+  polymarket_us:
+    enabled: true
+    page_size: 100
+    max_pages: 50
+
+  feeds:
+    - id: arxiv_qfin_trading
+      enabled: true
+      name: arXiv q-fin.TR
+      type: paper
+      url: https://rss.arxiv.org/rss/q-fin.TR
+    - id: arxiv_qfin_statistics
+      enabled: true
+      name: arXiv q-fin.ST
+      type: paper
+      url: https://rss.arxiv.org/rss/q-fin.ST
+    - id: arxiv_econometrics
+      enabled: true
+      name: arXiv econ.EM
+      type: paper
+      url: https://rss.arxiv.org/rss/econ.EM
+      include_keywords: [forecast, prediction, market, odds, calibration, sports]
+    - id: arxiv_machine_learning
+      enabled: true
+      name: arXiv stat.ML
+      type: paper
+      url: https://rss.arxiv.org/rss/stat.ML
+      include_keywords: [forecast, prediction market, calibration, online learning, sports]
+
+  x:
+    enabled: false
+    note: >-
+      Explicit opt-in only. X is pay-per-use; set X_BEARER_TOKEN and pass
+      --include-x after approving a monthly API budget.
+    max_results_per_query: 25
+    queries:
+      - '(prediction market OR event contract) (fee OR rule OR settlement OR API) -is:retweet lang:en'
+      - '(sports betting OR market making) (research OR model OR mispricing) -is:retweet lang:en'
+      - '(Kalshi OR Polymarket OR ForecastEx OR ProphetX) -is:retweet lang:en'
+
+intake:
+  max_assignments: 50
+  lane_concentration_cap: 0.40
+  note: Source engagement is never used as evidence of edge.

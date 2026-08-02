@@ -1,0 +1,11 @@
+[Unit]
+Description=Betting Pod Shop — daily broad research intake timer
+
+[Timer]
+OnCalendar=*-*-* 04:05:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=research-intake.service
+
+[Install]
+WantedBy=timers.target

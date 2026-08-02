@@ -1,0 +1,135 @@
+schema_version: 1
+jurisdiction:
+  country: US
+  state: TX
+  note: >-
+    Research classification only; not legal advice. New execution paths require
+    current venue/account/product eligibility evidence and human approval.
+
+defaults:
+  unknown_status: pending_review
+  research_allowed: true
+  execution_allowed: false
+  review_days: 30
+
+venues:
+  - id: kalshi
+    name: KalshiEX LLC
+    regulator: CFTC
+    regulatory_class: designated_contract_market
+    status: reference_only
+    research_allowed: true
+    execution_allowed: false
+    rationale: >-
+      Existing project execution is governed separately. This research registry
+      does not grant or revoke that authority; every newly proposed product must
+      receive an explicit product-level approval before a new execution path.
+    evidence:
+      - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/42993
+      - https://help.kalshi.com/en/articles/13823778-signing-up-as-an-individual
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []
+  - id: polymarket_us
+    name: QCX LLC d/b/a Polymarket US
+    regulator: CFTC
+    regulatory_class: designated_contract_market
+    status: pending_review
+    research_allowed: true
+    execution_allowed: false
+    rationale: Public market discovery is available; execution requires approved
+      identity, API access, and a Texas/product eligibility review.
+    evidence:
+      - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations
+      - https://docs.polymarket.us/api-reference/introduction
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []
+
+  - id: forecastex
+    name: ForecastEx LLC
+    regulator: CFTC
+    regulatory_class: designated_contract_market
+    status: pending_review
+    research_allowed: true
+    execution_allowed: false
+    rationale: Discovery and account/product eligibility depend on an eligible
+      Interactive Brokers account and must be verified before execution.
+    evidence:
+      - https://www.interactivebrokers.com/predictionmarkets/en/home.php
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []
+
+  - id: cme_event_contracts
+    name: CME Group Event Contracts
+    regulator: CFTC
+    regulatory_class: designated_contract_market
+    status: pending_review
+    research_allowed: true
+    execution_allowed: false
+    rationale: Product and account eligibility vary and require verification.
+    evidence:
+      - https://www.interactivebrokers.com/predictionmarkets/en/home.php
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []
+
+  - id: prophetx
+    name: ProphetX LLC
+    regulator: CFTC
+    regulatory_class: designated_contract_market
+    status: pending_review
+    research_allowed: true
+    execution_allowed: false
+    rationale: Read-only research is permitted by project policy; execution is
+      not approved and API response shapes remain unverified in this repository.
+    evidence:
+      - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations
+      - https://www.prophetx.co/lobby/t-c/market-participant-agreement
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []
+
+  - id: texas_parimutuel
+    name: Texas licensed pari-mutuel racing
+    regulator: Texas Racing Commission
+    regulatory_class: state_licensed_parimutuel
+    status: pending_review
+    research_allowed: true
+    execution_allowed: false
+    rationale: Only specifically licensed wagering channels/products may qualify;
+      no remote or programmatic execution path is approved.
+    evidence:
+      - https://www.txrc.texas.gov/s/2021_10_01-Codified-Texas-Racing-Act.pdf
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []
+
+  - id: polymarket_international
+    name: Polymarket international CLOB
+    regulator: none_us
+    regulatory_class: offshore_prediction_market
+    status: prohibited
+    research_allowed: true
+    execution_allowed: false
+    rationale: Reference data only; never propose it as an executable Texas leg.
+    evidence: []
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []
+
+  - id: offshore_sportsbook
+    name: Offshore sportsbooks
+    regulator: none_us
+    regulatory_class: offshore_sportsbook
+    status: prohibited
+    research_allowed: false
+    execution_allowed: false
+    rationale: Excluded from collection and execution absent explicit legal and
+      data-licensing review.
+    evidence:
+      - https://statutes.capitol.texas.gov/Docs/PE/pdf/PE.47.pdf
+    verified_at: 2026-08-01
+    expires_at: 2026-09-01
+    products: []

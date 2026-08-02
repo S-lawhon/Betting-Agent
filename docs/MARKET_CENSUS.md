@@ -3,6 +3,8 @@
 The market census broadens idea discovery without turning breadth into false
 confidence. It is a deterministic inventory/delta process; `strategy-scout`
 remains the model-driven researcher that must falsify each promising seed.
+Its seeds also bridge into the venue-agnostic intake described in
+`docs/RESEARCH_OPERATING_SYSTEM.md`.
 
 ```text
 Kalshi /series

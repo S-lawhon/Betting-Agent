@@ -157,6 +157,31 @@ services:
 # not evidence of success; only fresh output is.
 # -----------------------------------------------------------------------------
 jobs:
+  - id: market_census
+    host: droplet
+    schedule: "35 3 * * *"
+    description: Daily venue census; full-universe rotation on UTC day 1
+    output:
+      file: data/market_census/latest_manifest.json
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      Install and enable market-census.timer. A fresh manifest proves discovery
+      ran; it does not prove strategy-scout researched the generated seeds.
+
+  - id: research_intake
+    host: droplet
+    schedule: "5 4 * * *"
+    description: Broad CFTC, venue, literature, and census-source research intake
+    output:
+      file: data/research_intake/latest_manifest.json
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      Install and enable research-intake.timer after creating its writable data
+      directory. Collector errors are recorded in the manifest; X remains off
+      unless a paid API budget is explicitly approved.
+
   - id: clv_settlement
     host: droplet
     schedule: "30 7 * * *"

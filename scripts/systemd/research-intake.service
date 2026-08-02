@@ -1,0 +1,30 @@
+[Unit]
+Description=Betting Pod Shop — broad research source intake
+After=network-online.target market-census.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_intake
+ExecStartPost=/opt/betting-pod-shop/venv/bin/python -m scripts.build_research_metrics
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=research-intake
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=512M
+TimeoutStartSec=1800
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/research_intake
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

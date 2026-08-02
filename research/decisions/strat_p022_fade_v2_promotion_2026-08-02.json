@@ -1,0 +1,27 @@
+{
+  "strategy_id": "strat_p022_fade_v2",
+  "decision_at": "2026-08-02T02:34:00Z",
+  "from_state": "spec",
+  "to_state": "retired",
+  "decision": "retire",
+  "rationale": [
+    "HOUSEKEEPING, not a research verdict, and specifically NOT a kill of P-022. This record is a calibration artifact: P-022 was entered into the factory retrospectively to test the spec/integrity/validation agents against a known-answer case. The live pod continues unchanged in paper under its own pre-registered forward gate.",
+    "It cannot advance on its own terms. Integrity PASSED, and validation returned status=warn / go_no_go=hold — correctly, because the locked rule governs the FORWARD gate at T>=24 and T is currently 0. A retrospective backtest cannot clear a gate that has not been reached, so this record can never legitimately reach `validated` no matter how long it sits.",
+    "Its findings are already carried forward where they matter, so nothing is lost by closing it: the estimator mismatch (harness reports the pooled sum(p*w)/total_w, the rule defines equal-weighted mean(x_t)) and the capacity overstatement (quote_size=25 = $23.09/name against a $5.00 cap, 4.62x) are both recorded in manager/registry.yaml's P-022 entry, and the estimator finding is independently reproducible via golf_quirks_research/repro_estimator_check.py.",
+    "Sam decided 2026-08-02 that T=24 stands and the dispersion is accepted — no amendment to the locked rule. That decision is recorded in manager/registry.yaml rather than here, since it governs the live pod's gate and not this factory record."
+  ],
+  "required_conditions": [],
+  "owner_agent": "human-housekeeping",
+  "review_window_days": 0,
+  "approval_ref": null,
+  "provenance": {
+    "created_by": "human (Claude, registry housekeeping at Sam's request)",
+    "code_commit": "19c7e16",
+    "artifact_path": "research/decisions/strat_p022_fade_v2_promotion_2026-08-02.json"
+  },
+  "extra": {
+    "not_agent_authored": "Written by hand, not by strategy-promotion. Bookkeeping closure with fully known rationale, labelled so it is never mistaken for an independent agent verdict.",
+    "live_pod_unaffected": "P-022 continues running in paper (systemd unit betting-round-leader-fade), accruing toward T>=24. Retiring this factory record has no effect on it, and this retirement must NOT be read as a verdict on the strategy.",
+    "calibration_outcome": "All six factory roles exercised. strategy-spec produced one substantive error caught by integrity; strategy-integrity performed well on both cycles; strategy-validator recomputed from the harness rather than quoting, found the estimator mismatch, and correctly refused `go`."
+  }
+}

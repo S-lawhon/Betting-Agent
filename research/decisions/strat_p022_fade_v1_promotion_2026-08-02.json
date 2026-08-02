@@ -1,0 +1,26 @@
+{
+  "strategy_id": "strat_p022_fade_v1",
+  "decision_at": "2026-08-02T02:33:00Z",
+  "from_state": "spec",
+  "to_state": "retired",
+  "decision": "retire",
+  "rationale": [
+    "HOUSEKEEPING, not a research verdict. This record is a calibration artifact: P-022 was entered into the strategy factory retrospectively to test the spec/integrity/validation agents against a case whose answer was already known by hand. It never represented a new strategy.",
+    "It cannot advance. Integrity FAILED (research/integrity/strat_p022_fade_v1_integrity_2026-08-02.json): the spec agent's entry_logic asserted that close_time is the correct close anchor on this family, which is the superseded 2026-07-26 fix. Verified by hand: src/round_leader_fade_maker.py contains zero references to close_time or occurrence_datetime and depends entirely on GolfScheduleResolver. record_validation refuses to run while integrity fails, and attach_spec refuses to replace a spec on an existing record, so this record is a permanent dead end by construction.",
+    "It is superseded. op_20260802_002 / strat_p022_fade_v2 carries the corrected spec, passed integrity, and reached validation.",
+    "Retiring it keeps the registry honest: a record parked at `spec` forever reads as work in progress. Nothing about the live P-022 pod changes — it continues in paper under its own pre-registered forward gate (T>=24, currently T=0), which no artifact in this chain touched."
+  ],
+  "required_conditions": [],
+  "owner_agent": "human-housekeeping",
+  "review_window_days": 0,
+  "approval_ref": null,
+  "provenance": {
+    "created_by": "human (Claude, registry housekeeping at Sam's request)",
+    "code_commit": "19c7e16",
+    "artifact_path": "research/decisions/strat_p022_fade_v1_promotion_2026-08-02.json"
+  },
+  "extra": {
+    "not_agent_authored": "Written by hand, not by strategy-promotion. These are bookkeeping closures of calibration records with fully known rationale, not research judgements, and are labelled as such so they are never mistaken for independent agent verdicts.",
+    "live_pod_unaffected": "P-022 continues running in paper (systemd unit betting-round-leader-fade). Retiring this factory record has no effect on it."
+  }
+}

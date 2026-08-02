@@ -482,15 +482,29 @@ workstreams:
     # occurrence being 2026-07-26 21:26:45Z, five minutes before the fixed
     # process started at 21:31:32Z.
     #
-    # It is not `time` yet, because the RATE is measured at n=3. It becomes
-    # `time` the moment n >= 10 post-fix placements confirms it; see
-    # research/REPORT_P001_Admissibility_2026-07-29.md §6.
-    blocked_on: measurement
-    recheck_after: "2026-08-01"
+    # PROMOTED measurement -> time on 2026-08-02. The pre-specified condition
+    # ("n >= 10 post-fix placements confirms the rate") is met: scripts/
+    # p001_checkpoint.py reports 11 admissible forward rows. The rate is now
+    # measured, so `time` is honest where it previously would not have been.
+    # See research/REPORT_P001_Admissibility_2026-07-29.md §6.
+    blocked_on: time
+    # Re-measure once the 2026-07-30 entry loosening (MLB min_edge 3% -> 1%)
+    # has more than the ~2 days of data it had at this reading. 3 of the 11
+    # rows are sub-3%, so the current rate understates the post-loosening one.
+    recheck_after: "2026-08-23"
     summary: >
       Core moneyline pod. Lifetime verdict was KEEP-but-RECALIBRATE (model
       overconfident ~5pp). CLV gate active since 2026-07-19 restricting to
       underdogs <50c with positive net-edge-maker.
+      ACCRUAL RATE MEASURED 2026-08-02, and it is far slower than the gate's
+      own prose assumes: 11 admissible rows in 6.19 days since the epoch =
+      1.78 rows/day. At that rate the remaining 189 rows take ~106 more days
+      and the 200-row threshold lands ~2026-11-16 — NOT the "late Aug - early
+      Sept 2026" the decision text projects from "5-8 MLB settlements/day".
+      The projection was made before any forward rows existed. The gate itself
+      is untouched: 200 rows, scenario D, silence is still not confirmation.
+      Current read (informational, well under threshold, NO DECISION):
+      +0.70c/ct net-maker over 5 day clusters, CI [-1.87, +2.45].
     gate:
       question: Does realized underdog ROI follow the measured +1.4pp net-maker CLV?
       # RE-SCOPED 2026-07-26 (scenario D, approved by Sam). The metric is
@@ -1097,7 +1111,36 @@ workstreams:
       after each round had settled. Reconciled against the locked rule and
       restarted 2026-07-26 22:36 UTC. T counts from that restart; nothing was
       lost, because nothing was ever quoted.
-      Capacity is deliberately small (~$140 P&L on ~$3.8k collateral per month).
+      Capacity is deliberately small (~$140 P&L on ~$3.8k collateral per month)
+      — but see ESTIMATOR / CAPACITY below: that figure is measured at a size
+      the registered caps do not permit.
+      ESTIMATOR MISMATCH IN THE BACKTEST HARNESS, found and independently
+      reproduced 2026-08-02 (golf_quirks_research/repro_estimator_check.py).
+      quirks_common.bootstrap_weighted reports its point estimate as
+      sum(p*w)/total_w — POOLED across every filled contract — while
+      P022_DECISION_RULE.md §3 defines edge = mean(x_t), EQUAL weight per
+      tournament. The bootstrap resamples tournaments, so the CI clustering is
+      right; only the point estimate is the wrong statistic. Published sample
+      (364 markets, T=19): pooled +3.41c vs equal-weight +3.80c, z=3.29 — the
+      two AGREE and the Phase-2 GREEN-LIGHT stands on either. Widened sample
+      (404 markets, T=22): pooled +2.57c vs equal-weight +1.45c, z=0.65 — NOT
+      significant. Amendment 1 cites the +2.57c pooled figure when setting
+      T=24 for "90% power", so the power basis assumes an effect larger and a
+      dispersion smaller (sd 5.04c published vs 10.44c widened) than the
+      rule's own statistic gives.
+      DECIDED 2026-08-02 by Sam: T=24 STANDS. The dispersion is accepted; no
+      amendment. Recorded here so the gate is not silently re-litigated later
+      — the finding is known, was weighed, and the threshold was left alone.
+      scripts/p022_checkpoint.py (the forward reader) is unaffected: it
+      already computes statistics.mean(xs) with MIN_T_DECISION=24.
+      CAPACITY OVERSTATED, verified 2026-08-02. The harness replays at its
+      default quote_size=25 contracts/name. At the measured mean filled quote
+      of $0.0763 that is 25 x $0.9237 = $23.09 of collateral per name against
+      a registered per-name cap of $5.00 (0.5% of $1,000) — a 4.62x breach.
+      The cap permits ~5.4 contracts, not 25, so the ~$140/month figure above
+      is measured at roughly 4.6x the authorised size. A cap-respecting replay
+      puts it near $11/month net (that number is the validator agent's and has
+      NOT been independently reproduced; the 4.62x breach itself has been).
     gate:
       question: Does the +3.4c/ct dead-heat fade replicate forward, net of adverse selection?
       metric: settled_tournaments

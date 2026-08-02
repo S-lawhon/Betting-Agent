@@ -186,6 +186,27 @@ exposure — the guard rejected nothing, and only the pod's own
   de-vigged sharp close as the north-star metric, not raw P&L.
 - Bootstrap CIs for backtests cluster by event/tournament (within-event outcomes
   correlate) — treat each event as one observation.
+- **A clustered CI does not mean the POINT ESTIMATE is clustered too, and in the
+  golf harness it is not.** `quirks_common.bootstrap_weighted` resamples
+  tournaments correctly for the interval, but returns `sum(p*w)/total_w` as its
+  estimate — a **pooled** contract-weighted mean in which a large-field
+  tournament dominates. `P022_DECISION_RULE.md` §3 defines the gate statistic as
+  `edge = mean(x_t)`, **equal weight per tournament**. Anyone reading
+  `net_per_contract` off that harness is reading the pooled number, not the
+  gate's. Measured 2026-08-02: on the published 364-market sample the two agree
+  (+3.41¢ vs +3.80¢, both z>3, so the Phase-2 GREEN-LIGHT stands on either), but
+  on the widened 404-market sample they split — +2.57¢ pooled vs **+1.45¢
+  equal-weighted, z=0.65, not significant**. The divergence grows with
+  field-size imbalance, so it is invisible exactly until it matters. Reproduce
+  with `python3 golf_quirks_research/repro_estimator_check.py`. The forward
+  reader `scripts/p022_checkpoint.py` is fine — it uses `statistics.mean(xs)`.
+- **A backtest that ignores the pod's own caps is measuring a strategy you are
+  not allowed to run.** The same harness replays at `quote_size=25`
+  contracts/name; at the measured mean filled quote of $0.0763 that is
+  25 × $0.9237 = **$23.09 of collateral against a $5.00 per-name cap — 4.62×**.
+  The cap permits ~5.4 contracts. Any capacity or P&L figure taken from that run
+  is quoted at ~4.6× authorised size. Caps are GATE CONDITIONS in the P-022
+  rule, not tuning knobs, so this is not a rounding detail.
 - **Commit research artifacts at each gate, not at the end of the run.** On
   2026-07-25 the `golf_quirks_research/` harness `.py` files were never committed
   and vanished; the reports survived only as session copies. Before ending a

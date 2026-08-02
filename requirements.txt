@@ -1,0 +1,58 @@
+# Betting Pod Shop — RUNTIME dependencies
+# ============================================================================
+# What the engine needs to run on the droplet. Install with:
+#
+#     python3 -m pip install -r requirements.txt
+#
+# Test-only packages live in requirements-dev.txt. Keeping them apart is not
+# tidiness: three source files deliberately avoid scipy so the droplet does not
+# have to carry it (src/combo_copula.py, src/crypto_options_pricer.py,
+# src/maker_challenger.py all say so in comments), and the droplet venv indeed
+# has no scipy while running the engine fine. Do not promote a test dependency
+# into this file without checking those comments first.
+#
+# ---------------------------------------------------------------------------
+# Why FLOORS and not exact pins
+# ---------------------------------------------------------------------------
+# Three environments run this code and none of them agree on versions:
+#
+#   droplet          Python 3.12.3   numpy 2.5.1   cryptography 46.0.5
+#   Mac (zsh)        Python 3.9      numpy 2.0.2   cryptography 46.0.5
+#   Mac (bash)       Python 3.14.3   numpy 2.5.1   cryptography 49.0.0
+#
+# The Mac has two interpreters and which one you get depends on the SHELL —
+# bash and zsh resolve `python3` differently. That split silently shrank the
+# deploy test gate by 47 tests on 2026-08-01 (see scripts/deploy.sh). Exact
+# pins would make at least one of the three environments unsatisfiable, so
+# these are the lowest versions observed passing the full suite (2240 tests)
+# on all three.
+# ---------------------------------------------------------------------------
+
+PyYAML>=6.0            # config_multi_pod.yaml, manager/registry.yaml
+requests>=2.32         # kalshi_public, odds/sportsbook clients
+httpx>=0.28            # async paths in src/ and scripts/
+cryptography>=46.0     # RSA-PSS request signing in src/kalshi_private.py
+numpy>=2.0             # src/combo_copula.py (P-029 correlation pricer)
+pyarrow>=21.0          # parquet in scripts/ (archival only, not the hot path)
+
+# Polymarket, used by the cross-venue pods. The marker is load-bearing, not
+# decoration: py-clob-client requires Python >=3.9.10 and the Mac's zsh
+# interpreter is 3.9.6, so without it `pip install -r requirements.txt` fails
+# outright there with "No matching distribution found". Must be
+# python_full_version, not python_version — the latter is only major.minor
+# ("3.9") and would compare 3.9.6 as satisfying >=3.9.10.
+py-clob-client>=0.34; python_full_version >= "3.9.10"
+
+# ---------------------------------------------------------------------------
+# OPTIONAL — deliberately NOT installed anywhere, and that is fine
+# ---------------------------------------------------------------------------
+# Both are lazy imports inside try/except ImportError, so the code degrades
+# with a clear message rather than failing at startup. Neither is present on
+# the droplet or on either Mac interpreter, and the full suite passes without
+# them. Install only if you actually need the feature.
+#
+#   ib_insync          # src/forecastex_client.py — Interactive Brokers /
+#                      # ForecastEx. Legacy; the project is Kalshi-focused.
+#   websocket-client   # src/kalshi_private.py websocket path. The demo creds
+#                      # block websockets anyway — see the book-capture daemon,
+#                      # which falls back to 1-minute REST polling.

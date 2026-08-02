@@ -1,0 +1,29 @@
+# Betting Pod Shop — TEST / DEV dependencies
+# ============================================================================
+#     python3 -m pip install -r requirements-dev.txt
+#
+# Everything in requirements.txt, plus what the test suite needs and the
+# runtime deliberately does not carry.
+
+-r requirements.txt
+
+pytest>=8.4
+scipy>=1.13             # test-only. tests/test_combo_copula.py validates the
+                        # Monte Carlo copula against scipy's exact bivariate
+                        # normal CDF — an oracle, not a runtime dependency.
+                        # The droplet has no scipy and must stay that way.
+
+# ---------------------------------------------------------------------------
+# KEEP IN SYNC with the preflight in scripts/deploy.sh
+# ---------------------------------------------------------------------------
+# That check aborts the deploy if the test interpreter is missing anything the
+# suite `importorskip`s on, because a missing dependency skips a WHOLE test
+# module while the run still reports green — 47 tests vanished that way on
+# 2026-08-01 and showed up only as "4 skipped" instead of 2.
+#
+# It lists IMPORT names, this file lists DISTRIBUTION names, and they differ
+# (PyYAML -> yaml, py-clob-client -> py_clob_client), which is why it is a
+# separate hand-maintained list rather than something parsed from here. If you
+# add a dependency that a test module importorskips on, add it to BOTH.
+#
+# Current preflight list: pytest, yaml, requests, numpy, scipy, cryptography

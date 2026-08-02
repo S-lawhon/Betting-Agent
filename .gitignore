@@ -41,3 +41,9 @@ manager/state/
 .env*
 !.env.example
 _to_delete/
+
+# Claude Code personal overrides. The tool rewrites this file every time a
+# permission is approved, so tracking it means a dirty tree after every
+# session and a merge conflict whenever two machines approve different things.
+# Shared, portable rules belong in .claude/settings.json, which IS tracked.
+.claude/settings.local.json

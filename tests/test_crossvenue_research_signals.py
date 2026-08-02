@@ -28,7 +28,7 @@ def test_project_venue_pipeline_explains_expansion_state():
         "blocked": 1, "excluded": 2,
     }
     rows = {row["id"]: row for row in pipeline["venues"]}
-    assert rows["prophetx"]["collection_state"] == "blocked_api_credentials"
+    assert rows["prophetx"]["collection_state"] == "blocked_production_credentials"
     assert rows["prophetx"]["adapter"] == "scripts.collect_crossvenue_basis"
     assert rows["novig"]["automated_collection_allowed"] is False
     assert rows["underdog_predict"]["execution_allowed"] is False

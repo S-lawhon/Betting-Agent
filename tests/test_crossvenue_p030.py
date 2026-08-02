@@ -270,6 +270,61 @@ def test_client_rejects_unknown_env():
         ProphetXClient(env="prod")
 
 
+def test_client_uses_current_unversioned_market_data_routes(monkeypatch):
+    from src.prophetx_client import ProphetXClient
+    c = ProphetXClient(access_key="access", secret_key="secret", env="sandbox")
+    calls = []
+
+    def fake_get(path, params=None, retries=3):
+        calls.append((path, params))
+        return {"data": {"tournaments": [], "sport_events": [], "markets": []}}
+
+    monkeypatch.setattr(c, "get", fake_get)
+    c.tournaments()
+    c.sport_events("109")
+    c.markets_for_event("123")
+    assert calls == [
+        ("/mm/get_tournaments", None),
+        ("/mm/get_sport_events", {"tournament_id": "109"}),
+        ("/mm/get_markets", {"event_id": "123"}),
+    ]
+
+
+def test_moneyline_book_parses_current_nested_sandbox_shape():
+    from src.prophetx_client import ProphetXClient
+    c = ProphetXClient(access_key="access", secret_key="secret", env="sandbox")
+    market = {"type": "moneyline", "selections": [
+        [{"name": "Los Angeles Dodgers", "odds": -160, "stake": 25,
+          "value": 38.99}],
+        [{"name": "Boston Red Sox", "odds": 154, "stake": 40,
+          "value": 25.97}],
+    ]}
+    book = c.moneyline_book(market)
+    dodgers, red_sox = book["Los Angeles Dodgers"], book["Boston Red Sox"]
+    assert book["_unparsed"] == []
+    assert dodgers["ask_odds"] == -160
+    assert dodgers["ask_prob"] == pytest.approx(160 / 260)
+    assert dodgers["ask_size"] == 25
+    assert red_sox["ask_odds"] == 154
+    assert red_sox["bid_prob"] == pytest.approx(1 - dodgers["ask_prob"])
+    assert red_sox["bid_size"] == 25
+    assert red_sox["bid_derived_from_complement"] is True
+
+
+def test_shape_dump_waits_for_a_populated_market(tmp_path):
+    from src.prophetx_client import ProphetXClient
+    path = tmp_path / "shapes.jsonl"
+    c = ProphetXClient(access_key="access", secret_key="secret", env="sandbox",
+                       dump_shapes_path=str(path))
+    c._record_shape("/mm/get_markets", {"data": {"markets": None}})
+    assert not path.exists()
+    c._record_shape("/mm/get_markets", {
+        "data": {"markets": [{"type": "moneyline", "selections": []}]}})
+    recorded = path.read_text()
+    assert '"markets": [' in recorded
+    assert '"selections"' in recorded
+
+
 # ── collector logic ──────────────────────────────────────────────────────────
 
 def test_collector_refuses_to_run_without_credentials(monkeypatch):
@@ -308,15 +363,52 @@ def test_matcher_pairs_mlb_on_canonical_abbreviations():
     import scripts.collect_crossvenue_basis as C
     kg = {"KXMLBGAME-26JUL29NYYBOS": {
         "series": "KXMLBGAME", "sport": "mlb",
-        "tickers": {"NYY": "tk-NYY", "BOS": "tk-BOS"}, "titles": {}}}
+        "tickers": {"NYY": "tk-NYY", "BOS": "tk-BOS"}, "titles": {},
+        "scheduled_start_at": "2026-07-29T23:05:00+00:00"}}
     px = [{"event_id": "e1", "title": "Yankees @ Red Sox",
            "names": ["New York Yankees", "Boston Red Sox"],
+           "scheduled_start_at": "2026-07-29T23:05:00Z",
            "book": {"New York Yankees": {"ask_prob": 0.44},
                     "Boston Red Sox": {"ask_prob": 0.58}}}]
     pairs, _ = C.match_pairs(kg, px)
     assert len(pairs) == 1
     assert pairs[0]["px_names"] == {"NYY": "New York Yankees",
                                     "BOS": "Boston Red Sox"}
+
+
+def test_matcher_rejects_same_teams_on_wrong_date():
+    import scripts.collect_crossvenue_basis as C
+    kg = {"game": {"series": "KXMLBGAME", "sport": "mlb",
+                   "tickers": {"NYY": "a", "BOS": "b"}, "titles": {},
+                   "scheduled_start_at": "2026-08-05T23:05:00Z"}}
+    px = [{"event_id": "e1", "title": "Yankees @ Red Sox",
+           "names": ["New York Yankees", "Boston Red Sox"],
+           "scheduled_start_at": "2026-08-03T23:05:00Z", "book": {}}]
+    pairs, reasons = C.match_pairs(kg, px)
+    assert pairs == []
+    assert reasons["schedule_mismatch"] == 1
+
+
+def test_prophetx_universe_keeps_only_exact_main_game_moneyline():
+    import scripts.collect_crossvenue_basis as C
+
+    class FakePx:
+        def sport_events(self):
+            return [{"event_id": 1, "name": "Yankees at Red Sox",
+                     "scheduled": "2026-08-03T23:05:00Z"}]
+
+        def markets_for_event(self, event_id):
+            return [{"id": 1, "type": "moneyline", "name": "Moneyline"},
+                    {"id": 2, "type": "moneyline",
+                     "name": "1st 5 Innings Moneyline"}]
+
+        def moneyline_book(self, market):
+            return {"_unparsed": [], "New York Yankees": {},
+                    "Boston Red Sox": {}}
+
+    rows = C.prophetx_moneylines(FakePx())
+    assert len(rows) == 1
+    assert rows[0]["market_id"] == 1
 
 
 def test_gap_is_one_minus_both_asks():
@@ -335,6 +427,9 @@ def test_snapshot_row_carries_every_gate_input():
                     "bid_qty": 800, "ask_qty": 900}
 
     pair = {"game_id": "G1", "series": "KXMLBGAME", "sport": "mlb",
+            "px_environment": "sandbox",
+            "kalshi_scheduled_start_at": "2026-08-03T23:05:00+00:00",
+            "px_scheduled_start_at": "2026-08-03T23:10:00+00:00",
             "kalshi_tickers": {"NYY": "tk-NYY", "BOS": "tk-BOS"},
             "px_event_id": "e1", "px_names": {"NYY": "Yanks", "BOS": "Sox"},
             "px_book": {"Yanks": {"ask_prob": 0.50, "ask_size": 5000,
@@ -345,6 +440,8 @@ def test_snapshot_row_carries_every_gate_input():
                                 "bid_odds": 117, "bid_size": 3000}}}
     rows = C.snapshot(FakeK(), None, pair, tax_rate=0.32)
     assert len(rows) == 2
+    assert all(row["px_environment"] == "sandbox" for row in rows)
+    assert all(row["schedule_skew_seconds"] == 300 for row in rows)
     r = rows[0]
     for k in ("gap", "breakeven_fees_only", "breakeven_with_tax",
               "px_leg_edge_vs_fmv", "rule46_ceiling", "rule46_bustable",

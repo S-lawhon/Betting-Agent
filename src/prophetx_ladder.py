@@ -23,9 +23,12 @@ There is NO gap at even money: the ladder runs ... -102, -101, +100, +101 ...
 continuously, with +100 == -100 == 50.000%. Note the ladder contains +100 but
 not -100, so `snap_prob(0.5)` returns +100.
 
-REFRESH THIS at runtime when credentials exist -- ProphetXClient.price_ladder()
-prefers the live endpoint and falls back to this constant. A ladder that has
-drifted silently would push orders to invalid ticks.
+ProphetXClient.price_ladder() prefers the live endpoint and falls back to this
+constant. On 2026-08-02 the sandbox returned 555 ticks from -25000 to +25000;
+the 291 pinned ticks were a strict subset of that live ladder. The fallback is
+therefore incomplete but still valid and conservative for read-only analysis.
+Any future execution client must use the live ladder and fail closed if it is
+unavailable rather than relying on this subset.
 """
 from __future__ import annotations
 

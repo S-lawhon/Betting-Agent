@@ -4,20 +4,20 @@ After=network-online.target
 Wants=network-online.target
 
 # P-030 pre-registered falsification, research/SPEC_P030_CrossVenue_Kalshi_ProphetX.md.
-# NOT INSTALLED YET — blocked on ProphetX API credentials. Before enabling:
+# NOT INSTALLED YET — blocked on production credentials and Gate 0. Sandbox
+# authentication and response shapes were validated 2026-08-02. Before enabling:
 #   1. GATE 0: get the s165(d) / s1092 characterization answer from a CPA.
 #      Gambling treatment moves the breakeven gap from 2.25c to ~3.85c and
 #      probably kills P-030 outright. Do not spend 14 days collecting first.
-#   2. Request API access (prophethelp.zendesk.com/hc/en-us/requests/new or
-#      marketmaking@prophetexchange.com), then set PROPHETX_ACCESS_KEY and
-#      PROPHETX_SECRET_KEY in /opt/betting-pod-shop/.env.
-#   3. Reconcile response shapes on the SANDBOX first — every ProphetX field
-#      name in src/prophetx_client.py came from the OpenAPI spec, not from an
-#      observed response:
+#   2. Obtain PRODUCTION API access, then set PROPHETX_ACCESS_KEY and
+#      PROPHETX_SECRET_KEY in /opt/betting-pod-shop/.env. Sandbox credentials
+#      must never feed the production evidence directory.
+#   3. Repeat response-shape reconciliation in PRODUCTION before enabling:
 #        python3 scripts/collect_crossvenue_basis.py --probe
 #        python3 scripts/collect_crossvenue_basis.py --dump-shapes /tmp/px.jsonl --once
 #        python3 scripts/collect_crossvenue_basis.py --discover   # build VOCAB maps
-#   4. Sanity-check matching:  python3 scripts/collect_crossvenue_basis.py --match-only
+#   4. Sanity-check schedule-aligned matching:
+#        python3 scripts/collect_crossvenue_basis.py --env production --match-only
 #
 # Deploy after edits:
 #   scp scripts/betting-crossvenue-basis.service root@129.212.176.202:/etc/systemd/system/

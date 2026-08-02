@@ -37,9 +37,11 @@ MLB / NBA / NHL moneyline + tennis match winner ONLY. Excluded for cause:
                    corridor is closed in the tails. Sampled anyway (recording
                    is free) but flagged `in_spec_band` for the gates.
 
-BLOCKED ON CREDENTIALS. Every ProphetX endpoint returns 401 unauthenticated.
-Run --probe first; with no credentials the collector logs the blocker and
-exits 2 rather than writing an empty sample that later looks like evidence.
+Production collection remains blocked on production credentials and Gate 0.
+Sandbox authentication and shapes were validated 2026-08-02. With no
+credentials the collector exits 2 rather than writing an empty sample that
+later looks like evidence. Sandbox rows are written to a separate directory
+and carry `px_environment=sandbox` so they cannot enter the production gate.
 
 Usage:
   python3 scripts/collect_crossvenue_basis.py --probe        # credential/liveness check
@@ -59,6 +61,7 @@ import signal
 import sys
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -70,7 +73,10 @@ from src.prophetx_fees import (breakeven_gap, no_cancel_ceiling,  # noqa: E402
                                kalshi_fee_per_contract)
 
 OUT_DIR = os.path.join(ROOT, "data", "crossvenue_basis")
+SANDBOX_OUT_DIR = os.path.join(ROOT, "data", "crossvenue_basis_sandbox")
 log = logging.getLogger("crossvenue_basis")
+EASTERN = ZoneInfo("America/New_York")
+MAX_START_SKEW_SECONDS = 15 * 60
 
 # Kalshi series that carry a two-sided game winner. Off-season series simply
 # return zero open markets, so leaving them all on costs one cheap call each.
@@ -95,6 +101,29 @@ def _kalshi_abbr(ticker: str):
     return ticker.rsplit("-", 1)[1].upper() if "-" in ticker else None
 
 
+def _kalshi_start(ticker: str):
+    match = re.search(r"-(\d{2})([A-Z]{3})(\d{2})(\d{4})", ticker.upper())
+    if not match:
+        return None
+    try:
+        parsed = datetime.strptime("".join(match.groups()), "%y%b%d%H%M")
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=EASTERN).astimezone(timezone.utc)
+
+
+def _iso_start(value):
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 # ── Kalshi side: collapse per-team tickers into one game ─────────────────────
 
 def kalshi_games(kp: KalshiPublic, series: dict = None) -> dict:
@@ -108,8 +137,11 @@ def kalshi_games(kp: KalshiPublic, series: dict = None) -> dict:
             if not tk or "-" not in tk or not abbr:
                 continue
             gid = tk.rsplit("-", 1)[0]
+            start = _kalshi_start(gid)
             g = games.setdefault(gid, {"series": stick, "sport": sport,
-                                       "tickers": {}, "titles": {}})
+                                       "tickers": {}, "titles": {},
+                                       "scheduled_start_at": (start.isoformat()
+                                                              if start else None)})
             g["tickers"][abbr] = tk
             g["titles"][abbr] = m.get("yes_sub_title") or m.get("title") or ""
     return {gid: g for gid, g in games.items() if len(g["tickers"]) == 2}
@@ -120,8 +152,8 @@ def kalshi_games(kp: KalshiPublic, series: dict = None) -> dict:
 def prophetx_moneylines(px: ProphetXClient, max_events: int = 400) -> list:
     """[{event_id, title, market, book, names}] for two-sided ProphetX markets.
 
-    ⚠️ Field names are UNVERIFIED (401 without credentials). Anything this
-    cannot parse is counted, not silently dropped -- a matcher that quietly
+    Sandbox field names were reconciled on 2026-08-02. Anything this cannot
+    parse is still counted, not silently dropped -- a matcher that quietly
     matches nothing looks identical to a venue with no mispricing, and that
     failure mode would produce a false KILL.
     """
@@ -133,10 +165,13 @@ def prophetx_moneylines(px: ProphetXClient, max_events: int = 400) -> list:
             continue
         title = ev.get("name") or ev.get("display_name") or ev.get("title") or ""
         for mk in px.markets_for_event(str(eid)) or []:
-            mtype = _norm(mk.get("type") or mk.get("market_type")
-                          or mk.get("name") or "")
-            if mtype and not any(t in mtype for t in
-                                 ("moneyline", "matchwinner", "winner", "h2h")):
+            mtype = _norm(mk.get("type") or mk.get("market_type") or "")
+            mname = _norm(mk.get("name") or "")
+            if mtype not in ("moneyline", "matchwinner", "winner", "h2h"):
+                continue
+            # `type=moneyline` also appears on period/inning and YES/NO props.
+            # Only the exact main-game market is contract-comparable here.
+            if mname not in ("moneyline", "matchwinner", "winner", "h2h"):
                 continue
             book = px.moneyline_book(mk)
             names = [k for k in book if k != "_unparsed"]
@@ -145,6 +180,7 @@ def prophetx_moneylines(px: ProphetXClient, max_events: int = 400) -> list:
                 continue
             out.append({"event_id": str(eid), "title": title, "names": names,
                         "book": book,
+                        "scheduled_start_at": ev.get("scheduled"),
                         "market_id": mk.get("market_id") or mk.get("id")})
     if skipped:
         log.warning("prophetx: %d events/markets unparsed -- reconcile with "
@@ -198,7 +234,11 @@ def match_pairs(kgames: dict, pxmls: list) -> tuple:
         by_pair.setdefault(frozenset(keys), []).append(
             (m, dict(zip(keys, m["names"]))))
 
-    pairs, reasons = [], {"no_px_market": 0, "no_vocab_for_sport": 0}
+    pairs, reasons = [], {
+        "no_px_market": 0, "no_vocab_for_sport": 0,
+        "schedule_unavailable": 0, "schedule_mismatch": 0,
+        "ambiguous_px_market": 0,
+    }
     for gid, g in kgames.items():
         if not VOCAB.get(g["sport"]):
             reasons["no_vocab_for_sport"] += 1
@@ -207,11 +247,33 @@ def match_pairs(kgames: dict, pxmls: list) -> tuple:
         if not cands:
             reasons["no_px_market"] += 1
             continue
-        m, keymap = cands[0]
+        kalshi_start = _iso_start(g.get("scheduled_start_at"))
+        if not kalshi_start:
+            reasons["schedule_unavailable"] += 1
+            continue
+        aligned = []
+        had_px_start = False
+        for m, keymap in cands:
+            px_start = _iso_start(m.get("scheduled_start_at"))
+            if not px_start:
+                continue
+            had_px_start = True
+            if abs((kalshi_start - px_start).total_seconds()) <= MAX_START_SKEW_SECONDS:
+                aligned.append((m, keymap, px_start))
+        if not aligned:
+            reasons["schedule_mismatch" if had_px_start
+                    else "schedule_unavailable"] += 1
+            continue
+        if len(aligned) != 1:
+            reasons["ambiguous_px_market"] += 1
+            continue
+        m, keymap, px_start = aligned[0]
         pairs.append({"game_id": gid, "series": g["series"], "sport": g["sport"],
                       "kalshi_tickers": g["tickers"],
                       "px_event_id": m["event_id"], "px_title": m["title"],
-                      "px_names": keymap, "px_book": m["book"]})
+                      "px_names": keymap, "px_book": m["book"],
+                      "kalshi_scheduled_start_at": kalshi_start.isoformat(),
+                      "px_scheduled_start_at": px_start.isoformat()})
     return pairs, reasons
 
 
@@ -232,6 +294,10 @@ def snapshot(kp: KalshiPublic, px: ProphetXClient, pair: dict,
     manufacture edge. Snapping only matters when posting, which this cannot do.
     """
     ts = datetime.now(timezone.utc).isoformat()
+    kalshi_start = _iso_start(pair.get("kalshi_scheduled_start_at"))
+    px_start = _iso_start(pair.get("px_scheduled_start_at"))
+    schedule_skew = (abs((kalshi_start - px_start).total_seconds())
+                     if kalshi_start and px_start else None)
     charges_maker = SERIES_CHARGES_MAKER.get(pair["series"], True)
     k_books, px_books = {}, {}
     for abbr, tk in pair["kalshi_tickers"].items():
@@ -263,6 +329,10 @@ def snapshot(kp: KalshiPublic, px: ProphetXClient, pair: dict,
         rows.append({
             "ts_utc": ts, "game_id": pair["game_id"], "series": pair["series"],
             "sport": pair["sport"], "team": abbr, "other": other,
+            "px_environment": pair.get("px_environment") or "unknown",
+            "kalshi_scheduled_start_at": pair.get("kalshi_scheduled_start_at"),
+            "px_scheduled_start_at": pair.get("px_scheduled_start_at"),
+            "schedule_skew_seconds": schedule_skew,
             "kalshi_ticker": pair["kalshi_tickers"][abbr],
             "px_event_id": pair["px_event_id"],
             "k_yes_bid": k_bid, "k_yes_ask": k_ask, "k_mid": k_mid,
@@ -292,12 +362,12 @@ def snapshot(kp: KalshiPublic, px: ProphetXClient, pair: dict,
     return rows
 
 
-def append_rows(rows) -> int:
+def append_rows(rows, output_dir=OUT_DIR) -> int:
     if not rows:
         return 0
-    os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     day = datetime.now(timezone.utc).date().isoformat()
-    with open(os.path.join(OUT_DIR, f"{day}.jsonl"), "a") as fh:
+    with open(os.path.join(output_dir, f"{day}.jsonl"), "a") as fh:
         for r in rows:
             fh.write(json.dumps(r) + "\n")
     return len(rows)
@@ -323,12 +393,17 @@ def main() -> int:
                     choices=["sandbox", "production"])
     ap.add_argument("--dump-shapes", metavar="PATH",
                     help="record one response skeleton per endpoint")
+    ap.add_argument("--output-dir",
+                    help="observation directory; defaults to an isolated "
+                         "sandbox directory when --env=sandbox")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
 
     kp = KalshiPublic()
     px = ProphetXClient(env=args.env, dump_shapes_path=args.dump_shapes)
+    output_dir = (args.output_dir or
+                  (SANDBOX_OUT_DIR if args.env == "sandbox" else OUT_DIR))
 
     if args.probe:
         info = px.probe()
@@ -372,6 +447,8 @@ def main() -> int:
         kg = kalshi_games(kp)
         pxm = prophetx_moneylines(px)
         pairs, reasons = match_pairs(kg, pxm)
+        for pair in pairs:
+            pair["px_environment"] = args.env
         log.info("kalshi games=%d  prophetx moneylines=%d  matched=%d  %s",
                  len(kg), len(pxm), len(pairs), reasons)
         return pairs
@@ -384,9 +461,9 @@ def main() -> int:
                      list(p["kalshi_tickers"]))
         if args.match_only:
             return 0
-        total = sum(append_rows(snapshot(kp, px, p, args.tax_rate))
+        total = sum(append_rows(snapshot(kp, px, p, args.tax_rate), output_dir)
                     for p in pairs)
-        log.info("--once: wrote %d rows to %s", total, OUT_DIR)
+        log.info("--once: wrote %d rows to %s", total, output_dir)
         return 0
 
     stop = {"v": False}
@@ -406,7 +483,8 @@ def main() -> int:
         wrote = 0
         for p in pairs:
             try:
-                wrote += append_rows(snapshot(kp, px, p, args.tax_rate))
+                wrote += append_rows(
+                    snapshot(kp, px, p, args.tax_rate), output_dir)
             except Exception as exc:
                 log.error("snapshot failed for %s: %s", p.get("game_id"), exc)
         if wrote:

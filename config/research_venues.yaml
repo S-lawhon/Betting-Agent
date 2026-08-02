@@ -82,15 +82,16 @@ venues:
     status: reference_only
     research_allowed: true
     execution_allowed: false
-    rationale: Read-only research is permitted through ProphetX's approved API,
-      but this repository is still blocked on credentials and live response-shape
-      reconciliation. Execution remains unapproved.
+    rationale: Read-only sandbox authentication, response shapes, main-game
+      moneyline parsing, and schedule-aligned matching were validated on
+      2026-08-02. Production collection and execution remain unapproved.
     automated_collection_allowed: true
-    collection_state: blocked_api_credentials
+    collection_state: blocked_production_credentials
     research_adapter: scripts.collect_crossvenue_basis
     next_action: >-
-      Obtain read-only API credentials, run --probe and --dump-shapes, reconcile
-      response fields, then approve a time-boxed collection service.
+      Obtain production API credentials, repeat the fail-closed shape and match
+      checks against production, resolve tax Gate 0, then separately approve a
+      time-boxed production collection service.
     evidence:
       - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations
       - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/58754

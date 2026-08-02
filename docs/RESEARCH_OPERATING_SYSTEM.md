@@ -273,8 +273,9 @@ small early sample must not permanently starve new sources or market families.
 - Polymarket US discovery is public and read-only; execution remains pending.
 - ForecastEx discovery still depends on eligible IBKR product discovery and is
   not yet implemented by the legacy connector.
-- ProphetX remains read-only and requires authenticated response-shape
-  reconciliation.
+- ProphetX remains read-only. Sandbox authentication and response shapes are
+  reconciled; production credentials, production-shape validation, and tax
+  Gate 0 remain blockers to a production evidence run.
 - The bounded X pilot is enabled with application and X-side budget controls;
   the runtime credential remains VPS-only and uncommitted.
 - No repository daemon invokes the model-driven agents automatically. The

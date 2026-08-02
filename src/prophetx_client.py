@@ -20,13 +20,11 @@ asserts the absence of those symbols so the constraint cannot rot.
 
 TWO THINGS TO KNOW BEFORE YOU TRUST OUTPUT FROM THIS FILE
 ---------------------------------------------------------
-1. **RESPONSE SHAPES ARE UNVERIFIED.** Every ProphetX data endpoint returns 401
-   unauthenticated (confirmed on both sandbox and production 2026-07-29), so
-   the field names below are taken from the published OpenAPI spec and the
-   first-party integration guide, NOT from an observed live response. The
-   parsers are deliberately tolerant and every one of them records what it
-   could not understand. Run `--dump-shapes` on the first authenticated call
-   and reconcile before trusting a single measured basis.
+1. **SANDBOX SHAPES WERE RECONCILED 2026-08-02.** The current Trading API uses
+   unversioned `/mm/` routes for tournaments and events. Moneyline selections
+   are grouped as a list of one-element lists and expose the executable offer
+   as `odds` with available `stake`. Production shapes must still be checked
+   independently before a production collector is enabled.
 
 2. **RATE LIMITS ARE UNPUBLISHED.** Nothing in ProphetX's docs states them.
    The default throttle here is deliberately slow (4 req/s). Ask during API
@@ -58,6 +56,10 @@ BASES = {
     "sandbox": "https://api-ss-sandbox.betprophet.co/partner",
     "production": "https://cash.api.prophetx.co/partner",
 }
+
+MM_TOURNAMENTS = "/mm/get_tournaments"
+MM_SPORT_EVENTS = "/mm/get_sport_events"
+MM_MARKETS = "/mm/get_markets"
 
 # Access token lifetime is 20 minutes per the docs; refresh early.
 _TOKEN_TTL = 20 * 60
@@ -166,8 +168,12 @@ class ProphetXClient:
 
     def _record_shape(self, path: str, body: Any) -> None:
         """Append one observed response skeleton per endpoint, once. This is
-        how the UNVERIFIED shapes above get reconciled on the first real run."""
+        how sandbox and production schemas are compared without storing data."""
         if not self._dump_path or path in self._dumped:
+            return
+        # Event iteration commonly reaches an event with no markets first. Do
+        # not let that empty response permanently mask the populated schema.
+        if path == MM_MARKETS and not self._unwrap(body, "markets", "market"):
             return
         self._dumped.add(path)
 
@@ -257,23 +263,25 @@ class ProphetXClient:
         if not live:
             return list(VALID_ODDS)
         if sorted(live) != sorted(VALID_ODDS):
+            relationship = ("extends pinned fallback"
+                            if set(VALID_ODDS).issubset(set(live))
+                            else "conflicts with pinned fallback")
             logger.warning(
-                "prophetx: LIVE LADDER DIFFERS from pinned constant "
-                "(live=%d ticks, pinned=%d). Update src/prophetx_ladder.py.",
-                len(live), len(VALID_ODDS))
+                "prophetx: live ladder %s (live=%d ticks, pinned=%d)",
+                relationship, len(live), len(VALID_ODDS))
         return live
 
     def tournaments(self) -> List[dict]:
-        return self._unwrap(self.get("/v4/mm/get_tournaments"),
+        return self._unwrap(self.get(MM_TOURNAMENTS),
                             "tournaments", "data")
 
     def sport_events(self, tournament_id: Optional[str] = None) -> List[dict]:
         params = {"tournament_id": tournament_id} if tournament_id else None
-        return self._unwrap(self.get("/v4/mm/get_sport_events", params),
+        return self._unwrap(self.get(MM_SPORT_EVENTS, params),
                             "sport_events", "events")
 
     def markets_for_event(self, event_id: str) -> List[dict]:
-        body = self.get("/v4/mm/get_markets", {"event_id": event_id})
+        body = self.get(MM_MARKETS, {"event_id": event_id})
         return self._unwrap(body, "markets", "market")
 
     def moneyline_book(self, market: dict) -> Dict[str, Any]:
@@ -284,17 +292,27 @@ class ProphetXClient:
                         "bid_size", "ask_size"}} plus "_unparsed" listing any
         field it could not interpret.
 
-        ⚠️ SHAPE UNVERIFIED (see module docstring). ProphetX is a back/lay-style
-        exchange: what is displayed as a "bid" on a selection is economically a
-        resting offer to take the OTHER side. Do not assume the sign convention
-        matches Kalshi's yes_bid/yes_ask until reconciled against --dump-shapes.
+        The sandbox's `odds`/`stake` pair is the executable offer to back that
+        selection, so it maps to ask price/size. For binary markets the
+        complementary selection's ask implies a synthetic bid; that derivation
+        is labeled in the normalized record.
         """
         out: Dict[str, Any] = {"_unparsed": []}
         selections = (market.get("selections") or market.get("outcomes")
                       or market.get("lines") or [])
         if isinstance(selections, dict):
             selections = list(selections.values())
-        for sel in selections:
+        for group in selections:
+            # Current Trading API shape: [[selection], [selection]]. A spread
+            # or total may have several line entries in one group; prefer the
+            # first executable quote, then retain the first descriptor.
+            if isinstance(group, list):
+                candidates = [row for row in group if isinstance(row, dict)]
+                sel = next((row for row in candidates
+                            if isinstance(row.get("odds"), (int, float))),
+                           candidates[0] if candidates else None)
+            else:
+                sel = group
             if not isinstance(sel, dict):
                 out["_unparsed"].append(repr(sel)[:80])
                 continue
@@ -304,8 +322,9 @@ class ProphetXClient:
                 out["_unparsed"].append(sorted(sel)[:8])
                 continue
             rec: Dict[str, Any] = {}
-            for side, keys in (("bid", ("bid_odds", "back_odds", "odds", "best_bid")),
-                               ("ask", ("ask_odds", "lay_odds", "best_ask"))):
+            for side, keys in (("bid", ("bid_odds", "best_bid")),
+                               ("ask", ("ask_odds", "back_odds", "odds",
+                                        "best_ask"))):
                 odds = next((sel[k] for k in keys
                              if isinstance(sel.get(k), (int, float))), None)
                 rec[f"{side}_odds"] = odds
@@ -313,12 +332,21 @@ class ProphetXClient:
                     rec[f"{side}_prob"] = american_to_prob(odds) if odds else None
                 except ValueError:
                     rec[f"{side}_prob"] = None
-            for side, keys in (("bid", ("bid_size", "back_size", "stake", "size")),
-                               ("ask", ("ask_size", "lay_size", "liability"))):
+            for side, keys in (("bid", ("bid_size",)),
+                               ("ask", ("ask_size", "back_size", "stake",
+                                        "size", "liability"))):
                 rec[f"{side}_size"] = next(
                     (float(sel[k]) for k in keys
                      if isinstance(sel.get(k), (int, float))), None)
             out[str(name)] = rec
+        names = [name for name in out if name != "_unparsed"]
+        if len(names) == 2:
+            left, right = out[names[0]], out[names[1]]
+            for row, opposite in ((left, right), (right, left)):
+                if row.get("bid_prob") is None and opposite.get("ask_prob") is not None:
+                    row["bid_prob"] = 1.0 - opposite["ask_prob"]
+                    row["bid_size"] = opposite.get("ask_size")
+                    row["bid_derived_from_complement"] = True
         return out
 
     def probe(self) -> dict:

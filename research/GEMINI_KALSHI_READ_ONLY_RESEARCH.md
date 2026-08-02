@@ -121,9 +121,11 @@ collection.
 ## Additional venue decisions
 
 - ProphetX remains the next adapter candidate. It is a CFTC-designated contract
-  market and the repository contains a read-only client, but collection is
-  blocked until API credentials and live response shapes are verified. Its MLB
-  settlement terms are tracked as non-equivalent to Kalshi.
+  market and the repository contains a read-only client. Sandbox credentials,
+  response shapes, quote parsing, and schedule-aligned matching are validated;
+  production credentials, production-shape validation, and tax Gate 0 still
+  block a production evidence run. Its MLB settlement terms are tracked as
+  non-equivalent to Kalshi.
 - Novig is research-only. Texas eligibility is documented, but its sweepstakes
   rules prohibit automated or systematic participation; no automated adapter
   should be built without written API/institutional authorization and renewed

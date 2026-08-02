@@ -9,9 +9,20 @@ with no monitor scheduled — the note is written, nobody opens it.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 
 from manager.checks import check_workstreams
+
+
+def today():
+    """UTC, matching check_workstreams — never the local date.
+
+    The first version of this file used the LOCAL date. It passed all day and
+    failed the moment UTC rolled past midnight while the Mac was still on the
+    previous date, reporting "4d overdue" for a date built as today-3. The
+    whole manager is UTC; a test that is not will be green until it is not.
+    """
+    return datetime.now(timezone.utc).date()
 
 
 def _snap(recheck_after, **kw):
@@ -26,12 +37,12 @@ def _keys(findings):
 
 
 def test_recheck_due_today_fires():
-    findings = check_workstreams(_snap(date.today().isoformat()))
+    findings = check_workstreams(_snap(today().isoformat()))
     assert "ws.R-TEST.recheck_due" in _keys(findings)
 
 
 def test_recheck_overdue_fires_and_counts_days():
-    past = (date.today() - timedelta(days=3)).isoformat()
+    past = (today() - timedelta(days=3)).isoformat()
     finding = next(f for f in check_workstreams(_snap(past))
                    if f.key == "ws.R-TEST.recheck_due")
     assert finding.severity == "action"
@@ -39,7 +50,7 @@ def test_recheck_overdue_fires_and_counts_days():
 
 
 def test_future_recheck_stays_silent():
-    future = (date.today() + timedelta(days=40)).isoformat()
+    future = (today() + timedelta(days=40)).isoformat()
     assert "ws.R-TEST.recheck_due" not in _keys(check_workstreams(_snap(future)))
 
 
@@ -55,6 +66,6 @@ def test_unparseable_recheck_does_not_crash_the_check():
 
 def test_action_required_is_used_as_the_detail_when_present():
     finding = next(f for f in check_workstreams(
-        _snap(date.today().isoformat(), action_required="Re-query the series."))
+        _snap(today().isoformat(), action_required="Re-query the series."))
         if f.key == "ws.R-TEST.recheck_due")
     assert finding.detail == "Re-query the series."

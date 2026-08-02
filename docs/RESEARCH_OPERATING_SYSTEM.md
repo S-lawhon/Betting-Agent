@@ -49,7 +49,7 @@ eligibility, and metrics. Agents are used only where judgment is necessary.
 | Venue/CFTC rules and products | Daily | Terms, fees, incentives, new DCMs |
 | Kalshi census | Daily; full on UTC day 1 | Deltas plus coverage rotation |
 | Academic feeds | Daily collection, weekly review | Mechanisms and replication leads |
-| X curated queries | Explicit opt-in; twice daily | Practitioner and emerging leads |
+| X curated queries | Once daily during $50 pilot | Practitioner and emerging leads |
 | Official event data | Event-specific | Timestamped falsification inputs |
 
 The current scheduled intake runs daily at 04:05 UTC, after the 03:35 UTC
@@ -57,12 +57,20 @@ Kalshi census. The collector is intentionally not a low-latency trading feed.
 
 ### X cost and data controls
 
-X is disabled in `config/research_sources.yaml`. To enable a bounded pilot:
+X uses a two-key opt-in in `config/research_sources.yaml` and at runtime. The
+approved pilot runs once daily:
 
-1. Approve a monthly API budget outside the repository.
-2. Set `X_BEARER_TOKEN` in the service secret environment.
-3. Start with the three configured queries and inspect source yield.
-4. Run `python3 -m scripts.run_research_intake --include-x`.
+1. Keep the X-side monthly hard limit at $50 with auto-recharge disabled.
+2. Set `X_BEARER_TOKEN` in the root `.env` for local runs, or in the VPS-only
+   `/opt/betting-pod-shop/.env.x`; never commit the token.
+3. Keep `collectors.x.enabled: true` and pass `--include-x`.
+4. Start with the three configured queries and inspect source yield.
+
+The application allows one run per UTC day, warns at a conservative estimated
+$40, and stops before its next worst-case run could exceed $45. X's billing
+console remains authoritative. `data/research_intake/x_usage.json` is a local
+guard ledger based on returned posts and authors; it can overestimate billing
+because it deliberately does not assume X resource deduplication.
 
 The collector stores post ID, URL, author, timestamp, metrics, and a short
 excerpt. It does not use follower counts or engagement to score edge and does
@@ -111,6 +119,12 @@ python3 -m scripts.run_market_census --fetch-live --full-on-month-start
 python3 -m scripts.run_research_intake
 ```
 
+Live intake including the bounded X pilot:
+
+```bash
+python3 -m scripts.run_research_intake --include-x
+```
+
 Build source/lane funnel metrics:
 
 ```bash
@@ -124,6 +138,7 @@ Outputs under `data/research_intake/`:
 - `assignments/`: lane-balanced research assignments;
 - `manifests/`: coverage, errors, deferrals, and eligibility audit;
 - `metrics.json`: disposition yield by source and lane.
+- `x_usage.json`: daily returned-resource counts and conservative cost estimate.
 
 Partial source failures are recorded in `collector_errors`. Prior state is
 written atomically. The scheduled unit fails only when collectors report errors
@@ -141,6 +156,12 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now market-census.timer research-intake.timer
 systemctl list-timers market-census.timer research-intake.timer
 ```
+
+`research-intake.service` imports `/opt/betting-pod-shop/.env`, then the
+optional X-only `/opt/betting-pod-shop/.env.x`, and supplies the explicit
+`--include-x` flag. The X-only file is preferred for this pilot so deploying the
+Bearer Token does not copy unrelated credentials. Lock it to mode `0600` and
+owner `bettingbot:bettingbot`. The normal code deploy excludes secret files.
 
 The manager registry monitors both manifests for freshness. A fresh intake
 manifest proves collection ran; it does not prove any agent researched the

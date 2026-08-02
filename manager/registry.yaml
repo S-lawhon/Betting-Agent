@@ -179,8 +179,9 @@ jobs:
     severity: warn
     note: >
       Install and enable research-intake.timer after creating its writable data
-      directory. Collector errors are recorded in the manifest; X remains off
-      unless a paid API budget is explicitly approved.
+      directory. Collector errors and conservative X usage are recorded in the
+      manifest. The approved X pilot is limited to one run per UTC day, warns
+      at $40 estimated usage, and stops below the $50 X-side hard limit.
 
   - id: clv_settlement
     host: droplet

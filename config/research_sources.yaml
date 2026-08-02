@@ -39,11 +39,19 @@ collectors:
       include_keywords: [forecast, prediction market, calibration, online learning, sports]
 
   x:
-    enabled: false
+    enabled: true
     note: >-
-      Explicit opt-in only. X is pay-per-use; set X_BEARER_TOKEN and pass
-      --include-x after approving a monthly API budget.
+      Approved $50 pilot. Collection still requires X_BEARER_TOKEN and the
+      explicit --include-x runtime flag.
     max_results_per_query: 25
+    max_queries_per_run: 3
+    budget:
+      max_runs_per_utc_day: 1
+      post_read_usd: 0.005
+      user_read_usd: 0.010
+      warning_usd: 40.00
+      halt_usd: 45.00
+      x_hard_limit_usd: 50.00
     queries:
       - '(prediction market OR event contract) (fee OR rule OR settlement OR API) -is:retweet lang:en'
       - '(sports betting OR market making) (research OR model OR mispricing) -is:retweet lang:en'

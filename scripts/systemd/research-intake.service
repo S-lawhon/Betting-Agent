@@ -8,7 +8,9 @@ Type=oneshot
 User=bettingbot
 Group=bettingbot
 WorkingDirectory=/opt/betting-pod-shop
-ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_intake
+EnvironmentFile=-/opt/betting-pod-shop/.env
+EnvironmentFile=-/opt/betting-pod-shop/.env.x
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_intake --include-x
 ExecStartPost=/opt/betting-pod-shop/venv/bin/python -m scripts.build_research_metrics
 
 StandardOutput=journal

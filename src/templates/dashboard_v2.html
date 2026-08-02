@@ -1090,6 +1090,7 @@ function renderResearchPipeline(r){
   var operations = r.operations || {}, activity = operations.activity_24h || {};
   var queue = operations.queue || {}, semantics = operations.semantics || {};
   var health = r.collector_health || {}, zeroFeeds = health.zero_academic_feeds || [];
+  var expectedFeeds = health.expected_empty_academic_feeds || [];
   var quality = r.quality_control || {};
   el("r-state").textContent = r.available
     ? (isNum(pending) ? intf(pending) + " task packets pending review" : "") : "";
@@ -1111,7 +1112,9 @@ function renderResearchPipeline(r){
     ? "Source health: " + (health.status || "unknown") + " · " +
       numTxt(health.academic_feed_items_raw) + " raw academic items · " +
       numTxt(health.collector_error_count) + " collector errors" +
-      (zeroFeeds.length ? " · zero feeds: " + zeroFeeds.join(", ") : "")
+      (zeroFeeds.length ? " · zero feeds" +
+        (expectedFeeds.length === zeroFeeds.length ? " (expected today)" : "") +
+        ": " + zeroFeeds.join(", ") : "")
     : "Source health unavailable.";
   el("r-quality").textContent = r.available
     ? "Quality control: " + numTxt(quality.intake_rejected) + " rejected at intake · " +

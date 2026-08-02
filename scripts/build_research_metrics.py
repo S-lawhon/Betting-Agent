@@ -279,13 +279,22 @@ def _collector_health(intake_manifest: Dict[str, Any]) -> Dict[str, Any]:
             if str(key).startswith("feed:") and not str(key).endswith(":raw")
         }
     zero_feeds = sorted(key for key, value in raw_feeds.items() if value == 0)
+    expected_empty = sorted({
+        str(key)[:-len(":expected_empty")]
+        for key, value in counts.items()
+        if str(key).startswith("feed:")
+        and str(key).endswith(":expected_empty") and value
+    })
+    unexpected_zero = sorted(set(zero_feeds) - set(expected_empty))
     status = "unknown"
     if raw_feeds or errors:
-        status = "degraded" if errors or zero_feeds else "healthy"
+        status = "degraded" if errors or unexpected_zero else "healthy"
     return {
         "status": status,
         "academic_feed_items_raw": sum(raw_feeds.values()),
         "zero_academic_feeds": zero_feeds,
+        "expected_empty_academic_feeds": expected_empty,
+        "unexpected_zero_academic_feeds": unexpected_zero,
         "collector_error_count": len(errors),
         "collector_errors": errors[:20],
     }

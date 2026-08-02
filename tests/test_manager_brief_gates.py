@@ -169,6 +169,7 @@ def research_snap() -> dict:
         "collector_health": {
             "status": "degraded", "academic_feed_items_raw": 0,
             "zero_academic_feeds": ["feed:arxiv_qfin_trading"],
+            "expected_empty_academic_feeds": [],
             "collector_error_count": 1,
         },
         "quality_control": {

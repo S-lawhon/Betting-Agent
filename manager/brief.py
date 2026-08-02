@@ -316,13 +316,18 @@ def render_markdown(b: Dict[str, Any]) -> str:
         collector_health = research.get("collector_health") or {}
         quality = research.get("quality_control") or {}
         zero_feeds = collector_health.get("zero_academic_feeds") or []
+        expected_feeds = (collector_health.get("expected_empty_academic_feeds")
+                          or [])
         L.append("")
         L.append("Source health: {} — {} raw academic items, {} collector errors{}"
                  .format(
                      collector_health.get("status") or "unknown",
                      _metric(collector_health.get("academic_feed_items_raw")),
                      _metric(collector_health.get("collector_error_count")),
-                     ("; zero feeds: {}".format(", ".join(zero_feeds))
+                     ("; zero feeds{}: {}".format(
+                         " (expected today)"
+                         if len(expected_feeds) == len(zero_feeds) else "",
+                         ", ".join(zero_feeds))
                       if zero_feeds else "")))
         L.append("Quality control: {} rejected at intake, {} blocked at triage, "
                  "{} legacy packets quarantined".format(
@@ -555,12 +560,17 @@ def render_html(b: Dict[str, Any]) -> str:
         collector_health = research.get("collector_health") or {}
         quality = research.get("quality_control") or {}
         zero_feeds = collector_health.get("zero_academic_feeds") or []
+        expected_feeds = (collector_health.get("expected_empty_academic_feeds")
+                          or [])
         P.append("<div class='dim'>Source health: {} — {} raw academic items, {} "
                  "collector errors{}</div>".format(
                      e(str(collector_health.get("status") or "unknown")),
                      e(_metric(collector_health.get("academic_feed_items_raw"))),
                      e(_metric(collector_health.get("collector_error_count"))),
-                     e("; zero feeds: {}".format(", ".join(zero_feeds))
+                     e("; zero feeds{}: {}".format(
+                       " (expected today)"
+                       if len(expected_feeds) == len(zero_feeds) else "",
+                       ", ".join(zero_feeds))
                        if zero_feeds else "")))
         P.append("<div class='dim'>Quality control: {} rejected at intake, {} "
                  "blocked at triage, {} legacy packets quarantined</div>".format(

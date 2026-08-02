@@ -134,3 +134,31 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(agent["dispatched_24h"], 1)
             self.assertEqual(agent["oldest_pending_age_hours"], 60.0)
             self.assertEqual(agent["queue_state"], "overdue")
+
+    def test_expected_weekend_empty_feed_remains_healthy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("assignments", "dispositions", "triage"):
+                (root / name).mkdir()
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({
+                "collector_counts": {
+                    "feed:arxiv:raw": 0,
+                    "feed:arxiv:expected_empty": 1,
+                },
+                "collector_errors": [],
+            }))
+            output = root / "metrics.json"
+            self.assertEqual(main([
+                "--assignments-dir", str(root / "assignments"),
+                "--dispositions-dir", str(root / "dispositions"),
+                "--dispatches-dir", str(root / "triage"),
+                "--intake-manifest", str(manifest),
+                "--output", str(output),
+                "--now", "2026-08-02T12:00:00Z",
+            ]), 0)
+            health = json.loads(output.read_text())["collector_health"]
+            self.assertEqual(health["status"], "healthy")
+            self.assertEqual(
+                health["expected_empty_academic_feeds"], ["feed:arxiv"])
+            self.assertEqual(health["unexpected_zero_academic_feeds"], [])

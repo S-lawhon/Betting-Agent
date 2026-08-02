@@ -53,13 +53,26 @@ class TestRunResearchIntake(TestCase):
                 "id": "academic", "enabled": True, "name": "Academic",
                 "type": "paper", "url": "https://example.test/rss",
             }]},
-        }, now=_utc("2026-08-02T04:05:00Z"))
+        }, now=_utc("2026-08-03T04:05:00Z"))
         self.assertEqual(items, [])
         self.assertEqual(counts["feed:academic:raw"], 0)
         self.assertEqual(errors[0]["source"], "feed:academic")
         self.assertIn("zero raw items", errors[0]["error"])
         self.assertEqual(telemetry["status"], "not_requested")
         self.assertFalse(changed)
+
+    @patch("scripts.run_research_intake.FeedCollector.fetch", return_value=[])
+    def test_weekend_empty_arxiv_feed_is_expected_not_an_error(self, _fetch):
+        items, errors, counts, _, _ = collect_live({
+            "collectors": {"feeds": [{
+                "id": "arxiv", "enabled": True, "name": "arXiv",
+                "type": "paper", "url": "https://rss.arxiv.org/rss/q-fin.TR",
+            }]},
+        }, now=_utc("2026-08-02T04:05:00Z"))
+        self.assertEqual(items, [])
+        self.assertEqual(errors, [])
+        self.assertEqual(counts["feed:arxiv:raw"], 0)
+        self.assertEqual(counts["feed:arxiv:expected_empty"], 1)
 
     def test_offline_run_writes_all_artifacts_without_network(self):
         with tempfile.TemporaryDirectory() as tmp:

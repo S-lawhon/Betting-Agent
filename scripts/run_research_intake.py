@@ -247,16 +247,25 @@ def collect_live(config: Dict[str, Any], *, now: datetime,
             continue
         counts[f"feed:{feed.get('id')}"] = 0
         try:
+            feed_url = str(feed["url"])
             raw_feed_items = FeedCollector(
                 str(feed.get("name") or feed.get("id")),
                 str(feed.get("type") or "paper"),
-            ).fetch(str(feed["url"]), now=now)
+            ).fetch(feed_url, now=now)
             counts[f"feed:{feed.get('id')}:raw"] = len(raw_feed_items)
             if not raw_feed_items:
-                errors.append({
-                    "source": f"feed:{feed.get('id')}",
-                    "error": "enabled academic feed returned zero raw items",
-                })
+                # arXiv announces new papers five days per week. Its valid RSS
+                # channels are normally empty on Saturday and Sunday, which is
+                # observable idleness rather than a collector outage.
+                expected_empty = (
+                    "arxiv.org" in feed_url.lower() and now.weekday() >= 5)
+                if expected_empty:
+                    counts[f"feed:{feed.get('id')}:expected_empty"] = 1
+                else:
+                    errors.append({
+                        "source": f"feed:{feed.get('id')}",
+                        "error": "enabled academic feed returned zero raw items",
+                    })
             feed_items = raw_feed_items
             keywords = [str(value).lower() for value in
                         feed.get("include_keywords") or []]

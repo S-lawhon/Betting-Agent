@@ -50,6 +50,7 @@ def root(tmp_path: Path) -> Path:
     (tmp_path / "data" / "trade_logs").mkdir(parents=True)
     (tmp_path / "data" / "p022_window_check").mkdir(parents=True)
     (tmp_path / "data" / "research_intake").mkdir(parents=True)
+    (tmp_path / "data" / "gemini_crossvenue").mkdir(parents=True)
     (tmp_path / "manager" / "state").mkdir(parents=True)
     return tmp_path
 
@@ -60,6 +61,7 @@ LOADERS = [
     ("load_manager_status", lambda r: r / "manager/state/status.json"),
     ("load_rollup", lambda r: r / "data/dashboard/rollup.json"),
     ("load_research_metrics", lambda r: r / "data/research_intake/metrics.json"),
+    ("load_crossvenue_metrics", lambda r: r / "data/gemini_crossvenue/metrics.json"),
 ]
 
 
@@ -224,6 +226,18 @@ def test_research_metrics_uses_generated_timestamp(root):
     assert meta["stale"] is False
 
 
+def test_crossvenue_metrics_uses_generated_timestamp(root):
+    path = root / "data" / "gemini_crossvenue" / "metrics.json"
+    path.write_text(json.dumps({
+        "generated_at": ago(minutes=5), "status": "healthy",
+        "latest": {"matched_events": 9},
+    }))
+    payload, meta = ds.load_crossvenue_metrics(root, None, clock)
+    assert payload["latest"]["matched_events"] == 9
+    assert meta["available"] is True
+    assert meta["stale"] is False
+
+
 # ── the p022 window tail ──────────────────────────────────────────────
 
 
@@ -276,7 +290,7 @@ def test_load_all_on_an_empty_tree_never_raises(root):
     out = ds.load_all(root, clock=clock)
     assert set(out["sources"]) == {"engine_state", "open_positions",
                                   "manager_status", "rollup", "p022_window",
-                                  "research_metrics", "clv"}
+                                  "research_metrics", "crossvenue_metrics", "clv"}
     for name, meta in out["sources"].items():
         assert meta["available"] is False, name
         assert meta["reason"], name

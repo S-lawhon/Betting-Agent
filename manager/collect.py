@@ -1235,6 +1235,7 @@ class Collector:
             "decisions": payload.get("decisions") or {},
             "top_rejection_reasons": payload.get("top_rejection_reasons") or {},
             "x_pilot": payload.get("x_pilot") or {},
+            "crossvenue_pilot": payload.get("crossvenue_pilot") or {},
         }
 
     # ---- P-014 gate (delegates to the sanctioned reader) -----------------

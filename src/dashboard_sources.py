@@ -94,6 +94,7 @@ ROLLUP_MAX_AGE_S = 10800.0            # 3 x the hourly rollup timer
 P022_WINDOW_MAX_AGE_S = 10800.0       # registry says max_stale_hours: 3
 CLV_MAX_AGE_S = 172800.0             # registry says max_stale_hours: 48
 RESEARCH_METRICS_MAX_AGE_S = 108000.0  # daily intake; allow 30 hours
+CROSSVENUE_METRICS_MAX_AGE_S = 1200.0  # four five-minute collection windows
 
 #: Kill-switch sentinel files.  Existence — not content — means "killed".
 KILL_SWITCH_NAMES = (
@@ -112,6 +113,7 @@ PATHS = {
     "p022_window":    "data/p022_window_check/status.jsonl",
     "clv":            "data/trade_logs/clv_log.jsonl",
     "research_metrics": "data/research_intake/metrics.json",
+    "crossvenue_metrics": "data/gemini_crossvenue/metrics.json",
 }
 
 
@@ -389,6 +391,27 @@ def load_research_metrics(
     return payload, meta
 
 
+def load_crossvenue_metrics(
+    root: Path,
+    state_dir: Optional[Path] = None,
+    clock: Optional[Clock] = None,
+) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """Current read-only Gemini/Kalshi research collector metrics."""
+    del state_dir
+    path = root / "data" / "gemini_crossvenue" / "metrics.json"
+    payload, meta = load_json_file(
+        path, max_age_s=CROSSVENUE_METRICS_MAX_AGE_S, clock=clock,
+        content_ts_key="generated_at")
+    if payload is None:
+        if meta.get("reason") == "file does not exist":
+            meta["reason"] = "no Gemini/Kalshi research snapshot yet"
+        return None, meta
+    if not isinstance(payload, dict):
+        return None, _meta(path, available=False, clock=clock,
+                           reason="expected a JSON object")
+    return payload, meta
+
+
 def tail_p022_window(
     root: Path,
     clock: Optional[Clock] = None,
@@ -506,6 +529,7 @@ def load_all(
     manager_status, m_mgr = load_manager_status(root, clock)
     rollup, m_rollup = load_rollup(root, sd, clock)
     research_metrics, m_research = load_research_metrics(root, sd, clock)
+    crossvenue_metrics, m_crossvenue = load_crossvenue_metrics(root, sd, clock)
     p022_window, m_p022 = tail_p022_window(root, clock)
     _, m_clv = clv_freshness(root, clock)
 
@@ -518,6 +542,7 @@ def load_all(
         "manager_status": manager_status,
         "rollup":         rollup,
         "research_metrics": research_metrics,
+        "crossvenue_metrics": crossvenue_metrics,
         "p022_window":    p022_window,
         "kill_switches":  kill_switches(root),
         "sources": {
@@ -526,6 +551,7 @@ def load_all(
             "manager_status": m_mgr,
             "rollup":         m_rollup,
             "research_metrics": m_research,
+            "crossvenue_metrics": m_crossvenue,
             "p022_window":    m_p022,
             "clv":            m_clv,
         },
@@ -553,7 +579,8 @@ def source_fingerprint(root: Path, state_dir: Optional[Path] = None) -> str:
             h.update("{}:absent".format(rel).encode())
     for p in (root / "manager" / "state" / "status.json",
               root / "data" / "p022_window_check" / "status.jsonl",
-              root / "data" / "research_intake" / "metrics.json"):
+              root / "data" / "research_intake" / "metrics.json",
+              root / "data" / "gemini_crossvenue" / "metrics.json"):
         try:
             st = p.stat()
             h.update("{}:{}:{}".format(p.name, st.st_mtime_ns, st.st_size).encode())

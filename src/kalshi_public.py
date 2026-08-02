@@ -111,6 +111,28 @@ class KalshiPublic:
             params["cursor"] = cursor
         return out
 
+    def open_events(self, series_ticker: str,
+                    max_pages: int = 10) -> List[Dict[str, Any]]:
+        """All open events with their markets for a series."""
+        out: List[Dict[str, Any]] = []
+        params: Dict[str, Any] = {
+            "series_ticker": series_ticker,
+            "status": "open",
+            "with_nested_markets": "true",
+            "limit": 200,
+        }
+        for _ in range(max_pages):
+            data = self.get("/events", params)
+            if data is None:
+                raise RuntimeError("Kalshi event request failed")
+            out.extend(item for item in data.get("events", [])
+                       if isinstance(item, dict))
+            cursor = data.get("cursor")
+            if not cursor:
+                break
+            params["cursor"] = cursor
+        return out
+
     def get_market(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Single market by ticker, or None.
 

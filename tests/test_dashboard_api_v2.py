@@ -40,7 +40,8 @@ def sources(**over):
     base = {name: meta(available=False, path="/x/" + name,
                        age=None, stale=True, reason="file does not exist")
             for name in ("engine_state", "open_positions", "manager_status",
-                        "rollup", "p022_window", "research_metrics", "clv")}
+                        "rollup", "p022_window", "research_metrics",
+                        "crossvenue_metrics", "clv")}
     base.update(over)
     return base
 
@@ -71,7 +72,7 @@ def src(**over):
         "generated_at_utc": "2026-07-30T12:00:00+00:00",
         "engine_state": None, "open_positions": None, "manager_status": None,
         "rollup": None, "p022_window": None, "kill_switches": [],
-        "research_metrics": None,
+        "research_metrics": None, "crossvenue_metrics": None,
         "sources": sources(),
     }
     base.update(over)
@@ -629,6 +630,11 @@ def test_research_pipeline_surfaces_dispatch_yield_and_x_cost():
         }},
         "x_pilot": {"month": "2026-08", "estimated_cost_usd": 1.065,
                     "assignments": 10, "reviewed": 4, "advanced": 1},
+        "crossvenue_pilot": {
+            "status": "healthy", "generated_at": "2026-08-02T12:00:00Z",
+            "terms_equivalence": "unverified",
+            "latest": {"matched_events": 3, "actionable_paths": 0},
+        },
     }
     research = api.build_v2(src(
         research_metrics=metrics,
@@ -639,6 +645,25 @@ def test_research_pipeline_surfaces_dispatch_yield_and_x_cost():
     assert research["operations"]["queue"]["overdue"] == 2
     assert research["operations"]["semantics"]["agent_invocation_tracked"] is False
     assert research["x_pilot"]["estimated_cost_usd"] == 1.065
+    assert research["crossvenue_pilot"]["latest"]["matched_events"] == 3
+
+
+def test_live_crossvenue_metrics_override_daily_embedded_copy():
+    daily = {
+        "generated_at": "2026-08-02T04:00:00Z",
+        "funnel": {}, "operations": {},
+        "crossvenue_pilot": {"latest": {"matched_events": 3}},
+    }
+    live = {
+        "generated_at": "2026-08-02T12:05:00Z", "status": "healthy",
+        "latest": {"matched_events": 9},
+    }
+    research = api.build_v2(src(
+        research_metrics=daily, crossvenue_metrics=live,
+        sources=sources(research_metrics=meta(), crossvenue_metrics=meta()),
+    ))["pipeline"]["research"]
+
+    assert research["crossvenue_pilot"]["latest"]["matched_events"] == 9
 
 
 def test_missing_research_metrics_is_unknown_not_zero():

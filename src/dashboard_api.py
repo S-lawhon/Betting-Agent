@@ -693,6 +693,7 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
     rollup = _d(src.get("rollup"))
     win = _d(src.get("p022_window"))
     research_metrics = _d(src.get("research_metrics"))
+    crossvenue_metrics = _d(src.get("crossvenue_metrics"))
     now = _parse(src.get("generated_at_utc")) or datetime.now(UTC)
 
     # ---- research discovery -> specialist review -> opportunity funnel ----
@@ -711,6 +712,10 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
             "collector_health": _d(research_metrics.get("collector_health")),
             "quality_control": _d(research_metrics.get("quality_control")),
             "x_pilot": _d(research_metrics.get("x_pilot")),
+            "crossvenue_pilot": (
+                crossvenue_metrics
+                if _available(sources, "crossvenue_metrics") and crossvenue_metrics
+                else _d(research_metrics.get("crossvenue_pilot"))),
             "generated_at": research_metrics.get("generated_at"),
             "reason": None,
             "source": "data/research_intake/metrics.json",
@@ -722,6 +727,7 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
             "dispatch": {}, "by_source_type": {}, "by_source_name": {},
             "by_lane": {}, "decisions": {}, "operations": {},
             "collector_health": {}, "quality_control": {}, "x_pilot": {},
+            "crossvenue_pilot": {},
             "generated_at": None,
             "reason": (_reason(sources, "research_metrics")
                        or "research metrics are unavailable"),

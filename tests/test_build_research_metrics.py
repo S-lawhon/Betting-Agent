@@ -72,12 +72,19 @@ class TestBuildResearchMetrics(TestCase):
                 "quality_rejection_reasons": {"expired_market": 4},
             }))
             output = root / "metrics.json"
+            crossvenue = root / "crossvenue.json"
+            crossvenue.write_text(json.dumps({
+                "status": "healthy", "generated_at": "2026-08-02T00:00:00Z",
+                "terms_equivalence": "unverified",
+                "latest": {"matched_events": 2, "actionable_paths": 0},
+            }))
             self.assertEqual(main([
                 "--assignments-dir", str(assignments),
                 "--dispositions-dir", str(dispositions),
                 "--dispatches-dir", str(dispatches.parent),
                 "--execution-dir", str(root / "execution"),
                 "--intake-manifest", str(intake_manifest),
+                "--crossvenue-metrics", str(crossvenue),
                 "--output", str(output),
                 "--now", "2026-08-02T00:00:00Z",
             ]), 0)
@@ -89,6 +96,8 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(metrics["dispatch"]["dispatched"], 1)
             self.assertEqual(metrics["funnel"]["dispatched_reviewed"], 1)
             self.assertEqual(metrics["x_pilot"]["estimated_cost_usd"], 1.25)
+            self.assertEqual(
+                metrics["crossvenue_pilot"]["latest"]["matched_events"], 2)
             self.assertEqual(metrics["collector_health"]["status"], "degraded")
             self.assertEqual(
                 metrics["collector_health"]["academic_feed_items_raw"], 3)

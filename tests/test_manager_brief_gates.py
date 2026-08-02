@@ -168,6 +168,14 @@ def research_snap() -> dict:
         },
         "x_pilot": {"month": "2026-08", "estimated_cost_usd": 1.065,
                     "assignments": 10, "reviewed": 2, "advanced": 1},
+        "crossvenue_pilot": {
+            "status": "healthy", "generated_at": "2026-08-02T12:00:00Z",
+            "terms_equivalence": "unverified",
+            "latest": {"matched_events": 3,
+                       "hypothetical_positive_paths": 1,
+                       "actionable_paths": 0},
+            "last_24h": {"snapshots": 288, "matched_events": 24},
+        },
         "collector_health": {
             "status": "degraded", "academic_feed_items_raw": 0,
             "zero_academic_feeds": ["feed:arxiv_qfin_trading"],
@@ -188,6 +196,8 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "200 assignments" in text
         assert "10 dispatched" in text
         assert "8 pending" in text
+        assert "Gemini/Kalshi research: healthy" in text
+        assert "settlement terms unverified" in text
         assert "strategy-scout" in text
         assert "worker claims/start state are tracked" in text.lower()
         assert "model invocation is not tracked" in text.lower()

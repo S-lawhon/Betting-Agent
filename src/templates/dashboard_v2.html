@@ -391,6 +391,7 @@ iframe{width:100%;height:78vh;border:1px solid var(--border);border-radius:var(-
         <tbody><tr><td colspan="6" class="empty">&mdash;</td></tr></tbody>
       </table></div>
       <div class="cap" id="r-x"></div>
+      <div class="cap" id="r-crossvenue"></div>
       <div class="src" id="r-src"></div>
     </div>
 
@@ -1184,6 +1185,16 @@ function renderResearchPipeline(r){
       numTxt(x.reviewed) + " reviewed · " + numTxt(x.advanced) + " advanced" +
       (isNum(x.cost_per_advanced_usd) ? " · $" + x.cost_per_advanced_usd.toFixed(2) + " per advance" : "")
     : "X pilot cost/yield will appear after the first measured run.";
+  var cv = r.crossvenue_pilot || {}, cvLatest = cv.latest || {}, cvDay = cv.last_24h || {};
+  el("r-crossvenue").textContent = cv.generated_at
+    ? "Gemini/Kalshi research: " + (cv.status || "unknown") +
+      " · " + numTxt(cvLatest.matched_events) + " matched now · " +
+      numTxt(cvLatest.hypothetical_positive_paths) + " hypothetical positive paths · " +
+      numTxt(cvLatest.actionable_paths) + " actionable · " +
+      numTxt(cvDay.snapshots) + " snapshots / " +
+      numTxt(cvDay.matched_events) + " matched observations in 24h · terms " +
+      (cv.terms_equivalence || "unknown")
+    : "Gemini/Kalshi research metrics will appear after the first snapshot.";
 }
 
 function drawSpark(weeks){

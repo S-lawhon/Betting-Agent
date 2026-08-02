@@ -86,6 +86,11 @@ def test_the_unknown_helpers_exist(html):
         assert fn in html, "missing %s — the unknown-state contract needs it" % fn
 
 
+def test_crossvenue_research_has_a_dashboard_surface(html):
+    assert 'id="r-crossvenue"' in html
+    assert "r.crossvenue_pilot" in html
+
+
 def test_isnum_rejects_non_finite(html):
     assert 'typeof v === "number" && isFinite(v)' in html, (
         "isNum must reject NaN/Infinity, not just non-numbers")

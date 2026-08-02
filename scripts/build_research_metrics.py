@@ -363,6 +363,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--intake-manifest", type=Path,
                         default=ROOT / "data" / "research_intake"
                         / "latest_manifest.json")
+    parser.add_argument("--crossvenue-metrics", type=Path,
+                        default=ROOT / "data" / "gemini_crossvenue"
+                        / "metrics.json")
     parser.add_argument("--output", type=Path,
                         default=ROOT / "data" / "research_intake" / "metrics.json")
     parser.add_argument("--now", help="ISO timestamp (test/replay only)")
@@ -379,6 +382,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     intake_manifest = _read_json(args.intake_manifest, {})
     metrics["x_pilot"] = _x_pilot_metrics(
         assignments, dispositions, intake_manifest)
+    metrics["crossvenue_pilot"] = _read_json(args.crossvenue_metrics, {})
     metrics["collector_health"] = _collector_health(intake_manifest)
     triage_manifest = _read_json(args.dispatches_dir / "latest_manifest.json", {})
     quarantine_files = list(

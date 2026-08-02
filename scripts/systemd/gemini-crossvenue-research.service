@@ -1,0 +1,29 @@
+[Unit]
+Description=Betting Pod Shop — read-only Gemini/Kalshi research snapshot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_gemini_crossvenue_research
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gemini-crossvenue-research
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=256M
+TimeoutStartSec=120
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/gemini_crossvenue
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

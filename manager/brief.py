@@ -319,6 +319,7 @@ def render_markdown(b: Dict[str, Any]) -> str:
                         _metric(row.get("advance_24h")),
                         _metric(row.get("research_minutes_24h"))))
         x_pilot = research.get("x_pilot") or {}
+        crossvenue = research.get("crossvenue_pilot") or {}
         collector_health = research.get("collector_health") or {}
         quality = research.get("quality_control") or {}
         zero_feeds = collector_health.get("zero_academic_feeds") or []
@@ -350,6 +351,20 @@ def render_markdown(b: Dict[str, Any]) -> str:
                          cost_text, _metric(x_pilot.get("assignments")),
                          _metric(x_pilot.get("reviewed")),
                          _metric(x_pilot.get("advanced"))))
+        if crossvenue.get("generated_at"):
+            latest = crossvenue.get("latest") or {}
+            day = crossvenue.get("last_24h") or {}
+            L.append("")
+            L.append("Gemini/Kalshi research: {} — {} matched now, {} hypothetical "
+                     "positive paths, {} actionable; {} snapshots and {} matched observations in "
+                     "24h; settlement terms {}.".format(
+                         crossvenue.get("status") or "unknown",
+                         _metric(latest.get("matched_events")),
+                         _metric(latest.get("hypothetical_positive_paths")),
+                         _metric(latest.get("actionable_paths")),
+                         _metric(day.get("snapshots")),
+                         _metric(day.get("matched_events")),
+                         crossvenue.get("terms_equivalence") or "unknown"))
     L.append("")
 
     if b["gates"]:
@@ -570,6 +585,7 @@ def render_html(b: Dict[str, Any]) -> str:
                              e(_metric(row.get("research_minutes_24h")))))
             P.append("</ul></div>")
         x_pilot = research.get("x_pilot") or {}
+        crossvenue = research.get("crossvenue_pilot") or {}
         collector_health = research.get("collector_health") or {}
         quality = research.get("quality_control") or {}
         zero_feeds = collector_health.get("zero_academic_feeds") or []
@@ -599,6 +615,19 @@ def render_html(b: Dict[str, Any]) -> str:
                          e(cost_text), e(_metric(x_pilot.get("assignments"))),
                          e(_metric(x_pilot.get("reviewed"))),
                          e(_metric(x_pilot.get("advanced")))))
+        if crossvenue.get("generated_at"):
+            latest = crossvenue.get("latest") or {}
+            day = crossvenue.get("last_24h") or {}
+            P.append("<div class='dim'>Gemini/Kalshi research: {} — {} matched now, "
+                     "{} hypothetical positive paths, {} actionable; {} snapshots and {} matched "
+                     "observations in 24h; settlement terms {}.</div>".format(
+                         e(str(crossvenue.get("status") or "unknown")),
+                         e(_metric(latest.get("matched_events"))),
+                         e(_metric(latest.get("hypothetical_positive_paths"))),
+                         e(_metric(latest.get("actionable_paths"))),
+                         e(_metric(day.get("snapshots"))),
+                         e(_metric(day.get("matched_events"))),
+                         e(str(crossvenue.get("terms_equivalence") or "unknown"))))
 
     if b["gates"]:
         P.append("<h2>Gate progress</h2>")

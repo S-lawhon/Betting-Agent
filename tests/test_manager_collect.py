@@ -317,6 +317,33 @@ def test_collector_loads_shared_research_operations_contract(tmp_path):
     assert record["quality_control"]["intake_rejected"] == 4
 
 
+def test_collector_overlays_live_crossvenue_metrics_for_daily_brief(tmp_path):
+    project = tmp_path / "opt" / "betting-pod-shop"
+    metrics_dir = project / "data" / "research_intake"
+    metrics_dir.mkdir(parents=True)
+    (metrics_dir / "metrics.json").write_text(json.dumps({
+        "generated_at": "2026-08-02T04:00:00Z",
+        "operations": {},
+        "crossvenue_pilot": {
+            "generated_at": "2026-08-02T04:00:00Z",
+            "terms_equivalence": "unverified",
+        },
+    }), encoding="utf-8")
+    live_dir = project / "data" / "gemini_crossvenue"
+    live_dir.mkdir(parents=True)
+    (live_dir / "metrics.json").write_text(json.dumps({
+        "generated_at": "2026-08-02T19:45:00Z",
+        "terms_equivalence": "not_equivalent",
+        "analytics": {"quote_completeness": 1.0},
+    }), encoding="utf-8")
+    reg = write_registry(tmp_path, str(project), str(project))
+
+    record = collect.Collector(reg, root=project).research_operations()
+
+    assert record["crossvenue_pilot"]["terms_equivalence"] == "not_equivalent"
+    assert record["crossvenue_pilot"]["analytics"]["quote_completeness"] == 1.0
+
+
 def test_collector_admits_missing_research_operations(tmp_path):
     project = tmp_path / "project"
     project.mkdir()

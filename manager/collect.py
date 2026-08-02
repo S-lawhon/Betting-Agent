@@ -1221,6 +1221,19 @@ class Collector:
                 "reason": "research metrics have no operations block",
             }
         age_minutes = file_age(path)
+        crossvenue = payload.get("crossvenue_pilot") or {}
+        live_crossvenue_path = (
+            self.root / "data" / "gemini_crossvenue" / "metrics.json")
+        if live_crossvenue_path.exists():
+            try:
+                live_crossvenue = json.loads(
+                    live_crossvenue_path.read_text(encoding="utf-8"))
+                if isinstance(live_crossvenue, dict) and live_crossvenue:
+                    crossvenue = live_crossvenue
+            except (OSError, json.JSONDecodeError):
+                # The aggregate remains usable and truthfully falls back to its
+                # last embedded snapshot while the live source is being replaced.
+                pass
         return {
             "available": True,
             "path": str(path),
@@ -1235,7 +1248,7 @@ class Collector:
             "decisions": payload.get("decisions") or {},
             "top_rejection_reasons": payload.get("top_rejection_reasons") or {},
             "x_pilot": payload.get("x_pilot") or {},
-            "crossvenue_pilot": payload.get("crossvenue_pilot") or {},
+            "crossvenue_pilot": crossvenue,
         }
 
     # ---- P-014 gate (delegates to the sanctioned reader) -----------------

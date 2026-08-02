@@ -26,15 +26,48 @@ HEALTH_URL="http://localhost:8080/health"
 HEALTH_TIMEOUT=60      # seconds to wait for healthy response
 HEALTH_INTERVAL=5      # seconds between health check retries
 BACKUP_SUFFIX=".deploy-backup"
+PYTHON="${PYTHON:-python3}"
 
 if [[ -z "$SERVER_IP" ]]; then
   echo "Usage: bash scripts/deploy.sh SERVER_IP [restart]"
   exit 1
 fi
 
+# ── Pre-deploy: prove the test gate can actually measure ──────────────
+# Several test modules open with `pytest.importorskip(...)`, so a missing
+# third-party dependency skips the WHOLE module and the run still reports
+# green. Measured 2026-08-01: this script's shell resolved python3 to a
+# 3.14 framework build with no numpy/scipy, silently dropping 47 tests —
+# every test of the P-029 combo correlation pricer, the module whose output
+# Gate 0's verdict depends on — and the summary showed it only as "4
+# skipped" instead of 2. A gate that quietly stops measuring is worse than
+# no gate, so a missing dependency now aborts the deploy instead.
+echo "==> Checking the test environment ..."
+echo "    interpreter: $("$PYTHON" -c 'import sys; print(sys.executable)')"
+missing=$("$PYTHON" - <<'PY'
+import importlib.util
+# Anything a test module importorskips on. Add to this list, never remove:
+# a name dropping off is exactly the silent-shrinkage this check exists for.
+required = ("pytest", "yaml", "requests", "numpy", "scipy", "cryptography")
+print(" ".join(m for m in required if importlib.util.find_spec(m) is None))
+PY
+)
+if [[ -n "$missing" ]]; then
+  echo ""
+  echo "ABORT: the test interpreter is missing: $missing"
+  echo ""
+  echo "  Test modules importorskip on these, so the suite would report green"
+  echo "  while silently not running them. Fix one of:"
+  echo "    $PYTHON -m pip install $missing"
+  echo "    PYTHON=/path/to/python3 bash scripts/deploy.sh $SERVER_IP ${RESTART}"
+  echo ""
+  echo "  Nothing was deployed."
+  exit 1
+fi
+
 # ── Pre-deploy: run tests locally ─────────────────────────────────────
 echo "==> Running local tests ..."
-if ! python3 -m pytest tests/ -q --tb=no 2>&1 | tail -3; then
+if ! "$PYTHON" -m pytest tests/ -q --tb=no 2>&1 | tail -3; then
   echo ""
   echo "WARNING: Some tests failed. Review output above."
   read -p "Continue with deploy? [y/N] " -n 1 -r

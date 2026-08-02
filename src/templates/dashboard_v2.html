@@ -429,6 +429,18 @@ iframe{width:100%;height:78vh;border:1px solid var(--border);border-radius:var(-
       <div class="rb" id="sk-bars"><div class="empty">&mdash;</div></div>
       <div class="cap" id="sk-cov"></div>
     </div>
+
+    <!-- Shadow-mode counterpart to the skip panel. While the aggregate
+         risk guard runs with enforce:false these trades were PLACED, so
+         they are absent from "Why nothing fired" above — without this
+         card the portfolio constraint looks like it vanished. -->
+    <div class="card span" id="shr-card" hidden>
+      <div class="ct">Risk guard &mdash; shadow mode
+        <span class="sub" id="shr-sub"></span>
+      </div>
+      <div class="rb" id="shr-bars"><div class="empty">&mdash;</div></div>
+      <div class="cap" id="shr-cov"></div>
+    </div>
   </section>
 
   <!-- ══ OPS ══ -->
@@ -1088,6 +1100,7 @@ function renderPipeline(d){
     : '<tr><td colspan="5" class="empty">' + esc(pr.reason || "no weekly data") + "</td></tr>";
 
   renderSkip(d);
+  renderShadowRisk(d);
 }
 
 function renderResearchPipeline(r){
@@ -1310,6 +1323,60 @@ function drawSpark(weeks){
     '<circle cx="' + (lastX - 3) + '" cy="' + lastY.toFixed(1) + '" r="3.5" fill="#58a6ff" stroke="#161b22" stroke-width="2"></circle>';
 }
 
+/* Shared [label, count] bar list — used by the skip panel and by the
+   shadow-mode panel, which must stay visually comparable: they are two
+   halves of the same question (what did not get placed, and what only
+   got placed because the guard is not enforcing). */
+function drawBars(box, rows, emptyMsg){
+  if(!rows || !rows.length){
+    box.innerHTML = '<div class="empty">' + esc(emptyMsg || "no rows") + "</div>";
+    return;
+  }
+  var top = rows.slice(0, 12);
+  var max = Math.max.apply(null, top.map(function(r){ return isNum(r[1]) ? r[1] : 0; }));
+  var total = rows.reduce(function(a,b){ return a + (isNum(b[1]) ? b[1] : 0); }, 0);
+  box.innerHTML = top.map(function(r){
+    var wpc = max > 0 ? (r[1] / max * 100) : 0;
+    var share = total > 0 ? (r[1] / total * 100) : null;
+    return '<div class="rbrow">' +
+      '<div class="rbname" title="' + esc(r[0]) + '">' + esc(r[0]) + "</div>" +
+      '<div class="rbbar"><i style="width:' + wpc.toFixed(2) + '%"></i></div>' +
+      '<div class="rbval">' + intf(r[1]) + (share !== null ? " · " + share.toFixed(1) + "%" : "") + "</div>" +
+    "</div>";
+  }).join("") + (rows.length > 12
+    ? '<div class="cap">' + (rows.length - 12) + " further row(s) not shown; the full set is in /api/v2/rollup.</div>"
+    : "");
+}
+
+function renderShadowRisk(d){
+  var sh = ((d.pipeline || {}).shadow_risk) || {};
+  var card = el("shr-card");
+  if(!card) return;
+
+  // Hidden entirely when the guard is enforcing — there is no shadow log
+  // then, and an empty card would imply the opposite.
+  if(!sh.available){ card.hidden = true; return; }
+  card.hidden = false;
+
+  var rows = SKIP_MODE === "windowed" ? (sh.windowed || []) : (sh.lifetime || []);
+  var usd = isNum(sh.usd_passed_through) ? sh.usd_passed_through : null;
+
+  el("shr-sub").textContent =
+    "NOT ENFORCING · " + numTxt(sh.lifetime_total) +
+    " trade(s) placed that the guard would have blocked" +
+    (usd !== null ? " · $" + usd.toLocaleString(undefined,
+      {minimumFractionDigits:2, maximumFractionDigits:2}) + " notional" : "") +
+    (SKIP_MODE === "windowed"
+      ? " · showing last " + numTxt(sh.window_days) + " days"
+      : " · showing all time");
+
+  drawBars(el("shr-bars"), rows,
+    SKIP_MODE === "windowed" ? "no shadow rows in the window" : "no shadow rows");
+
+  el("shr-cov").textContent = (sh.note || "") +
+    (sh.last_utc ? " Last recorded " + sh.last_utc + "." : "");
+}
+
 function renderSkip(d){
   var sk = ((d.pipeline || {}).skip_reasons) || {};
   var rows = SKIP_MODE === "windowed" ? (sk.windowed || []) : (sk.lifetime || []);
@@ -1321,26 +1388,8 @@ function renderSkip(d){
       " days retained · lifetime total " + lifeTotal.toLocaleString()
     : "all time · dominated by whatever config was live months ago";
 
-  var box = el("sk-bars");
-  if(!rows.length){
-    box.innerHTML = '<div class="empty">' + esc(sk.reason ||
-      (SKIP_MODE === "windowed" ? "no skip rows in the window" : "no skip rows")) + "</div>";
-  } else {
-    var top = rows.slice(0, 12);
-    var max = Math.max.apply(null, top.map(function(r){ return isNum(r[1]) ? r[1] : 0; }));
-    var total = rows.reduce(function(a,b){ return a + (isNum(b[1]) ? b[1] : 0); }, 0);
-    box.innerHTML = top.map(function(r){
-      var wpc = max > 0 ? (r[1] / max * 100) : 0;
-      var share = total > 0 ? (r[1] / total * 100) : null;
-      return '<div class="rbrow">' +
-        '<div class="rbname" title="' + esc(r[0]) + '">' + esc(r[0]) + "</div>" +
-        '<div class="rbbar"><i style="width:' + wpc.toFixed(2) + '%"></i></div>' +
-        '<div class="rbval">' + intf(r[1]) + (share !== null ? " · " + share.toFixed(1) + "%" : "") + "</div>" +
-      "</div>";
-    }).join("") + (rows.length > 12
-      ? '<div class="cap">' + (rows.length - 12) + " further reason(s) not shown; the full set is in /api/v2/rollup.</div>"
-      : "");
-  }
+  drawBars(el("sk-bars"), rows, sk.reason ||
+    (SKIP_MODE === "windowed" ? "no skip rows in the window" : "no skip rows"));
   var cov = sk.coverage || {};
   el("sk-cov").textContent = isNum(cov.rows_total)
     ? "Coverage: " + intf(cov.rows_with_skip_reason) + " of " + intf(cov.rows_total) +
@@ -1429,8 +1478,8 @@ function show(v){
 Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(b){
   b.addEventListener("click", function(){ show(b.dataset.view); });
 });
-el("sk-win").addEventListener("click", function(){ SKIP_MODE = "windowed"; if(DATA) renderSkip(DATA); });
-el("sk-life").addEventListener("click", function(){ SKIP_MODE = "lifetime"; if(DATA) renderSkip(DATA); });
+el("sk-win").addEventListener("click", function(){ SKIP_MODE = "windowed"; if(DATA){ renderSkip(DATA); renderShadowRisk(DATA); } });
+el("sk-life").addEventListener("click", function(){ SKIP_MODE = "lifetime"; if(DATA){ renderSkip(DATA); renderShadowRisk(DATA); } });
 el("eq-chart").addEventListener("click", function(){ setEq("chart"); });
 el("eq-table").addEventListener("click", function(){ setEq("table"); });
 function setEq(m){

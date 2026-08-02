@@ -171,6 +171,42 @@ exposure — the guard rejected nothing, and only the pod's own
 - `_add_position` is idempotent by market_id and `close_position` credits
   the venue/pod buckets back — they used to only ever go up. Do not call
   `_add_position` from a pod (P-006 used to; it double-counted).
+- **SHADOW MODE while in research (`aggregate_risk.enforce: false`, 2026-08-02).**
+  The guard now MEASURES the portfolio constraint instead of imposing it.
+  Every limit is still evaluated and every breach recorded; nothing is
+  blocked. Rationale: vetoing paper trades **biases** the research, it does
+  not merely shrink it — a trade is dropped when the book is already full,
+  which correlates with high opportunity density, so the skips delete
+  observations from busy regimes and pods are then compared on the
+  survivors. The portfolio-wide daily-loss halt was worse still: it
+  **couples the pods**, so one pod's bad hour blanks every other pod's data
+  for 60 minutes, which is fatal when the objective is per-pod attribution.
+  Measured on the shipped config: 40 × $25 tickets in one scan → **12 placed
+  enforcing vs 40 in shadow**. ~70% of the sample was being deleted.
+- **A veto is destructive; a log is replayable.** From an unconstrained log
+  you can reconstruct what any cap setting would have done; from a
+  constrained log you can never recover the blocked trades. `shadow_log`
+  (`data/trade_logs/aggregate_risk_shadow.jsonl`) carries pod, venue, size
+  and full exposure state per decision — the raw material for that replay.
+  **Caveat: the recorded verdicts are evaluated against the UNCONSTRAINED
+  book** (nothing was blocked, so exposure runs past the caps). They say
+  which trades touched a limit, NOT what the constrained portfolio would
+  have held. That requires replaying the log offline.
+- **Shadow mode is PAPER-ONLY and fails closed.** `from_config(config,
+  mode=...)` forces enforcement back on unless the caller states
+  `mode="paper"`, and logs an ERROR when it does. `cli.py` resolves
+  `args.mode or "paper"`. The live-capable paths are unaffected: P-016 and
+  P-029 are separate units, and the P-022 standalone maker calls
+  `from_config(config)` with no mode, so it keeps enforcing. A repo-wide
+  research flag that silently disarmed a live guard is the failure this
+  project already had once with the loss guard — do not add one.
+- **`enforce: false` does NOT make the caps dead config** — they decide what
+  gets recorded. Keep them meaningful. **Flip back to `true` before funding.**
+- **The binding cap is the VENUE cap, not the total cap.** With P-002/P-006
+  shelved every pod trades Kalshi, so `max_venue_exposure_pct: 0.30` ($300
+  of the $1k paper bankroll) binds before `max_total_exposure_pct: 0.50`.
+- **`exempt_pods` bypasses ONLY the total-exposure check** — venue, per-pod,
+  position-count and halt checks still apply. It is not an off switch.
 - **Bootstrap tracks paper positions for pods that have a settler**
   (`settled_pod_ids`, derived by `engine._settled_pod_ids`). The old blanket
   paper-skip predated the P-015/P-017 settlers and, since the whole engine

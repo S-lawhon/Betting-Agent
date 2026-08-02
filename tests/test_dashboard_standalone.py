@@ -67,7 +67,11 @@ def full_root(tmp_path: Path) -> Path:
         "risk": {"bankroll": 10000.0, "total_exposure_usd": 1250.0,
                  "total_exposure_pct": 12.5, "daily_pnl": -4.25,
                  "daily_pnl_pct": -0.04, "open_positions": 8, "halted": False,
-                 "halt_reason": None, "venue_exposure": {"kalshi": 1250.0}},
+                 "halt_reason": None, "venue_exposure": {"kalshi": 1250.0},
+                 # Shadow-mode fields: engine_state.json IS _serialize()'s
+                 # output, so a real file always carries these.
+                 "enforcing": False, "would_halt": True,
+                 "shadow_counts": {"venue_exposure": 8}},
         "cycle": {"cycle_number": 8812, "duration_seconds": 0.43,
                   "pods_scanned": 4, "placed_count": 0, "skipped_count": 118,
                   "error_count": 0, "success_rate": 100.0,
@@ -248,7 +252,9 @@ def test_file_backed_v1_equals_the_in_memory_serializer(full_root):
         total_exposure_usd=1250.0, total_exposure_pct=0.125,
         venue_exposure={"kalshi": 1250.0}, pod_exposure={},
         daily_pnl=-4.25, daily_pnl_pct=-0.0004, open_positions=8,
-        halted=False, halt_reason=None)
+        halted=False, halt_reason=None,
+        enforcing=False, would_halt=True,
+        shadow_counts={"venue_exposure": 8})
     report = SimpleNamespace(
         cycle_number=8812, timestamp_utc=raw["cycle"]["timestamp_utc"],
         duration_seconds=0.43, pods_scanned=4, total_results=4,

@@ -865,8 +865,52 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
         "source": "data/dashboard/rollup.json:skip_reasons",
     }
 
+    # ---- aggregate-risk shadow (enforce: false) ----
+    # Sits alongside skip_reasons on purpose: while the guard is in shadow
+    # mode these trades are MISSING from skip_reasons, because the pod was
+    # approved and placed them. Reading the skip panel alone would say the
+    # portfolio constraint had gone away.
+    shr = _d(rollup.get("shadow_risk"))
+    shr_life = _d(shr.get("lifetime"))
+    shr_day = _d(shr.get("by_day"))
+    shr_windowed: Dict[str, float] = {}
+    shr_days_in_window = 0
+    for day, counts in shr_day.items():
+        if str(day) < cutoff:
+            continue
+        shr_days_in_window += 1
+        for kind, n in _d(counts).items():
+            shr_windowed[kind] = shr_windowed.get(kind, 0) + (_num(n) or 0)
+
+    shadow_risk = {
+        "available": bool(shr.get("available")),
+        "enforcing": not bool(shr.get("available")),
+        "window_days": SKIP_WINDOW_DAYS,
+        "days_in_window": shr_days_in_window,
+        "retention_days": _num(shr.get("by_day_retention_days")),
+        "lifetime_total": _num(shr_life.get("total")),
+        "usd_passed_through": _num(shr_life.get("usd_passed_through")),
+        "windowed": sorted(([k, int(n)] for k, n in shr_windowed.items()),
+                           key=lambda kv: -kv[1]),
+        "lifetime": sorted(
+            ([k, int(_num(n) or 0)] for k, n in _d(shr_life.get("by_kind")).items()),
+            key=lambda kv: -kv[1]),
+        "lifetime_by_pod": {
+            pid: sorted(([k, int(_num(n) or 0)] for k, n in _d(c).items()),
+                        key=lambda kv: -kv[1])
+            for pid, c in sorted(_d(shr_life.get("by_pod")).items())
+        },
+        "last_utc": shr.get("last_utc"),
+        "note": shr.get("note"),
+        "reason": (None if shr.get("available")
+                   else "no shadow log — the aggregate risk guard is "
+                        "enforcing, or has not run in shadow mode yet"),
+        "source": "data/dashboard/rollup.json:shadow_risk",
+    }
+
     return {"research": research, "p022_window": p022,
-            "placement": placement, "skip_reasons": skip}
+            "placement": placement, "skip_reasons": skip,
+            "shadow_risk": shadow_risk}
 
 
 # ── ops / work ────────────────────────────────────────────────────────

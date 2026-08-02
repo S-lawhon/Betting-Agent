@@ -609,5 +609,172 @@ class TestSettledPodIds(unittest.TestCase):
         self.assertEqual(_settled_pod_ids({"nowcast_client": object()}), set())
 
 
+class TestShadowMode(unittest.TestCase):
+    """enforce=False: measure every limit, block nothing."""
+
+    def _guard(self, **kw):
+        kw.setdefault("bankroll", 1000.0)
+        kw.setdefault("enforce", False)
+        kw.setdefault("_now_fn", lambda: _NOW)
+        return AggregateRiskGuard(**kw)
+
+    def test_over_total_exposure_is_allowed_through(self):
+        g = self._guard(max_total_exposure_pct=0.10)
+        g._add_position("P-001", "kalshi", "MKT-A", 500.0)
+        # 500 + 100 = 60% of bankroll, way past the 10% cap.
+        self.assertTrue(g.check_trade("P-002", "kalshi", 100.0))
+        self.assertEqual(g.shadow_counts.get("total_exposure"), 1)
+
+    def test_enforcing_guard_still_blocks_the_same_trade(self):
+        """The shadow path must not change what the limits MEAN."""
+        g = self._guard(max_total_exposure_pct=0.10, enforce=True)
+        g._add_position("P-001", "kalshi", "MKT-A", 500.0)
+        self.assertFalse(g.check_trade("P-002", "kalshi", 100.0))
+        self.assertEqual(g.shadow_counts, {})
+
+    def test_venue_and_pod_breaches_are_classified(self):
+        g = self._guard(max_venue_exposure_pct=0.05, max_pod_exposure_pct=0.99)
+        self.assertTrue(g.check_trade("P-001", "kalshi", 100.0))
+        self.assertEqual(g.shadow_counts.get("venue_exposure"), 1)
+
+        g2 = self._guard(max_pod_exposure_pct=0.05, max_venue_exposure_pct=0.99)
+        self.assertTrue(g2.check_trade("P-001", "kalshi", 100.0))
+        self.assertEqual(g2.shadow_counts.get("pod_exposure"), 1)
+
+    def test_position_count_breach_is_allowed_through(self):
+        g = self._guard(max_open_positions=1)
+        g._add_position("P-001", "kalshi", "MKT-A", 10.0)
+        self.assertTrue(g.check_trade("P-002", "kalshi", 10.0))
+        self.assertEqual(g.shadow_counts.get("position_count"), 1)
+
+    def test_halt_does_not_stop_cycles_or_trades(self):
+        """The portfolio-wide halt is the worst offender for research —
+        it blanks every pod at once. Shadow must record it, not apply it."""
+        g = self._guard(max_daily_loss_pct=0.05)
+        g.record_pnl(-100.0)              # 10% of bankroll → halt
+        self.assertTrue(g.is_halted)      # state is still tracked...
+        self.assertTrue(g.check_pre_cycle())   # ...but nothing is blocked
+        self.assertTrue(g.check_trade("P-001", "kalshi", 5.0))
+        self.assertEqual(g.shadow_counts.get("halted"), 1)
+
+    def test_observed_halt_does_not_report_as_halted(self):
+        """health_check, manager/checks, web_dashboard and both HTML
+        templates read snapshot.halted as 'trading is stopped'. In shadow
+        mode nothing is stopped, so reporting True would page the whole
+        monitoring stack for a halt that halted nothing."""
+        g = self._guard(max_daily_loss_pct=0.05)
+        g.record_pnl(-100.0)
+        snap = g.snapshot()
+        self.assertFalse(snap.halted)       # nothing actually stopped
+        self.assertTrue(snap.would_halt)    # ...but it is observable
+        self.assertIn("daily_loss_limit", snap.halt_reason or "")
+
+    def test_enforcing_halt_reports_as_halted(self):
+        g = self._guard(max_daily_loss_pct=0.05, enforce=True)
+        g.record_pnl(-100.0)
+        snap = g.snapshot()
+        self.assertTrue(snap.halted)
+        self.assertTrue(snap.would_halt)
+
+    def test_halt_still_stops_everything_when_enforcing(self):
+        g = self._guard(max_daily_loss_pct=0.05, enforce=True)
+        g.record_pnl(-100.0)
+        self.assertFalse(g.check_pre_cycle())
+        self.assertFalse(g.check_trade("P-001", "kalshi", 5.0))
+
+    def test_exposure_accounting_still_runs_in_shadow(self):
+        """Reservations must keep working — the recorded verdicts are
+        only meaningful if the book state behind them is real."""
+        g = self._guard(max_total_exposure_pct=0.10)
+        self.assertTrue(g.reserve_trade("P-001", "kalshi", "MKT-A", 80.0))
+        self.assertEqual(g._reserved(), 80.0)
+
+    def test_breach_is_recorded_once_per_market_per_cycle(self):
+        """Pod pre-check and executor check the same market; counting it
+        twice would overstate the constraint on replay."""
+        g = self._guard(max_total_exposure_pct=0.01)
+        g.check_trade("P-001", "kalshi", 50.0, market_id="MKT-A")
+        g.check_trade("P-001", "kalshi", 50.0, market_id="MKT-A")
+        self.assertEqual(g.shadow_counts.get("total_exposure"), 1)
+
+    def test_dedup_resets_at_the_cycle_boundary(self):
+        g = self._guard(max_total_exposure_pct=0.01)
+        g.check_trade("P-001", "kalshi", 50.0, market_id="MKT-A")
+        g.check_pre_cycle()
+        g.check_trade("P-001", "kalshi", 50.0, market_id="MKT-A")
+        self.assertEqual(g.shadow_counts.get("total_exposure"), 2)
+
+    def test_snapshot_reports_shadow_state(self):
+        g = self._guard(max_total_exposure_pct=0.01)
+        g.check_trade("P-001", "kalshi", 50.0, market_id="MKT-A")
+        snap = g.snapshot()
+        self.assertFalse(snap.enforcing)
+        self.assertEqual(snap.shadow_counts.get("total_exposure"), 1)
+
+    def test_shadow_log_records_replayable_state(self):
+        import json as _json
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "nested" / "shadow.jsonl"
+            g = self._guard(max_total_exposure_pct=0.01, shadow_log_path=path)
+            g._add_position("P-009", "kalshi", "MKT-OLD", 25.0)
+            g.check_trade("P-001", "kalshi", 50.0, market_id="MKT-A")
+
+            rows = [_json.loads(ln) for ln in path.read_text().splitlines() if ln]
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["pod_id"], "P-001")
+        self.assertEqual(row["venue"], "kalshi")
+        self.assertEqual(row["market_id"], "MKT-A")
+        self.assertEqual(row["position_size_usd"], 50.0)
+        self.assertEqual(row["breach_kind"], "total_exposure")
+        # Exposure state at decision time is what a replay needs.
+        self.assertEqual(row["bankroll"], 1000.0)
+        self.assertEqual(row["total_exposure_usd"], 25.0)
+        self.assertEqual(row["open_positions"], 1)
+        self.assertEqual(row["limit_pct"], 0.01)
+
+    def test_shadow_log_failure_never_breaks_the_scan(self):
+        # Path is a directory → open() raises; the trade must still pass.
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            g = self._guard(max_total_exposure_pct=0.01, shadow_log_path=Path(td))
+            self.assertTrue(g.check_trade("P-001", "kalshi", 50.0))
+        self.assertEqual(g.shadow_counts.get("total_exposure"), 1)
+
+
+class TestShadowModeConfigGate(unittest.TestCase):
+    """enforce:false is paper-only and fails closed."""
+
+    CFG = {
+        "risk": {"initial_bankroll": 1000.0},
+        "aggregate_risk": {"enforce": False, "shadow_log": "data/shadow.jsonl"},
+    }
+
+    def test_paper_mode_honours_shadow(self):
+        g = AggregateRiskGuard.from_config(self.CFG, mode="paper")
+        self.assertFalse(g.enforce)
+        self.assertEqual(g.shadow_log_path, Path("data/shadow.jsonl"))
+
+    def test_live_mode_forces_enforcement_on(self):
+        g = AggregateRiskGuard.from_config(self.CFG, mode="live")
+        self.assertTrue(g.enforce)
+
+    def test_unstated_mode_forces_enforcement_on(self):
+        """The P-022 standalone maker calls from_config() with no mode.
+        A caller that cannot say it is paper does not get shadow mode."""
+        g = AggregateRiskGuard.from_config(self.CFG)
+        self.assertTrue(g.enforce)
+
+    def test_defaults_to_enforcing_when_key_absent(self):
+        g = AggregateRiskGuard.from_config(
+            {"risk": {}, "aggregate_risk": {}}, mode="paper",
+        )
+        self.assertTrue(g.enforce)
+        self.assertIsNone(g.shadow_log_path)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -398,7 +398,11 @@ function updatePortfolio(d){
     set('exposure','$'+abs2(r.total_exposure_usd)+'  ('+r.total_exposure_pct.toFixed(1)+'%)');
     set('daily-pnl',fmtPnl(r.daily_pnl)+'  ('+fmtPct(r.daily_pnl_pct)+')',pc(r.daily_pnl));
     set('open-pos',r.open_positions+' open');
-    set('status-txt',r.halted?('HALTED'+(r.halt_reason?' \u2014 '+r.halt_reason:'')):'ACTIVE',r.halted?'neg':'pos');
+    set('status-txt',
+        r.halted?('HALTED'+(r.halt_reason?' \u2014 '+r.halt_reason:''))
+        :(r.would_halt?('ACTIVE (would be halted'+(r.halt_reason?': '+r.halt_reason:'')+')')
+        :(r.enforcing===false?'ACTIVE \u2014 risk guard in SHADOW mode':'ACTIVE')),
+        r.halted?'neg':(r.would_halt||r.enforcing===false?'warn':'pos'));
   }
   if(d.cycle){
     const c=d.cycle;

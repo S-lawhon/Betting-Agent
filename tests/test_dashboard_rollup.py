@@ -468,3 +468,69 @@ def test_cli_writes_and_backs_up(root: Path):
     assert bak.exists(), "the timer relies on --backup; rollup.json is not rebuildable"
     with gzip.open(bak, "rt", encoding="utf-8") as fh:
         assert json.load(fh)["lifetime"]["placed"] == 3
+
+
+# ── aggregate-risk shadow log ─────────────────────────────────────────
+
+
+def _shadow(root: Path, rows) -> None:
+    path = root / "data" / "trade_logs" / "aggregate_risk_shadow.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+def _row(day="2026-08-02", pod="P-017", kind="venue_exposure", usd=25.0):
+    return {
+        "timestamp_utc": day + "T12:00:00+00:00",
+        "pod_id": pod, "venue": "kalshi", "market_id": "MKT",
+        "position_size_usd": usd, "breach_kind": kind,
+        "breach_detail": "…", "measured_pct": 0.32, "limit_pct": 0.30,
+    }
+
+
+def test_shadow_absent_when_guard_is_enforcing(root: Path):
+    """No shadow log is the NORMAL state under enforcement — nothing
+    writes it then. It must read as unavailable, not as zero blocks."""
+    payload, summary = build(root, root / "data" / "dashboard" / "rollup.json")
+    assert payload["shadow_risk"]["available"] is False
+    assert summary["shadow_risk_rows"] == 0
+
+
+def test_shadow_aggregates_by_kind_pod_and_day(root: Path):
+    _shadow(root, [
+        _row(kind="venue_exposure", pod="P-017"),
+        _row(kind="venue_exposure", pod="P-017"),
+        _row(kind="total_exposure", pod="P-015", usd=10.0),
+        _row(day="2026-08-01", kind="halted", pod="P-015", usd=5.0),
+    ])
+    payload, summary = build(root, root / "data" / "dashboard" / "rollup.json")
+    sh = payload["shadow_risk"]
+
+    assert sh["available"] is True
+    assert sh["lifetime"]["total"] == 4
+    assert sh["lifetime"]["by_kind"] == {
+        "venue_exposure": 2, "total_exposure": 1, "halted": 1}
+    assert sh["lifetime"]["by_pod"]["P-017"] == {"venue_exposure": 2}
+    assert sh["lifetime"]["usd_passed_through"] == 65.0
+    assert sh["by_day"]["2026-08-02"]["venue_exposure"] == 2
+    assert sh["by_day"]["2026-08-01"] == {"halted": 1}
+    assert sh["last_utc"] == "2026-08-02T12:00:00+00:00"
+    assert summary["shadow_risk_rows"] == 4
+
+
+def test_shadow_is_recomputed_not_accumulated(root: Path):
+    """It is NOT part of the archive/tail checkpoint machinery. A second
+    run over the same file must not double the counts."""
+    _shadow(root, [_row(), _row()])
+    out = root / "data" / "dashboard" / "rollup.json"
+    p1, _ = build(root, out)
+    out.write_text(json.dumps(p1))
+    p2, _ = build(root, out)
+    assert p2["shadow_risk"]["lifetime"]["total"] == 2
+
+
+def test_shadow_survives_corrupt_lines(root: Path):
+    path = root / "data" / "trade_logs" / "aggregate_risk_shadow.jsonl"
+    path.write_text(json.dumps(_row()) + "\n{ truncated\n" + json.dumps(_row()) + "\n")
+    sh = build(root, root / "data" / "dashboard" / "rollup.json")[0]["shadow_risk"]
+    assert sh["lifetime"]["total"] == 2
+    assert sh["rows_unparseable"] == 1

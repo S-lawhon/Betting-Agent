@@ -160,6 +160,13 @@ class DashboardState:
                 "open_positions":     max(s.open_positions, open_from_log),
                 "halted":             s.halted,
                 "halt_reason":        getattr(s, "halt_reason", None),
+                # Shadow mode: `halted` is False because nothing was
+                # actually stopped, but the halt condition may still be
+                # met.  Surfaced separately so consumers that page on
+                # `halted` stay correct.
+                "enforcing":          getattr(s, "enforcing", True),
+                "would_halt":         getattr(s, "would_halt", False),
+                "shadow_counts":      dict(getattr(s, "shadow_counts", None) or {}),
                 "venue_exposure": {
                     k: round(v, 2)
                     for k, v in (getattr(s, "venue_exposure", None) or {}).items()

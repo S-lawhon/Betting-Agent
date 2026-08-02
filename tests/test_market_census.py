@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import TestCase
 
-from scripts.run_market_census import main
+from scripts.run_market_census import _fetch_active_series, main
 from src.market_census import build_census, normalize_series, seeds_payload
 
 
@@ -106,6 +106,46 @@ class TestMarketCensus(TestCase):
         lane_counts = result.manifest["lane_counts"]
         self.assertLessEqual(max(lane_counts.values()), 4)
         self.assertGreaterEqual(len(lane_counts), 3)
+
+    def test_inactive_series_is_suppressed_until_first_open_event(self):
+        first = build_census(
+            [_series("KXDORMANT")], now=NOW, active_series=[])
+        self.assertEqual(first.seeds, [])
+        self.assertEqual(first.manifest["changes"]["inactive_suppressed"], 1)
+        self.assertFalse(first.snapshot["series"][0]["has_open_events"])
+
+        activated = build_census(
+            [_series("KXDORMANT")], previous_snapshot=first.snapshot,
+            previous_ledger=first.ledger,
+            now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+            active_series=["KXDORMANT"],
+        )
+        self.assertEqual(len(activated.seeds), 1)
+        self.assertIn("market_activated", activated.seeds[0].reason_codes)
+        self.assertTrue(activated.seeds[0].evidence["has_open_events"])
+
+    def test_fetch_active_series_paginates_and_deduplicates(self):
+        class Client:
+            def __init__(self):
+                self.calls = []
+
+            def get(self, path, params):
+                self.calls.append((path, dict(params)))
+                if len(self.calls) == 1:
+                    return {
+                        "events": [
+                            {"series_ticker": "kxa"},
+                            {"series_ticker": "KXB"},
+                        ],
+                        "cursor": "next",
+                    }
+                return {
+                    "events": [{"series_ticker": "KXA"}], "cursor": "",
+                }
+
+        client = Client()
+        self.assertEqual(_fetch_active_series(client), {"KXA", "KXB"})
+        self.assertEqual(client.calls[1][1]["cursor"], "next")
 
     def test_cli_persists_snapshot_manifest_ledger_and_inbox(self):
         with tempfile.TemporaryDirectory() as tmp:

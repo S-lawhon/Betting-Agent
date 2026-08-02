@@ -48,11 +48,31 @@ def _load_opportunities(directory: Path) -> List[Dict[str, Any]]:
     return cards
 
 
-def _fetch_live() -> Dict[str, Any]:
-    data = KalshiPublic(timeout=30.0).get("/series/", {"limit": 5})
+def _fetch_live(client: Optional[KalshiPublic] = None) -> Dict[str, Any]:
+    client = client or KalshiPublic(timeout=30.0)
+    data = client.get("/series/", {"limit": 5})
     if not data or not data.get("series"):
         raise RuntimeError("live /series returned no series; outputs left unchanged")
     return data
+
+
+def _fetch_active_series(client: KalshiPublic, max_pages: int = 100) -> set[str]:
+    """Return every series with at least one currently open event."""
+    active: set[str] = set()
+    params: Dict[str, Any] = {"status": "open", "limit": 200}
+    for _ in range(max_pages):
+        data = client.get("/events", params)
+        if not data:
+            raise RuntimeError("live /events returned no payload; outputs left unchanged")
+        for event in data.get("events") or []:
+            ticker = str(event.get("series_ticker") or "").strip().upper()
+            if ticker:
+                active.add(ticker)
+        cursor = data.get("cursor")
+        if not cursor:
+            return active
+        params["cursor"] = cursor
+    raise RuntimeError("live /events pagination exceeded safety cap")
 
 
 def _parse_now(value: Optional[str]) -> datetime:
@@ -89,7 +109,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.error("seed caps must be between 1 and 500")
     now = _parse_now(args.now)
     full = args.full or (args.full_on_month_start and now.day == 1)
-    raw_series = _fetch_live() if args.fetch_live else _read_json(args.series_input, None)
+    active_series = None
+    if args.fetch_live:
+        client = KalshiPublic(timeout=30.0)
+        raw_series = _fetch_live(client)
+        active_series = _fetch_active_series(client)
+    else:
+        raw_series = _read_json(args.series_input, None)
     if raw_series is None:
         raise SystemExit(f"series input does not exist: {args.series_input}")
 
@@ -104,6 +130,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         now=now,
         full=full,
         max_seeds=args.full_max_seeds if full else args.max_seeds,
+        active_series=active_series,
     )
 
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
@@ -118,7 +145,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(
         f"{result.manifest['run_id']}: {result.manifest['source_count']} series; "
         f"new={changes['new']} changed={changes['changed']} "
-        f"missing={changes['missing']}; {len(result.seeds)} scout seeds"
+        f"missing={changes['missing']} inactive_suppressed="
+        f"{changes['inactive_suppressed']}; {len(result.seeds)} scout seeds"
     )
     return 0
 

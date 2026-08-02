@@ -22,6 +22,7 @@ SERIES_FIELDS = (
     "fee_multiplier", "contract_terms_url", "contract_url",
     "settlement_sources", "additional_prohibitions", "tags",
 )
+ACTIVITY_FIELD = "has_open_events"
 
 
 def utc_iso(value: datetime) -> str:
@@ -69,7 +70,10 @@ def load_snapshot_series(snapshot: Optional[Mapping[str, Any]]) -> Dict[str, Dic
 
 
 def _changed_fields(current: Mapping[str, Any], old: Mapping[str, Any]) -> List[str]:
-    return [key for key in SERIES_FIELDS if current.get(key) != old.get(key)]
+    fields = list(SERIES_FIELDS)
+    if ACTIVITY_FIELD in current or ACTIVITY_FIELD in old:
+        fields.append(ACTIVITY_FIELD)
+    return [key for key in fields if current.get(key) != old.get(key)]
 
 
 def _lane(row: Mapping[str, Any], reasons: Sequence[str]) -> str:
@@ -179,6 +183,7 @@ def _score(row: Mapping[str, Any], reasons: Sequence[str], duplicates: Sequence[
         "other_metadata_changed": 10,
         "full_universe_review": 5,
         "scheduled_recheck": 60,
+        "market_activated": 70,
     }
     score = sum(weights.get(reason, 0) for reason in reasons)
     if row.get("fee_type") != MAKER_FEE_TYPE:
@@ -200,17 +205,26 @@ def build_census(
     now: Optional[datetime] = None,
     full: bool = False,
     max_seeds: int = 25,
+    active_series: Optional[Sequence[str]] = None,
 ) -> CensusResult:
     """Build a reproducible snapshot, coverage ledger, and ranked scout inbox."""
     now = now or datetime.now(timezone.utc)
     generated_at = utc_iso(now)
     rows = normalize_series(raw_series)
+    if active_series is not None:
+        active = {str(ticker).strip().upper() for ticker in active_series}
+        for row in rows:
+            row[ACTIVITY_FIELD] = row["ticker"] in active
+            row["fingerprint"] = _hash({
+                key: row.get(key) for key in (*SERIES_FIELDS, ACTIVITY_FIELD)
+            })
     prior = load_snapshot_series(previous_snapshot)
     run_id = f"census_{now.strftime('%Y%m%dT%H%M%SZ')}_{_hash(rows)[:8]}"
 
     candidates: List[Dict[str, Any]] = []
     changed_counts: Dict[str, int] = {
         "new": 0, "changed": 0, "unchanged": 0, "missing": 0,
+        "inactive_suppressed": 0,
     }
     current_tickers = {row["ticker"] for row in rows}
     changed_counts["missing"] = len(set(prior) - current_tickers)
@@ -231,6 +245,8 @@ def build_census(
             changed_counts["new"] += 1
         elif changed:
             changed_counts["changed"] += 1
+            if ACTIVITY_FIELD in changed and row.get(ACTIVITY_FIELD):
+                reasons.append("market_activated")
             if "contract_terms_url" in changed or "contract_url" in changed:
                 reasons.append("contract_terms_changed")
             if "settlement_sources" in changed:
@@ -251,6 +267,12 @@ def build_census(
             reasons.append("scheduled_recheck")
 
         if not reasons:
+            continue
+        if row.get(ACTIVITY_FIELD) is False:
+            # A series definition is not an executable market. Keep it in the
+            # snapshot so false->true becomes a market_activated delta later,
+            # but do not spend scarce scout capacity until an event is open.
+            changed_counts["inactive_suppressed"] += 1
             continue
         duplicates = _known_opportunity_ids(row["ticker"], opportunities)
         coverage_bonus = 20 if full and not old_coverage.get("times_seeded") else 0
@@ -291,6 +313,7 @@ def build_census(
                 "settlement_sources": row.get("settlement_sources") or [],
                 "series_fingerprint": row["fingerprint"],
                 "due_rechecks": item["due_rechecks"],
+                "has_open_events": row.get(ACTIVITY_FIELD),
             },
             possible_duplicates=list(item["duplicates"]),
             assignment={

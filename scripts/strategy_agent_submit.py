@@ -79,7 +79,11 @@ def main() -> int:
         os.fsync(fh.fileno())
         tmp_path = Path(fh.name)
     os.replace(tmp_path, out)
-    out.chmod(0o600)
+    # Submissions are often created by an operator account while the daemon
+    # runs as ``bettingbot``. The queue contains strategy artifacts, never
+    # credentials; make the request readable across that service boundary.
+    # Directory permissions still control who can create or remove requests.
+    out.chmod(0o644)
     print(out)
     return 0
 

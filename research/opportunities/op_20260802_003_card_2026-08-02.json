@@ -1,0 +1,54 @@
+{
+  "id": "op_20260802_003",
+  "created_at": "2026-08-02T18:36:00Z",
+  "source_agent": "scout",
+  "market_family": "Gemini Predictions / Kalshi economically equivalent event contracts",
+  "thesis": "Gemini Titan now operates a CFTC-designated prediction exchange with public market-data APIs and substantial contract overlap with Kalshi. Independent order books may produce short-lived, fee-adjusted price dislocations on contracts with equivalent outcomes. This is a data-collection hypothesis, not evidence of edge: the first manually matched MLB moneyline showed identical 0.05/0.06 Pittsburgh and 0.94/0.95 Cincinnati quotes on both venues. The cheapest decisive test is a timestamp-aligned, read-only census that matches contracts conservatively, verifies settlement equivalence, and measures whether executable cross-venue spreads exceed both venues' fees and latency allowance often enough to justify authenticated execution work.",
+  "edge_source": [
+    "Independent regulated order books can react at different speeds and carry different participant composition; any edge must be observed as executable, synchronized price divergence rather than inferred from venue novelty.",
+    "Gemini exposes active events and contract bid/ask data through an unauthenticated REST API and documents WebSocket market data, so the hypothesis can be tested without credentials or trading authority.",
+    "Gemini and Kalshi currently list overlapping sports, macro, politics, weather, crypto, and culture contracts, including directly comparable MLB moneylines."
+  ],
+  "external_data_needed": [
+    "Timestamp-aligned Gemini and Kalshi public top-of-book snapshots with request latency recorded.",
+    "A conservative contract-equivalence map covering outcome, event time, postponement, cancellation, source-agency, and settlement differences.",
+    "Current fee schedules for the exact contract families and maker/taker path on both venues.",
+    "Gemini account-level confirmation that prediction contracts are available to the Texas-resident fund before any authenticated or execution work."
+  ],
+  "confidence": 0.4,
+  "urgency": "high",
+  "status": "open",
+  "known_failure_modes": [
+    "Apparent arbitrage can be false when cancellation, postponement, participant, strike, timing, or resolution-source terms differ.",
+    "Displayed top-of-book size may disappear before both legs execute; one-sided fill risk can dominate a small spread.",
+    "Gemini taker fees use 0.07*C*P*(1-P) and maker fees use 0.0175*C*P*(1-P), so gross one-cent discrepancies often do not survive costs and rounding.",
+    "Public REST snapshots are not atomic across venues; network latency can manufacture apparent divergence.",
+    "Market overlap may be broad but shallow, and the two venues may usually converge to identical quotes, as in the first MLB sample.",
+    "Federal venue status and general all-state Gemini availability do not substitute for account-level product eligibility verification in Texas."
+  ],
+  "rule_ambiguities": [
+    "Gemini and Kalshi use different language and discretionary procedures for cancellations, forfeits, rescheduling, and indeterminate outcomes; each matched family requires a primary-terms equivalence decision.",
+    "Gemini's event response can include related child events and contracts, so a collector must avoid treating nested but economically distinct spreads, totals, and props as matches.",
+    "The correct fee path depends on whether an order rests or crosses and on each venue's exact series classification at trade time."
+  ],
+  "next_step": "data_collection",
+  "extra": {
+    "source_assignment_id": "assignment_168715f3bf9e6439beaf",
+    "legal_readiness": "Gemini Titan is CFTC-designated; Gemini states it supports all 50 states. Account-level prediction-product eligibility remains a hard pre-execution check.",
+    "primary_sources": [
+      "https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/44472",
+      "https://developer.gemini.com/prediction-markets/prediction-markets",
+      "https://www.gemini.com/fees/predictions",
+      "https://support.gemini.com/hc/en-us/articles/204072799-Which-countries-and-U-S-states-does-Gemini-support"
+    ],
+    "initial_observation": {
+      "observed_at": "2026-08-02T18:35:00Z",
+      "gemini_event": "MLB-2608021740-PIT-CIN-M",
+      "kalshi_event": "KXMLBGAME-26AUG021340PITCIN",
+      "gemini_pittsburgh_bid_ask": [0.05, 0.06],
+      "kalshi_pittsburgh_bid_ask": [0.05, 0.06],
+      "result": "no gross dislocation in first sample"
+    },
+    "hard_boundary": "Read-only market-data collection only. This card authorizes neither account creation nor authenticated trading, deposits, or order placement."
+  }
+}

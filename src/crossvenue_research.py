@@ -129,7 +129,7 @@ def evaluate_pair_signals(pair_id: str, metrics: Mapping[str, Any], *,
             "detail": (
                 f"{persistent} currently persistent episode(s), "
                 f"{int(qualifying)} qualifying observations in-window; "
-                f"qualifying observations; settlement status is {terms}. "
+                f"settlement status is {terms}. "
                 "Investigate the basis, but do not treat it as an arbitrage."),
             "value": int(persistent),
         })

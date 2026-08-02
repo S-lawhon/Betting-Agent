@@ -53,6 +53,7 @@ def test_persistent_dislocation_is_research_only_warning():
     assert signal["severity"] == "warn"
     assert signal["trade_allowed"] is False
     assert "not_equivalent" in signal["detail"]
+    assert signal["detail"].count("qualifying observations") == 1
 
 
 def test_old_persistent_episode_does_not_keep_alerting():

@@ -60,6 +60,13 @@ FUNNEL_STAGES: Tuple[str, ...] = (
     "candidates_without_quote",
 )
 
+RESEARCH_FUNNEL_STAGES: Tuple[str, ...] = (
+    "assignments",
+    "dispatched",
+    "dispatched_reviewed",
+    "dispatched_advanced",
+)
+
 #: snapshot key -> pod id, for the sanctioned checkpoint readers.
 CHECKPOINT_KEYS = {
     "p001": "P-001",
@@ -685,7 +692,37 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
     sources = _d(src.get("sources"))
     rollup = _d(src.get("rollup"))
     win = _d(src.get("p022_window"))
+    research_metrics = _d(src.get("research_metrics"))
     now = _parse(src.get("generated_at_utc")) or datetime.now(UTC)
+
+    # ---- research discovery -> specialist review -> opportunity funnel ----
+    if _available(sources, "research_metrics") and research_metrics:
+        raw_research_funnel = _d(research_metrics.get("funnel"))
+        research = {
+            "available": True,
+            "funnel": [[stage, _num(raw_research_funnel.get(stage))]
+                       for stage in RESEARCH_FUNNEL_STAGES],
+            "dispatch": _d(research_metrics.get("dispatch")),
+            "by_source_type": _d(research_metrics.get("by_source_type")),
+            "by_source_name": _d(research_metrics.get("by_source_name")),
+            "by_lane": _d(research_metrics.get("by_lane")),
+            "decisions": _d(research_metrics.get("decisions")),
+            "x_pilot": _d(research_metrics.get("x_pilot")),
+            "generated_at": research_metrics.get("generated_at"),
+            "reason": None,
+            "source": "data/research_intake/metrics.json",
+        }
+    else:
+        research = {
+            "available": False,
+            "funnel": [[stage, None] for stage in RESEARCH_FUNNEL_STAGES],
+            "dispatch": {}, "by_source_type": {}, "by_source_name": {},
+            "by_lane": {}, "decisions": {}, "x_pilot": {},
+            "generated_at": None,
+            "reason": (_reason(sources, "research_metrics")
+                       or "research metrics are unavailable"),
+            "source": "data/research_intake/metrics.json",
+        }
 
     # ---- P-022 window funnel ----
     if _available(sources, "p022_window") and win:
@@ -818,7 +855,8 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
         "source": "data/dashboard/rollup.json:skip_reasons",
     }
 
-    return {"p022_window": p022, "placement": placement, "skip_reasons": skip}
+    return {"research": research, "p022_window": p022,
+            "placement": placement, "skip_reasons": skip}
 
 
 # ── ops / work ────────────────────────────────────────────────────────

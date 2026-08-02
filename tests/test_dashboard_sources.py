@@ -49,6 +49,7 @@ def root(tmp_path: Path) -> Path:
     (tmp_path / "data" / "dashboard").mkdir(parents=True)
     (tmp_path / "data" / "trade_logs").mkdir(parents=True)
     (tmp_path / "data" / "p022_window_check").mkdir(parents=True)
+    (tmp_path / "data" / "research_intake").mkdir(parents=True)
     (tmp_path / "manager" / "state").mkdir(parents=True)
     return tmp_path
 
@@ -58,6 +59,7 @@ LOADERS = [
     ("load_open_positions", lambda r: r / "data/dashboard/open_positions.json"),
     ("load_manager_status", lambda r: r / "manager/state/status.json"),
     ("load_rollup", lambda r: r / "data/dashboard/rollup.json"),
+    ("load_research_metrics", lambda r: r / "data/research_intake/metrics.json"),
 ]
 
 
@@ -210,6 +212,18 @@ def test_rollup_meta_surfaces_the_horizon_counters(root):
     assert meta["pruned_sources_counted"] == 7
 
 
+def test_research_metrics_uses_generated_timestamp(root):
+    path = root / "data" / "research_intake" / "metrics.json"
+    path.write_text(json.dumps({
+        "generated_at": ago(minutes=5),
+        "funnel": {"assignments": 10, "dispatched": 4},
+    }))
+    payload, meta = ds.load_research_metrics(root, None, clock)
+    assert payload["funnel"]["dispatched"] == 4
+    assert meta["available"] is True
+    assert meta["stale"] is False
+
+
 # ── the p022 window tail ──────────────────────────────────────────────
 
 
@@ -262,7 +276,7 @@ def test_load_all_on_an_empty_tree_never_raises(root):
     out = ds.load_all(root, clock=clock)
     assert set(out["sources"]) == {"engine_state", "open_positions",
                                   "manager_status", "rollup", "p022_window",
-                                  "clv"}
+                                  "research_metrics", "clv"}
     for name, meta in out["sources"].items():
         assert meta["available"] is False, name
         assert meta["reason"], name

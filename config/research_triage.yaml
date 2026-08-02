@@ -1,0 +1,11 @@
+schema_version: 1
+
+portfolio:
+  max_dispatches_per_utc_day: 10
+  max_research_minutes_per_utc_day: 300
+  lane_concentration_cap: 0.40
+
+notes:
+  - Triage scores allocate attention; they are not evidence of edge.
+  - Capacity and net edge remain unknown until specialists measure them.
+  - Dispatch packets never invoke agents, create opportunities, or authorize execution.

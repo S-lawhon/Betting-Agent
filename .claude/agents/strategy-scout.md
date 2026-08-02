@@ -7,7 +7,9 @@ model: sonnet
 
 You deeply research candidate strategies; you do not run the broad universe
 census, specify, validate, promote, deploy, or trade them. Prefer the highest
-ranked unreviewed assignment in `data/research_intake/assignments/`, falling
+priority pending packet in `data/research_triage/dispatches/strategy-scout/`,
+falling back to the highest ranked unreviewed assignment in
+`data/research_intake/assignments/`, falling
 back to `data/market_census/scout_inbox/`, but also accept a seed supplied
 directly by the user. Read repository evidence before
 using the web. Treat contract-rule ambiguity, unavailable data, likely execution

@@ -28,14 +28,16 @@ and counsel guidance before granting an execution approval.
 Official venue APIs ─┐
 CFTC filings ────────┤
 Academic RSS ────────┼─> SourceItem ledger ─> ranked assignments
-X recent search ─────┤          │                    │
-Kalshi census ───────┘          │                    ├─ literature-scout
-                                │                    ├─ social-scout
- eligibility registry ──────────┘                    └─ strategy-scout
-                                                          │
-                                                   research-critic
-                                                          │
-                                      reject / defer / OpportunityCard
+X recent search ─────┤          │
+Kalshi census ───────┘          ├─> ranked assignments ─> bounded triage
+                                │                              │
+ eligibility registry ──────────┘                              ├─ literature-scout
+                                                               ├─ social-scout
+                                                               └─ strategy-scout
+                                                                      │
+                                                               research-critic
+                                                                      │
+                                                  reject / defer / OpportunityCard
 ```
 
 Deterministic software owns fetching, hashing, deduplication, provenance,
@@ -90,6 +92,17 @@ scope, and compact metadata.
 A ranked instruction to a specialist. It carries source provenance and current
 eligibility decisions and always sets `may_enter_strategy_registry: false`.
 
+### `DispatchPacket`
+
+Defined in `src/research_triage.py` and written under
+`data/research_triage/dispatches/<agent>/`. It carries the assignment plus the
+compact original source, attention-allocation scorecard, explicit unknowns,
+research-minute budget, similarity warnings, and specialist handoff chain.
+Triage preserves at least one candidate per available lane before score-based
+filling, caps lane concentration, and limits all retries combined to 10 packets
+and 300 allocated research minutes per UTC day. It never treats its priors as edge evidence.
+It creates tasks only: no agent is invoked and no strategy state changes.
+
 ### `ResearchDisposition`
 
 Defined in `src/research_outcomes.py` and stored under
@@ -125,6 +138,12 @@ Live intake including the bounded X pilot:
 python3 -m scripts.run_research_intake --include-x
 ```
 
+Allocate the newest unreviewed assignments to specialist queues:
+
+```bash
+python3 -m scripts.run_research_triage
+```
+
 Build source/lane funnel metrics:
 
 ```bash
@@ -140,6 +159,13 @@ Outputs under `data/research_intake/`:
 - `metrics.json`: disposition yield by source and lane.
 - `x_usage.json`: daily returned-resource counts and conservative cost estimate.
 
+Outputs under `data/research_triage/`:
+
+- `ledger.json`: assignments already dispatched and compact title history;
+- `dispatches/<agent>/`: durable specialist task packets;
+- `dispatch_archive/<agent>/`: packets with a disposition or registered opportunity;
+- `latest_manifest.json`: selection, deferral, diversity, and safety telemetry.
+
 Partial source failures are recorded in `collector_errors`. Prior state is
 written atomically. The scheduled unit fails only when collectors report errors
 and produce no usable items.
@@ -149,7 +175,8 @@ and produce no usable items.
 ```bash
 sudo install -d -o bettingbot -g bettingbot -m 0750 \
   /opt/betting-pod-shop/data/market_census \
-  /opt/betting-pod-shop/data/research_intake
+  /opt/betting-pod-shop/data/research_intake \
+  /opt/betting-pod-shop/data/research_triage
 sudo cp scripts/systemd/market-census.{service,timer} /etc/systemd/system/
 sudo cp scripts/systemd/research-intake.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -163,10 +190,10 @@ optional X-only `/opt/betting-pod-shop/.env.x`, and supplies the explicit
 Bearer Token does not copy unrelated credentials. Lock it to mode `0600` and
 owner `bettingbot:bettingbot`. The normal code deploy excludes secret files.
 
-The manager registry monitors both manifests for freshness. A fresh intake
-manifest proves collection ran; it does not prove any agent researched the
-assignments. The existing strategy-agent daemon remains an artifact recorder,
-not an LLM runner.
+The manager registry monitors census, intake, and triage manifests for
+freshness. A fresh triage manifest proves tasks were allocated; only a durable
+`ResearchDisposition` proves review. The existing strategy-agent daemon remains
+an artifact recorder, not an LLM runner.
 
 ## Research allocation and measurement
 
@@ -177,6 +204,10 @@ P(real edge) × deployable capacity × expected half-life × executability
 ──────────────────────────────────────────────────────────────────────
                     research time and data cost
 ```
+
+The deterministic runner can measure provenance, eligibility state, title
+similarity, source/lane priors, and attention decay. It cannot know real edge or
+capacity, so those fields remain null until specialist evidence exists.
 
 Apply penalties for prior rejection, unavailable timestamp-correct data,
 settlement basis, rule ambiguity, unrealistic fills, fees, inaccessible

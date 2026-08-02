@@ -183,6 +183,20 @@ jobs:
       manifest. The approved X pilot is limited to one run per UTC day, warns
       at $40 estimated usage, and stops below the $50 X-side hard limit.
 
+  - id: research_triage
+    host: droplet
+    schedule: "5 4 * * *"
+    description: Bounded research allocation and specialist dispatch generation
+    output:
+      file: data/research_triage/latest_manifest.json
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      Runs as research-intake.service post-processing. A fresh manifest proves
+      deterministic allocation and task-packet creation; it does not prove an
+      agent reviewed the packets. Review and advancement yield live in
+      data/research_intake/metrics.json.
+
   - id: clv_settlement
     host: droplet
     schedule: "30 7 * * *"

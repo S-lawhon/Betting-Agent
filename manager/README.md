@@ -55,6 +55,15 @@ research or make model decisions; it validates and persists agent-produced JSON:
 - `data/strategy_agents/heartbeat.jsonl` is the service heartbeat the manager
   watches
 
+Research discovery has a separate deterministic attention queue:
+
+- `scripts/run_research_triage.py` ranks unreviewed assignments within daily
+  packet, minute, and lane-concentration limits
+- `data/research_triage/dispatches/<agent>/` contains pending specialist packets
+- `research/dispositions/` is the only durable proof a packet was reviewed
+- `data/research_intake/metrics.json` measures assignment → dispatch → review →
+  advancement yield and the conservative X pilot cost
+
 ## Daily use
 
 ```bash

@@ -376,6 +376,18 @@ iframe{width:100%;height:78vh;border:1px solid var(--border);border-radius:var(-
   <!-- ══ PIPELINE ══ -->
   <section id="v-pipeline" hidden>
     <div class="card span" style="margin-bottom:12px">
+      <div class="ct">Research edge-discovery funnel <span class="sub" id="r-state"></span></div>
+      <div id="r-detail" class="cap" style="margin-top:0;margin-bottom:12px">&mdash;</div>
+      <div class="fn" id="r-funnel"><div class="empty">&mdash;</div></div>
+      <div class="tw" style="margin-top:12px"><table class="rfl" id="r-sources">
+        <thead><tr><th>Source</th><th>Assigned</th><th>Reviewed</th><th>Advanced</th><th>Review %</th><th>Advance %</th></tr></thead>
+        <tbody><tr><td colspan="6" class="empty">&mdash;</td></tr></tbody>
+      </table></div>
+      <div class="cap" id="r-x"></div>
+      <div class="src" id="r-src"></div>
+    </div>
+
+    <div class="card span" style="margin-bottom:12px">
       <div class="ct">P-022 placement funnel <span class="sub" id="f-state"></span></div>
       <div id="f-detail" class="cap" style="margin-top:0;margin-bottom:12px">&mdash;</div>
       <div class="fn" id="f-funnel"><div class="empty">&mdash;</div></div>
@@ -556,7 +568,7 @@ function renderChips(d){
   var need = {
     now:["engine_state","manager_status","rollup","p022_window"],
     gates:["manager_status"], pnl:["rollup","engine_state"],
-    pipeline:["rollup","p022_window"], ops:["manager_status"], manager:["manager_status"]
+    pipeline:["research_metrics","rollup","p022_window"], ops:["manager_status"], manager:["manager_status"]
   }[VIEW] || ["manager_status"];
   var srcs = d.sources || {}, worst = null, worstName = null, missing = [];
   need.forEach(function(n){
@@ -996,6 +1008,7 @@ var FUNNEL_HELP = {
 };
 function renderPipeline(d){
   var pl = d.pipeline || {}, w = pl.p022_window || {};
+  renderResearchPipeline(pl.research || {});
   el("f-state").textContent = w.available ? (w.state || "") : "";
   el("f-detail").textContent = w.available ? (w.detail || "") : (w.reason || "no window-check data");
   el("f-src").textContent = "source: " + (w.source || "");
@@ -1063,6 +1076,55 @@ function renderPipeline(d){
     : '<tr><td colspan="5" class="empty">' + esc(pr.reason || "no weekly data") + "</td></tr>";
 
   renderSkip(d);
+}
+
+function renderResearchPipeline(r){
+  var dispatch = r.dispatch || {}, pending = dispatch.pending_review;
+  el("r-state").textContent = r.available
+    ? (isNum(pending) ? intf(pending) + " pending specialist review" : "") : "";
+  el("r-detail").textContent = r.available
+    ? "Triage ranks attention only; capacity and net edge remain unknown until specialist review and validation."
+    : (r.reason || "research metrics unavailable");
+  el("r-src").textContent = "source: " + (r.source || "");
+
+  var funnel = r.funnel || [], box = el("r-funnel");
+  var nums = funnel.map(function(stage){ return stage[1]; }).filter(isNum);
+  var max = nums.length ? Math.max.apply(null, nums) : null;
+  box.innerHTML = max === null
+    ? '<div class="empty">' + esc(r.reason || "no research funnel") + "</div>"
+    : funnel.map(function(stage){
+        var value = stage[1], width = max > 0 && isNum(value) ? value / max * 100 : 0;
+        return '<div class="fnrow"><div class="fnlab">' +
+          esc(stage[0].replace(/_/g," ")) + '</div><div class="fnbar"><i class="' +
+          (!isNum(value) || value === 0 ? "zero" : "") + '" style="' +
+          (isNum(value) && value !== 0 ? "width:" + width.toFixed(2) + "%" : "") +
+          '"></i></div><div class="fnval">' +
+          (isNum(value) ? intf(value) : '<span class="unknown">—</span>') +
+          "</div></div>";
+      }).join("");
+
+  var sources = r.by_source_type || {}, names = Object.keys(sources).sort();
+  var tb = el("r-sources").querySelector("tbody");
+  tb.innerHTML = names.length ? names.map(function(name){
+    var row = sources[name] || {};
+    return "<tr>" +
+      '<td data-label="Source">' + esc(name) + "</td>" +
+      '<td data-label="Assigned">' + numCell(row.assigned) + "</td>" +
+      '<td data-label="Reviewed">' + numCell(row.reviewed) + "</td>" +
+      '<td data-label="Advanced">' + numCell(row.advance) + "</td>" +
+      '<td data-label="Review %">' + (isNum(row.review_rate) ? (100*row.review_rate).toFixed(1) : "—") + "</td>" +
+      '<td data-label="Advance %">' + (isNum(row.advance_rate) ? (100*row.advance_rate).toFixed(1) : "—") + "</td>" +
+      "</tr>";
+  }).join("") : '<tr><td colspan="6" class="empty">no source outcomes yet</td></tr>';
+
+  var x = r.x_pilot || {};
+  el("r-x").textContent = x.month
+    ? "X pilot " + x.month + ": estimated $" +
+      (isNum(x.estimated_cost_usd) ? x.estimated_cost_usd.toFixed(3) : "—") +
+      " · " + numTxt(x.assignments) + " assignments · " +
+      numTxt(x.reviewed) + " reviewed · " + numTxt(x.advanced) + " advanced" +
+      (isNum(x.cost_per_advanced_usd) ? " · $" + x.cost_per_advanced_usd.toFixed(2) + " per advance" : "")
+    : "X pilot cost/yield will appear after the first measured run.";
 }
 
 function drawSpark(weeks){

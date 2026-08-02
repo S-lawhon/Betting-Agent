@@ -34,6 +34,7 @@ is named differently so it can never be mistaken for one.
 | **Engine** | `betting-pod-shop.service`, every 300 s | `data/dashboard/engine_state.json`, `data/dashboard/open_positions.json` | — |
 | **Manager collector** | cron, every 15 min | `manager/state/status.json` | *unchanged by this rebuild* |
 | **Rollup** | `dashboard-rollup.timer`, hourly at :07 | `data/dashboard/rollup.json` (+ `.bak.gz`) | never builds a `TradeStore` |
+| **Research intake + triage** | `research-intake.timer`, daily | `data/research_intake/metrics.json`, `data/research_triage/latest_manifest.json` | never invokes an agent or claims edge |
 | **Dashboard** | `betting-dashboard.service`, `127.0.0.1:8081` | **nothing** (`ReadOnlyPaths`, no `ReadWritePaths`) | never fetches a price, never evaluates a gate |
 | **Caddy** | `caddy.service` | TLS + basic auth in front of 8081 | — |
 
@@ -57,6 +58,7 @@ the engine is down — and it reports "down" from systemd's own view in
 | Open exposure, bankroll | `risk.*` | `engine_state.json` **only** — never back-derived |
 | Open positions | rows | `open_positions.json` (capped at 400) |
 | CLV | means per pod | `rollup.json:clv` (log fields `pinn_fair_close` / `clv_net_maker`, as written on disk — **not** `src/clv.py`'s `CLV_FIELDS`, which differ) |
+| Research funnel and X pilot yield | assignments, dispatches, reviews, advances, conservative cost | `data/research_intake/metrics.json` |
 | P-022 funnel | 8 stages, state, refusals | `data/p022_window_check/status.jsonl`, live tail |
 | Placement rate by week | placed / skipped / rate | `rollup.json:weekly_by_pod` |
 | Skip reasons | 30-day window + lifetime | `rollup.json:skip_reasons` |

@@ -11,6 +11,7 @@ WorkingDirectory=/opt/betting-pod-shop
 EnvironmentFile=-/opt/betting-pod-shop/.env
 EnvironmentFile=-/opt/betting-pod-shop/.env.x
 ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_intake --include-x
+ExecStartPost=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_triage
 ExecStartPost=/opt/betting-pod-shop/venv/bin/python -m scripts.build_research_metrics
 
 StandardOutput=journal
@@ -25,7 +26,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/betting-pod-shop/data/research_intake
+ReadWritePaths=/opt/betting-pod-shop/data/research_intake /opt/betting-pod-shop/data/research_triage
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ProtectKernelTunables=true
 ProtectKernelModules=true

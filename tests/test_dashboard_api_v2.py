@@ -40,7 +40,7 @@ def sources(**over):
     base = {name: meta(available=False, path="/x/" + name,
                        age=None, stale=True, reason="file does not exist")
             for name in ("engine_state", "open_positions", "manager_status",
-                        "rollup", "p022_window", "clv")}
+                        "rollup", "p022_window", "research_metrics", "clv")}
     base.update(over)
     return base
 
@@ -71,6 +71,7 @@ def src(**over):
         "generated_at_utc": "2026-07-30T12:00:00+00:00",
         "engine_state": None, "open_positions": None, "manager_status": None,
         "rollup": None, "p022_window": None, "kill_switches": [],
+        "research_metrics": None,
         "sources": sources(),
     }
     base.update(over)
@@ -136,6 +137,9 @@ def test_funnel_stage_order_is_canonical_and_monotone():
     f = api.build_v2(src())["pipeline"]["p022_window"]["funnel"]
     assert [s[0] for s in f] == list(api.FUNNEL_STAGES)
     assert all(s[1] is None for s in f), "absent source must be null, not 0"
+    rf = api.build_v2(src())["pipeline"]["research"]["funnel"]
+    assert [stage[0] for stage in rf] == list(api.RESEARCH_FUNNEL_STAGES)
+    assert all(stage[1] is None for stage in rf)
 
 
 # ── mode ribbon ───────────────────────────────────────────────────────
@@ -595,6 +599,37 @@ def test_clv_means_and_the_inline_caveat():
 
 
 # ── pipeline ──────────────────────────────────────────────────────────
+
+
+def test_research_pipeline_surfaces_dispatch_yield_and_x_cost():
+    metrics = {
+        "generated_at": "2026-08-02T14:00:00Z",
+        "funnel": {
+            "assignments": 50, "dispatched": 10,
+            "dispatched_reviewed": 4, "dispatched_advanced": 1,
+        },
+        "dispatch": {"pending_review": 6, "review_rate": 0.4},
+        "by_source_type": {"social": {
+            "assigned": 10, "advance": 1, "review_rate": 0.4,
+            "advance_rate": 0.1,
+        }},
+        "x_pilot": {"month": "2026-08", "estimated_cost_usd": 1.065,
+                    "assignments": 10, "reviewed": 4, "advanced": 1},
+    }
+    research = api.build_v2(src(
+        research_metrics=metrics,
+        sources=sources(research_metrics=meta())))["pipeline"]["research"]
+    assert research["available"] is True
+    assert research["funnel"][-1] == ["dispatched_advanced", 1.0]
+    assert research["dispatch"]["pending_review"] == 6
+    assert research["x_pilot"]["estimated_cost_usd"] == 1.065
+
+
+def test_missing_research_metrics_is_unknown_not_zero():
+    research = api.build_v2(src())["pipeline"]["research"]
+    assert research["available"] is False
+    assert research["reason"]
+    assert all(value is None for _, value in research["funnel"])
 
 
 WINDOW = {

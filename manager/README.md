@@ -62,7 +62,14 @@ Research discovery has a separate deterministic attention queue:
 - `data/research_triage/dispatches/<agent>/` contains pending specialist packets
 - `research/dispositions/` is the only durable proof a packet was reviewed
 - `data/research_intake/metrics.json` measures assignment → dispatch → review →
-  advancement yield and the conservative X pilot cost
+  advancement yield, 24-hour activity, per-agent pending/overdue queue age,
+  and the conservative X pilot cost
+
+The dashboard and emailed daily brief both read that shared operations contract.
+They explicitly report that dispatch means a task packet was created; agent
+invocation/started state is not tracked, and only a durable disposition proves
+review. This prevents a healthy queue generator from being reported as active
+research labor.
 
 ## Daily use
 

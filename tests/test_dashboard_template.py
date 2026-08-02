@@ -165,6 +165,15 @@ def test_tables_reflow_via_data_label(html):
     assert 'data-label="' in html, "cells need labels for the reflow to work"
 
 
+def test_research_operations_shows_agent_queues_and_execution_semantics(html):
+    assert 'id="r-agents"' in html
+    assert 'id="r-day"' in html
+    assert "Agent invocation/started state" in html
+    for field in ("dispatched_24h", "reviewed_24h", "advance_24h",
+                  "research_minutes_24h", "oldest_pending_age_hours"):
+        assert field in html
+
+
 def test_reduced_motion_is_respected(html):
     assert "prefers-reduced-motion" in html
 

@@ -280,6 +280,41 @@ def test_work_today_without_git_is_unavailable_not_a_crash(tmp_path, monkeypatch
     assert col.faults == [], "a missing repo is a reported gap, not a crash"
 
 
+def test_collector_loads_shared_research_operations_contract(tmp_path):
+    project = tmp_path / "opt" / "betting-pod-shop"
+    metrics_dir = project / "data" / "research_intake"
+    metrics_dir.mkdir(parents=True)
+    (metrics_dir / "metrics.json").write_text(json.dumps({
+        "generated_at": "2026-08-03T04:10:00Z",
+        "funnel": {"assignments": 200, "dispatched": 10,
+                   "dispatched_reviewed": 2, "dispatched_advanced": 1},
+        "dispatch": {"pending_review": 8},
+        "operations": {
+            "semantics": {"agent_invocation_tracked": False},
+            "activity_24h": {"dispatched": 10, "reviewed": 2},
+            "queue": {"pending": 8, "overdue": 1},
+            "agents": {"strategy-scout": {"pending": 8}},
+        },
+        "x_pilot": {"month": "2026-08", "estimated_cost_usd": 1.065},
+    }), encoding="utf-8")
+    reg = write_registry(tmp_path, str(project), str(project))
+    record = collect.Collector(reg, root=project).research_operations()
+
+    assert record["available"] is True
+    assert record["funnel"]["assignments"] == 200
+    assert record["operations"]["queue"]["pending"] == 8
+    assert record["operations"]["semantics"]["agent_invocation_tracked"] is False
+
+
+def test_collector_admits_missing_research_operations(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    reg = write_registry(tmp_path, str(project), str(project))
+    record = collect.Collector(reg, root=project).research_operations()
+    assert record["available"] is False
+    assert "does not exist" in record["reason"]
+
+
 def test_snapshot_is_json_serialisable(tmp_path):
     """write_state uses json.dumps; None-valued fields must round-trip."""
     project = tmp_path / "opt" / "betting-pod-shop"

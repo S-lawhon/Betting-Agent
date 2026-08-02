@@ -378,7 +378,12 @@ iframe{width:100%;height:78vh;border:1px solid var(--border);border-radius:var(-
     <div class="card span" style="margin-bottom:12px">
       <div class="ct">Research edge-discovery funnel <span class="sub" id="r-state"></span></div>
       <div id="r-detail" class="cap" style="margin-top:0;margin-bottom:12px">&mdash;</div>
+      <div id="r-day" class="cap" style="margin-top:0;margin-bottom:8px">&mdash;</div>
       <div class="fn" id="r-funnel"><div class="empty">&mdash;</div></div>
+      <div class="tw" style="margin-top:12px"><table class="rfl" id="r-agents">
+        <thead><tr><th>Agent queue</th><th>State</th><th>Pending</th><th>Overdue</th><th>Oldest</th><th>Dispatched 24h</th><th>Reviewed 24h</th><th>Advanced 24h</th><th>Research min 24h</th></tr></thead>
+        <tbody><tr><td colspan="9" class="empty">&mdash;</td></tr></tbody>
+      </table></div>
       <div class="tw" style="margin-top:12px"><table class="rfl" id="r-sources">
         <thead><tr><th>Source</th><th>Assigned</th><th>Reviewed</th><th>Advanced</th><th>Review %</th><th>Advance %</th></tr></thead>
         <tbody><tr><td colspan="6" class="empty">&mdash;</td></tr></tbody>
@@ -1080,11 +1085,24 @@ function renderPipeline(d){
 
 function renderResearchPipeline(r){
   var dispatch = r.dispatch || {}, pending = dispatch.pending_review;
+  var operations = r.operations || {}, activity = operations.activity_24h || {};
+  var queue = operations.queue || {}, semantics = operations.semantics || {};
   el("r-state").textContent = r.available
-    ? (isNum(pending) ? intf(pending) + " pending specialist review" : "") : "";
+    ? (isNum(pending) ? intf(pending) + " task packets pending review" : "") : "";
   el("r-detail").textContent = r.available
-    ? "Triage ranks attention only; capacity and net edge remain unknown until specialist review and validation."
+    ? "Dispatch proves task creation only. Agent invocation/started state is " +
+      (semantics.agent_invocation_tracked === true ? "tracked" : "not tracked") +
+      "; completion requires a durable research disposition."
     : (r.reason || "research metrics unavailable");
+  el("r-day").textContent = r.available && operations.window_hours
+    ? "Last " + numTxt(operations.window_hours) + "h: " +
+      numTxt(activity.dispatched) + " dispatched · " +
+      numTxt(activity.reviewed) + " reviewed · " +
+      numTxt(activity.advance) + " advanced · " +
+      numTxt(activity.reject) + " rejected · " +
+      numTxt(activity.defer) + " deferred · queue " +
+      numTxt(queue.pending) + " pending / " + numTxt(queue.overdue) + " overdue"
+    : "Daily agent activity will appear after the operations metric is generated.";
   el("r-src").textContent = "source: " + (r.source || "");
 
   var funnel = r.funnel || [], box = el("r-funnel");
@@ -1102,6 +1120,23 @@ function renderResearchPipeline(r){
           (isNum(value) ? intf(value) : '<span class="unknown">—</span>') +
           "</div></div>";
       }).join("");
+
+  var agents = operations.agents || {}, agentNames = Object.keys(agents).sort();
+  var atb = el("r-agents").querySelector("tbody");
+  atb.innerHTML = agentNames.length ? agentNames.map(function(name){
+    var row = agents[name] || {}, oldest = row.oldest_pending_age_hours;
+    return "<tr>" +
+      '<td data-label="Agent queue">' + esc(name) + "</td>" +
+      '<td data-label="State">' + esc(row.queue_state || "unknown") + "</td>" +
+      '<td data-label="Pending">' + numCell(row.pending) + "</td>" +
+      '<td data-label="Overdue">' + numCell(row.overdue) + "</td>" +
+      '<td data-label="Oldest">' + (isNum(oldest) ? oldest.toFixed(1) + "h" : '<span class="unknown">—</span>') + "</td>" +
+      '<td data-label="Dispatched 24h">' + numCell(row.dispatched_24h) + "</td>" +
+      '<td data-label="Reviewed 24h">' + numCell(row.reviewed_24h) + "</td>" +
+      '<td data-label="Advanced 24h">' + numCell(row.advance_24h) + "</td>" +
+      '<td data-label="Research min 24h">' + numCell(row.research_minutes_24h) + "</td>" +
+      "</tr>";
+  }).join("") : '<tr><td colspan="9" class="empty">no specialist task packets yet</td></tr>';
 
   var sources = r.by_source_type || {}, names = Object.keys(sources).sort();
   var tb = el("r-sources").querySelector("tbody");

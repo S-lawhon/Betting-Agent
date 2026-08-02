@@ -25,13 +25,14 @@ class TestBuildResearchMetrics(TestCase):
             }))
             (dispositions / "a1.json").write_text(json.dumps({
                 "assignment_id": "a1", "source_item_id": "s1",
-                "decided_at": "2026-08-01T00:00:00Z", "decision": "reject",
+                "decided_at": "2026-08-01T18:00:00Z", "decision": "reject",
                 "reason_codes": ["not_replicable"],
                 "evidence_checked": ["code"], "research_minutes": 20,
             }))
             (dispatches / "a1.json").write_text(json.dumps({
                 "assignment_id": "a1", "assigned_agent": "literature-scout",
                 "priority": "high", "research_budget_minutes": 45,
+                "created_at": "2026-08-01T12:00:00Z",
             }))
             intake_manifest = root / "latest_manifest.json"
             intake_manifest.write_text(json.dumps({"x_usage": {
@@ -46,6 +47,7 @@ class TestBuildResearchMetrics(TestCase):
                 "--dispatches-dir", str(dispatches.parent),
                 "--intake-manifest", str(intake_manifest),
                 "--output", str(output),
+                "--now", "2026-08-02T00:00:00Z",
             ]), 0)
             metrics = json.loads(output.read_text())
             self.assertEqual(metrics["reviewed"], 1)
@@ -55,3 +57,52 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(metrics["dispatch"]["dispatched"], 1)
             self.assertEqual(metrics["funnel"]["dispatched_reviewed"], 1)
             self.assertEqual(metrics["x_pilot"]["estimated_cost_usd"], 1.25)
+            operations = metrics["operations"]
+            self.assertFalse(
+                operations["semantics"]["agent_invocation_tracked"])
+            self.assertEqual(operations["activity_24h"]["reviewed"], 1)
+            self.assertEqual(operations["activity_24h"]["reject"], 1)
+            self.assertEqual(
+                operations["agents"]["literature-scout"]["queue_state"],
+                "idle")
+
+    def test_operations_report_pending_and_overdue_per_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            assignments = root / "assignments"
+            dispositions = root / "dispositions"
+            dispatches = root / "triage" / "dispatches" / "social-scout"
+            assignments.mkdir()
+            dispositions.mkdir()
+            dispatches.mkdir(parents=True)
+            (assignments / "batch.json").write_text(json.dumps({
+                "assignments": [
+                    {"id": "a1", "source_type": "social", "lane": "social_signal"},
+                    {"id": "a2", "source_type": "social", "lane": "social_signal"},
+                ],
+            }))
+            for assignment_id, created_at in (
+                    ("a1", "2026-08-01T00:00:00Z"),
+                    ("a2", "2026-08-03T00:00:00Z")):
+                (dispatches / f"{assignment_id}.json").write_text(json.dumps({
+                    "assignment_id": assignment_id,
+                    "assigned_agent": "social-scout",
+                    "priority": "high", "research_budget_minutes": 20,
+                    "created_at": created_at,
+                }))
+            output = root / "metrics.json"
+            self.assertEqual(main([
+                "--assignments-dir", str(assignments),
+                "--dispositions-dir", str(dispositions),
+                "--dispatches-dir", str(root / "triage"),
+                "--intake-manifest", str(root / "missing.json"),
+                "--output", str(output),
+                "--now", "2026-08-03T12:00:00Z",
+            ]), 0)
+            operations = json.loads(output.read_text())["operations"]
+            agent = operations["agents"]["social-scout"]
+            self.assertEqual(agent["pending"], 2)
+            self.assertEqual(agent["overdue"], 1)
+            self.assertEqual(agent["dispatched_24h"], 1)
+            self.assertEqual(agent["oldest_pending_age_hours"], 60.0)
+            self.assertEqual(agent["queue_state"], "overdue")

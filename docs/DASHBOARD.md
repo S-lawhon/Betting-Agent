@@ -58,7 +58,7 @@ the engine is down — and it reports "down" from systemd's own view in
 | Open exposure, bankroll | `risk.*` | `engine_state.json` **only** — never back-derived |
 | Open positions | rows | `open_positions.json` (capped at 400) |
 | CLV | means per pod | `rollup.json:clv` (log fields `pinn_fair_close` / `clv_net_maker`, as written on disk — **not** `src/clv.py`'s `CLV_FIELDS`, which differ) |
-| Research funnel and X pilot yield | assignments, dispatches, reviews, advances, conservative cost | `data/research_intake/metrics.json` |
+| Research operations | lifetime funnel, 24h activity, per-agent pending/overdue queues, oldest task, X pilot yield and conservative cost | `data/research_intake/metrics.json` |
 | P-022 funnel | 8 stages, state, refusals | `data/p022_window_check/status.jsonl`, live tail |
 | Placement rate by week | placed / skipped / rate | `rollup.json:weekly_by_pod` |
 | Skip reasons | 30-day window + lifetime | `rollup.json:skip_reasons` |
@@ -69,6 +69,13 @@ Every block in `/api/v2/dashboard` also carries a `source` string, and
 `sources{}` carries `{available, path, mtime_utc, age_seconds, stale, reason}`
 per source. The Ops tab renders that table directly, so "why is this blank?" is
 answerable from the page itself.
+
+The Research Operations panel deliberately labels a dispatch as task creation,
+not agent execution. Until a model invocation/claim event is implemented,
+"started" remains explicitly untracked; only a durable
+`ResearchDisposition` counts as reviewed or completed. The same contract feeds
+the server-rendered daily brief and its email, preventing the dashboard and
+email from presenting different research progress.
 
 ---
 

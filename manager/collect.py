@@ -1188,6 +1188,53 @@ class Collector:
         result["available"] = True
         return result
 
+    # ---- research operations --------------------------------------------
+    @safe("research_operations")
+    def research_operations(self) -> Dict[str, Any]:
+        """Load the shared research funnel/queue contract for the daily brief.
+
+        The collector copies measured facts only. In particular, a dispatch is
+        not promoted into an "agent started" claim: metrics.json explicitly
+        records that invocation tracking is unavailable.
+        """
+        path = self.root / "data" / "research_intake" / "metrics.json"
+        if not path.exists():
+            return {
+                "available": False,
+                "path": str(path),
+                "reason": "research metrics file does not exist",
+            }
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return {
+                "available": False,
+                "path": str(path),
+                "reason": "{}: {}".format(type(exc).__name__, exc),
+            }
+        operations = payload.get("operations")
+        if not isinstance(operations, dict):
+            return {
+                "available": False,
+                "path": str(path),
+                "generated_at": payload.get("generated_at"),
+                "reason": "research metrics have no operations block",
+            }
+        age_minutes = file_age(path)
+        return {
+            "available": True,
+            "path": str(path),
+            "generated_at": payload.get("generated_at"),
+            "age_hours": (
+                round(age_minutes / 60.0, 2) if age_minutes is not None else None),
+            "funnel": payload.get("funnel") or {},
+            "dispatch": payload.get("dispatch") or {},
+            "operations": operations,
+            "decisions": payload.get("decisions") or {},
+            "top_rejection_reasons": payload.get("top_rejection_reasons") or {},
+            "x_pilot": payload.get("x_pilot") or {},
+        }
+
     # ---- P-014 gate (delegates to the sanctioned reader) -----------------
     @safe("p014_gate")
     def p014_gate(self) -> Dict[str, Any]:
@@ -1264,6 +1311,7 @@ class Collector:
             "errors": self.recent_errors() or {},
             "workstreams": self.workstreams(trade) or [],
             "work_today": self.work_today() or {},
+            "research_operations": self.research_operations() or {},
             "faults": self.faults,
         }
         # Last, and fed the snapshot: throughput reads the gate readers'

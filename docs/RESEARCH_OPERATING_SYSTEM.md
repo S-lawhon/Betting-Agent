@@ -218,6 +218,13 @@ research minutes per advance, rejection reasons, and yield by source/lane.
 Validated and paper/live outcomes should eventually be joined back to
 `opportunity_id`; advance rate alone is not research quality.
 
+`data/research_intake/metrics.json` also carries the Research Operations
+contract used by both the dashboard and daily email: 24-hour dispatch/review
+activity, per-agent pending and overdue queues, oldest task age, and explicit
+execution semantics. A dispatch is task creation only. Agent invocation/start
+is untracked until a dedicated claim event exists, while a newer durable
+disposition is the completion signal.
+
 Maintain a 15–20% exploration floor even after source metrics accumulate. A
 small early sample must not permanently starve new sources or market families.
 
@@ -230,5 +237,6 @@ small early sample must not permanently starve new sources or market families.
   not yet implemented by the legacy connector.
 - ProphetX remains read-only and requires authenticated response-shape
   reconciliation.
-- X is disabled until budget approval and credentials exist.
+- The bounded X pilot is enabled with application and X-side budget controls;
+  the runtime credential remains VPS-only and uncommitted.
 - No repository daemon invokes the model-driven agents automatically.

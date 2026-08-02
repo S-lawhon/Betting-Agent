@@ -609,6 +609,20 @@ def test_research_pipeline_surfaces_dispatch_yield_and_x_cost():
             "dispatched_reviewed": 4, "dispatched_advanced": 1,
         },
         "dispatch": {"pending_review": 6, "review_rate": 0.4},
+        "operations": {
+            "semantics": {"agent_invocation_tracked": False},
+            "window_hours": 24,
+            "activity_24h": {"dispatched": 10, "reviewed": 4,
+                             "advance": 1, "reject": 3, "defer": 0,
+                             "research_minutes": 80},
+            "queue": {"pending": 6, "overdue": 2,
+                      "oldest_pending_age_hours": 51.0},
+            "agents": {"social-scout": {
+                "queue_state": "overdue", "pending": 6, "overdue": 2,
+                "dispatched_24h": 10, "reviewed_24h": 4,
+                "advance_24h": 1,
+            }},
+        },
         "by_source_type": {"social": {
             "assigned": 10, "advance": 1, "review_rate": 0.4,
             "advance_rate": 0.1,
@@ -622,6 +636,8 @@ def test_research_pipeline_surfaces_dispatch_yield_and_x_cost():
     assert research["available"] is True
     assert research["funnel"][-1] == ["dispatched_advanced", 1.0]
     assert research["dispatch"]["pending_review"] == 6
+    assert research["operations"]["queue"]["overdue"] == 2
+    assert research["operations"]["semantics"]["agent_invocation_tracked"] is False
     assert research["x_pilot"]["estimated_cost_usd"] == 1.065
 
 

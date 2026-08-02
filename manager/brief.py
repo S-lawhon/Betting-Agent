@@ -63,6 +63,13 @@ def _pct_bar(pct: float, width: int = 20) -> str:
     return "[" + "#" * filled + "-" * (width - filled) + "]"
 
 
+def _metric(value: Any) -> str:
+    """Render a measured count without turning missing into zero."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return "unknown"
+    return str(int(value)) if float(value).is_integer() else "{:.1f}".format(value)
+
+
 def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any]:
     """Assemble the brief into structured sections."""
     by_sev: Dict[str, List[checks.Finding]] = {}
@@ -145,6 +152,7 @@ def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any
         "services": snap.get("services", []),
         "trade": snap.get("trade", {}),
         "work": snap.get("work_today", {}),
+        "research": snap.get("research_operations", {}),
         "gates": gates,
         "accumulating": accumulating,
         "active_dirs": active_dirs,
@@ -249,6 +257,72 @@ def render_markdown(b: Dict[str, Any]) -> str:
         if work.get("fetched") is False:
             L.append("")
             L.append("_(git mirror fetch failed — list may be stale)_")
+    L.append("")
+
+    research = b.get("research") or {}
+    L.append("## Research operations")
+    L.append("")
+    if not research.get("available"):
+        L.append("_Research operations unavailable — {}._".format(
+            research.get("reason") or "no measured operations snapshot"))
+    else:
+        operations = research.get("operations") or {}
+        semantics = operations.get("semantics") or {}
+        activity = operations.get("activity_24h") or {}
+        queue = operations.get("queue") or {}
+        funnel = research.get("funnel") or {}
+        L.append(
+            "**Execution status:** task packets are created automatically; "
+            "agent invocation/started state is {}tracked. Completion requires "
+            "a durable research disposition.".format(
+                "" if semantics.get("agent_invocation_tracked") else "not "))
+        L.append("")
+        L.append(
+            "- Lifetime funnel: {} assignments → {} dispatched → {} reviewed → "
+            "{} advanced".format(
+                _metric(funnel.get("assignments")),
+                _metric(funnel.get("dispatched")),
+                _metric(funnel.get("dispatched_reviewed")),
+                _metric(funnel.get("dispatched_advanced"))))
+        L.append(
+            "- Last 24h: {} dispatched, {} reviewed ({} advanced / {} rejected / "
+            "{} deferred), {} research minutes".format(
+                _metric(activity.get("dispatched")),
+                _metric(activity.get("reviewed")),
+                _metric(activity.get("advance")),
+                _metric(activity.get("reject")),
+                _metric(activity.get("defer")),
+                _metric(activity.get("research_minutes"))))
+        L.append(
+            "- Queue: {} pending, {} older than {}h; oldest {}".format(
+                _metric(queue.get("pending")), _metric(queue.get("overdue")),
+                _metric(operations.get("overdue_after_hours")),
+                _fmt_age(queue.get("oldest_pending_age_hours"))))
+        agents = operations.get("agents") or {}
+        if agents:
+            L.append("")
+            L.append("Agent queues:")
+            for agent, row in sorted(agents.items()):
+                L.append(
+                    "- **{}** — {} pending ({} overdue; oldest {}), {} reviewed, "
+                    "{} advanced, and {} research minutes in 24h".format(
+                        agent, _metric(row.get("pending")),
+                        _metric(row.get("overdue")),
+                        _fmt_age(row.get("oldest_pending_age_hours")),
+                        _metric(row.get("reviewed_24h")),
+                        _metric(row.get("advance_24h")),
+                        _metric(row.get("research_minutes_24h"))))
+        x_pilot = research.get("x_pilot") or {}
+        if x_pilot.get("month"):
+            cost = x_pilot.get("estimated_cost_usd")
+            cost_text = ("${:.3f}".format(cost)
+                         if isinstance(cost, (int, float)) else "unknown")
+            L.append("")
+            L.append("X pilot: {} estimated spend; {} assignments, {} reviewed, "
+                     "{} advanced.".format(
+                         cost_text, _metric(x_pilot.get("assignments")),
+                         _metric(x_pilot.get("reviewed")),
+                         _metric(x_pilot.get("advanced"))))
     L.append("")
 
     if b["gates"]:
@@ -411,6 +485,66 @@ def render_html(b: Dict[str, Any]) -> str:
                      .format(unc, "s" if unc != 1 else ""))
         if work.get("fetched") is False:
             P.append("<div class='dim'>(git mirror fetch failed — list may be stale)</div>")
+
+    research = b.get("research") or {}
+    P.append("<h2>Research operations</h2>")
+    if not research.get("available"):
+        P.append("<div class='dim'>Research operations unavailable — {}.</div>".format(
+            e(str(research.get("reason") or "no measured operations snapshot"))))
+    else:
+        operations = research.get("operations") or {}
+        semantics = operations.get("semantics") or {}
+        activity = operations.get("activity_24h") or {}
+        queue = operations.get("queue") or {}
+        funnel = research.get("funnel") or {}
+        tracking = "tracked" if semantics.get("agent_invocation_tracked") else "not tracked"
+        P.append("<div class='card'><b>Execution status</b><br>Task packets are "
+                 "created automatically; agent invocation/started state is {}. "
+                 "Completion requires a durable research disposition.</div>".format(
+                     e(tracking)))
+        P.append("<ul>")
+        P.append("<li>Lifetime funnel: {} assignments → {} dispatched → {} reviewed "
+                 "→ {} advanced</li>".format(
+                     e(_metric(funnel.get("assignments"))),
+                     e(_metric(funnel.get("dispatched"))),
+                     e(_metric(funnel.get("dispatched_reviewed"))),
+                     e(_metric(funnel.get("dispatched_advanced")))))
+        P.append("<li>Last 24h: {} dispatched, {} reviewed ({} advanced / {} rejected "
+                 "/ {} deferred), {} research minutes</li>".format(
+                     e(_metric(activity.get("dispatched"))),
+                     e(_metric(activity.get("reviewed"))),
+                     e(_metric(activity.get("advance"))),
+                     e(_metric(activity.get("reject"))),
+                     e(_metric(activity.get("defer"))),
+                     e(_metric(activity.get("research_minutes")))))
+        P.append("<li>Queue: {} pending, {} older than {}h; oldest {}</li>".format(
+            e(_metric(queue.get("pending"))), e(_metric(queue.get("overdue"))),
+            e(_metric(operations.get("overdue_after_hours"))),
+            e(_fmt_age(queue.get("oldest_pending_age_hours")))))
+        P.append("</ul>")
+        agents = operations.get("agents") or {}
+        if agents:
+            P.append("<div class='card'><b>Agent queues</b><ul>")
+            for agent, row in sorted(agents.items()):
+                P.append("<li><b>{}</b> — {} pending ({} overdue; oldest {}), {} "
+                         "reviewed, {} advanced, and {} research minutes in 24h</li>".format(
+                             e(str(agent)), e(_metric(row.get("pending"))),
+                             e(_metric(row.get("overdue"))),
+                             e(_fmt_age(row.get("oldest_pending_age_hours"))),
+                             e(_metric(row.get("reviewed_24h"))),
+                             e(_metric(row.get("advance_24h"))),
+                             e(_metric(row.get("research_minutes_24h")))))
+            P.append("</ul></div>")
+        x_pilot = research.get("x_pilot") or {}
+        if x_pilot.get("month"):
+            cost = x_pilot.get("estimated_cost_usd")
+            cost_text = ("${:.3f}".format(cost)
+                         if isinstance(cost, (int, float)) else "unknown")
+            P.append("<div class='dim'>X pilot: {} estimated spend; {} assignments, "
+                     "{} reviewed, {} advanced.</div>".format(
+                         e(cost_text), e(_metric(x_pilot.get("assignments"))),
+                         e(_metric(x_pilot.get("reviewed"))),
+                         e(_metric(x_pilot.get("advanced")))))
 
     if b["gates"]:
         P.append("<h2>Gate progress</h2>")

@@ -142,3 +142,50 @@ def test_live_gate_still_renders_a_bar():
     assert "fills toward gate" in md
     assert "282/500" in md
     assert "CLOSED" not in md
+
+
+def research_snap() -> dict:
+    return {"research_operations": {
+        "available": True,
+        "funnel": {"assignments": 200, "dispatched": 10,
+                   "dispatched_reviewed": 2, "dispatched_advanced": 1},
+        "operations": {
+            "semantics": {"agent_invocation_tracked": False},
+            "window_hours": 24, "overdue_after_hours": 48,
+            "activity_24h": {"dispatched": 10, "reviewed": 2,
+                             "advance": 1, "reject": 1, "defer": 0,
+                             "research_minutes": 35},
+            "queue": {"pending": 8, "overdue": 1,
+                      "oldest_pending_age_hours": 52.0},
+            "agents": {"strategy-scout": {
+                "pending": 8, "overdue": 1,
+                "oldest_pending_age_hours": 52.0,
+                "reviewed_24h": 2, "advance_24h": 1,
+                "research_minutes_24h": 35,
+            }},
+        },
+        "x_pilot": {"month": "2026-08", "estimated_cost_usd": 1.065,
+                    "assignments": 10, "reviewed": 2, "advanced": 1},
+    }}
+
+
+def test_daily_brief_renders_research_operations_without_implying_agent_start():
+    b = brief.build(research_snap(), [])
+    for text in (brief.render_markdown(b), brief.render_html(b)):
+        assert "Research operations" in text
+        assert "200 assignments" in text
+        assert "10 dispatched" in text
+        assert "8 pending" in text
+        assert "strategy-scout" in text
+        assert "agent invocation/started state is not tracked" in text.lower()
+        assert "35 research minutes" in text
+        assert "$1.065" in text
+
+
+def test_daily_brief_reports_missing_research_operations_as_unknown():
+    b = brief.build({"research_operations": {
+        "available": False, "reason": "metrics missing",
+    }}, [])
+    md = brief.render_markdown(b)
+    assert "Research operations unavailable" in md
+    assert "metrics missing" in md

@@ -1,0 +1,129 @@
+{
+  "id": "strat_p022_fade_v1",
+  "opportunity_id": "op_20260802_001",
+  "name": "P-022 Round-Leader Dead-Heat Fade Maker (retrospective spec, calibration run)",
+  "version": "1.0.0",
+  "state": "spec",
+  "entry_logic": {
+    "type": "kalshi_maker_sell_yes_dead_heat_fade",
+    "market_family": "KX*R{1,2,3}LEAD golf round-leader",
+    "series": [
+      "KXPGAR1LEAD",
+      "KXPGAR2LEAD",
+      "KXPGAR3LEAD",
+      "KXDPWORLDTOURR1LEAD",
+      "KXDPWORLDTOURR2LEAD",
+      "KXDPWORLDTOURR3LEAD",
+      "KXLPGAR1LEAD",
+      "KXLPGAR2LEAD",
+      "KXLPGAR3LEAD",
+      "KXLIVR1LEAD",
+      "KXLIVR2LEAD",
+      "KXLIVR3LEAD",
+      "KXCHAMPTOURR1LEAD"
+    ],
+    "side": "sell_yes",
+    "close_reference_field_priority": ["close_time", "occurrence_datetime"],
+    "close_reference_rule": "On this family occurrence_datetime is a far-future placeholder (13.2-18.2d late, 10/10 sampled) and close_time is the correct anchor; this is the REVERSE of the top-N event-timing quirk in CLAUDE.md and must never be inferred by analogy.",
+    "anchor_price_band": {
+      "reference": "mid_price of the YES orderbook (best_bid, best_ask average) at time of evaluation",
+      "low_usd": 0.03,
+      "high_usd": 0.12,
+      "rule": "eligible_to_quote iff 0.03 <= mid_price <= 0.12; recompute mid_price every cycle, do not cache"
+    },
+    "quote_offset_usd": 0.02,
+    "quote_price_formula": "quote_px = round(mid_price + 0.02, 2)",
+    "posting_window": {
+      "fade_start_h_before_close": 24.0,
+      "no_new_quote_h_before_close": 12.0,
+      "rule": "can_place_new_quote iff 12.0 <= hours_to_close(close_time) <= 24.0; once placed a quote RESTS UNCHANGED through the round to close, no re-quoting or re-pricing inside 12h",
+      "outside_window_behavior": "outside [12h,24h] the engine discovers markets and settles positions but places NO new quotes"
+    },
+    "excluded_from_entry": [
+      "quotes placed inside 12h to close are non-compliant with the locked posting-window cap and must be excluded from T (P022_DECISION_RULE.md §7)"
+    ]
+  },
+  "exit_logic": {
+    "type": "hold_to_kalshi_settlement",
+    "active_exit": false,
+    "rule": "No discretionary exit. A resting maker quote is either filled and held to settlement, or pulled (unfilled) via cap exhaustion or the kill switch.",
+    "quote_pull_triggers": [
+      "data/KILL_ROUND_LEADER_FADE file present -> pull ALL resting quotes immediately",
+      "per-name, per-tournament, or aggregate collateral cap exhausted -> pull the specific quote that would breach it",
+      "mid_price exits [0.03, 0.12] band before fill on an unfilled resting quote -> re-evaluate/pull on next cycle"
+    ],
+    "settlement_mapping": {
+      "result_yes": "settlement_value = 1.00",
+      "result_no": "settlement_value = 0.00",
+      "result_scalar": "settlement_value = settlement_value_dollars, read from the per-ticker GET (never null); this is the $1/n dead-heat split or a withdrawal marked to fair value, and is a PARTIAL PAYOUT, NEVER a void",
+      "result_void": "excluded from P&L entirely -- no risk was taken; applies only to a market that never resolved, not to result=scalar"
+    }
+  },
+  "fair_value_model": {
+    "type": "settlement_mechanic_dead_heat_split",
+    "description": "Fair value is not a probability estimate; it is the certified contract term that a tie for the round lead splits the $1.00 notional 1/n (rounded down) across tied names, per governing tour PDF (e.g. PGAROUNDLEADER). A single outright leader settles YES=1.00/NO=0.00 as usual.",
+    "edge_definition": "edge_per_contract = quote_px - E[settlement_value] - maker_fee(series, quote_px), where E[settlement_value] is realized (not modeled) at settlement",
+    "pnl_formula": "pnl_per_contract = quote_px - settlement_value - maker_fee(series, quote_px)",
+    "mechanism_class": "settlement-mechanic hypothesis, not a probability-disagreement hypothesis; no CLV substitute is valid for this family (round-leader markets have no sharp external closing line) per P022_DECISION_RULE.md §8.5"
+  },
+  "fee_model": {
+    "venue": "kalshi",
+    "fee_type": "quadratic",
+    "maker_fee_rate": 0.0,
+    "computation": "src.kalshi_fees.fee_per_contract(price, series_ticker=<ticker>) -- series_ticker MUST be passed explicitly; lookup is EXACT match against src/fixtures/kalshi_series_fees.json, no prefix logic",
+    "assertion": "all 13 series in this spec's `series` list are classified `quadratic` (maker-fee-free); verified live via `python3 -m scripts.p022_checkpoint --check-fees`, which asserts rather than assumes fee==0 per contract on every *LEAD series",
+    "taker_fee_not_applicable": "P-022 is maker-only (sells YES / makes NO resting orders); taker fee formula 0.07*P*(1-P) does not apply to this strategy's own fills"
+  },
+  "risk_limits": {
+    "max_usd_at_risk": 150.0,
+    "bankroll_usd": 1000.0,
+    "sizing_basis": "collateral_at_risk = (1 - quote_px) per contract, NEVER contract count",
+    "per_name_cap_pct_bankroll": 0.005,
+    "per_name_cap_usd": 5.0,
+    "per_tournament_cap_pct_bankroll": 0.05,
+    "per_tournament_cap_usd": 50.0,
+    "aggregate_cap_pct_bankroll": 0.15,
+    "aggregate_cap_usd": 150.0,
+    "secondary_contract_count_cap_per_name": 25,
+    "cap_enforcement_rule": "each new quote is sized to the tightest remaining of {per-name, per-tournament, aggregate} cap; the quote is pulled the instant any cap is exhausted",
+    "cap_scope_caveat": "P-022 runs as its own process; AggregateRiskGuard reservations (reserve_trade on quote, release_reservation on pull) bind against P-022's OWN book only -- the aggregate 15% cap is NOT enforced against the 5-minute engine's other positions",
+    "cap_is_gate_condition": "these caps are GATE CONDITIONS, not tuning knobs, per P022_DECISION_RULE.md §7/§8.1: a tournament run with ANY cap breached is EXCLUDED from T and from the aggregate (it cannot contribute a favorable observation); raising ANY of the percentages above resets T to 0 and requires re-registration as a new pod ID (P-022b). This spec MUST NOT and does NOT loosen any of the values above.",
+    "posting_window_is_a_cap": "the [12h,24h] posting window in entry_logic is itself a cap; quotes placed inside 12h are excluded from T"
+  },
+  "null_hypothesis": "Net of the maker fee (asserted zero for this series family) and net of adverse selection in live resting fills, the equal-weighted-across-tournament, contract-weighted-within-tournament mean settlement P&L per filled contract for selling YES in [0.03,0.12] at mid+0.02, posted 12-24h pre-round on KX*R{1,2,3}LEAD, is not reliably positive: at T>=24 tournament observations (P022_DECISION_RULE.md §2-3 unit of observation and test statistic), edge <= 0 or z < 2.0. Equivalently: the +3.4c/ct [+1.7,+5.1] Phase-2 backtest estimate fails to replicate forward and the dead-heat/longshot mechanism does not survive real maker-fill adverse selection at tradeable size.",
+  "alternative_hypothesis": "The $1/n dead-heat settlement split plus retail longshot overpricing on cheap round-leader names produces a persistent, fee-free, adverse-selection-robust positive net edge (Phase-2 backtest: +3.4c/ct net, 95% CI [+1.7,+5.1], 16/19 tournaments positive, fill rate 0.47) that replicates forward at T>=24 with edge>0 and z>=2.0 per P022_DECISION_RULE.md §4, authorizing (paper-only) continued allocation within the §7 caps.",
+  "provenance": {
+    "created_by": "spec-agent",
+    "code_commit": "c97bd6b",
+    "artifact_path": "research/specs/strat_p022_fade_v1_2026-08-02.json",
+    "dataset_hash": null,
+    "gate_path": "golf_quirks_research/P022_DECISION_RULE.md",
+    "gate_hash": null,
+    "session_id": null
+  },
+  "extra": {
+    "created_at": "2026-08-02T01:15:00Z",
+    "purpose": "RETROSPECTIVE CALIBRATION SPEC. P-022 is already built and running in paper (systemd unit betting-round-leader-fade). This spec documents the rule the shipped implementation should satisfy, for validator calibration against a known-answer case -- it is not a discovery artifact.",
+    "alternative_hypotheses": [
+      "Primary (stated in alternative_hypothesis above): the mechanism replicates forward and passes the locked gate.",
+      "Alternative-B (partial regression): the effect is real but smaller than backtest (regression toward zero from a one-month, non-holdout sample per P022_DECISION_RULE.md §6), producing the marginal-result path (0 < edge, z < 2.0 at T=24) that triggers the single pre-registered extension to T=40 at byte-identical parameters, per §4a.",
+      "Alternative-C (mechanism absent forward): adverse selection dominates in live resting fills to the point of flipping sign, producing the HARD KILL condition z <= -2.0 at any T, per §4."
+    ],
+    "boundary_not_to_cross": "This spec does NOT compute, estimate, or report any live forward-gate statistic (edge, se, z, T, or verdict). As of 2026-08-01 T=0 for this pod; P022_DECISION_RULE.md makes T<24 NO DECISION and forbids an early look. scripts/p022_checkpoint.py is the ONLY sanctioned reader of forward results and is not invoked by this artifact.",
+    "decision_rule_locked_reference": "golf_quirks_research/P022_DECISION_RULE.md, LOCKED 2026-07-26, Amendment 1 2026-07-28 (T=14 -> T=24). This spec reproduces its thresholds verbatim (HARD KILL z<=-2.0 at any T; NO DECISION T<24; KILL if T>=24 and edge<=0; single extension to T=40 if T>=24, edge>0, z<2.0; PASS if T>=24 and edge>0 and z>=2.0; KILL at T>=40 if edge>0 and z<2.0) and does not loosen, restate-looser, or omit any of them.",
+    "unit_of_observation": "ONE tournament = one observation (KXPGAR1LEAD-XXX26 and KXPGAR2LEAD-XXX26 of the same event pool to ONE observation, not two). Within-tournament statistic is contract-weighted mean net c/contract; across-tournament aggregate is equal-weighted mean of per-tournament statistics.",
+    "test_statistic_reference": "P022_DECISION_RULE.md §3: x_t = contract-weighted mean pnl_per_contract within tournament t; edge = mean(x_t); se = stdev(x_t)/sqrt(T); z = edge/se. VOIDs excluded; scalar settlements NEVER excluded and NEVER booked at $0.",
+    "params_source": "golf_quirks_research/p022_p023_params.json (p022_round_leader_fade block), generated_utc 2026-07-26, values used verbatim -- band [0.03,0.12], anchor_hours_before_close 12, offset 0.02, side sell_yes, maker_fee 0.0, research_quote_size 25.",
+    "implementation_reference": "src/round_leader_fade_maker.py (RoundLeaderFadeMakerPod, @register_pod(\"P-022\")); scripts/run_round_leader_fade.py (standalone fast-loop runner, NOT in pods.active, kill switch data/KILL_ROUND_LEADER_FADE); tests/test_round_leader_fade.py (21 tests).",
+    "known_failure_modes_carried_forward": [
+      "Adverse selection on the maker side (E[settle|filled] 3.2c vs posted 1.8c in Phase-2 -- does not flip sign but is real)",
+      "One-sided fills: filling only the leg that goes on to lose",
+      "Capacity is small by construction (~$140/month projected at 25-ct caps) -- not a reason to loosen caps",
+      "close_time vs occurrence_datetime reversal is family-specific and was a total quoting blocker for 3 days (2026-07-23 to 2026-07-26) before the fix",
+      "result=scalar must never be booked VOID -- doing so deletes the exact event the strategy exists to harvest"
+    ],
+    "related_pod": "P-022, standalone maker, systemd unit betting-round-leader-fade, VPS 129.212.176.202",
+    "opportunity_card_path": "research/opportunities/op_20260802_001_card_2026-08-02.json",
+    "verification_note_added_on_persist": "Claims spot-checked against the repo before persisting. CONFIRMED: Amendment 1 (T=14 -> T=24) is real and P022_DECISION_RULE.md line 169 reads 'T < 24 | NO DECISION'; src/round_leader_fade_maker.py and tests/test_round_leader_fade.py both exist; scripts/p022_checkpoint.py really does implement --check-fees (line 417). ONE ERROR LEFT UNCORRECTED, deliberately, so the artifact records what the agent actually produced: implementation_reference above says '21 tests' for tests/test_round_leader_fade.py; the real count is 57."
+  }
+}

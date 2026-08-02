@@ -1,0 +1,38 @@
+{
+  "id": "op_20260802_001",
+  "created_at": "2026-08-02T01:05:00Z",
+  "source_agent": "scout",
+  "market_family": "KX*R{1,2,3}LEAD golf round-leader (PGA/DPWT/LPGA/LIV/Champions)",
+  "thesis": "RETROSPECTIVE REGISTRATION — this opportunity is already built, backtested and running in paper as P-022. It is being entered into the strategy factory to CALIBRATE the spec/integrity/validation agents against a case whose answer is already known by hand, not to discover anything new. Thesis as originally stated: Kalshi golf round-leader markets settle a tie for the round lead by splitting the payout $1/n across the tied names, so a name that does lead realises materially less than $1.00. A maker selling YES on cheap round-leader names inside a defined price band, at a small offset, should capture the difference between the market's implied outright-win price and the tie-adjusted fair value, net of fees (this family is maker-free) and net of adverse selection.",
+  "edge_source": [
+    "Structural: the $1/n dead-heat split on KX*R{1,2,3}LEAD is unconditional for this family (distinct from the KXLEADER* season stat-leader family, whose split IS conditional on the league's own tiebreaker).",
+    "Maker-free execution: every LEAD series is `quadratic`, so the maker fee is zero. Swept 2026-07-26 across all series: 88 tickers contain LEAD and not one is quadratic_with_maker_fees.",
+    "The tie mass is realised, not theoretical: 21 scalar LEAD events in the census settled at exactly 1/n (2-way 0.50, 3-way 0.33, 4-way 0.25, 5-way 0.20, 6-way 0.16)."
+  ],
+  "external_data_needed": [
+    "An EXTERNAL round-end schedule. Kalshi publishes no field carrying the real close on an open market — close_time, occurrence_datetime, expiration_time, expected_expiration_time and latest_expiration_time all collapse to a far-future placeholder and close_time is rewritten only at the moment the market closes. src/golf_schedule.py resolves (competition, round) -> round-end UTC from ESPN's free public golf API for all five tours.",
+    "Kalshi public market data via src/kalshi_public.py for orderbook and candlesticks.",
+    "Historical settled leader trades and candles — present locally under golf_quirks_research/data/ (299MB) and mirrored gzipped under golf_quirks_research/archive/."
+  ],
+  "confidence": 0.7,
+  "urgency": "low",
+  "status": "open",
+  "known_failure_modes": [
+    "Adverse selection on the maker side — the whole reason Phase 2 exists as a separate gate from Phase 1.",
+    "One-sided fills: filling only the leg that goes on to lose is the standing risk for any maker in a thin book.",
+    "Capacity is small by construction; a real edge that cannot be sized is still not a business.",
+    "Timing: the pod ran for three days writing ZERO quotes because _close_epoch preferred occurrence_datetime, a far-future placeholder on this family, so the placement window opened after every round had already settled. A window defined relative to the determining event is only as good as the external schedule behind it.",
+    "Settlement handling: result=\"scalar\" on this family is a PARTIAL PAYOUT at settlement_value_dollars, never a void. Booking it as a void erases exactly the event the strategy exists to harvest."
+  ],
+  "rule_ambiguities": [
+    "The $1/n split on KX*R{1,2,3}LEAD must be confirmed unconditional against the governing contract terms — the sibling KXLEADER* family carries an explicit carve-out (\"and <league> does not declare a single winner through official tiebreaker procedures\") that makes its split conditional, and prior write-ups stated it unconditionally.",
+    "Whether the external ESPN-derived round-end schedule is accurate enough, and errs EARLY rather than late, since predicting a close late puts orders into a live round."
+  ],
+  "next_step": "spec",
+  "extra": {
+    "purpose": "CALIBRATION RUN. P-022 is live in paper with a pre-registered forward gate (T>=24 settled tournaments, currently T=0). The factory is being asked to reach an independent verdict on the RETROSPECTIVE backtest only.",
+    "hard_boundary": "The live forward gate is OFF LIMITS. P022_DECISION_RULE.md makes T<14 a NO DECISION and explicitly forbids an early look; the sanctioned reader scripts/p022_checkpoint.py reports T=0. No agent in this chain may compute, estimate or report a live forward-gate statistic.",
+    "registered_by": "human (retrospective), not discovered by the scout agent",
+    "related_pod": "P-022, standalone maker, systemd unit betting-round-leader-fade"
+  }
+}

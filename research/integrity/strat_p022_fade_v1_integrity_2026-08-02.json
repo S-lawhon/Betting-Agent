@@ -1,0 +1,58 @@
+{
+  "strategy_id": "strat_p022_fade_v1",
+  "checked_at": "2026-08-02T01:12:00Z",
+  "status": "fail",
+  "contract_terms": {
+    "passed": true,
+    "checked_against": "live fetch of https://assets.kalshi.com/contract_terms/PGAROUNDLEADER.pdf (ACHIEVEMENTS template), confirmed as the contract_terms_url returned live by GET /trade-api/v2/series/KXPGAR1LEAD (fee_type=quadratic, matches fee_mapping)",
+    "finding": "Verbatim clause read directly from the PDF: 'If multiple participants are reported as the result of <achievement>, then the markets for those participants will resolve so \"Yes\" holders receive $1/[the number of participants declared as the result of <achievement>] rounded down to the nearest cent and \"No\" holders receive $1 minus the Yes payout.' This clause carries NO conditional language of the kind LEAGUELEADER.pdf uses for KXLEADER* ('and <league> does not declare a single winner through official tiebreaker procedures'). The split is unconditional for the KX*R{1,2,3}LEAD family. CLAUDE.md's assertion and the spec's fair_value_model both hold up against the primary source, not just the quoted summary in golf_quirks_research/REPORT_Golf_Quirks_2026-07.md.",
+    "secondary_confirmation": "Same PDF: withdrawal from a round-leader determination resolves the market to 'No' (not a fair-value scalar) -- consistent with the spec's settlement_mapping (result_no -> 0.00) and distinct from the GOLFFINISH-template withdrawal-at-fair-value behavior documented for P-017/top-N, so the two are correctly not conflated in this spec."
+  },
+  "settlement_mapping": {
+    "passed": true,
+    "checked_against": "src/round_leader_fade_maker.py:_maybe_settle (lines ~998-1056), the actual settlement path P-022 runs (NOT src/kalshi_golf_settler.py, which is P-017-specific: default pod_id='P-017' and is not imported by round_leader_fade_maker.py or run_round_leader_fade.py)",
+    "finding": "Code matches the spec's settlement_mapping exactly: result='yes' -> payout 1.0, result='no' -> payout 0.0, result='scalar' -> payout read from settlement_value_dollars via fnum(), booked as WIN/LOSS via (fill.price - payout - fee) -- never VOID. If settlement_value_dollars is absent on a scalar result, the code logs a warning and defers (retries next cycle) rather than defaulting to zero or void, which is stricter than but consistent with the spec's intent ('never a void'). This correctly avoids the historical bug (scalar booked as VOID at $0) described in CLAUDE.md and golf_quirks_research/REPORT_P022_Settler_Scalar_Fix_2026-07-26.md. The generic KalshiGolfSettler in src/kalshi_golf_settler.py implements the equivalent fix for P-017 but is a separate code path and not what P-022 uses; the spec does not claim otherwise."
+  },
+  "fee_mapping": {
+    "passed": true,
+    "checked_against": "src/fixtures/kalshi_series_fees.json (generated_at_utc 2026-07-27, source GET /trade-api/v2/series/), src/kalshi_fees.py (exact-match logic), and a live GET /trade-api/v2/series/KXPGAR1LEAD call",
+    "finding": "All 13 series named in the spec (KXPGAR1/2/3LEAD, KXDPWORLDTOURR1/2/3LEAD, KXLPGAR1/2/3LEAD, KXLIVR1/2/3LEAD, KXCHAMPTOURR1LEAD) are present in the fixture's 'all_series' list and absent from 'maker_fee_series', so series_maker_charges_fee() returns False for all 13 and fee_per_contract(maker=True, series_ticker=...) returns 0.0 for each, matching the spec's maker_fee_rate=0.0 assertion. Live-verified fee_type='quadratic' for KXPGAR1LEAD directly against the exchange. Matching is exact-ticker per src/kalshi_fees.py, so the historical prefix-nesting trap does not apply here. The spec's series list also correctly excludes KXCHAMPTOURR2LEAD/R3LEAD, which src/kalshi_fees.py's _PENDING_SERIES table notes do not exist yet (Champions Tour lists R1 only) -- consistent."
+  },
+  "api_field_reliability": {
+    "passed": false,
+    "checked_against": "src/round_leader_fade_maker.py (grep for 'close_time'/'occurrence_datetime': zero matches), src/golf_schedule.py docstring, research/REPORT_P022_Close_Time_2026-07.md, golf_quirks_research/P022_DECISION_RULE.md §11b/11c, CLAUDE.md",
+    "finding": "The spec's entry_logic.close_reference_field_priority=['close_time','occurrence_datetime'] and its close_reference_rule ('close_time is the correct anchor ... REVERSE of the top-N quirk ... must never be inferred by analogy') is NOT what the shipped pod does and is NOT substantiated by current repo evidence -- it is actively contradicted. Two things established directly: (1) src/round_leader_fade_maker.py contains zero references to either close_time or occurrence_datetime anywhere in the file; its only close-reference mechanism is GolfScheduleResolver.resolve_event_close() from src/golf_schedule.py, an EXTERNAL ESPN-derived schedule. (2) src/golf_schedule.py's own docstring and research/REPORT_P022_Close_Time_2026-07.md state the opposite of the spec's claim: 'On an open round-leader market all six time fields (close_time, occurrence_datetime, expected_expiration_time, expiration_time, latest_expiration_time) collapse to one conservative ~20-day fallback; close_time is rewritten to the truth only at the instant the market closes' -- i.e. close_time is EQUALLY unreliable while the market is open, not a safe anchor, matching (not reversing) the general exchange-wide gotcha already documented in CLAUDE.md ('never a golf quirk'). What the spec describes matches only the FIRST, since-superseded fix from 2026-07-26 (P022_DECISION_RULE.md §11c: 'occurrence_datetime -> close_time' field-priority swap), which itself was found on 2026-07-27/28 to still be broken on open markets and was replaced by the external-schedule approach that is what actually ships. Presenting the superseded, still-broken field-priority rule as the current, correct, validated mechanism is exactly the class of error CLAUDE.md flags as having 'now cost P-022 two separate fixes' and the exact failure mode that produced 3 days of zero quotes (2026-07-23 to 2026-07-26/28). This is a factual defect in the spec, not merely an unmeasured item."
+  },
+  "external_schedule_dependency": {
+    "required": true,
+    "available": true,
+    "detail": "src/golf_schedule.py's GolfScheduleResolver (ESPN public golf API, unauthenticated) is a hard dependency for P-022's entire placement-window logic -- there is no Kalshi-field fallback (see api_field_reliability finding above; the pod fails closed with no quote if the resolver returns None). Verified live 2026-08-02: GET site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?dates=2026 and GET .../leaderboard?league=pga&event=<id> both returned HTTP 200 with well-formed tournament/leaderboard/tee-time JSON. tests/test_golf_schedule.py asserts fail-closed behavior and the one-sided-early calibration on mocked data; live reachability was independently confirmed here rather than inferred from the tests."
+  },
+  "blocking_issues": [
+    "api_field_reliability check FAILED: the spec's stated close-time resolution mechanism (close_reference_field_priority preferring close_time over occurrence_datetime, described as 'the correct anchor' and 'the REVERSE of the top-N quirk') does not match the shipped implementation and is contradicted by src/golf_schedule.py, research/REPORT_P022_Close_Time_2026-07.md, and CLAUDE.md. The pod actually depends exclusively on an external ESPN schedule (src/golf_schedule.py) because close_time, like every other Kalshi time field, is a placeholder on an OPEN market -- it is not a reliable anchor on this family any more than on the top-N family. A reader relying on this spec's entry_logic to reproduce or extend P-022's timing logic would reintroduce the exact defect (structurally zero quotes) that was already fixed twice."
+  ],
+  "provenance": {
+    "created_by": "integrity-agent",
+    "code_commit": "c97bd6b",
+    "artifact_path": "research/integrity/strat_p022_fade_v1_integrity_2026-08-02.json",
+    "dataset_hash": null,
+    "gate_path": "golf_quirks_research/P022_DECISION_RULE.md",
+    "gate_hash": null,
+    "session_id": null
+  },
+  "extra": {
+    "spec_checked": "research/specs/strat_p022_fade_v1_2026-08-02.json",
+    "opportunity_card_checked": "research/opportunities/op_20260802_001_card_2026-08-02.json",
+    "other_fields_spot_checked_and_confirmed_correct": [
+      "anchor_price_band [0.03, 0.12], quote_offset_usd 0.02, posting_window [12h,24h] all byte-identical to src/round_leader_fade_maker.py defaults (mid_band, quote_offset, fade_start_h, no_new_quote_h)",
+      "risk_limits (pct_per_name 0.005 / $5, pct_per_tournament 0.05 / $50, pct_total 0.15 / $150, max_contracts_per_name 25) byte-identical to code defaults",
+      "13-series DEFAULT_SERIES tuple in code matches spec's series list exactly",
+      "spec's null/alternative hypotheses and decision thresholds (T<24 NO DECISION, hard kill z<=-2.0, T=24/40 schedule) reproduce golf_quirks_research/P022_DECISION_RULE.md Amendment 1 verbatim",
+      "tests/test_round_leader_fade.py actually contains 57 test functions, confirming the spec's own self-flagged correction (its implementation_reference text still says '21 tests', left uncorrected on purpose per the spec's provenance note) -- an honest, non-blocking discrepancy the spec discloses itself",
+      "scripts/p022_checkpoint.py --check-fees exists (line 417) as claimed"
+    ],
+    "hard_boundary_respected": "No live forward-gate statistic (edge, se, z, T, verdict) was computed, estimated, or reported anywhere in this review. T remains untouched; scripts/p022_checkpoint.py was not invoked.",
+    "note_on_verdict": "Three of four mandatory mappings pass on direct primary-source verification (live PDF fetch, live /series call, direct code read of the settlement path actually used). The api_field_reliability failure is a specific, demonstrable factual error in the spec's entry_logic description, not an artifact of missing information -- per instructions this is not resolved in the strategy's favor, and per IntegrityReport.passes() a single failing mandatory mapping means the report cannot pass regardless of the other three.",
+    "independently_reverified_on_persist": "The central claim was checked by hand before this artifact was accepted, because the whole calibration turns on it. CONFIRMED: `grep -c 'close_time\\|occurrence_datetime' src/round_leader_fade_maker.py` returns 0; the file imports GolfScheduleResolver at line 55 and raises at line 235 if one is not supplied; src/golf_schedule.py lines 10-13 state that all six time fields collapse on an open market and close_time is rewritten only at the instant of close. The integrity agent's finding is correct and the spec agent's entry_logic is wrong."
+  }
+}

@@ -153,9 +153,9 @@
     <div class="facts">
       <div class="fact paperflag"><b>PAPER / DEMO MODE</b> <span>— no real money, ever</span></div>
       <div class="fact"><b>4</b> <span>active pods</span></div>
-      <div class="fact"><b>10</b> <span>agent roles</span></div>
+      <div class="fact"><b>12</b> <span>agent roles</span></div>
       <div class="fact"><b>76</b> <span>Python modules</span></div>
-      <div class="fact"><b>2,272</b> <span>tests</span></div>
+      <div class="fact"><b>2,301</b> <span>tests</span></div>
       <div class="fact"><b>6</b> <span>services on the VPS</span></div>
       <div class="fact"><span>repo</span> <b>S-lawhon/Betting-Agent</b></div>
       <div class="fact"><span>as of</span> <b>Aug 2 2026</b></div>
@@ -386,7 +386,7 @@
 
   <div class="card">
     <h3>The short version</h3>
-    <p class="muted">Ten specialist agents, each with a narrow job and no ability to do the next one's. A scout can propose but not specify. A reviewer can verify but not validate. A validator can measure but not deploy. <b>Nothing reaches real money without a named human approval</b> — and that isn't a policy note, it's a line of Python that raises an exception.</p>
+    <p class="muted">Twelve specialist agents, each with a narrow job and no ability to do the next one's. A scout can propose but not specify. A reviewer can verify but not validate. A validator can measure but not deploy. <b>Nothing reaches real money without a named human approval</b> — and that isn't a policy note, it's a line of Python that raises an exception.</p>
     <p class="muted">The agents don't run themselves. A background worker records what they produce; a person (or a Claude session) actually invokes them. <b>A running service does not mean research is happening</b> — that distinction has its own alarm, because it's the easiest thing in the system to get wrong.</p>
   </div>
 
@@ -606,6 +606,7 @@ flowchart LR
       </div>
       <p class="note">The deterministic ranker can measure provenance, eligibility, similarity to past work, and attention decay. It <b>cannot</b> know real edge or capacity — so those stay null until a specialist produces evidence. Penalties apply for prior rejection, missing timestamp-correct data, rule ambiguity, unrealistic fills, fees, and crowding.</p>
     </div>
+    <p class="muted"><b>research-director</b> is the agent that works this ranking — it allocates effort across venues and source lanes, orders the queue by what a check is worth against what it costs, and holds the exploration floor open. Its job is triage, not judgement about any single idea.</p>
     <p class="muted">A <b>15–20% exploration floor</b> is held even once metrics accumulate, so a small early sample can't permanently starve a new source or an unfamiliar market family.</p>
   </div>
 </div></section>

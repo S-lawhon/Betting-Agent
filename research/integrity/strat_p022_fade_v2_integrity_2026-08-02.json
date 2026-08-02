@@ -1,0 +1,58 @@
+{
+  "strategy_id": "strat_p022_fade_v2",
+  "checked_at": "2026-08-02T01:52:00Z",
+  "status": "pass",
+  "contract_terms": {
+    "passed": true,
+    "checked_against": "Live fetch + direct read of https://assets.kalshi.com/contract_terms/PGAROUNDLEADER.pdf (ACHIEVEMENTS template) and leader_research/contract_terms/LEAGUELEADER.pdf, both read verbatim as primary sources (not a quoted summary). contract_terms_url and fee_type=quadratic independently confirmed live via GET /trade-api/v2/series/KXPGAR1LEAD.",
+    "finding": "PGAROUNDLEADER.pdf verbatim: 'If multiple participants are reported as the result of <achievement>, then the markets for those participants will resolve so \"Yes\" holders receive $1/[the number of participants declared as the result of <achievement>] rounded down to the nearest cent and \"No\" holders receive $1 minus the Yes payout.' This carries NO conditional carve-out. By contrast LEAGUELEADER.pdf (KXLEADER* family) verbatim: 'In the event of a tie ... and <league> does not declare a single winner through official tiebreaker procedures, the markets ... will resolve so ...' — explicitly conditional. The spec's fair_value_model claim is confirmed verbatim against both primary PDFs read directly. Withdrawal clause, also verbatim: 'If <participant> forfeits, withdraws from consideration ... the market will resolve to \"No\" for <participant>' — confirms the spec's settlement_mapping claim that a withdrawal on this family settles NO, not a fair-value scalar (the distinct GOLFFINISH/top-N template)."
+  },
+  "settlement_mapping": {
+    "passed": true,
+    "checked_against": "src/round_leader_fade_maker.py:_maybe_settle (lines 998-1057), the actual settlement path P-022 runs; scripts/p022_checkpoint.py:normalise_fade_settle docstring (lines 112-139) and P022_DECISION_RULE.md §3.",
+    "finding": "Code matches the spec's settlement_mapping exactly: result='yes' -> payout 1.0; result='no' -> payout 0.0 (consistent with the withdrawal-resolves-NO clause verified above); result='scalar' -> payout = fnum(settlement_value_dollars), booked as pnl = (fill.price - payout - fee) * qty, NEVER void. If settlement_value_dollars is absent on a scalar result the code logs a warning and returns without marking the book done (defers/retries next cycle) rather than defaulting to zero — matches the spec's 'DEFERS to the next cycle' claim exactly. On the void claim: the engine has no explicit 'void' branch at all — any result not in {yes,no,scalar} falls through to 'return # not settled yet (or unknown) -- retry next cycle', and p022_checkpoint.py's own docstring states this plainly: 'The engine never emits a void -- it only settles on a populated yes/no/scalar result -- so there is nothing here to exclude.' The spec's characterization is an accurate description of this implicit-exclusion behaviour, not a misdescription of a nonexistent explicit code path."
+  },
+  "fee_mapping": {
+    "passed": true,
+    "checked_against": "src/kalshi_fees.py (exact-match logic, series_maker_charges_fee), src/fixtures/kalshi_series_fees.json (generated_at_utc 2026-07-27T16:48:05Z, n_series=12199), and a live GET /trade-api/v2/series/KXPGAR1LEAD call made directly in this review.",
+    "finding": "All 13 series named in the spec appear in the fixture's 'all_series' array (grep-verified at lines 2317, 3178-3180, 5735-5737, 5822-5824, 8086-8093) and NONE appear in 'maker_fee_series' (lines 6-137). Matching in src/kalshi_fees.py is exact on the ticker string (full ticker, then leading hyphen segment), so fee_per_contract(maker=True, series_ticker=<any of the 13>) returns 0.0, matching the spec's maker_fee_rate=0.0 assertion. Live-verified: GET /trade-api/v2/series/KXPGAR1LEAD returns fee_type='quadratic'. The 13-series list is byte-identical to DEFAULT_SERIES in src/round_leader_fade_maker.py (lines 71-77) and to golf_quirks_research/p022_p023_params.json. scripts/p022_checkpoint.py --check-fees exists (line 417) as the spec claims."
+  },
+  "api_field_reliability": {
+    "passed": true,
+    "checked_against": "src/round_leader_fade_maker.py (full read, including resolve_event_close lines 512-536, discover lines 538-601, engine constructor lines 162-291), src/golf_schedule.py (full read), golf_quirks_research/schedule_resolver_validation.json, research/REPORT_P022_Close_Time_2026-07.md.",
+    "finding": "The spec's close_resolution section matches the shipped implementation on every substantive point checked: (1) 'NO Kalshi-field fallback' — confirmed, the engine constructor raises ValueError if no schedule resolver is passed (lines 231-236), and resolve_event_close/discover reference only self.schedule; grep for close_time/occurrence_datetime/expiration_time/expected_expiration_time/latest_expiration_time across the file returns zero matches. (2) 'kalshi_time_fields_are_unusable' — verbatim match to src/golf_schedule.py's own docstring (all six fields collapse to a ~20-day placeholder while open). (3) 'fails_closed' with three named paths to None — confirmed exactly against resolve_event_close: (a) no product_metadata.competition -> returns None (lines 521-523), (b) resolver raises -> caught, returns None (lines 528-531), (c) schedule.resolve() returns None (lines 532-534); unresolved_events records the reason in all three cases. (4) 'calibrated_to_err_early ... 72 of 72 ... minimum +0.16h' — independently confirmed against golf_quirks_research/schedule_resolver_validation.json stats.live: n=72, min=0.15888..., n_negative=0. (5) 'must_be_re_resolved' — confirmed in discover() (lines 538-601): existing books are re-resolved every pass and upgraded from tour_day_offset to tee_times as ESPN publishes them. One minor, non-behavioural inaccuracy: the spec attributes resolve_event_close to 'RoundLeaderFadeMakerPod.resolve_event_close', but the method is defined on RoundLeaderFadeMakerEngine (class at line 162); RoundLeaderFadeMakerPod (line 1059) is only a thin @register_pod wrapper exposing from_config. A class-naming slip, not a misdescription of the mechanism, the fail-closed behaviour, the field-unusability claim, or the calibration — all of which are correct and match the code exactly, in contrast to v1's substantive error."
+  },
+  "external_schedule_dependency": {
+    "required": true,
+    "available": true,
+    "detail": "src/golf_schedule.py's GolfScheduleResolver (ESPN public golf API, unauthenticated) is a hard, no-fallback dependency for P-022's entire placement-window logic — the engine constructor raises if none is supplied, and resolve_event_close/discover have no Kalshi-field code path. Verified live in this review: GET site.api.espn.com/apis/site/v2/sports/golf/liv/scoreboard?dates=2026 returned a well-formed 'events' array (LIV Golf Riyadh, Adelaide, Hong Kong with ISO dates); GET .../pga/scoreboard?dates=2026 also returned live, well-formed data. tests/test_round_leader_fade.py and tests/test_golf_schedule.py assert the fail-closed behaviour and the one-sided-early calibration on mocked data."
+  },
+  "blocking_issues": [],
+  "provenance": {
+    "created_by": "integrity-agent",
+    "code_commit": "b8f159c",
+    "artifact_path": "research/integrity/strat_p022_fade_v2_integrity_2026-08-02.json",
+    "dataset_hash": null,
+    "gate_path": "golf_quirks_research/P022_DECISION_RULE.md",
+    "gate_hash": null,
+    "session_id": null
+  },
+  "extra": {
+    "spec_checked": "research/specs/strat_p022_fade_v2_2026-08-02.json",
+    "opportunity_card_checked": "research/opportunities/op_20260802_002_card_2026-08-02.json",
+    "provenance_of_v2_itself": "This spec is disclosed by its own provenance/extra fields as hand-written by 'human (Claude, correcting the v1 agent spec)', not produced by strategy-spec. That disclosure is accurate and does not by itself weaken or strengthen the review — v2 was checked on its own factual merits against primary sources, exactly as v1 was.",
+    "other_fields_spot_checked_and_confirmed_correct": [
+      "anchor_price_band [0.03, 0.12], quote_offset_usd 0.02, posting_window [12h,24h] all byte-identical to src/round_leader_fade_maker.py engine constructor defaults",
+      "risk_limits (per_name 0.005, per_tournament 0.05, aggregate 0.15, max_contracts_per_name 25, bankroll 1000.0) byte-identical to code defaults; max_usd_at_risk=150.0=bankroll*pct_total",
+      "13-series list byte-identical to DEFAULT_SERIES in code and to golf_quirks_research/p022_p023_params.json",
+      "tests/test_round_leader_fade.py counted directly: 57 test functions, matching the spec's corrected implementation_reference (v1's uncorrected '21 tests' claim is not repeated here)",
+      "null/alternative hypotheses and the decision schedule reproduce P022_DECISION_RULE.md Amendment 1 verbatim: HARD KILL z<=-2.0 any T, NO DECISION T<24, T>=24 KILL if edge<=0 / single extension to T=40 if 0<edge and z<2.0 / PASS if edge>0 and z>=2.0, T>=40 KILL if still z<2.0 — no loosening detected anywhere",
+      "fair_value_model.mechanism_class citation 'P022_DECISION_RULE.md §8.5' correctly maps to anti-rationalisation clause 5 ('No CLV substitute')",
+      "excluded_from_entry claims match §7 and the code's discover()/can_place_new logic exactly"
+    ],
+    "non_blocking_discrepancy": "close_resolution.source misattributes resolve_event_close to RoundLeaderFadeMakerPod instead of RoundLeaderFadeMakerEngine. Flagged for correction; does not misdescribe the mechanism and is judged non-blocking.",
+    "hard_boundary_respected": "No live forward-gate statistic (edge, se, z, T, verdict) was computed, estimated, or reported anywhere in this review. scripts/p022_checkpoint.py was not invoked.",
+    "verdict_rationale": "All four mandatory mappings pass on direct, independent primary-source verification performed in this review (live PDF reads, a live /series call, live ESPN calls, direct code reads, independent grep-counts) rather than on trust in the spec's own citations or in the earlier v1 report. The single factual defect found is cosmetic and does not resemble v1's blocking defect.",
+    "independently_reverified_on_persist": "Both of this report's checkable novel claims were confirmed by hand before acceptance. (1) resolve_event_close is at line 512, inside RoundLeaderFadeMakerEngine (class line 162); RoundLeaderFadeMakerPod is at line 1060 — the misnaming catch is correct and the error is the spec author's. (2) golf_quirks_research/schedule_resolver_validation.json stats.live reads n=72, min=0.15888888888888889, n_negative=0 — exactly as cited."
+  }
+}

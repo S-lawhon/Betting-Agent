@@ -1084,11 +1084,20 @@ workstreams:
       threshold: 24           # 90% power vs the measured +3.4c effect (rule §5)
       t_start_utc: 2026-07-26T22:36:52Z
       # progress is DERIVED by the reader. Do not hand-maintain it here.
+      # TRANSCRIPTION CORRECTED 2026-08-02: this said "T<14 is NO DECISION" and
+      # "At T>=14", both superseded by Amendment 1 (2026-07-28) which raised the
+      # threshold to 24. P022_DECISION_RULE.md line 169 reads "T < 24 | NO
+      # DECISION ... (was T < 14; see Amendment 1)". The `threshold: 24` field
+      # above was already right, so the reader and this prose disagreed and the
+      # prose was the stale half. Correcting a transcription that contradicts
+      # the authoritative rule doc is NOT reinterpreting the gate — the rule doc
+      # governs, this is a pointer to it. Caught by the strategy-spec agent
+      # while writing strat_p022_fade_v1 against the primary source.
       decision: >
         LOCKED in golf_quirks_research/P022_DECISION_RULE.md — read it, do not
-        reinterpret. HARD KILL at any T if z <= -2.0. T<14 is NO DECISION
+        reinterpret. HARD KILL at any T if z <= -2.0. T<24 is NO DECISION
         (underpowered; a T=8 look has 23% power against half the effect and is
-        explicitly forbidden). At T>=14: KILL if edge<=0, PASS if z>=2.0, else
+        explicitly forbidden). At T>=24: KILL if edge<=0, PASS if z>=2.0, else
         ONE extension to T=40 at byte-identical parameters and then KILL if
         still z<2.0. Caps are GATE CONDITIONS: a tournament with any cap
         breached is EXCLUDED from T, and raising a cap resets T to 0 under a new

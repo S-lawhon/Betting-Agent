@@ -1,0 +1,38 @@
+{
+  "id": "op_20260802_002",
+  "created_at": "2026-08-02T01:25:00Z",
+  "source_agent": "scout",
+  "market_family": "KX*R{1,2,3}LEAD golf round-leader (PGA/DPWT/LPGA/LIV/Champions)",
+  "thesis": "RETROSPECTIVE REGISTRATION, SECOND ATTEMPT — supersedes op_20260802_001, whose spec (strat_p022_fade_v1) failed integrity on a factual error about how the close time is resolved. Thesis unchanged: Kalshi golf round-leader markets settle a tie for the round lead by splitting the payout $1/n across the tied names, so a name that does lead realises materially less than $1.00. A maker selling YES on cheap round-leader names inside a defined price band, at a small offset, should capture the difference between the market's implied outright-win price and the tie-adjusted fair value, net of fees (this family is maker-free) and net of adverse selection. The purpose of this record is to carry a CORRECT spec far enough to exercise strategy-validator against the retrospective Phase-2 backtest, which is a known-answer case.",
+  "edge_source": [
+    "Structural: the $1/n dead-heat split on KX*R{1,2,3}LEAD is unconditional. Confirmed verbatim from PGAROUNDLEADER.pdf during the v1 integrity review, which found NO carve-out of the kind LEAGUELEADER.pdf carries for the KXLEADER* season stat-leader family.",
+    "Maker-free execution: all 13 series are `quadratic`, verified against both src/fixtures/kalshi_series_fees.json and a live /series call during the v1 integrity review.",
+    "The tie mass is realised, not theoretical: 21 scalar LEAD events in the census settled at exactly 1/n (2-way 0.50, 3-way 0.33, 4-way 0.25, 5-way 0.20, 6-way 0.16)."
+  ],
+  "external_data_needed": [
+    "An EXTERNAL round-end schedule, and it is a HARD dependency with no Kalshi-field fallback. On an open market all six Kalshi time fields collapse to a conservative far-future placeholder; close_time is rewritten to the truth only at the instant the market closes. src/golf_schedule.py resolves (competition, round) -> round-end UTC from ESPN's free public golf API.",
+    "Kalshi public market data via src/kalshi_public.py for orderbook and candlesticks.",
+    "Historical settled leader trades and candles — present locally under golf_quirks_research/data/ (299MB), mirrored gzipped under golf_quirks_research/archive/."
+  ],
+  "confidence": 0.7,
+  "urgency": "low",
+  "status": "open",
+  "known_failure_modes": [
+    "Adverse selection on the maker side — the whole reason Phase 2 exists as a separate gate from Phase 1.",
+    "One-sided fills: filling only the leg that goes on to lose.",
+    "Capacity is small by construction; a real edge that cannot be sized is still not a business.",
+    "Timing: the pod ran three days writing ZERO quotes because it anchored on a Kalshi time field. The first fix (prefer close_time over occurrence_datetime) was ALSO wrong and was superseded by the external schedule. A spec that describes either field-priority rule as current is describing a defect — this is precisely what killed strat_p022_fade_v1 at integrity.",
+    "result=\"scalar\" is a PARTIAL PAYOUT at settlement_value_dollars, never a void. Booking it as a void erases exactly the event the strategy exists to harvest."
+  ],
+  "rule_ambiguities": [
+    "None outstanding on contract terms: the v1 integrity review resolved the $1/n unconditionality against the primary PDF, and resolved that a withdrawal on this family settles NO rather than a fair-value scalar (unlike the top-N/GOLFFINISH template).",
+    "Open: whether the ESPN-derived round-end schedule remains accurate and continues to err EARLY rather than late, since predicting a close late puts orders into a live round."
+  ],
+  "next_step": "spec",
+  "extra": {
+    "purpose": "CALIBRATION RUN, CYCLE 2. The goal is to reach strategy-validator, which remains unexercised because record_validation refuses to run until integrity passes.",
+    "supersedes": "op_20260802_001 / strat_p022_fade_v1, which sits at state `spec` with a failed integrity report at research/integrity/strat_p022_fade_v1_integrity_2026-08-02.json",
+    "hard_boundary": "The live forward gate is OFF LIMITS. P022_DECISION_RULE.md Amendment 1 (2026-07-28) makes T<24 a NO DECISION and forbids an early look; the sanctioned reader scripts/p022_checkpoint.py reports T=0. No agent in this chain may compute, estimate or report a live forward-gate statistic. The validation target is the RETROSPECTIVE backtest only.",
+    "registered_by": "human (retrospective), not discovered by the scout agent"
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "id": "strat_p022_fade_v2",
+  "opportunity_id": "op_20260802_002",
+  "name": "P-022 Round-Leader Dead-Heat Fade Maker (retrospective spec v2, corrected close resolution)",
+  "version": "2.0.0",
+  "state": "spec",
+  "entry_logic": {
+    "type": "kalshi_maker_sell_yes_dead_heat_fade",
+    "market_family": "KX*R{1,2,3}LEAD golf round-leader",
+    "series": [
+      "KXPGAR1LEAD", "KXPGAR2LEAD", "KXPGAR3LEAD",
+      "KXDPWORLDTOURR1LEAD", "KXDPWORLDTOURR2LEAD", "KXDPWORLDTOURR3LEAD",
+      "KXLPGAR1LEAD", "KXLPGAR2LEAD", "KXLPGAR3LEAD",
+      "KXLIVR1LEAD", "KXLIVR2LEAD", "KXLIVR3LEAD",
+      "KXCHAMPTOURR1LEAD"
+    ],
+    "side": "sell_yes",
+    "close_resolution": {
+      "source": "EXTERNAL — src/golf_schedule.py GolfScheduleResolver, via RoundLeaderFadeMakerPod.resolve_event_close(event_ticker) -> Optional[RoundClose]",
+      "rule": "close_epoch comes ONLY from the external ESPN-derived schedule. Resolve (product_metadata.competition, series-derived round, product_metadata.competition_scope) -> round-end UTC. There is NO Kalshi-field fallback.",
+      "kalshi_time_fields_are_unusable": "close_time, occurrence_datetime, expiration_time, expected_expiration_time and latest_expiration_time ALL collapse to one conservative far-future placeholder while the market is OPEN; close_time is rewritten to the true value only at the instant the market closes. This is exchange-wide, not a golf quirk, and it is NOT reversed for this family. src/round_leader_fade_maker.py contains zero references to any of these fields.",
+      "fails_closed": "resolve_event_close returns None -> DO NOT QUOTE. Three paths produce None and all of them mean no quote: (a) event has no product_metadata.competition, (b) the resolver raises, (c) the resolver has no round-end for that (competition, round). Unresolved events are recorded in pod.unresolved_events with a reason. A wrong round time is worse than no quote.",
+      "calibrated_to_err_early": "src/golf_schedule.py is deliberately calibrated to predict the round end EARLY — validated one-sided on 72 of 72 settled events, minimum +0.16h. Predicting a close LATE would put resting orders into a live round.",
+      "must_be_re_resolved": "Books are RE-RESOLVED, not timed once at discovery. ESPN publishes no tee times ~3 days out, so the coarse per-tour day offset is what is available at listing time and the answer sharpens as the event approaches.",
+      "history": "The pod ran 2026-07-23 to 2026-07-26 writing ZERO quotes because it anchored on occurrence_datetime. The first fix swapped the field priority to close_time; that was ALSO wrong (still a placeholder on an open market) and was superseded on 2026-07-27/28 by this external schedule. strat_p022_fade_v1 failed integrity for describing that superseded field-priority rule as current."
+    },
+    "anchor_price_band": {
+      "reference": "mid_price of the YES orderbook at time of evaluation",
+      "low_usd": 0.03,
+      "high_usd": 0.12,
+      "rule": "eligible_to_quote iff 0.03 <= mid_price <= 0.12; recompute every cycle, do not cache"
+    },
+    "quote_offset_usd": 0.02,
+    "quote_price_formula": "quote_px = round(mid_price + 0.02, 2)",
+    "posting_window": {
+      "fade_start_h_before_close": 24.0,
+      "no_new_quote_h_before_close": 12.0,
+      "measured_from": "the EXTERNALLY resolved close_epoch above, never a Kalshi field",
+      "rule": "can_place_new_quote iff 12.0 <= hours_to_close(close_epoch) <= 24.0; once placed a quote RESTS UNCHANGED to close — no re-quoting or re-pricing inside 12h",
+      "outside_window_behavior": "outside [12h,24h] the engine discovers markets and settles positions but places NO new quotes"
+    },
+    "excluded_from_entry": [
+      "quotes placed inside 12h to close are non-compliant with the locked posting-window cap and must be EXCLUDED from T (P022_DECISION_RULE.md §7)",
+      "events whose close could not be externally resolved — no quote is placed at all, so they contribute nothing"
+    ]
+  },
+  "exit_logic": {
+    "type": "hold_to_kalshi_settlement",
+    "active_exit": false,
+    "rule": "No discretionary exit. A resting maker quote is either filled and held to settlement, or pulled unfilled via cap exhaustion or the kill switch.",
+    "quote_pull_triggers": [
+      "data/KILL_ROUND_LEADER_FADE present -> pull ALL resting quotes immediately",
+      "per-name, per-tournament or aggregate collateral cap exhausted -> pull the quote that would breach it",
+      "mid_price leaves [0.03,0.12] before fill on an unfilled resting quote -> re-evaluate/pull next cycle"
+    ],
+    "settlement_mapping": {
+      "result_yes": "settlement_value = 1.00",
+      "result_no": "settlement_value = 0.00 — note a WITHDRAWAL on this family settles NO, not a fair-value scalar; that is the top-N/GOLFFINISH template, a different rulebook",
+      "result_scalar": "settlement_value = settlement_value_dollars from the per-ticker GET. PARTIAL PAYOUT, NEVER a void. Booked WIN/LOSS on the sign of (fill.price - payout - fee). If settlement_value_dollars is absent the pod logs and DEFERS to the next cycle rather than defaulting to zero.",
+      "result_void": "excluded from P&L entirely — applies only to a market that never resolved, never to result=scalar"
+    }
+  },
+  "fair_value_model": {
+    "type": "settlement_mechanic_dead_heat_split",
+    "description": "Fair value is not a probability estimate. It is the certified contract term that a tie for the round lead splits the $1.00 notional $1/n (rounded down) across tied names. Verified verbatim from PGAROUNDLEADER.pdf: the clause carries NO conditional carve-out, unlike LEAGUELEADER.pdf which governs the KXLEADER* family and makes its split contingent on the league not declaring a winner through official tiebreakers.",
+    "edge_definition": "edge_per_contract = quote_px - E[settlement_value] - maker_fee(series, quote_px)",
+    "pnl_formula": "pnl_per_contract = quote_px - settlement_value - maker_fee(series, quote_px)",
+    "mechanism_class": "settlement-mechanic hypothesis, not a probability-disagreement hypothesis. No CLV substitute is valid for this family — round-leader markets have no sharp external closing line (P022_DECISION_RULE.md §8.5)."
+  },
+  "fee_model": {
+    "venue": "kalshi",
+    "fee_type": "quadratic",
+    "maker_fee_rate": 0.0,
+    "computation": "src.kalshi_fees.fee_per_contract(price, series_ticker=<ticker>) — series_ticker MUST be passed; lookup is EXACT match against src/fixtures/kalshi_series_fees.json, never prefix logic",
+    "assertion": "all 13 series are `quadratic` (maker-free). Verified in the v1 integrity review against both the generated fixture and a live GET /series/KXPGAR1LEAD. scripts/p022_checkpoint.py --check-fees asserts this live rather than assuming it.",
+    "taker_fee_not_applicable": "P-022 is maker-only; the taker formula 0.07*P*(1-P) does not apply to its own fills"
+  },
+  "risk_limits": {
+    "max_usd_at_risk": 150.0,
+    "bankroll_usd": 1000.0,
+    "sizing_basis": "collateral_at_risk = (1 - quote_px) per contract, NEVER contract count",
+    "per_name_cap_pct_bankroll": 0.005,
+    "per_tournament_cap_pct_bankroll": 0.05,
+    "aggregate_cap_pct_bankroll": 0.15,
+    "max_contracts_per_name": 25,
+    "cap_enforcement_rule": "each new quote is sized to the tightest remaining of {per-name, per-tournament, aggregate}; the quote is pulled the instant any cap is exhausted",
+    "cap_scope_caveat": "P-022 runs as its own process, so AggregateRiskGuard reservations bind against P-022's OWN book only — the 15% aggregate cap is NOT enforced against the 5-minute engine's other positions",
+    "cap_is_gate_condition": "these caps are GATE CONDITIONS, not tuning knobs (P022_DECISION_RULE.md §7/§8.1). A tournament with ANY cap breached is EXCLUDED from T. Raising ANY cap resets T to 0 and requires re-registration under a new pod ID (P-022b). This spec does not loosen any value above."
+  },
+  "null_hypothesis": "Net of the maker fee (zero for this family) and net of adverse selection in real resting fills, the equal-weighted-across-tournament, contract-weighted-within-tournament mean settlement P&L per filled contract — for selling YES in [0.03,0.12] at mid+0.02, posted 12-24h before an EXTERNALLY resolved round close on KX*R{1,2,3}LEAD — is not reliably positive. Retrospectively: the backtest point estimate is <= 0, or its tournament-clustered 95% CI includes 0.",
+  "alternative_hypothesis": "The unconditional $1/n dead-heat split, combined with retail longshot overpricing on cheap round-leader names, produces a positive net edge per filled contract that survives fees (zero here), the modelled fill process, and tournament-level clustering — i.e. a tournament-clustered 95% CI strictly above 0 on the retrospective sample.",
+  "provenance": {
+    "created_by": "human (Claude, correcting the v1 agent spec)",
+    "code_commit": "b8f159c",
+    "artifact_path": "research/specs/strat_p022_fade_v2_2026-08-02.json",
+    "dataset_hash": null,
+    "gate_path": "golf_quirks_research/P022_DECISION_RULE.md",
+    "gate_hash": null,
+    "session_id": null
+  },
+  "extra": {
+    "created_at": "2026-08-02T01:27:00Z",
+    "authorship": "NOT produced by strategy-spec. strat_p022_fade_v1 was, and it failed integrity on entry_logic.close_reference_field_priority. This v2 is a hand-correction of that single defect; every other field is carried over from v1, which the integrity review had confirmed byte-identical to src/round_leader_fade_maker.py defaults. Recorded explicitly so nobody later reads v2 as an independent agent product — it is not, and it must not be counted as evidence that strategy-spec can produce a passing spec.",
+    "what_changed_from_v1": "entry_logic.close_reference_field_priority and close_reference_rule (both wrong) REPLACED by entry_logic.close_resolution, which describes the external GolfScheduleResolver dependency, its fail-closed behaviour, its deliberate early bias and the re-resolution requirement. Also corrected: v1's implementation_reference said tests/test_round_leader_fade.py has 21 tests; it has 57.",
+    "purpose": "Reach strategy-validator, which is unexercised because record_validation refuses to run until integrity passes.",
+    "validation_target": "The RETROSPECTIVE Phase-2 backtest ONLY, recomputed from golf_quirks_research/ harness + data. NOT the live forward gate.",
+    "boundary_not_to_cross": "P-022's live forward gate is at T>=24 (Amendment 1, 2026-07-28). T is currently 0 and P022_DECISION_RULE.md forbids an early look. No artifact in this chain may compute, estimate or report a live forward-gate statistic. scripts/p022_checkpoint.py is the only sanctioned reader and is not invoked here.",
+    "decision_rule_locked_reference": "golf_quirks_research/P022_DECISION_RULE.md, LOCKED 2026-07-26, Amendment 1 2026-07-28 (T=14 -> T=24). Reproduced without loosening: HARD KILL z<=-2.0 at any T; NO DECISION T<24; at T>=24 KILL if edge<=0, PASS if z>=2.0, else ONE extension to T=40 at byte-identical parameters then KILL if still z<2.0.",
+    "unit_of_observation": "ONE TOURNAMENT = one observation. R1/R2/R3 events of the same tournament pool to a single observation, not three. Within-tournament statistic is the contract-weighted mean net per-contract P&L; the across-tournament aggregate is the equal-weighted mean of those per-tournament statistics. Bootstrap CIs cluster by tournament.",
+    "params_source": "golf_quirks_research/p022_p023_params.json, p022_round_leader_fade block, generated_utc 2026-07-26 — band [0.03,0.12], anchor_hours_before_close 12, offset 0.02, side sell_yes, maker fee 0.0.",
+    "implementation_reference": "src/round_leader_fade_maker.py (RoundLeaderFadeMakerPod); scripts/run_round_leader_fade.py (standalone runner, NOT in pods.active; kill switch data/KILL_ROUND_LEADER_FADE); tests/test_round_leader_fade.py (57 tests).",
+    "supersedes": "strat_p022_fade_v1 / op_20260802_001"
+  }
+}

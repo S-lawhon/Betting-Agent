@@ -119,6 +119,30 @@
   footer{border-top:1px solid var(--line);padding:22px 0;color:var(--faint);font-size:12px}
   .legend{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 14px;font-size:12px;color:var(--dim)}
   .legend span{display:flex;align-items:center;gap:6px}
+
+  /* ---------- diagrams (added 2026-08-02) ----------
+     Sections are display:none until their tab is active, so a diagram
+     rendered on load inside a hidden section comes out zero-width. These
+     render lazily, on first reveal. See renderSection() at the foot. */
+  .dia{margin:14px 0 4px;border:1px solid var(--line);border-radius:12px;
+    background:#0b0e13;overflow:hidden}
+  .dia > figcaption{display:flex;align-items:center;gap:8px;
+    padding:9px 14px;border-bottom:1px solid var(--line);background:var(--panel2);
+    font:11.5px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .dia > figcaption::before{content:"";width:7px;height:7px;border-radius:2px;
+    background:var(--c,var(--accent));flex:none}
+  .dia .scroll{overflow-x:auto;padding:18px 14px}
+  .dia .mermaid{min-width:min-content}
+  .dia .mermaid text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace !important}
+  .dia .note{padding:0 14px 12px;color:var(--faint);font-size:12.5px}
+  .dia.wide .scroll{padding-bottom:22px}
+  /* Legend chips under a diagram — colour carries meaning, so name it. */
+  .legend{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 13px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;
+    font-size:11.5px;color:var(--dim)}
+  .legend span::before{content:"";width:9px;height:9px;border-radius:2px;
+    background:var(--c);flex:none}
 </style>
 </head>
 <body>
@@ -129,11 +153,12 @@
     <div class="facts">
       <div class="fact paperflag"><b>PAPER / DEMO MODE</b> <span>— no real money, ever</span></div>
       <div class="fact"><b>4</b> <span>active pods</span></div>
-      <div class="fact"><b>~75</b> <span>Python modules</span></div>
-      <div class="fact"><b>1,357</b> <span>tests</span></div>
-      <div class="fact"><b>3</b> <span>services on the VPS</span></div>
+      <div class="fact"><b>10</b> <span>agent roles</span></div>
+      <div class="fact"><b>76</b> <span>Python modules</span></div>
+      <div class="fact"><b>2,272</b> <span>tests</span></div>
+      <div class="fact"><b>6</b> <span>services on the VPS</span></div>
       <div class="fact"><span>repo</span> <b>S-lawhon/Betting-Agent</b></div>
-      <div class="fact"><span>as of</span> <b>Jul 23 2026</b></div>
+      <div class="fact"><span>as of</span> <b>Aug 2 2026</b></div>
     </div>
   </div>
 </header>
@@ -354,6 +379,237 @@
   </div>
 </div></section>
 
+<!-- ============ AGENTS ============ -->
+<section id="agents"><div class="wrap">
+  <h2>The agent layer — how an idea gets judged</h2>
+  <p class="lede">Everything above this point is <i>deterministic</i>: code that scans, prices, and settles the same way every time. This section is the part that exercises judgement — and the whole design question is how to let a language model propose strategies without letting it promote its own work.</p>
+
+  <div class="card">
+    <h3>The short version</h3>
+    <p class="muted">Ten specialist agents, each with a narrow job and no ability to do the next one's. A scout can propose but not specify. A reviewer can verify but not validate. A validator can measure but not deploy. <b>Nothing reaches real money without a named human approval</b> — and that isn't a policy note, it's a line of Python that raises an exception.</p>
+    <p class="muted">The agents don't run themselves. A background worker records what they produce; a person (or a Claude session) actually invokes them. <b>A running service does not mean research is happening</b> — that distinction has its own alarm, because it's the easiest thing in the system to get wrong.</p>
+  </div>
+
+  <div class="card">
+    <h3>The strategy factory — six roles, one direction of travel</h3>
+    <p class="muted">An idea moves left to right. Each stage produces one typed JSON artifact, and the next stage can't start until the previous one exists and passes.</p>
+
+    <figure class="dia" style="--c:var(--accent)">
+      <figcaption>strategy factory · six roles</figcaption>
+      <div class="scroll"><pre class="mermaid">
+flowchart LR
+  SC["strategy-scout<br/>proposes"] --> SP["strategy-spec<br/>makes it testable"]
+  SP --> IN["strategy-integrity<br/>checks the contract"]
+  IN --> VA["strategy-validator<br/>measures the edge"]
+  VA --> PR["strategy-promotion<br/>decides"]
+  PR --> MO["strategy-monitor<br/>watches it live"]
+  MO -. "may only demote" .-> PR
+  SC:::a
+  SP:::a
+  IN:::b
+  VA:::b
+  PR:::c
+  MO:::d
+  classDef a fill:#1c2230,stroke:#5aa9ff,color:#e6edf3
+  classDef b fill:#1c2230,stroke:#bc8cff,color:#e6edf3
+  classDef c fill:#1c2230,stroke:#e3b341,color:#e6edf3
+  classDef d fill:#1c2230,stroke:#39c5bb,color:#e6edf3
+</pre></div>
+      <div class="legend">
+        <span style="--c:#5aa9ff">propose &amp; specify</span>
+        <span style="--c:#bc8cff">verify &amp; measure</span>
+        <span style="--c:#e3b341">decide</span>
+        <span style="--c:#39c5bb">watch</span>
+      </div>
+      <p class="note">The dotted line is the only backward arrow, and it only ever points down: a monitor can ask for a demotion, never a promotion.</p>
+    </figure>
+  </div>
+
+  <div class="card">
+    <h3>The states an idea can be in</h3>
+    <p class="muted">A strategy sits in exactly one state. The arrows below are the <i>only</i> legal moves — anything else raises <code>StrategyTransitionError</code> rather than being politely ignored.</p>
+
+    <figure class="dia" style="--c:var(--amber)">
+      <figcaption>state machine · src/strategy_orchestration.py</figcaption>
+      <div class="scroll"><pre class="mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --> idea
+  idea --> spec
+  spec --> validated
+  validated --> paper_live
+  paper_live --> live_small
+  live_small --> live_scaled
+  idea --> retired
+  spec --> retired
+  validated --> retired
+  paper_live --> degraded
+  live_small --> degraded
+  live_scaled --> degraded
+  degraded --> paper_live
+  degraded --> retired
+  paper_live --> retired
+  live_small --> retired
+  live_scaled --> retired
+  retired --> [*]
+</pre></div>
+      <p class="note"><b>The ratchet:</b> moving <i>up</i> needs a typed artifact plus a human-approved decision. Moving <i>down</i> — to <code>degraded</code> or <code>retired</code> — is the only thing an agent may do on its own authority. The system is allowed to become more cautious by itself, never more aggressive.</p>
+    </figure>
+
+    <p class="muted">Two of those steps are hard-blocked in code, not by convention:</p>
+    <ul class="muted">
+      <li><b>You cannot validate before integrity passes.</b> Ask, and it raises.</li>
+      <li><b>You cannot promote into <code>live_small</code> or <code>live_scaled</code> without an <code>approval_ref</code></b> — a human's name against the decision. Agents are told never to invent one, and the dataclass refuses to construct without it either way.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>How work actually moves — the inbox is the authority</h3>
+    <p class="muted">Agents don't talk to the registry. They write a JSON file into a role-specific inbox, and a small worker picks it up every 60 seconds. The clever part is what grants permission: <b>authority comes from which folder the file landed in</b>, never from anything the file says about itself. A spec dropped into the monitoring inbox is rejected, no matter what it claims to be.</p>
+
+    <figure class="dia wide" style="--c:var(--teal)">
+      <figcaption>queue worker · one pass</figcaption>
+      <div class="scroll"><pre class="mermaid">
+flowchart TD
+  A["agent produces<br/>one JSON artifact"] --> B["dropped into the<br/>role's inbox folder"]
+  B --> W{"worker wakes<br/>every 60s"}
+  W --> C{"does the file type<br/>match its inbox?"}
+  C -- no --> X["rejected<br/>archived with the error"]
+  C -- yes --> D{"is the move legal<br/>from this state?"}
+  D -- no --> X
+  D -- yes --> E["registry updated<br/>event appended"]
+  E --> F["archived as done"]
+  X --> R["registry reloaded from disk<br/>a bad request cannot taint the next"]
+  classDef ok fill:#1c2230,stroke:#3fb950,color:#e6edf3
+  classDef bad fill:#1c2230,stroke:#f85149,color:#e6edf3
+  classDef n fill:#161b22,stroke:#2a3140,color:#e6edf3
+  A:::n
+  B:::n
+  W:::n
+  C:::n
+  D:::n
+  E:::ok
+  F:::ok
+  X:::bad
+  R:::bad
+</pre></div>
+      <p class="note">Every accepted change appends a timestamped event — who did it, from which state, to which state. The registry is saved with a revision check, so a stale writer is refused rather than silently overwriting a newer version.</p>
+    </figure>
+  </div>
+
+  <div class="card">
+    <h3>What it has actually done</h3>
+    <p class="muted">The factory went live on <b>2 Aug 2026</b>. Its first real subject was a fantasy-football dead-heat idea, which it <b>killed at the integrity gate</b>: the market family turned out to be season-long single-rank contracts, not the weekly threshold markets the thesis assumed. The idea had a plausible mechanism and no product to trade it on.</p>
+    <p class="muted">It was then run over <b>P-022</b> — a strategy already validated by hand — purely to check whether the agents could be trusted. That run found a real defect nobody had noticed: the backtest harness reports a <i>pooled</i> average where the locked decision rule specifies an <i>equal-weighted-per-tournament</i> one. On the original sample the two agree, so the original green light stands. On the widened sample they don't: +2.6¢ becomes +1.5¢ and stops being statistically significant.</p>
+    <p class="muted">Read that as the intended outcome. A factory whose first two runs both ended in "no" is behaving correctly; the failure mode to fear is the one that says yes to everything.</p>
+  </div>
+</div></section>
+
+<!-- ============ RESEARCH ============ -->
+<section id="research"><div class="wrap">
+  <h2>Research intake — where ideas come from</h2>
+  <p class="lede">The factory above judges ideas. This is the part that <i>finds</i> them — and its guiding principle is that the existence of a market, a paper, or a popular post is an input, never evidence that an edge exists.</p>
+
+  <div class="card">
+    <h3>Sources in, ranked assignments out</h3>
+    <p class="muted">Deterministic code owns everything mechanical: fetching, hashing, de-duplicating, recording provenance, checking whether a venue may even be researched. Agents are used only where judgement is genuinely required — and they sit at the far right, after the cheap filters have already run.</p>
+
+    <figure class="dia wide" style="--c:var(--purple)">
+      <figcaption>research pipeline · sources → disposition</figcaption>
+      <div class="scroll"><pre class="mermaid">
+flowchart LR
+  S1["venue APIs"] --> L
+  S2["CFTC filings"] --> L
+  S3["academic feeds"] --> L
+  S4["X, bounded pilot"] --> L
+  S5["Kalshi census"] --> L
+  L["source ledger<br/>hashed, de-duplicated"] --> E{"eligibility<br/>registry"}
+  E --> RA["ranked assignments"]
+  RA --> T["bounded triage<br/>10 packets, 300 min per day"]
+  T --> LS["literature-scout"]
+  T --> SS["social-scout"]
+  T --> ST["strategy-scout"]
+  LS --> RC["research-critic<br/>attacks it before anyone builds it"]
+  SS --> RC
+  ST --> RC
+  RC --> RJ["reject"]
+  RC --> DF["defer<br/>with a recheck date"]
+  RC --> OC["OpportunityCard"]
+  classDef src fill:#161b22,stroke:#39c5bb,color:#9aa7b5
+  classDef det fill:#1c2230,stroke:#39c5bb,color:#e6edf3
+  classDef agent fill:#1c2230,stroke:#bc8cff,color:#e6edf3
+  classDef out fill:#1c2230,stroke:#3fb950,color:#e6edf3
+  classDef no fill:#161b22,stroke:#6b7684,color:#9aa7b5
+  S1:::src
+  S2:::src
+  S3:::src
+  S4:::src
+  S5:::src
+  L:::det
+  E:::det
+  RA:::det
+  T:::det
+  LS:::agent
+  SS:::agent
+  ST:::agent
+  RC:::agent
+  RJ:::no
+  DF:::no
+  OC:::out
+</pre></div>
+      <div class="legend">
+        <span style="--c:#39c5bb">deterministic code</span>
+        <span style="--c:#bc8cff">agents (judgement)</span>
+        <span style="--c:#3fb950">survives</span>
+        <span style="--c:#6b7684">closed out</span>
+      </div>
+      <p class="note">Every reviewed assignment ends as one of three things, and <b>a fast, well-evidenced rejection counts as a successful outcome</b>. Deferrals must carry a date, so nothing is quietly parked forever.</p>
+    </figure>
+  </div>
+
+  <div class="card">
+    <h3>The wall between finding and doing</h3>
+    <p class="muted">This is the most important structural fact in the whole research system, and it is deliberately boring: <b>nothing discovered here can walk itself into the trading registry.</b></p>
+    <ul class="muted">
+      <li>Research assignments carry <code>may_enter_strategy_registry: false</code> — permanently, as a field.</li>
+      <li>No census or intake output matches the shape the strategy queue accepts, so a seed <i>cannot</i> be mistaken for a strategy request even by accident.</li>
+      <li>Whether a venue may be researched, and whether a new idea may call itself executable, is a separate registry with a named human approver and an expiry date.</li>
+      <li>A surviving idea becomes an <code>OpportunityCard</code>, which an authorised person must then hand to the factory. That handoff is manual on purpose.</li>
+    </ul>
+    <p class="muted">The Texas venue classifications in that registry are operational controls, not legal advice.</p>
+  </div>
+
+  <div class="card">
+    <h3>What runs on a timer, and what doesn't</h3>
+    <p class="muted">Two jobs are automated. Neither of them thinks.</p>
+    <table>
+      <thead><tr><th>When (UTC)</th><th>What</th><th>Produces</th></tr></thead>
+      <tbody>
+        <tr><td class="tier">03:35 daily</td><td>Market census — scan the public series inventory</td><td>New families, terms/fee changes, ranked scout inbox</td></tr>
+        <tr><td class="tier">04:05 daily</td><td>Research intake — collect and rank free sources</td><td>Source ledger, assignments, coverage manifest</td></tr>
+        <tr><td class="tier">1st of month</td><td>Full-universe rotation instead of a delta scan</td><td>Series that have never been looked at get priority</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:12px"><b>The timers do not invoke an agent.</b> They fill an inbox. A person or a Claude session has to actually do the research — so a green timer is evidence that <i>tasks were created</i>, never that anything was reviewed. Only a stored disposition proves review happened.</p>
+  </div>
+
+  <div class="card">
+    <h3>How effort gets allocated</h3>
+    <p class="muted">Assignments are ranked by what they're worth against what they cost to check:</p>
+    <div class="dia" style="--c:var(--amber)">
+      <div class="scroll" style="padding:16px 14px">
+        <code style="display:block;text-align:center;line-height:1.9;background:none;border:0;font-size:13px">
+          P(real edge) × capacity × expected half-life × executability<br>
+          <span style="color:var(--faint)">─────────────────────────────────────────────</span><br>
+          research time + data cost
+        </code>
+      </div>
+      <p class="note">The deterministic ranker can measure provenance, eligibility, similarity to past work, and attention decay. It <b>cannot</b> know real edge or capacity — so those stay null until a specialist produces evidence. Penalties apply for prior rejection, missing timestamp-correct data, rule ambiguity, unrealistic fills, fees, and crowding.</p>
+    </div>
+    <p class="muted">A <b>15–20% exploration floor</b> is held even once metrics accumulate, so a small early sample can't permanently starve a new source or an unfamiliar market family.</p>
+  </div>
+</div></section>
+
 <!-- ============ MODULES ============ -->
 <section id="modules"><div class="wrap">
   <h2>Module reference — every file, searchable</h2>
@@ -427,15 +683,20 @@
   </div>
 
   <div class="card">
-    <h3>The three services running on the server</h3>
+    <h3>The services running on the server</h3>
     <table>
       <thead><tr><th>Service (systemd unit)</th><th>What it runs</th><th>Cadence</th></tr></thead>
       <tbody>
         <tr><td><code>betting-pod-shop</code></td><td>The main 5-minute engine (P-001/014/015/017) + web dashboard</td><td>every 5 min</td></tr>
+        <tr><td><code>betting-round-leader-fade</code></td><td>P-022 golf dead-heat maker — its own fast loop, not a pod in the engine</td><td>continuous</td></tr>
+        <tr><td><code>betting-strategy-agents</code></td><td>Records what the strategy agents produce. <b>Does not run them</b></td><td>every 60 s</td></tr>
+        <tr><td><code>betting-dashboard</code></td><td>Standalone dashboard, survives the engine dying</td><td>continuous</td></tr>
         <tr><td><code>betting-book-capture</code></td><td>Records Kalshi order-book snapshots for research</td><td>every 1 min</td></tr>
-        <tr><td><code>mlb-props-collector</code></td><td>MLB order-book snapshots (systemd timer)</td><td>timer</td></tr>
+        <tr><td><code>betting-inplay-basis</code></td><td>Kalshi ↔ Polymarket in-play basis collector</td><td>continuous</td></tr>
+        <tr><td><code>market-census</code> · <code>research-intake</code></td><td>Timers that fill the research inbox. <b>Neither invokes an agent</b></td><td>03:35 · 04:05 UTC</td></tr>
       </tbody>
     </table>
+    <p class="muted">Six services were active as of 2 Aug 2026; the two research timers are in the repo and awaiting install. The deploy script now prints a warning whenever a unit file in the repo differs from the one actually installed, because those two drifting apart silently is how a fix ships to a server and never takes effect.</p>
     <p class="small muted"><code>betting-live-maker</code> (P-016) was a fourth unit — decommissioned Jul 22 2026 after it failed its gate. Kalshi throttles <b>per-IP</b>, so all services share one rate budget (hence the 2 req/s limit on the main client).</p>
   </div>
 
@@ -497,13 +758,16 @@
 <script>
 /* ---------- NAV ---------- */
 const tabs=[["overview","Overview"],["lifecycle","Lifecycle"],["architecture","Architecture"],
+  ["agents","Agents"],["research","Research"],
   ["modules","Modules"],["pods","Pods"],["deploy","Deploy & GitHub"],["monitoring","Monitoring"],["glossary","Glossary"]];
 const nav=document.getElementById('nav');
 tabs.forEach(([id,label],i)=>{const b=document.createElement('button');b.textContent=label;b.dataset.t=id;
   if(i===0)b.classList.add('on');b.onclick=()=>show(id);nav.appendChild(b);});
 function show(id){document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===id));
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
-  window.scrollTo({top:0,behavior:'instant'});}
+  window.scrollTo({top:0,behavior:'instant'});
+  /* Diagrams in a hidden section measure zero-width, so render on reveal. */
+  if(window.renderSection)window.renderSection(id);}
 
 /* ---------- MODULE DATA ---------- */
 // group keys → {label,color}
@@ -702,7 +966,14 @@ const GLOSS=[
   ["Settlement","After a game ends, looking up the result and scoring every open bet as win/loss/void with its P&L."],
   ["Backtest","Running a strategy against historical data to estimate whether the edge would have worked, before building it live."],
   ["The drop","Deploying: pushing code from your Mac to the live server safely (tests → sync → restart → health-check → rollback)."],
-  ["systemd service / unit","A background program the Linux server keeps running and auto-restarts. This project has three."],
+  ["systemd service / unit","A background program the Linux server keeps running and auto-restarts. Six were active as of Aug 2026."],
+  ["Agent (here)","A language model given one narrow job, a fixed set of tools, and no ability to do the next job in the chain. Ten of them exist; none can promote its own work."],
+  ["Typed artifact","The single JSON object an agent must return — an OpportunityCard, a StrategySpec, an IntegrityReport. Validated against a schema on arrival, so a malformed or over-reaching one is rejected rather than absorbed."],
+  ["The ratchet","The rule that a strategy can move DOWN (to degraded or retired) on an agent's own authority, but can only move UP with a typed artifact and a named human approval."],
+  ["approval_ref","A human's sign-off recorded against a promotion into live money. Without one the code refuses to construct the decision at all."],
+  ["Integrity gate","The check that a strategy's contract terms, settlement, fees and API fields are what the spec claims. It killed the first idea the factory ever ran."],
+  ["Disposition","The end state of a reviewed research assignment: reject, defer (with a date), or advance. A fast, well-evidenced rejection counts as success."],
+  ["Pooled vs equal-weighted","Two ways to average a backtest. Pooled lets a big tournament dominate; equal-weighted gives each event one vote. Using the wrong one flattered a widened P-022 sample from +1.5¢ to +2.6¢."],
   ["rsync","A tool that copies changed files from your Mac to the server — used by the deploy script (it excludes live data)."],
   ["Kalshi","A US-regulated exchange for event contracts (yes/no markets). The primary venue since the July 2026 pivot."],
   ["Polymarket","A crypto-based prediction market. Used for research/matching, but this project has no execution access there."],
@@ -717,6 +988,76 @@ document.getElementById('glossary-grid').innerHTML=GLOSS.map(([t,d])=>`
   <div class="mod" style="border-left-color:var(--teal);cursor:default">
     <div class="name" style="font-family:inherit;font-size:14px;color:var(--ink)">${t}</div>
     <div class="desc" style="margin-top:6px">${d}</div></div>`).join("");
+</script>
+
+<!-- ---------- MERMAID ----------
+     Themed to this page's own tokens so diagrams read as part of the document
+     rather than pasted-in images. Rendered lazily: a diagram laid out inside a
+     display:none section comes out zero-width, so each section is rendered the
+     first time its tab is opened.
+
+     If this file is ever published as a Claude Artifact, the CDN below is
+     blocked by CSP and the platform renders the mermaid PRE blocks natively
+     instead — which is why the diagrams are authored as literal markup in the
+     document rather than being built by script. -->
+<script type="module">
+  const done = new Set();
+  let mermaid = null;
+
+  try {
+    ({ default: mermaid } = await import(
+      'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'));
+  } catch (e) {
+    // Offline, or CSP-blocked. Leave the source visible rather than an empty box.
+    document.querySelectorAll('.dia .mermaid').forEach(n => {
+      n.style.whiteSpace = 'pre';
+      n.style.color = 'var(--dim)';
+      n.style.font = '12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+    });
+  }
+
+  if (mermaid) {
+    const css = getComputedStyle(document.documentElement);
+    const tok = n => css.getPropertyValue(n).trim();
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      themeVariables: {
+        darkMode: true,
+        background: '#0b0e13',
+        primaryColor: tok('--panel2') || '#1c2230',
+        primaryTextColor: tok('--ink') || '#e6edf3',
+        primaryBorderColor: tok('--line') || '#2a3140',
+        lineColor: tok('--faint') || '#6b7684',
+        secondaryColor: tok('--panel') || '#161b22',
+        tertiaryColor: tok('--panel') || '#161b22',
+        fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+        fontSize: '13px',
+        // state diagram
+        labelColor: tok('--ink') || '#e6edf3',
+        transitionColor: tok('--faint') || '#6b7684',
+        stateBkg: tok('--panel2') || '#1c2230',
+        stateLabelColor: tok('--ink') || '#e6edf3'
+      },
+      flowchart: { curve: 'basis', htmlLabels: true, padding: 10 }
+    });
+
+    window.renderSection = async id => {
+      if (done.has(id)) return;
+      const sec = document.getElementById(id);
+      if (!sec) return;
+      const nodes = sec.querySelectorAll('.mermaid');
+      if (!nodes.length) { done.add(id); return; }
+      done.add(id);
+      try { await mermaid.run({ nodes }); }
+      catch (e) { done.delete(id); console.error('mermaid', id, e); }
+    };
+
+    // Render whichever section is open on load (the deep-linked or default tab).
+    const open = document.querySelector('section.on');
+    if (open) window.renderSection(open.id);
+  }
 </script>
 </body>
 </html>

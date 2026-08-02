@@ -273,9 +273,12 @@ def render_markdown(b: Dict[str, Any]) -> str:
         funnel = research.get("funnel") or {}
         L.append(
             "**Execution status:** task packets are created automatically; "
-            "agent invocation/started state is {}tracked. Completion requires "
-            "a durable research disposition.".format(
-                "" if semantics.get("agent_invocation_tracked") else "not "))
+            "worker claims/start state are {}; model invocation is {}. Completion "
+            "requires a durable research disposition.".format(
+                "tracked" if semantics.get("started_tracking_available")
+                else "not tracked",
+                "tracked" if semantics.get("agent_invocation_tracked")
+                else "not tracked"))
         L.append("")
         L.append(
             "- Lifetime funnel: {} assignments → {} dispatched → {} reviewed → "
@@ -285,17 +288,19 @@ def render_markdown(b: Dict[str, Any]) -> str:
                 _metric(funnel.get("dispatched_reviewed")),
                 _metric(funnel.get("dispatched_advanced"))))
         L.append(
-            "- Last 24h: {} dispatched, {} reviewed ({} advanced / {} rejected / "
-            "{} deferred), {} research minutes".format(
+            "- Last 24h: {} dispatched, {} started, {} reviewed ({} advanced / "
+            "{} rejected / {} deferred), {} research minutes".format(
                 _metric(activity.get("dispatched")),
+                _metric(activity.get("started")),
                 _metric(activity.get("reviewed")),
                 _metric(activity.get("advance")),
                 _metric(activity.get("reject")),
                 _metric(activity.get("defer")),
                 _metric(activity.get("research_minutes"))))
         L.append(
-            "- Queue: {} pending, {} older than {}h; oldest {}".format(
-                _metric(queue.get("pending")), _metric(queue.get("overdue")),
+            "- Queue: {} pending, {} in progress, {} older than {}h; oldest {}".format(
+                _metric(queue.get("pending")), _metric(queue.get("in_progress")),
+                _metric(queue.get("overdue")),
                 _metric(operations.get("overdue_after_hours")),
                 _fmt_age(queue.get("oldest_pending_age_hours"))))
         agents = operations.get("agents") or {}
@@ -304,9 +309,10 @@ def render_markdown(b: Dict[str, Any]) -> str:
             L.append("Agent queues:")
             for agent, row in sorted(agents.items()):
                 L.append(
-                    "- **{}** — {} pending ({} overdue; oldest {}), {} reviewed, "
+                    "- **{}** — {} pending ({} in progress / {} overdue; oldest {}), {} reviewed, "
                     "{} advanced, and {} research minutes in 24h".format(
                         agent, _metric(row.get("pending")),
+                        _metric(row.get("in_progress")),
                         _metric(row.get("overdue")),
                         _fmt_age(row.get("oldest_pending_age_hours")),
                         _metric(row.get("reviewed_24h")),
@@ -518,11 +524,15 @@ def render_html(b: Dict[str, Any]) -> str:
         activity = operations.get("activity_24h") or {}
         queue = operations.get("queue") or {}
         funnel = research.get("funnel") or {}
-        tracking = "tracked" if semantics.get("agent_invocation_tracked") else "not tracked"
+        started_tracking = ("tracked" if semantics.get("started_tracking_available")
+                            else "not tracked")
+        model_tracking = ("tracked" if semantics.get("agent_invocation_tracked")
+                          else "not tracked")
         P.append("<div class='card'><b>Execution status</b><br>Task packets are "
-                 "created automatically; agent invocation/started state is {}. "
-                 "Completion requires a durable research disposition.</div>".format(
-                     e(tracking)))
+                 "created automatically; worker claims/start state are {}; model "
+                 "invocation is {}. Completion requires a durable research "
+                 "disposition.</div>".format(
+                     e(started_tracking), e(model_tracking)))
         P.append("<ul>")
         P.append("<li>Lifetime funnel: {} assignments → {} dispatched → {} reviewed "
                  "→ {} advanced</li>".format(
@@ -530,16 +540,18 @@ def render_html(b: Dict[str, Any]) -> str:
                      e(_metric(funnel.get("dispatched"))),
                      e(_metric(funnel.get("dispatched_reviewed"))),
                      e(_metric(funnel.get("dispatched_advanced")))))
-        P.append("<li>Last 24h: {} dispatched, {} reviewed ({} advanced / {} rejected "
-                 "/ {} deferred), {} research minutes</li>".format(
+        P.append("<li>Last 24h: {} dispatched, {} started, {} reviewed ({} advanced / "
+                 "{} rejected / {} deferred), {} research minutes</li>".format(
                      e(_metric(activity.get("dispatched"))),
+                     e(_metric(activity.get("started"))),
                      e(_metric(activity.get("reviewed"))),
                      e(_metric(activity.get("advance"))),
                      e(_metric(activity.get("reject"))),
                      e(_metric(activity.get("defer"))),
                      e(_metric(activity.get("research_minutes")))))
-        P.append("<li>Queue: {} pending, {} older than {}h; oldest {}</li>".format(
-            e(_metric(queue.get("pending"))), e(_metric(queue.get("overdue"))),
+        P.append("<li>Queue: {} pending, {} in progress, {} older than {}h; oldest {}</li>".format(
+            e(_metric(queue.get("pending"))), e(_metric(queue.get("in_progress"))),
+            e(_metric(queue.get("overdue"))),
             e(_metric(operations.get("overdue_after_hours"))),
             e(_fmt_age(queue.get("oldest_pending_age_hours")))))
         P.append("</ul>")
@@ -547,9 +559,10 @@ def render_html(b: Dict[str, Any]) -> str:
         if agents:
             P.append("<div class='card'><b>Agent queues</b><ul>")
             for agent, row in sorted(agents.items()):
-                P.append("<li><b>{}</b> — {} pending ({} overdue; oldest {}), {} "
+                P.append("<li><b>{}</b> — {} pending ({} in progress / {} overdue; oldest {}), {} "
                          "reviewed, {} advanced, and {} research minutes in 24h</li>".format(
                              e(str(agent)), e(_metric(row.get("pending"))),
+                             e(_metric(row.get("in_progress"))),
                              e(_metric(row.get("overdue"))),
                              e(_fmt_age(row.get("oldest_pending_age_hours"))),
                              e(_metric(row.get("reviewed_24h"))),

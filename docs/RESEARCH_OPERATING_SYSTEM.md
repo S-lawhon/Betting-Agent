@@ -103,6 +103,15 @@ filling, caps lane concentration, and limits all retries combined to 10 packets
 and 300 allocated research minutes per UTC day. It never treats its priors as edge evidence.
 It creates tasks only: no agent is invoked and no strategy state changes.
 
+### `ResearchClaim`
+
+Defined in `src/research_execution.py`. A human session or explicitly
+configured model runner must atomically claim a dispatch before starting work.
+Claims carry the worker identity, specialist role, packet and prompt paths, and
+a bounded lease. Expired claims are recoverable; released and completed attempts
+remain archived. A claim proves work was reserved and started, but does not
+prove that a model was invoked or that research was completed.
+
 ### `ResearchDisposition`
 
 Defined in `src/research_outcomes.py` and stored under
@@ -150,6 +159,26 @@ Build source/lane funnel metrics:
 python3 -m scripts.build_research_metrics
 ```
 
+Claim one bounded task for a human or configured runner:
+
+```bash
+python3 -m scripts.run_research_execution claim \
+  --worker-id manual-session-20260803 \
+  --agent strategy-scout
+```
+
+The returned claim names both the dispatch packet and the specialist prompt.
+Finish by writing a valid `ResearchDisposition` JSON and completing the claim:
+
+```bash
+python3 -m scripts.run_research_execution complete \
+  --claim data/research_execution/claims/strategy-scout/ASSIGNMENT.json \
+  --disposition /path/to/disposition.json
+```
+
+If work cannot continue, use `release --claim ... --reason ...`; do not delete
+claim files. `status` reports active, completed, released, and expired claims.
+
 Outputs under `data/research_intake/`:
 
 - `ledger.json`: durable source/content deduplication;
@@ -165,6 +194,14 @@ Outputs under `data/research_triage/`:
 - `dispatches/<agent>/`: durable specialist task packets;
 - `dispatch_archive/<agent>/`: packets with a disposition or registered opportunity;
 - `latest_manifest.json`: selection, deferral, diversity, and safety telemetry.
+
+Outputs under `data/research_execution/`:
+
+- `claims/<agent>/`: active leased work;
+- `claim_archive/<agent>/`: completed claims;
+- `claim_released/<agent>/`: explicitly returned work;
+- `claim_expired/<agent>/`: stale attempts recovered for retry;
+- `events.jsonl`: append-only start, completion, release, and expiry events.
 
 Partial source failures are recorded in `collector_errors`. Prior state is
 written atomically. The scheduled unit fails only when collectors report errors
@@ -220,10 +257,11 @@ Validated and paper/live outcomes should eventually be joined back to
 
 `data/research_intake/metrics.json` also carries the Research Operations
 contract used by both the dashboard and daily email: 24-hour dispatch/review
-activity, per-agent pending and overdue queues, oldest task age, and explicit
-execution semantics. A dispatch is task creation only. Agent invocation/start
-is untracked until a dedicated claim event exists, while a newer durable
-disposition is the completion signal.
+activity, per-agent pending, in-progress, and overdue queues, oldest task age,
+and explicit execution semantics. A dispatch is task creation only. A claim is
+the dedicated start event. Model invocation remains untracked until a provider
+adapter emits that separate fact, while a newer durable disposition is the
+completion signal.
 
 Maintain a 15–20% exploration floor even after source metrics accumulate. A
 small early sample must not permanently starve new sources or market families.
@@ -239,4 +277,6 @@ small early sample must not permanently starve new sources or market families.
   reconciliation.
 - The bounded X pilot is enabled with application and X-side budget controls;
   the runtime credential remains VPS-only and uncommitted.
-- No repository daemon invokes the model-driven agents automatically.
+- No repository daemon invokes the model-driven agents automatically. The
+  claim/completion lifecycle is ready, but live model execution remains
+  fail-closed until a headless runtime and explicit API budget are provisioned.

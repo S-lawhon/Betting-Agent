@@ -150,15 +150,17 @@ def research_snap() -> dict:
         "funnel": {"assignments": 200, "dispatched": 10,
                    "dispatched_reviewed": 2, "dispatched_advanced": 1},
         "operations": {
-            "semantics": {"agent_invocation_tracked": False},
+            "semantics": {"agent_invocation_tracked": False,
+                          "started_tracking_available": True},
             "window_hours": 24, "overdue_after_hours": 48,
-            "activity_24h": {"dispatched": 10, "reviewed": 2,
+            "activity_24h": {"dispatched": 10, "started": 3, "reviewed": 2,
                              "advance": 1, "reject": 1, "defer": 0,
                              "research_minutes": 35},
-            "queue": {"pending": 8, "overdue": 1,
+            "queue": {"pending": 8, "in_progress": 2, "overdue": 1,
                       "oldest_pending_age_hours": 52.0},
             "agents": {"strategy-scout": {
                 "pending": 8, "overdue": 1,
+                "in_progress": 2, "started_24h": 3,
                 "oldest_pending_age_hours": 52.0,
                 "reviewed_24h": 2, "advance_24h": 1,
                 "research_minutes_24h": 35,
@@ -187,7 +189,10 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "10 dispatched" in text
         assert "8 pending" in text
         assert "strategy-scout" in text
-        assert "agent invocation/started state is not tracked" in text.lower()
+        assert "worker claims/start state are tracked" in text.lower()
+        assert "model invocation is not tracked" in text.lower()
+        assert "3 started" in text
+        assert "2 in progress" in text
         assert "35 research minutes" in text
         assert "$1.065" in text
         assert "Source health: degraded" in text

@@ -15,9 +15,11 @@ class TestBuildResearchMetrics(TestCase):
             assignments = root / "assignments"
             dispositions = root / "dispositions"
             dispatches = root / "dispatches" / "literature-scout"
+            claims = root / "execution" / "claim_archive" / "literature-scout"
             assignments.mkdir()
             dispositions.mkdir()
             dispatches.mkdir(parents=True)
+            claims.mkdir(parents=True)
             (assignments / "batch.json").write_text(json.dumps({
                 "assignments": [{
                     "id": "a1", "source_type": "paper", "lane": "literature",
@@ -33,6 +35,12 @@ class TestBuildResearchMetrics(TestCase):
                 "assignment_id": "a1", "assigned_agent": "literature-scout",
                 "priority": "high", "research_budget_minutes": 45,
                 "created_at": "2026-08-01T12:00:00Z",
+            }))
+            (claims / "a1--claim-1.json").write_text(json.dumps({
+                "assignment_id": "a1", "assigned_agent": "literature-scout",
+                "worker_id": "worker-1", "claimed_at": "2026-08-01T13:00:00Z",
+                "lease_expires_at": "2026-08-01T14:30:00Z",
+                "status": "completed",
             }))
             (dispatches.parent / "latest_manifest.json").write_text(json.dumps({
                 "quality_blocked": 2,
@@ -68,6 +76,7 @@ class TestBuildResearchMetrics(TestCase):
                 "--assignments-dir", str(assignments),
                 "--dispositions-dir", str(dispositions),
                 "--dispatches-dir", str(dispatches.parent),
+                "--execution-dir", str(root / "execution"),
                 "--intake-manifest", str(intake_manifest),
                 "--output", str(output),
                 "--now", "2026-08-02T00:00:00Z",
@@ -97,6 +106,7 @@ class TestBuildResearchMetrics(TestCase):
             self.assertFalse(
                 operations["semantics"]["agent_invocation_tracked"])
             self.assertEqual(operations["activity_24h"]["reviewed"], 1)
+            self.assertEqual(operations["activity_24h"]["started"], 1)
             self.assertEqual(operations["activity_24h"]["reject"], 1)
             self.assertEqual(
                 operations["agents"]["literature-scout"]["queue_state"],
@@ -108,9 +118,11 @@ class TestBuildResearchMetrics(TestCase):
             assignments = root / "assignments"
             dispositions = root / "dispositions"
             dispatches = root / "triage" / "dispatches" / "social-scout"
+            execution = root / "execution" / "claims" / "social-scout"
             assignments.mkdir()
             dispositions.mkdir()
             dispatches.mkdir(parents=True)
+            execution.mkdir(parents=True)
             (assignments / "batch.json").write_text(json.dumps({
                 "assignments": [
                     {"id": "a1", "source_type": "social", "lane": "social_signal"},
@@ -126,11 +138,18 @@ class TestBuildResearchMetrics(TestCase):
                     "priority": "high", "research_budget_minutes": 20,
                     "created_at": created_at,
                 }))
+            (execution / "a2.json").write_text(json.dumps({
+                "assignment_id": "a2", "assigned_agent": "social-scout",
+                "worker_id": "worker-1", "claimed_at": "2026-08-03T11:00:00Z",
+                "lease_expires_at": "2026-08-03T13:00:00Z",
+                "status": "claimed",
+            }))
             output = root / "metrics.json"
             self.assertEqual(main([
                 "--assignments-dir", str(assignments),
                 "--dispositions-dir", str(dispositions),
                 "--dispatches-dir", str(root / "triage"),
+                "--execution-dir", str(root / "execution"),
                 "--intake-manifest", str(root / "missing.json"),
                 "--output", str(output),
                 "--now", "2026-08-03T12:00:00Z",
@@ -140,8 +159,10 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(agent["pending"], 2)
             self.assertEqual(agent["overdue"], 1)
             self.assertEqual(agent["dispatched_24h"], 1)
+            self.assertEqual(agent["started_24h"], 1)
+            self.assertEqual(agent["in_progress"], 1)
             self.assertEqual(agent["oldest_pending_age_hours"], 60.0)
-            self.assertEqual(agent["queue_state"], "overdue")
+            self.assertEqual(agent["queue_state"], "in_progress")
 
     def test_expected_weekend_empty_feed_remains_healthy(self):
         with tempfile.TemporaryDirectory() as tmp:

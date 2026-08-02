@@ -79,6 +79,21 @@ def _load_dispatches(directory: Path) -> tuple:
     return records, errors
 
 
+def _load_claims(directory: Path) -> tuple:
+    records: List[Dict[str, Any]] = []
+    errors: List[Dict[str, str]] = []
+    for bucket in ("claims", "claim_archive", "claim_expired", "claim_released"):
+        for path in sorted(directory.glob("{}/*/*.json".format(bucket))):
+            try:
+                payload = json.loads(path.read_text())
+                if not isinstance(payload, dict) or not payload.get("assignment_id"):
+                    raise ValueError("claim must be an object with assignment_id")
+                records.append(dict(payload) | {"_claim_bucket": bucket})
+            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                errors.append({"path": str(path), "error": str(exc)})
+    return records, errors
+
+
 def _parse_now(value: Optional[str]) -> datetime:
     if not value:
         return datetime.now(timezone.utc)
@@ -104,6 +119,7 @@ def _research_operations(
     assignments: List[Dict[str, Any]],
     dispositions: List[ResearchDisposition],
     dispatches: List[Dict[str, Any]],
+    claims: List[Dict[str, Any]],
     *,
     now: datetime,
     window_hours: int = 24,
@@ -135,6 +151,16 @@ def _research_operations(
         if current is None or item.decided_at >= current.decided_at:
             latest_disposition[item.assignment_id] = item
 
+    latest_claim: Dict[str, Dict[str, Any]] = {}
+    for item in claims:
+        assignment_id = str(item.get("assignment_id") or "")
+        if assignment_id not in assignment_ids:
+            continue
+        current = latest_claim.get(assignment_id)
+        if (current is None or str(item.get("claimed_at") or "") >=
+                str(current.get("claimed_at") or "")):
+            latest_claim[assignment_id] = item
+
     cutoff = now - timedelta(hours=window_hours)
     activity = Counter()
     agent_stats: Dict[str, Counter] = defaultdict(Counter)
@@ -151,6 +177,14 @@ def _research_operations(
         if dispatched_at and dispatched_at >= cutoff:
             row["dispatched_24h"] += 1
             activity["dispatched"] += 1
+
+        claim = latest_claim.get(assignment_id)
+        if claim:
+            row["started"] += 1
+            claimed_at = _parse_timestamp(claim.get("claimed_at"))
+            if claimed_at and claimed_at >= cutoff:
+                row["started_24h"] += 1
+                activity["started"] += 1
 
         disposition = latest_disposition.get(assignment_id)
         completed = bool(disposition) and (
@@ -173,6 +207,13 @@ def _research_operations(
             continue
 
         row["pending"] += 1
+        if claim:
+            lease_expires = _parse_timestamp(claim.get("lease_expires_at"))
+            is_active = claim.get("_claim_bucket") == "claims"
+            if is_active and lease_expires and lease_expires > now:
+                row["in_progress"] += 1
+            elif is_active:
+                row["stale_claims"] += 1
         if dispatched_at:
             if oldest_pending is None or dispatched_at < oldest_pending:
                 oldest_pending = dispatched_at
@@ -191,7 +232,8 @@ def _research_operations(
             key: values[key] for key in (
                 "dispatched", "pending", "overdue", "reviewed", "advance",
                 "reject", "defer", "allocated_minutes", "research_minutes",
-                "dispatched_24h", "reviewed_24h", "advance_24h",
+                "started", "in_progress", "stale_claims", "dispatched_24h",
+                "started_24h", "reviewed_24h", "advance_24h",
                 "reject_24h", "defer_24h", "research_minutes_24h")
         } | {
             "pending": pending,
@@ -201,27 +243,35 @@ def _research_operations(
             "oldest_pending_age_hours": (
                 round(max(0.0, (now - oldest).total_seconds() / 3600.0), 1)
                 if oldest else None),
-            "queue_state": "overdue" if overdue else ("pending" if pending else "idle"),
+            "queue_state": (
+                "in_progress" if values["in_progress"] else
+                ("overdue" if overdue else ("pending" if pending else "idle"))),
         }
 
     total_pending = sum(item["pending"] for item in agent_stats.values())
     total_overdue = sum(item["overdue"] for item in agent_stats.values())
+    total_in_progress = sum(item["in_progress"] for item in agent_stats.values())
+    total_stale_claims = sum(item["stale_claims"] for item in agent_stats.values())
     return {
         "semantics": {
             "dispatch_means": "task_packet_created",
             "agent_invocation_tracked": False,
-            "started_tracking_available": False,
+            "started_tracking_available": True,
+            "started_means": "active_worker_claim_created",
             "completion_signal": "durable_research_disposition",
         },
         "window_hours": window_hours,
         "overdue_after_hours": overdue_hours,
         "activity_24h": {
             key: activity[key] for key in (
-                "dispatched", "reviewed", "advance", "reject", "defer",
+                "dispatched", "started", "reviewed", "advance", "reject", "defer",
                 "research_minutes")
         },
         "queue": {
             "pending": total_pending,
+            "unclaimed": max(0, total_pending - total_in_progress),
+            "in_progress": total_in_progress,
+            "stale_claims": total_stale_claims,
             "overdue": total_overdue,
             "oldest_pending_created_at": (
                 oldest_pending.isoformat().replace("+00:00", "Z")
@@ -308,6 +358,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                         default=ROOT / "research" / "dispositions")
     parser.add_argument("--dispatches-dir", type=Path,
                         default=ROOT / "data" / "research_triage")
+    parser.add_argument("--execution-dir", type=Path,
+                        default=ROOT / "data" / "research_execution")
     parser.add_argument("--intake-manifest", type=Path,
                         default=ROOT / "data" / "research_intake"
                         / "latest_manifest.json")
@@ -319,9 +371,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     assignments = _load_assignments(args.assignments_dir)
     dispositions, errors = _load_dispositions(args.dispositions_dir)
     dispatches, dispatch_errors = _load_dispatches(args.dispatches_dir)
+    claims, claim_errors = _load_claims(args.execution_dir)
     metrics = summarize_research(assignments, dispositions, dispatches)
     metrics["invalid_dispositions"] = errors
     metrics["invalid_dispatches"] = dispatch_errors
+    metrics["invalid_claims"] = claim_errors
     intake_manifest = _read_json(args.intake_manifest, {})
     metrics["x_pilot"] = _x_pilot_metrics(
         assignments, dispositions, intake_manifest)
@@ -348,7 +402,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     }
     generated_at = _parse_now(args.now)
     metrics["operations"] = _research_operations(
-        assignments, dispositions, dispatches, now=generated_at)
+        assignments, dispositions, dispatches, claims, now=generated_at)
     metrics["generated_at"] = generated_at.isoformat().replace("+00:00", "Z")
     _write_atomic(args.output, metrics)
     print(
@@ -357,7 +411,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         f"dispatched={metrics['dispatch']['dispatched']} "
         f"invalid={len(errors) + len(dispatch_errors)}"
     )
-    return 2 if errors or dispatch_errors else 0
+    return 2 if errors or dispatch_errors or claim_errors else 0
 
 
 if __name__ == "__main__":

@@ -383,8 +383,8 @@ iframe{width:100%;height:78vh;border:1px solid var(--border);border-radius:var(-
       <div id="r-quality" class="cap" style="margin-top:0;margin-bottom:8px">&mdash;</div>
       <div class="fn" id="r-funnel"><div class="empty">&mdash;</div></div>
       <div class="tw" style="margin-top:12px"><table class="rfl" id="r-agents">
-        <thead><tr><th>Agent queue</th><th>State</th><th>Pending</th><th>Overdue</th><th>Oldest</th><th>Dispatched 24h</th><th>Reviewed 24h</th><th>Advanced 24h</th><th>Research min 24h</th></tr></thead>
-        <tbody><tr><td colspan="9" class="empty">&mdash;</td></tr></tbody>
+        <thead><tr><th>Agent queue</th><th>State</th><th>Pending</th><th>In progress</th><th>Overdue</th><th>Oldest</th><th>Dispatched 24h</th><th>Started 24h</th><th>Reviewed 24h</th><th>Advanced 24h</th><th>Research min 24h</th></tr></thead>
+        <tbody><tr><td colspan="11" class="empty">&mdash;</td></tr></tbody>
       </table></div>
       <div class="tw" style="margin-top:12px"><table class="rfl" id="r-sources">
         <thead><tr><th>Source</th><th>Assigned</th><th>Reviewed</th><th>Advanced</th><th>Review %</th><th>Advance %</th></tr></thead>
@@ -1095,18 +1095,22 @@ function renderResearchPipeline(r){
   el("r-state").textContent = r.available
     ? (isNum(pending) ? intf(pending) + " task packets pending review" : "") : "";
   el("r-detail").textContent = r.available
-    ? "Dispatch proves task creation only. Agent invocation/started state is " +
+    ? "Dispatch proves task creation only. Worker claims/start state are " +
+      (semantics.started_tracking_available === true ? "tracked" : "not tracked") +
+      "; model invocation is " +
       (semantics.agent_invocation_tracked === true ? "tracked" : "not tracked") +
       "; completion requires a durable research disposition."
     : (r.reason || "research metrics unavailable");
   el("r-day").textContent = r.available && operations.window_hours
     ? "Last " + numTxt(operations.window_hours) + "h: " +
       numTxt(activity.dispatched) + " dispatched · " +
+      numTxt(activity.started) + " started · " +
       numTxt(activity.reviewed) + " reviewed · " +
       numTxt(activity.advance) + " advanced · " +
       numTxt(activity.reject) + " rejected · " +
       numTxt(activity.defer) + " deferred · queue " +
-      numTxt(queue.pending) + " pending / " + numTxt(queue.overdue) + " overdue"
+      numTxt(queue.pending) + " pending / " + numTxt(queue.in_progress) +
+      " in progress / " + numTxt(queue.overdue) + " overdue"
     : "Daily agent activity will appear after the operations metric is generated.";
   el("r-health").textContent = r.available
     ? "Source health: " + (health.status || "unknown") + " · " +
@@ -1147,14 +1151,16 @@ function renderResearchPipeline(r){
       '<td data-label="Agent queue">' + esc(name) + "</td>" +
       '<td data-label="State">' + esc(row.queue_state || "unknown") + "</td>" +
       '<td data-label="Pending">' + numCell(row.pending) + "</td>" +
+      '<td data-label="In progress">' + numCell(row.in_progress) + "</td>" +
       '<td data-label="Overdue">' + numCell(row.overdue) + "</td>" +
       '<td data-label="Oldest">' + (isNum(oldest) ? oldest.toFixed(1) + "h" : '<span class="unknown">—</span>') + "</td>" +
       '<td data-label="Dispatched 24h">' + numCell(row.dispatched_24h) + "</td>" +
+      '<td data-label="Started 24h">' + numCell(row.started_24h) + "</td>" +
       '<td data-label="Reviewed 24h">' + numCell(row.reviewed_24h) + "</td>" +
       '<td data-label="Advanced 24h">' + numCell(row.advance_24h) + "</td>" +
       '<td data-label="Research min 24h">' + numCell(row.research_minutes_24h) + "</td>" +
       "</tr>";
-  }).join("") : '<tr><td colspan="9" class="empty">no specialist task packets yet</td></tr>';
+  }).join("") : '<tr><td colspan="11" class="empty">no specialist task packets yet</td></tr>';
 
   var sources = r.by_source_type || {}, names = Object.keys(sources).sort();
   var tb = el("r-sources").querySelector("tbody");

@@ -52,3 +52,7 @@ def test_collect_persists_snapshot_observation_and_metrics(tmp_path):
     assert metrics["last_24h"]["healthy_snapshots"] == 1
     assert analytics["path_observations"] == 2
     assert metrics["analytics"]["depth_status"] == "unavailable"
+    assert [row["kind"] for row in metrics["research_signals"]] == [
+        "settlement_health"]
+    assert metrics["venue_pipeline"]["summary"]["blocked"] == 1
+    assert metrics["venue_pipeline"]["summary"]["excluded"] == 2

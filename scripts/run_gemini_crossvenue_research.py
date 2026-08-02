@@ -25,6 +25,9 @@ from src.gemini_kalshi_research import (  # noqa: E402
     normalize_kalshi_events,
 )
 from src.dislocation_analytics import analyze_directory  # noqa: E402
+from src.crossvenue_research import (  # noqa: E402
+    evaluate_pair_signals, load_venue_pipeline,
+)
 from src.gemini_public import GeminiPublic  # noqa: E402
 from src.kalshi_public import KalshiPublic  # noqa: E402
 from src.settlement_registry import load_policy_state  # noqa: E402
@@ -146,7 +149,9 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
             *, now: Optional[datetime] = None,
             settlement_config: Path = ROOT / "config" / "settlement_equivalence.yaml",
             settlement_manifest: Path = ROOT / "data" / "settlement_registry"
-            / "manifest.json") -> Dict[str, Any]:
+            / "manifest.json",
+            venue_config: Path = ROOT / "config" / "research_venues.yaml"
+            ) -> Dict[str, Any]:
     captured_at = (now or datetime.now(UTC)).astimezone(UTC)
     collection_id = captured_at.strftime("%Y%m%dT%H%M%S.%fZ")
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -253,8 +258,11 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
         },
         "last_24h": day_metrics,
         "analytics": analytics,
+        "venue_pipeline": load_venue_pipeline(venue_config),
         "source": "data/gemini_crossvenue/latest.json",
     }
+    metrics["research_signals"] = evaluate_pair_signals(
+        "gemini_kalshi_mlb_moneyline", metrics)
     _write_atomic(output_dir / "metrics.json", metrics)
     return current
 
@@ -268,6 +276,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--settlement-manifest", type=Path,
                         default=ROOT / "data" / "settlement_registry"
                         / "manifest.json")
+    parser.add_argument("--venue-config", type=Path,
+                        default=ROOT / "config" / "research_venues.yaml")
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     lock_path = args.output_dir / ".collector.lock"
@@ -280,7 +290,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         result = collect(
             GeminiPublic(), KalshiPublic(), args.output_dir,
             settlement_config=args.settlement_config,
-            settlement_manifest=args.settlement_manifest)
+            settlement_manifest=args.settlement_manifest,
+            venue_config=args.venue_config)
     latest = result["matching"]["matched"]
     print(f"gemini cross-venue: status={result['status']} matched={latest} "
           f"skew={result['quote_skew_seconds']}s")

@@ -182,6 +182,10 @@ def research_snap() -> dict:
                              "median_duration_seconds": 300},
                 "net_edge_usd": {"p95": .041},
             },
+            "research_signals": [],
+            "venue_pipeline": {"summary": {
+                "collecting": 0, "blocked": 1, "excluded": 2,
+            }},
         },
         "collector_health": {
             "status": "degraded", "academic_feed_items_raw": 0,
@@ -207,6 +211,8 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "settlement terms unverified" in text
         assert "87.5% quote completeness" in text
         assert "2 persistent episodes" in text
+        assert "0 research alerts" in text
+        assert "0 collecting, 1 blocked, 2 excluded" in text
         assert "strategy-scout" in text
         assert "worker claims/start state are tracked" in text.lower()
         assert "model invocation is not tracked" in text.lower()

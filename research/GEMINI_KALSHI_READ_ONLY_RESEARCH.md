@@ -62,6 +62,20 @@ rather than represented as an estimate. A qualifying dislocation is at least
 three cents net after known fees; it is persistent only when it survives at
 least two observations no more than 450 seconds apart.
 
+Each run also emits a venue-neutral `research_signals` list. Collection or
+settlement-document degradation and quote completeness below 90% are data
+health warnings. A three-cent dislocation becomes a research-opportunity
+warning only when a persistent episode was observed within the last 15 minutes;
+old episodes cannot keep paging. Every signal carries
+`trade_allowed=false`—the alert asks for investigation and never overrides the
+settlement or eligibility gates.
+
+The `venue_pipeline` block reports onboarding state for additional venues
+without reading or exposing credentials. It distinguishes collecting, blocked,
+and policy-excluded venues and carries the next evidence required to advance
+each one. The same contract can be reused when a new venue pair begins
+collection.
+
 ## Additional venue decisions
 
 - ProphetX remains the next adapter candidate. It is a CFTC-designated contract

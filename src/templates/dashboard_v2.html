@@ -1187,7 +1187,9 @@ function renderResearchPipeline(r){
     : "X pilot cost/yield will appear after the first measured run.";
   var cv = r.crossvenue_pilot || {}, cvLatest = cv.latest || {}, cvDay = cv.last_24h || {},
       cvAnalytics = cv.analytics || {}, cvEpisodes = cvAnalytics.episodes || {},
-      cvEdge = cvAnalytics.net_edge_usd || {};
+      cvEdge = cvAnalytics.net_edge_usd || {},
+      cvSignals = Array.isArray(cv.research_signals) ? cv.research_signals : null,
+      cvVenueSummary = (cv.venue_pipeline || {}).summary || {};
   el("r-crossvenue").textContent = cv.generated_at
     ? "Gemini/Kalshi research: " + (cv.status || "unknown") +
       " · " + numTxt(cvLatest.matched_events) + " matched now · " +
@@ -1204,7 +1206,12 @@ function renderResearchPipeline(r){
       (isNum(cvEpisodes.median_duration_seconds) ?
         Math.round(cvEpisodes.median_duration_seconds) + "s" : "—") +
       " · p95 edge " +
-      (isNum(cvEdge.p95) ? "$" + cvEdge.p95.toFixed(3) : "—")
+      (isNum(cvEdge.p95) ? "$" + cvEdge.p95.toFixed(3) : "—") +
+      " · " + numTxt(cvSignals ? cvSignals.length : null) +
+      " research alerts · venue expansion " +
+      numTxt(cvVenueSummary.collecting) + " collecting / " +
+      numTxt(cvVenueSummary.blocked) + " blocked / " +
+      numTxt(cvVenueSummary.excluded) + " excluded"
     : "Gemini/Kalshi research metrics will appear after the first snapshot.";
 }
 

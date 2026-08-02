@@ -1017,6 +1017,30 @@ def check_errors(snap: Dict[str, Any]) -> List[Finding]:
     return out
 
 
+def check_crossvenue_research(snap: Dict[str, Any]) -> List[Finding]:
+    """Surface pair-neutral research signals without granting trade authority."""
+    research = snap.get("research_operations") or {}
+    crossvenue = research.get("crossvenue_pilot") or {}
+    out: List[Finding] = []
+    for signal in crossvenue.get("research_signals") or []:
+        if not isinstance(signal, dict) or not signal.get("id"):
+            continue
+        severity = signal.get("severity")
+        if severity not in ("warn", "info"):
+            severity = "info"
+        detail = str(signal.get("detail") or "")
+        if signal.get("kind") == "research_opportunity":
+            detail += "\n\nThis is a research alert, not execution approval."
+        out.append(Finding(
+            key="research.crossvenue.{}".format(signal["id"]),
+            severity=severity,
+            title=str(signal.get("title") or signal["id"]),
+            detail=detail,
+            workstream="crossvenue-research",
+            value=signal.get("value")))
+    return out
+
+
 def check_staleness(snap: Dict[str, Any]) -> List[Finding]:
     """Is the snapshot itself fresh? A stale status.json means the collector
     cron is dead, which would otherwise present as a perfectly healthy report."""
@@ -1078,6 +1102,7 @@ def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
     if reconcilable:
         findings += check_registry_reconciliation(snap, registry)
     findings += check_errors(snap)
+    findings += check_crossvenue_research(snap)
     findings += check_throughput(snap)
     findings += check_p022_window(snap)
     findings += check_evmap(snap)

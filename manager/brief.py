@@ -368,6 +368,10 @@ def render_markdown(b: Dict[str, Any]) -> str:
             analytics = crossvenue.get("analytics") or {}
             episodes = analytics.get("episodes") or {}
             edge = analytics.get("net_edge_usd") or {}
+            signals = crossvenue.get("research_signals")
+            signal_count = len(signals) if isinstance(signals, list) else None
+            venue_summary = ((crossvenue.get("venue_pipeline") or {})
+                             .get("summary") or {})
             completeness = analytics.get("quote_completeness")
             completeness_text = ("{:.1f}%".format(completeness * 100)
                                  if isinstance(completeness, (int, float))
@@ -377,7 +381,8 @@ def render_markdown(b: Dict[str, Any]) -> str:
                      "positive paths, {} actionable; {} snapshots and {} matched observations in "
                      "24h; settlement terms {}. 14d: {} quote completeness, "
                      "{} paths at least 3c, {} persistent episodes, median "
-                     "duration {}, p95 edge {}.".format(
+                     "duration {}, p95 edge {}; {} research alerts. Venue "
+                     "expansion: {} collecting, {} blocked, {} excluded.".format(
                          crossvenue.get("status") or "unknown",
                          _metric(latest.get("matched_events")),
                          _metric(latest.get("hypothetical_positive_paths")),
@@ -389,7 +394,10 @@ def render_markdown(b: Dict[str, Any]) -> str:
                          _metric(analytics.get("qualifying_path_observations")),
                          _metric(episodes.get("persistent_count")),
                          _seconds(episodes.get("median_duration_seconds")),
-                         _usd(edge.get("p95"))))
+                         _usd(edge.get("p95")), _metric(signal_count),
+                         _metric(venue_summary.get("collecting")),
+                         _metric(venue_summary.get("blocked")),
+                         _metric(venue_summary.get("excluded"))))
     L.append("")
 
     if b["gates"]:
@@ -646,6 +654,10 @@ def render_html(b: Dict[str, Any]) -> str:
             analytics = crossvenue.get("analytics") or {}
             episodes = analytics.get("episodes") or {}
             edge = analytics.get("net_edge_usd") or {}
+            signals = crossvenue.get("research_signals")
+            signal_count = len(signals) if isinstance(signals, list) else None
+            venue_summary = ((crossvenue.get("venue_pipeline") or {})
+                             .get("summary") or {})
             completeness = analytics.get("quote_completeness")
             completeness_text = ("{:.1f}%".format(completeness * 100)
                                  if isinstance(completeness, (int, float))
@@ -654,7 +666,9 @@ def render_html(b: Dict[str, Any]) -> str:
                      "{} hypothetical positive paths, {} actionable; {} snapshots and {} matched "
                      "observations in 24h; settlement terms {}. 14d: {} quote "
                      "completeness, {} paths at least 3c, {} persistent episodes, "
-                     "median duration {}, p95 edge {}.</div>".format(
+                     "median duration {}, p95 edge {}; {} research alerts. "
+                     "Venue expansion: {} collecting, {} blocked, {} "
+                     "excluded.</div>".format(
                          e(str(crossvenue.get("status") or "unknown")),
                          e(_metric(latest.get("matched_events"))),
                          e(_metric(latest.get("hypothetical_positive_paths"))),
@@ -666,7 +680,10 @@ def render_html(b: Dict[str, Any]) -> str:
                          e(_metric(analytics.get("qualifying_path_observations"))),
                          e(_metric(episodes.get("persistent_count"))),
                          e(_seconds(episodes.get("median_duration_seconds"))),
-                         e(_usd(edge.get("p95")))))
+                         e(_usd(edge.get("p95"))), e(_metric(signal_count)),
+                         e(_metric(venue_summary.get("collecting"))),
+                         e(_metric(venue_summary.get("blocked"))),
+                         e(_metric(venue_summary.get("excluded")))))
 
     if b["gates"]:
         P.append("<h2>Gate progress</h2>")

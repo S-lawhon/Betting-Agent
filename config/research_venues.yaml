@@ -87,6 +87,10 @@ venues:
       reconciliation. Execution remains unapproved.
     automated_collection_allowed: true
     collection_state: blocked_api_credentials
+    research_adapter: scripts.collect_crossvenue_basis
+    next_action: >-
+      Obtain read-only API credentials, run --probe and --dump-shapes, reconcile
+      response fields, then approve a time-boxed collection service.
     evidence:
       - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations
       - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/58754
@@ -104,6 +108,10 @@ venues:
     execution_allowed: false
     automated_collection_allowed: false
     collection_state: excluded_automation_prohibited
+    research_adapter: null
+    next_action: >-
+      Revisit only if Novig supplies written institutional/API authorization
+      permitting automated market-data collection.
     rationale: >-
       Novig states that Texas is eligible, but its Sweepstakes Rules prohibit
       automated or systematic participation. No automated adapter or execution
@@ -125,6 +133,10 @@ venues:
     execution_allowed: false
     automated_collection_allowed: false
     collection_state: excluded_no_approved_api
+    research_adapter: null
+    next_action: >-
+      Revisit only if Underdog supplies an approved market-data API and an
+      independent underlying-venue identifier.
     rationale: >-
       Prediction Picks are available in Texas but route accounts to underlying
       exchanges such as Kalshi or Crypto.com/Nadex, so Underdog is not reliably

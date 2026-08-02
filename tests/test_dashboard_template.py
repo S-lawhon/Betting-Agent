@@ -91,6 +91,8 @@ def test_crossvenue_research_has_a_dashboard_surface(html):
     assert "r.crossvenue_pilot" in html
     assert "quote completeness" in html
     assert "persistent episodes" in html
+    assert "research alerts" in html
+    assert "venue expansion" in html
 
 
 def test_isnum_rejects_non_finite(html):

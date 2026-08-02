@@ -157,6 +157,20 @@ services:
 # not evidence of success; only fresh output is.
 # -----------------------------------------------------------------------------
 jobs:
+  - id: gemini_crossvenue_research
+    host: droplet
+    schedule: "every 5 minutes (systemd timer)"
+    description: Read-only Gemini/Kalshi MLB quote and equivalence research
+    output:
+      file: data/gemini_crossvenue/metrics.json
+      max_stale_hours: 0.34
+    severity: warn
+    note: >
+      Public data only; no credentials or execution capability. A fresh metrics
+      file proves quote collection and exact matching ran. Settlement terms are
+      intentionally unverified, so hypothetical positive paths remain
+      non-actionable until a reviewed equivalence policy approves them.
+
   - id: market_census
     host: droplet
     schedule: "35 3 * * *"

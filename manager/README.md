@@ -73,6 +73,12 @@ claim means work started, model invocation is still untracked, and only a
 durable disposition proves review. This prevents a healthy queue generator—or
 an abandoned claim—from being reported as completed research labor.
 
+The separate five-minute Gemini/Kalshi research collector writes public,
+read-only quote snapshots under `data/gemini_crossvenue/`. Its live metrics feed
+the dashboard directly and its daily cadence, matches, and settlement-policy
+state flow into the same research operations email. The manager registry alerts
+when those metrics are more than roughly twenty minutes stale.
+
 ## Daily use
 
 ```bash

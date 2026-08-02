@@ -23,8 +23,12 @@ Rule summary (see the doc for the derivation)
   * any T  -> HARD KILL if z <= -2.0.
   * T < 24 -> NO DECISION (underpowered: 91% power at T=24 vs the
               measured +3.4c effect, only 71% at T=8).
-  * T >= 14 -> KILL if edge <= 0; PASS if z >= 2.0; else CONTINUE, the
+  * T >= 24 -> KILL if edge <= 0; PASS if z >= 2.0; else CONTINUE, the
               single extension, to T = 40 at UNCHANGED parameters.
+              (was T >= 14 in this docstring until 2026-08-02, contradicting
+               the T < 24 line directly above it; Amendment 1 raised the
+               threshold on 2026-07-28 and only the prose was left behind.
+               The CODE was always right -- MIN_T_DECISION = 24 below.)
   * T >= 40 -> KILL if still z < 2.0.  The extension is spent.
 
 PASS authorises more paper allocation within the caps and a written

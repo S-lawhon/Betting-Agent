@@ -70,6 +70,17 @@ def _metric(value: Any) -> str:
     return str(int(value)) if float(value).is_integer() else "{:.1f}".format(value)
 
 
+def _seconds(value: Any) -> str:
+    return "{}s".format(_metric(value)) if isinstance(value, (int, float)) else "unknown"
+
+
+def _usd(value: Any) -> str:
+    if not isinstance(value, (int, float)):
+        return "unknown"
+    normalized = 0.0 if abs(float(value)) < 0.0005 else float(value)
+    return "${:.3f}".format(normalized)
+
+
 def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any]:
     """Assemble the brief into structured sections."""
     by_sev: Dict[str, List[checks.Finding]] = {}
@@ -366,7 +377,7 @@ def render_markdown(b: Dict[str, Any]) -> str:
                      "positive paths, {} actionable; {} snapshots and {} matched observations in "
                      "24h; settlement terms {}. 14d: {} quote completeness, "
                      "{} paths at least 3c, {} persistent episodes, median "
-                     "duration {}s, p95 edge {}.".format(
+                     "duration {}, p95 edge {}.".format(
                          crossvenue.get("status") or "unknown",
                          _metric(latest.get("matched_events")),
                          _metric(latest.get("hypothetical_positive_paths")),
@@ -377,8 +388,8 @@ def render_markdown(b: Dict[str, Any]) -> str:
                          completeness_text,
                          _metric(analytics.get("qualifying_path_observations")),
                          _metric(episodes.get("persistent_count")),
-                         _metric(episodes.get("median_duration_seconds")),
-                         _metric(edge.get("p95"))))
+                         _seconds(episodes.get("median_duration_seconds")),
+                         _usd(edge.get("p95"))))
     L.append("")
 
     if b["gates"]:
@@ -643,7 +654,7 @@ def render_html(b: Dict[str, Any]) -> str:
                      "{} hypothetical positive paths, {} actionable; {} snapshots and {} matched "
                      "observations in 24h; settlement terms {}. 14d: {} quote "
                      "completeness, {} paths at least 3c, {} persistent episodes, "
-                     "median duration {}s, p95 edge {}.</div>".format(
+                     "median duration {}, p95 edge {}.</div>".format(
                          e(str(crossvenue.get("status") or "unknown")),
                          e(_metric(latest.get("matched_events"))),
                          e(_metric(latest.get("hypothetical_positive_paths"))),
@@ -654,8 +665,8 @@ def render_html(b: Dict[str, Any]) -> str:
                          e(completeness_text),
                          e(_metric(analytics.get("qualifying_path_observations"))),
                          e(_metric(episodes.get("persistent_count"))),
-                         e(_metric(episodes.get("median_duration_seconds"))),
-                         e(_metric(edge.get("p95")))))
+                         e(_seconds(episodes.get("median_duration_seconds"))),
+                         e(_usd(edge.get("p95")))))
 
     if b["gates"]:
         P.append("<h2>Gate progress</h2>")

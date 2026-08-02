@@ -40,6 +40,11 @@ class TestBuildResearchMetrics(TestCase):
                 "dispatches_quarantined_quality": 1,
                 "quarantined_assignment_ids": {"a3": "prior_research_killed"},
             }))
+            quarantine = (
+                dispatches.parent / "dispatch_quarantine" / "strategy-scout")
+            quarantine.mkdir(parents=True)
+            for assignment_id in ("a3", "a4", "a5"):
+                (quarantine / f"{assignment_id}.json").write_text("{}")
             intake_manifest = root / "latest_manifest.json"
             intake_manifest.write_text(json.dumps({
                 "x_usage": {
@@ -84,7 +89,10 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(metrics["quality_control"]["intake_rejected"], 4)
             self.assertEqual(metrics["quality_control"]["triage_blocked"], 2)
             self.assertEqual(
-                metrics["quality_control"]["legacy_dispatches_quarantined"], 1)
+                metrics["quality_control"]["legacy_dispatches_quarantined"], 3)
+            self.assertEqual(
+                metrics["quality_control"][
+                    "legacy_dispatches_quarantined_latest_run"], 1)
             operations = metrics["operations"]
             self.assertFalse(
                 operations["semantics"]["agent_invocation_tracked"])

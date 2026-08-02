@@ -327,6 +327,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         assignments, dispositions, intake_manifest)
     metrics["collector_health"] = _collector_health(intake_manifest)
     triage_manifest = _read_json(args.dispatches_dir / "latest_manifest.json", {})
+    quarantine_files = list(
+        args.dispatches_dir.glob("dispatch_quarantine/*/*.json"))
+    quarantine_total = (
+        len(quarantine_files) if quarantine_files else
+        triage_manifest.get("dispatches_quarantined_quality"))
     metrics["quality_control"] = {
         "status": "available" if intake_manifest or triage_manifest else "unknown",
         "intake_rejected": intake_manifest.get("quality_rejected"),
@@ -335,7 +340,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "triage_blocked": triage_manifest.get("quality_blocked"),
         "triage_blocked_assignment_ids": (
             triage_manifest.get("quality_blocked_assignment_ids") or {}),
-        "legacy_dispatches_quarantined": (
+        "legacy_dispatches_quarantined": quarantine_total,
+        "legacy_dispatches_quarantined_latest_run": (
             triage_manifest.get("dispatches_quarantined_quality")),
         "quarantined_assignment_ids": (
             triage_manifest.get("quarantined_assignment_ids") or {}),

@@ -379,6 +379,8 @@ iframe{width:100%;height:78vh;border:1px solid var(--border);border-radius:var(-
       <div class="ct">Research edge-discovery funnel <span class="sub" id="r-state"></span></div>
       <div id="r-detail" class="cap" style="margin-top:0;margin-bottom:12px">&mdash;</div>
       <div id="r-day" class="cap" style="margin-top:0;margin-bottom:8px">&mdash;</div>
+      <div id="r-health" class="cap" style="margin-top:0;margin-bottom:8px">&mdash;</div>
+      <div id="r-quality" class="cap" style="margin-top:0;margin-bottom:8px">&mdash;</div>
       <div class="fn" id="r-funnel"><div class="empty">&mdash;</div></div>
       <div class="tw" style="margin-top:12px"><table class="rfl" id="r-agents">
         <thead><tr><th>Agent queue</th><th>State</th><th>Pending</th><th>Overdue</th><th>Oldest</th><th>Dispatched 24h</th><th>Reviewed 24h</th><th>Advanced 24h</th><th>Research min 24h</th></tr></thead>
@@ -1087,6 +1089,8 @@ function renderResearchPipeline(r){
   var dispatch = r.dispatch || {}, pending = dispatch.pending_review;
   var operations = r.operations || {}, activity = operations.activity_24h || {};
   var queue = operations.queue || {}, semantics = operations.semantics || {};
+  var health = r.collector_health || {}, zeroFeeds = health.zero_academic_feeds || [];
+  var quality = r.quality_control || {};
   el("r-state").textContent = r.available
     ? (isNum(pending) ? intf(pending) + " task packets pending review" : "") : "";
   el("r-detail").textContent = r.available
@@ -1103,6 +1107,17 @@ function renderResearchPipeline(r){
       numTxt(activity.defer) + " deferred · queue " +
       numTxt(queue.pending) + " pending / " + numTxt(queue.overdue) + " overdue"
     : "Daily agent activity will appear after the operations metric is generated.";
+  el("r-health").textContent = r.available
+    ? "Source health: " + (health.status || "unknown") + " · " +
+      numTxt(health.academic_feed_items_raw) + " raw academic items · " +
+      numTxt(health.collector_error_count) + " collector errors" +
+      (zeroFeeds.length ? " · zero feeds: " + zeroFeeds.join(", ") : "")
+    : "Source health unavailable.";
+  el("r-quality").textContent = r.available
+    ? "Quality control: " + numTxt(quality.intake_rejected) + " rejected at intake · " +
+      numTxt(quality.triage_blocked) + " blocked at triage · " +
+      numTxt(quality.legacy_dispatches_quarantined) + " legacy packets quarantined"
+    : "Research quality control unavailable.";
   el("r-src").textContent = "source: " + (r.source || "");
 
   var funnel = r.funnel || [], box = el("r-funnel");

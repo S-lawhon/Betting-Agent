@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from unittest import TestCase
 
+from src.research_intake import SourceItem
 from src.research_triage import title_tokens, triage_assignments
 
 
@@ -83,6 +84,27 @@ class TestResearchTriage(TestCase):
         self.assertEqual(manifest["already_reviewed"], 1)
         self.assertEqual(manifest["already_opportunity"], 1)
         self.assertEqual(manifest["legally_blocked"], 1)
+
+    def test_quality_gate_rechecks_legacy_assignment_before_dispatch(self):
+        assignment = _assignment(
+            1, source="regulatory_filing", lane="new_products",
+            title="First inning run contract")
+        source = SourceItem.create(
+            source_type="regulatory_filing", source_name="CFTC",
+            external_id="filing-1", title="First inning run contract",
+            summary="Certified product listing", url="https://example.test/filing",
+            retrieved_at="2026-08-02T13:00:00Z")
+        _, manifest, packets = triage_assignments(
+            [assignment], source_items_by_id={"s1": source.to_dict()},
+            memory_rules=[{
+                "id": "P-024", "status": "killed",
+                "match_any": ["first inning"],
+            }], now=NOW)
+        self.assertEqual(packets, [])
+        self.assertEqual(manifest["quality_blocked"], 1)
+        self.assertEqual(
+            manifest["quality_blocked_assignment_ids"]["a1"],
+            "prior_research_killed")
 
     def test_second_pass_is_idempotent(self):
         ledger, _, first = triage_assignments([_assignment(1)], now=NOW)

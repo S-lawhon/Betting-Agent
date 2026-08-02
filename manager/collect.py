@@ -1230,6 +1230,8 @@ class Collector:
             "funnel": payload.get("funnel") or {},
             "dispatch": payload.get("dispatch") or {},
             "operations": operations,
+            "collector_health": payload.get("collector_health") or {},
+            "quality_control": payload.get("quality_control") or {},
             "decisions": payload.get("decisions") or {},
             "top_rejection_reasons": payload.get("top_rejection_reasons") or {},
             "x_pilot": payload.get("x_pilot") or {},

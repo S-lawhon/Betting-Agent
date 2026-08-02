@@ -1,0 +1,17 @@
+schema_version: 1
+
+# Explicit, auditable research-family memory. Matching a prior family prevents
+# a product listing or social post from being treated as a new hypothesis.
+# Re-open a family only by changing its status and documenting the new evidence.
+hypotheses:
+  - id: P-024
+    status: killed
+    name: MLB first-inning run / NRFI-YRFI sharp-reference lag
+    evidence: mlb_f5_research/REPORT_MLB_F5_2026-07.md
+    match_any: [first inning, yrfi, nrfi, kxmlbrfi]
+
+  - id: MLB-PROPS
+    status: existing
+    name: MLB batter props and home-run market research
+    evidence: mlb_props_research/PHASE1_REPORT.md
+    match_any: [home run, kxmlbhr, mlb home runs]

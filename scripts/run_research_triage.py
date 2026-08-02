@@ -16,6 +16,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.research_outcomes import ResearchDisposition  # noqa: E402
+from src.research_intake import quality_rejection_from_mapping  # noqa: E402
 from src.research_triage import triage_assignments  # noqa: E402
 
 
@@ -124,10 +125,43 @@ def _archive_completed_dispatches(output_dir: Path,
     return archived
 
 
+def _quarantine_invalid_dispatches(
+    output_dir: Path,
+    *,
+    source_items_by_id: Dict[str, Dict[str, Any]],
+    now: datetime,
+    memory_rules: List[Dict[str, Any]],
+) -> Dict[str, str]:
+    """Move legacy pending packets that fail today's source-quality gate."""
+    quarantined: Dict[str, str] = {}
+    dispatch_root = output_dir / "dispatches"
+    for path in sorted(dispatch_root.glob("*/*.json")):
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        source_item = payload.get("source_item") or source_items_by_id.get(
+            str(payload.get("source_item_id") or "")) or {}
+        reason = quality_rejection_from_mapping(
+            source_item, now=now,
+            memory_rules=memory_rules)
+        if not reason:
+            continue
+        assignment_id = str(payload.get("assignment_id") or path.stem)
+        destination = (
+            output_dir / "dispatch_quarantine" / path.parent.name / path.name)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(path, destination)
+        quarantined[assignment_id] = reason
+    return quarantined
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path,
                         default=ROOT / "config" / "research_triage.yaml")
+    parser.add_argument("--research-memory", type=Path,
+                        default=ROOT / "config" / "research_memory.yaml")
     parser.add_argument("--assignments-dir", type=Path,
                         default=ROOT / "data" / "research_intake" / "assignments")
     parser.add_argument("--source-batches-dir", type=Path,
@@ -142,6 +176,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     config = yaml.safe_load(args.config.read_text()) or {}
+    memory = (yaml.safe_load(args.research_memory.read_text()) or {}
+              if args.research_memory.exists() else {})
     portfolio = config.get("portfolio") or {}
     now = _parse_now(args.now)
     assignments = _load_assignments(args.assignments_dir)
@@ -151,6 +187,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     opportunities = _opportunity_assignments(args.strategy_registry)
     archived_completed = _archive_completed_dispatches(
         args.output_dir, reviewed | opportunities)
+    memory_rules = memory.get("hypotheses") or []
+    quarantined = _quarantine_invalid_dispatches(
+        args.output_dir, source_items_by_id=source_items, now=now,
+        memory_rules=memory_rules)
     ledger_path = args.output_dir / "ledger.json"
     ledger, manifest, packets = triage_assignments(
         assignments,
@@ -159,6 +199,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         reviewed_assignment_ids=reviewed,
         opportunity_assignment_ids=opportunities,
         redispatch_assignment_ids=due_deferrals,
+        memory_rules=memory_rules,
         now=now,
         max_dispatches=int(portfolio.get(
             "max_dispatches_per_utc_day",
@@ -171,6 +212,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     manifest["invalid_dispositions"] = disposition_errors
     manifest["dispatches_archived_completed"] = archived_completed
+    manifest["dispatches_quarantined_quality"] = len(quarantined)
+    manifest["quarantined_assignment_ids"] = dict(sorted(quarantined.items()))
 
     _write_atomic(ledger_path, ledger)
     _write_atomic(args.output_dir / "latest_manifest.json", manifest)

@@ -168,7 +168,11 @@ def test_tables_reflow_via_data_label(html):
 def test_research_operations_shows_agent_queues_and_execution_semantics(html):
     assert 'id="r-agents"' in html
     assert 'id="r-day"' in html
+    assert 'id="r-health"' in html
+    assert 'id="r-quality"' in html
     assert "Agent invocation/started state" in html
+    assert "academic_feed_items_raw" in html
+    assert "legacy_dispatches_quarantined" in html
     for field in ("dispatched_24h", "reviewed_24h", "advance_24h",
                   "research_minutes_24h", "oldest_pending_age_hours"):
         assert field in html

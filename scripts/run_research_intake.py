@@ -247,10 +247,17 @@ def collect_live(config: Dict[str, Any], *, now: datetime,
             continue
         counts[f"feed:{feed.get('id')}"] = 0
         try:
-            feed_items = FeedCollector(
+            raw_feed_items = FeedCollector(
                 str(feed.get("name") or feed.get("id")),
                 str(feed.get("type") or "paper"),
             ).fetch(str(feed["url"]), now=now)
+            counts[f"feed:{feed.get('id')}:raw"] = len(raw_feed_items)
+            if not raw_feed_items:
+                errors.append({
+                    "source": f"feed:{feed.get('id')}",
+                    "error": "enabled academic feed returned zero raw items",
+                })
+            feed_items = raw_feed_items
             keywords = [str(value).lower() for value in
                         feed.get("include_keywords") or []]
             if keywords:
@@ -286,6 +293,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                         default=ROOT / "config" / "research_sources.yaml")
     parser.add_argument("--eligibility", type=Path,
                         default=ROOT / "config" / "research_venues.yaml")
+    parser.add_argument("--research-memory", type=Path,
+                        default=ROOT / "config" / "research_memory.yaml")
     parser.add_argument("--output-dir", type=Path,
                         default=ROOT / "data" / "research_intake")
     parser.add_argument("--offline-items", type=Path,
@@ -299,6 +308,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.error("--max-assignments must be between 1 and 500")
 
     config = yaml.safe_load(args.config.read_text()) or {}
+    memory = (yaml.safe_load(args.research_memory.read_text()) or {}
+              if args.research_memory.exists() else {})
     eligibility = EligibilityRegistry.load(args.eligibility)
     now = _parse_now(args.now)
     if args.offline_items:
@@ -318,9 +329,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     previous = _read_json(output / "ledger.json", {})
     maximum = (args.max_assignments or
                int((config.get("intake") or {}).get("max_assignments", 50)))
+    quality = (config.get("intake") or {}).get("quality") or {}
     ledger, manifest, assignments = build_intake(
         items, eligibility=eligibility, previous_ledger=previous,
-        now=now, max_assignments=maximum)
+        now=now, max_assignments=maximum,
+        memory_rules=memory.get("hypotheses") or [],
+        family_cooldown_days=int(quality.get("family_cooldown_days", 30)))
+    manifest["research_memory_version"] = memory.get("schema_version")
     manifest["collector_errors"] = errors
     manifest["collector_counts"] = collector_counts
     manifest["x_usage"] = x_telemetry

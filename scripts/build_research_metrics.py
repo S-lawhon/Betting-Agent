@@ -265,6 +265,32 @@ def _x_pilot_metrics(assignments: List[Dict[str, Any]],
     }
 
 
+def _collector_health(intake_manifest: Dict[str, Any]) -> Dict[str, Any]:
+    counts = intake_manifest.get("collector_counts") or {}
+    errors = intake_manifest.get("collector_errors") or []
+    raw_feeds = {
+        str(key)[:-4]: int(value or 0) for key, value in counts.items()
+        if str(key).startswith("feed:") and str(key).endswith(":raw")
+    }
+    # Backward-compatible until the first run from the quality-gated collector.
+    if not raw_feeds:
+        raw_feeds = {
+            str(key): int(value or 0) for key, value in counts.items()
+            if str(key).startswith("feed:") and not str(key).endswith(":raw")
+        }
+    zero_feeds = sorted(key for key, value in raw_feeds.items() if value == 0)
+    status = "unknown"
+    if raw_feeds or errors:
+        status = "degraded" if errors or zero_feeds else "healthy"
+    return {
+        "status": status,
+        "academic_feed_items_raw": sum(raw_feeds.values()),
+        "zero_academic_feeds": zero_feeds,
+        "collector_error_count": len(errors),
+        "collector_errors": errors[:20],
+    }
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assignments-dir", type=Path,
@@ -287,8 +313,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     metrics = summarize_research(assignments, dispositions, dispatches)
     metrics["invalid_dispositions"] = errors
     metrics["invalid_dispatches"] = dispatch_errors
+    intake_manifest = _read_json(args.intake_manifest, {})
     metrics["x_pilot"] = _x_pilot_metrics(
-        assignments, dispositions, _read_json(args.intake_manifest, {}))
+        assignments, dispositions, intake_manifest)
+    metrics["collector_health"] = _collector_health(intake_manifest)
+    triage_manifest = _read_json(args.dispatches_dir / "latest_manifest.json", {})
+    metrics["quality_control"] = {
+        "status": "available" if intake_manifest or triage_manifest else "unknown",
+        "intake_rejected": intake_manifest.get("quality_rejected"),
+        "intake_rejection_reasons": (
+            intake_manifest.get("quality_rejection_reasons") or {}),
+        "triage_blocked": triage_manifest.get("quality_blocked"),
+        "triage_blocked_assignment_ids": (
+            triage_manifest.get("quality_blocked_assignment_ids") or {}),
+        "legacy_dispatches_quarantined": (
+            triage_manifest.get("dispatches_quarantined_quality")),
+        "quarantined_assignment_ids": (
+            triage_manifest.get("quarantined_assignment_ids") or {}),
+    }
     generated_at = _parse_now(args.now)
     metrics["operations"] = _research_operations(
         assignments, dispositions, dispatches, now=generated_at)

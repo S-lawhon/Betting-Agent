@@ -15,6 +15,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
+from src.research_intake import quality_rejection_from_mapping
+
 
 SCHEMA_VERSION = 1
 
@@ -305,6 +307,7 @@ def triage_assignments(
     reviewed_assignment_ids: Optional[Set[str]] = None,
     opportunity_assignment_ids: Optional[Set[str]] = None,
     redispatch_assignment_ids: Optional[Set[str]] = None,
+    memory_rules: Sequence[Mapping[str, Any]] = (),
     now: Optional[datetime] = None,
     max_dispatches: int = 10,
     max_research_minutes: int = 300,
@@ -356,14 +359,21 @@ def triage_assignments(
 
     packets: List[DispatchPacket] = []
     legally_blocked: List[str] = []
+    quality_blocked: Dict[str, str] = {}
     candidates = []
     for assignment_id, assignment in by_id.items():
         if (assignment_id in dispatched_before or assignment_id in reviewed
                 or assignment_id in opportunities):
             continue
+        source_item = source_items.get(str(assignment.get("source_item_id"))) or {}
+        quality_reason = quality_rejection_from_mapping(
+            source_item, now=now, memory_rules=memory_rules)
+        if quality_reason:
+            quality_blocked[assignment_id] = quality_reason
+            continue
         packet, blocked = _packet(
             assignment,
-            source_item=source_items.get(str(assignment.get("source_item_id"))) or {},
+            source_item=source_item,
             now=now, historical_titles=historical_titles,
             current_titles=current_titles)
         if blocked:
@@ -443,6 +453,8 @@ def triage_assignments(
         "reopened_due_deferral": len(set(by_id) & reopened),
         "legally_blocked": len(legally_blocked),
         "legally_blocked_assignment_ids": sorted(legally_blocked),
+        "quality_blocked": len(quality_blocked),
+        "quality_blocked_assignment_ids": dict(sorted(quality_blocked.items())),
         "eligible_candidates": len(candidates),
         "dispatched": len(packets),
         "deferred": len(candidates) - len(packets),

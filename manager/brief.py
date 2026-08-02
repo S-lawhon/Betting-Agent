@@ -313,6 +313,22 @@ def render_markdown(b: Dict[str, Any]) -> str:
                         _metric(row.get("advance_24h")),
                         _metric(row.get("research_minutes_24h"))))
         x_pilot = research.get("x_pilot") or {}
+        collector_health = research.get("collector_health") or {}
+        quality = research.get("quality_control") or {}
+        zero_feeds = collector_health.get("zero_academic_feeds") or []
+        L.append("")
+        L.append("Source health: {} — {} raw academic items, {} collector errors{}"
+                 .format(
+                     collector_health.get("status") or "unknown",
+                     _metric(collector_health.get("academic_feed_items_raw")),
+                     _metric(collector_health.get("collector_error_count")),
+                     ("; zero feeds: {}".format(", ".join(zero_feeds))
+                      if zero_feeds else "")))
+        L.append("Quality control: {} rejected at intake, {} blocked at triage, "
+                 "{} legacy packets quarantined".format(
+                     _metric(quality.get("intake_rejected")),
+                     _metric(quality.get("triage_blocked")),
+                     _metric(quality.get("legacy_dispatches_quarantined"))))
         if x_pilot.get("month"):
             cost = x_pilot.get("estimated_cost_usd")
             cost_text = ("${:.3f}".format(cost)
@@ -536,6 +552,21 @@ def render_html(b: Dict[str, Any]) -> str:
                              e(_metric(row.get("research_minutes_24h")))))
             P.append("</ul></div>")
         x_pilot = research.get("x_pilot") or {}
+        collector_health = research.get("collector_health") or {}
+        quality = research.get("quality_control") or {}
+        zero_feeds = collector_health.get("zero_academic_feeds") or []
+        P.append("<div class='dim'>Source health: {} — {} raw academic items, {} "
+                 "collector errors{}</div>".format(
+                     e(str(collector_health.get("status") or "unknown")),
+                     e(_metric(collector_health.get("academic_feed_items_raw"))),
+                     e(_metric(collector_health.get("collector_error_count"))),
+                     e("; zero feeds: {}".format(", ".join(zero_feeds))
+                       if zero_feeds else "")))
+        P.append("<div class='dim'>Quality control: {} rejected at intake, {} "
+                 "blocked at triage, {} legacy packets quarantined</div>".format(
+                     e(_metric(quality.get("intake_rejected"))),
+                     e(_metric(quality.get("triage_blocked"))),
+                     e(_metric(quality.get("legacy_dispatches_quarantined")))))
         if x_pilot.get("month"):
             cost = x_pilot.get("estimated_cost_usd")
             cost_text = ("${:.3f}".format(cost)

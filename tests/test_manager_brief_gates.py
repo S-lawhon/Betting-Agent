@@ -166,6 +166,15 @@ def research_snap() -> dict:
         },
         "x_pilot": {"month": "2026-08", "estimated_cost_usd": 1.065,
                     "assignments": 10, "reviewed": 2, "advanced": 1},
+        "collector_health": {
+            "status": "degraded", "academic_feed_items_raw": 0,
+            "zero_academic_feeds": ["feed:arxiv_qfin_trading"],
+            "collector_error_count": 1,
+        },
+        "quality_control": {
+            "intake_rejected": 4, "triage_blocked": 2,
+            "legacy_dispatches_quarantined": 1,
+        },
     }}
 
 
@@ -180,6 +189,10 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "agent invocation/started state is not tracked" in text.lower()
         assert "35 research minutes" in text
         assert "$1.065" in text
+        assert "Source health: degraded" in text
+        assert "arxiv_qfin_trading" in text
+        assert "4 rejected at intake" in text
+        assert "1 legacy packets quarantined" in text
 
 
 def test_daily_brief_reports_missing_research_operations_as_unknown():

@@ -34,12 +34,30 @@ class TestBuildResearchMetrics(TestCase):
                 "priority": "high", "research_budget_minutes": 45,
                 "created_at": "2026-08-01T12:00:00Z",
             }))
+            (dispatches.parent / "latest_manifest.json").write_text(json.dumps({
+                "quality_blocked": 2,
+                "quality_blocked_assignment_ids": {"a2": "terminal_market"},
+                "dispatches_quarantined_quality": 1,
+                "quarantined_assignment_ids": {"a3": "prior_research_killed"},
+            }))
             intake_manifest = root / "latest_manifest.json"
-            intake_manifest.write_text(json.dumps({"x_usage": {
-                "month": "2026-08", "estimated_cost_month_usd": 1.25,
-                "post_reads_month": 75, "user_reads_month": 70,
-                "estimate_is_conservative": True, "status": "completed",
-            }}))
+            intake_manifest.write_text(json.dumps({
+                "x_usage": {
+                    "month": "2026-08", "estimated_cost_month_usd": 1.25,
+                    "post_reads_month": 75, "user_reads_month": 70,
+                    "estimate_is_conservative": True, "status": "completed",
+                },
+                "collector_counts": {
+                    "feed:arxiv_qfin_trading:raw": 0,
+                    "feed:arxiv_qfin_statistics:raw": 3,
+                },
+                "collector_errors": [{
+                    "source": "feed:arxiv_qfin_trading",
+                    "error": "enabled academic feed returned zero raw items",
+                }],
+                "quality_rejected": 4,
+                "quality_rejection_reasons": {"expired_market": 4},
+            }))
             output = root / "metrics.json"
             self.assertEqual(main([
                 "--assignments-dir", str(assignments),
@@ -57,6 +75,16 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(metrics["dispatch"]["dispatched"], 1)
             self.assertEqual(metrics["funnel"]["dispatched_reviewed"], 1)
             self.assertEqual(metrics["x_pilot"]["estimated_cost_usd"], 1.25)
+            self.assertEqual(metrics["collector_health"]["status"], "degraded")
+            self.assertEqual(
+                metrics["collector_health"]["academic_feed_items_raw"], 3)
+            self.assertEqual(metrics["collector_health"]["zero_academic_feeds"], [
+                "feed:arxiv_qfin_trading",
+            ])
+            self.assertEqual(metrics["quality_control"]["intake_rejected"], 4)
+            self.assertEqual(metrics["quality_control"]["triage_blocked"], 2)
+            self.assertEqual(
+                metrics["quality_control"]["legacy_dispatches_quarantined"], 1)
             operations = metrics["operations"]
             self.assertFalse(
                 operations["semantics"]["agent_invocation_tracked"])

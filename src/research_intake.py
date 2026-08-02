@@ -10,10 +10,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -25,6 +27,23 @@ from src.research_eligibility import EligibilityRegistry
 
 
 SCHEMA_VERSION = 1
+
+TERMINAL_MARKET_STATUSES = {
+    "CANCELED", "CANCELLED", "CLOSED", "EXPIRED", "FINAL", "INACTIVE",
+    "MARKET_STATUS_CLOSED", "MARKET_STATUS_RESOLVED", "RESOLVED", "SETTLED",
+}
+
+SOCIAL_MARKET_TERMS = {
+    "betting", "event contract", "forecast", "forecastex", "kalshi",
+    "market making", "odds", "polymarket", "prediction market", "prophetx",
+    "sportsbook",
+}
+
+SOCIAL_MECHANISM_TERMS = {
+    "api", "arbitrage", "calibration", "data", "depth", "execution", "fee",
+    "latency", "liquidity", "mechanism", "mispricing", "model", "pricing",
+    "rebate", "rule", "settlement", "slippage", "spread", "timestamp",
+}
 
 
 def _canonical(value: Any) -> str:
@@ -155,6 +174,10 @@ def _source_score(item: SourceItem) -> int:
         "practitioner": 45,
         "social": 35,
     }.get(item.source_type, 30)
+    if item.source_type == "regulatory_filing" and "products" in item.topics:
+        # An official product filing proves existence and terms provenance. It
+        # does not by itself supply a mechanism, edge, or executable capacity.
+        base = 45
     if item.reliability == "primary":
         base += 10
     if item.url:
@@ -192,6 +215,107 @@ def _published_epoch(value: Optional[str]) -> float:
     return parsed.timestamp()
 
 
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    text = str(value).strip()
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def market_family_key(item: SourceItem) -> str:
+    """Return a deterministic research-family key, not a trade identifier."""
+    text = "{} {} {}".format(
+        item.title, item.summary, item.metadata.get("slug") or "").lower()
+    source = re.sub(r"[^a-z0-9]+", "_", item.source_name.lower()).strip("_")
+    if any(term in text for term in ("first inning", "yrfi", "nrfi", "kxmlbrfi")):
+        return "mlb_first_inning_run"
+    if "home run" in text or re.search(r"\bmlbhr\b", text):
+        return "mlb_player_home_run"
+    census_family = item.metadata.get("market_family")
+    if census_family:
+        return "{}:census:{}".format(source, str(census_family).lower())
+    if item.source_type == "venue_market" and re.search(r"\bvs\.?\b", text):
+        return "{}:{}:matchup".format(source, item.product_family.lower())
+    if item.source_type == "venue_market":
+        return "{}:{}".format(source, item.product_family.lower())
+    if item.source_type in {"paper", "social", "practitioner"}:
+        return "{}:{}".format(source, item.external_id)
+    normalized = re.sub(r"\b(?:19|20)\d{2}[-/]\d{1,2}[-/]\d{1,2}\b", "date", text)
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    tokens = [token for token in normalized.split() if len(token) > 1][:12]
+    fallback = "_".join(tokens) or item.external_id or item.id
+    return "{}:{}:{}".format(source, item.source_type, fallback)
+
+
+def _memory_match(item: SourceItem,
+                  rules: Sequence[Mapping[str, Any]]) -> Optional[Mapping[str, Any]]:
+    text = "{} {} {}".format(item.title, item.summary, item.external_id).lower()
+    for rule in rules:
+        terms = [str(term).lower() for term in rule.get("match_any") or [] if term]
+        if terms and any(term in text for term in terms):
+            return rule
+    return None
+
+
+def quality_rejection_reason(
+    item: SourceItem,
+    *,
+    now: datetime,
+    memory_rules: Sequence[Mapping[str, Any]] = (),
+) -> Optional[str]:
+    """Hard rejects for facts that make a research packet non-actionable."""
+    status = str(item.metadata.get("status") or "").strip().upper()
+    if item.source_type == "venue_market":
+        if status in TERMINAL_MARKET_STATUSES:
+            return "terminal_market"
+        end_at = _parse_datetime(item.metadata.get("end_at"))
+        if end_at and end_at <= now:
+            return "expired_market"
+    if item.source_type == "social":
+        text = "{} {}".format(item.title, item.summary).strip().lower()
+        if text.startswith("@"):
+            return "low_signal_social_reply"
+        if not any(term in text for term in SOCIAL_MARKET_TERMS):
+            return "social_missing_market_context"
+        if not any(term in text for term in SOCIAL_MECHANISM_TERMS):
+            return "social_missing_testable_mechanism"
+    if item.source_type == "regulatory_filing":
+        title = item.title.strip()
+        if (len(title) < 40 and " " not in title
+                and re.fullmatch(r"[A-Z0-9_-]+", title)):
+            return "opaque_product_code"
+    memory = _memory_match(item, memory_rules)
+    if memory and str(memory.get("status") or "").lower() in {
+            "existing", "killed", "retired", "validated", "paper", "live"}:
+        return "prior_research_{}".format(
+            str(memory.get("status") or "existing").lower())
+    return None
+
+
+def quality_rejection_from_mapping(
+    payload: Mapping[str, Any],
+    *,
+    now: datetime,
+    memory_rules: Sequence[Mapping[str, Any]] = (),
+) -> Optional[str]:
+    """Apply the SourceItem quality gate to a persisted source payload."""
+    try:
+        allowed = SourceItem.__dataclass_fields__
+        item = SourceItem(**{
+            key: value for key, value in dict(payload).items()
+            if key in allowed
+        })
+    except (TypeError, ValueError):
+        return None
+    return quality_rejection_reason(item, now=now, memory_rules=memory_rules)
+
+
 def _diverse(items: Sequence[Tuple[SourceItem, int]], limit: int) -> List[Tuple[SourceItem, int]]:
     if len(items) <= limit:
         return list(items)
@@ -219,6 +343,8 @@ def build_intake(
     previous_ledger: Optional[Mapping[str, Any]] = None,
     now: Optional[datetime] = None,
     max_assignments: int = 50,
+    memory_rules: Sequence[Mapping[str, Any]] = (),
+    family_cooldown_days: int = 30,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], List[ResearchAssignment]]:
     now = now or datetime.now(timezone.utc)
     created_at = _utc_iso(now)
@@ -230,6 +356,8 @@ def build_intake(
     unique: List[SourceItem] = []
     duplicates = 0
     prohibited = 0
+    quality_reasons: Counter = Counter()
+    quality_examples: List[Dict[str, str]] = []
     for item in items:
         if (item.id in seen_ids or item.content_hash in seen_hashes
                 or item.id in batch_ids or item.content_hash in batch_hashes):
@@ -237,6 +365,20 @@ def build_intake(
             continue
         batch_ids.add(item.id)
         batch_hashes.add(item.content_hash)
+        rejection = quality_rejection_reason(
+            item, now=now, memory_rules=memory_rules)
+        if rejection:
+            quality_reasons[rejection] += 1
+            if len(quality_examples) < 25:
+                quality_examples.append({
+                    "source_item_id": item.id,
+                    "source_name": item.source_name,
+                    "reason": rejection,
+                    "title": item.title[:180],
+                })
+            seen_ids.add(item.id)
+            seen_hashes.add(item.content_hash)
+            continue
         decisions = [eligibility.decision(venue, item.product_family, as_of=now.date())
                      for venue in item.venue_ids]
         if decisions and not all(decision.research_allowed for decision in decisions):
@@ -244,14 +386,42 @@ def build_intake(
             continue
         unique.append(item)
 
-    ranked = sorted(
+    ranked_all = sorted(
         ((item, _source_score(item)) for item in unique),
         key=lambda pair: (-pair[1], -_published_epoch(pair[0].published_at), pair[0].id),
     )
+    family_history = {
+        str(key): str(value) for key, value in
+        (previous.get("family_last_assigned") or {}).items()
+    }
+    family_cutoff = now - timedelta(days=max(0, family_cooldown_days))
+    batch_families: set = set()
+    ranked: List[Tuple[SourceItem, int]] = []
+    for item, score in ranked_all:
+        family = market_family_key(item)
+        last = _parse_datetime(family_history.get(family))
+        reason = None
+        if family in batch_families:
+            reason = "duplicate_market_family"
+        elif last and last >= family_cutoff:
+            reason = "market_family_cooldown"
+        if reason:
+            quality_reasons[reason] += 1
+            if len(quality_examples) < 25:
+                quality_examples.append({
+                    "source_item_id": item.id, "source_name": item.source_name,
+                    "reason": reason, "title": item.title[:180],
+                })
+            seen_ids.add(item.id)
+            seen_hashes.add(item.content_hash)
+            continue
+        batch_families.add(family)
+        ranked.append((item, score))
     selected = _diverse(ranked, max_assignments)
     for item, _ in selected:
         seen_ids.add(item.id)
         seen_hashes.add(item.content_hash)
+        family_history[market_family_key(item)] = created_at
     assignments: List[ResearchAssignment] = []
     for item, score in selected:
         decisions = [eligibility.decision(venue, item.product_family, as_of=now.date())
@@ -286,6 +456,11 @@ def build_intake(
                     "Extract and try to falsify an economically plausible mechanism. "
                     "This source is an idea lead, not evidence of edge."
                 ),
+                "market_family_key": market_family_key(item),
+                "quality_flags": (
+                    ["official_product_listing_is_not_edge_evidence"]
+                    if (item.source_type == "regulatory_filing"
+                        and "products" in item.topics) else []),
             },
         ))
 
@@ -294,6 +469,7 @@ def build_intake(
         "updated_at": created_at,
         "source_item_ids": sorted(seen_ids),
         "content_hashes": sorted(seen_hashes),
+        "family_last_assigned": dict(sorted(family_history.items())),
         "counts_by_type": {
             kind: sum(item.source_type == kind for item in unique)
             for kind in sorted({item.source_type for item, _ in selected})
@@ -306,8 +482,11 @@ def build_intake(
         "new_unique": len(unique),
         "duplicates": duplicates,
         "research_prohibited": prohibited,
+        "quality_rejected": sum(quality_reasons.values()),
+        "quality_rejection_reasons": dict(sorted(quality_reasons.items())),
+        "quality_rejection_examples": quality_examples,
         "assignments": len(assignments),
-        "backlog_deferred": len(unique) - len(assignments),
+        "backlog_deferred": len(ranked) - len(assignments),
         "lane_counts": {
             lane: sum(assignment.lane == lane for assignment in assignments)
             for lane in sorted({assignment.lane for assignment in assignments})
@@ -354,6 +533,7 @@ def market_census_items(payload: Mapping[str, Any], *, retrieved_at: str) -> Lis
             reliability="primary",
             metadata={
                 "census_run_id": run_id, "candidate_seed_id": seed_id,
+                "market_family": family,
                 "rank": seed.get("rank"), "score": seed.get("score"),
                 "reason_codes": seed.get("reason_codes") or [],
             },

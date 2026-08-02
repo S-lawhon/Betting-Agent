@@ -708,6 +708,8 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
             "by_lane": _d(research_metrics.get("by_lane")),
             "decisions": _d(research_metrics.get("decisions")),
             "operations": _d(research_metrics.get("operations")),
+            "collector_health": _d(research_metrics.get("collector_health")),
+            "quality_control": _d(research_metrics.get("quality_control")),
             "x_pilot": _d(research_metrics.get("x_pilot")),
             "generated_at": research_metrics.get("generated_at"),
             "reason": None,
@@ -718,7 +720,8 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
             "available": False,
             "funnel": [[stage, None] for stage in RESEARCH_FUNNEL_STAGES],
             "dispatch": {}, "by_source_type": {}, "by_source_name": {},
-            "by_lane": {}, "decisions": {}, "operations": {}, "x_pilot": {},
+            "by_lane": {}, "decisions": {}, "operations": {},
+            "collector_health": {}, "quality_control": {}, "x_pilot": {},
             "generated_at": None,
             "reason": (_reason(sources, "research_metrics")
                        or "research metrics are unavailable"),

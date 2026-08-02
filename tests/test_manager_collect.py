@@ -296,6 +296,15 @@ def test_collector_loads_shared_research_operations_contract(tmp_path):
             "agents": {"strategy-scout": {"pending": 8}},
         },
         "x_pilot": {"month": "2026-08", "estimated_cost_usd": 1.065},
+        "collector_health": {
+            "status": "degraded", "academic_feed_items_raw": 0,
+            "zero_academic_feeds": ["feed:arxiv_qfin_trading"],
+            "collector_error_count": 1,
+        },
+        "quality_control": {
+            "intake_rejected": 4, "triage_blocked": 2,
+            "legacy_dispatches_quarantined": 1,
+        },
     }), encoding="utf-8")
     reg = write_registry(tmp_path, str(project), str(project))
     record = collect.Collector(reg, root=project).research_operations()
@@ -304,6 +313,8 @@ def test_collector_loads_shared_research_operations_contract(tmp_path):
     assert record["funnel"]["assignments"] == 200
     assert record["operations"]["queue"]["pending"] == 8
     assert record["operations"]["semantics"]["agent_invocation_tracked"] is False
+    assert record["collector_health"]["status"] == "degraded"
+    assert record["quality_control"]["intake_rejected"] == 4
 
 
 def test_collector_admits_missing_research_operations(tmp_path):

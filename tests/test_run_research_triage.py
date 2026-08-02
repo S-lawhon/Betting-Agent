@@ -112,3 +112,56 @@ class TestRunResearchTriage(TestCase):
             manifest = json.loads((output / "latest_manifest.json").read_text())
             self.assertEqual(len(manifest["invalid_dispositions"]), 1)
             self.assertEqual(manifest["dispatched"], 0)
+
+    def test_runner_quarantines_legacy_dispatch_that_fails_quality_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = root / "triage.yaml"
+            config.write_text("portfolio: {}\n")
+            memory = root / "memory.yaml"
+            memory.write_text("hypotheses: []\n")
+            assignments = root / "assignments"
+            sources = root / "sources"
+            dispositions = root / "dispositions"
+            assignments.mkdir()
+            sources.mkdir()
+            dispositions.mkdir()
+            output = root / "output"
+            pending = output / "dispatches" / "strategy-scout" / "a1.json"
+            pending.parent.mkdir(parents=True)
+            pending.write_text(json.dumps({
+                "assignment_id": "a1", "source_item_id": "s1",
+            }))
+            (sources / "batch.json").write_text(json.dumps({"items": [{
+                    "id": "s1", "source_type": "venue_market",
+                    "source_name": "Polymarket US", "external_id": "m1",
+                    "title": "Resolved basketball game", "summary": "",
+                    "url": "https://example.test/m1",
+                    "retrieved_at": "2026-08-01T12:00:00Z",
+                    "published_at": None, "authors": [], "topics": [],
+                    "venue_ids": ["polymarket-us"],
+                    "product_family": "sports", "reliability": "unknown",
+                    "rights": "public_metadata", "metadata": {
+                        "status": "MARKET_STATUS_RESOLVED",
+                        "end_at": "2026-01-14T00:00:00Z",
+                    }, "content_hash": "hash",
+                }]}))
+            result = main([
+                "--config", str(config), "--research-memory", str(memory),
+                "--assignments-dir", str(assignments),
+                "--source-batches-dir", str(sources),
+                "--dispositions-dir", str(dispositions),
+                "--strategy-registry", str(root / "missing-registry.json"),
+                "--output-dir", str(output),
+                "--now", "2026-08-02T14:00:00Z",
+            ])
+            self.assertEqual(result, 0)
+            self.assertFalse(pending.exists())
+            self.assertTrue((
+                output / "dispatch_quarantine" / "strategy-scout" / "a1.json"
+            ).exists())
+            manifest = json.loads((output / "latest_manifest.json").read_text())
+            self.assertEqual(manifest["dispatches_quarantined_quality"], 1)
+            self.assertEqual(
+                manifest["quarantined_assignment_ids"]["a1"],
+                "terminal_market")

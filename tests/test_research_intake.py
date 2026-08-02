@@ -13,6 +13,7 @@ from src.research_intake import (
     XRecentSearchCollector,
     build_intake,
     market_census_items,
+    quality_rejection_reason,
 )
 
 
@@ -95,14 +96,18 @@ class TestSourceItems(TestCase):
         self.assertEqual(assignments, [])
 
     def test_lane_diversity_cap(self):
-        items = [_item(external_id=f"venue-{i}", title=f"Venue {i}") for i in range(20)]
+        items = [_item(
+            external_id=f"venue-{i}", title=f"Venue {i}",
+            product_family=f"family-{i}",
+        ) for i in range(20)]
         items += [_item(
             source_type="paper", source_name="arXiv", external_id=f"paper-{i}",
             title=f"Paper {i}", url=f"https://arxiv.org/abs/{i}", venue_ids=[],
         ) for i in range(5)]
         items += [_item(
             source_type="social", source_name="X", external_id=f"post-{i}",
-            title=f"Post {i}", url=f"https://x.com/u/status/{i}", venue_ids=[],
+            title=f"Prediction market fee mispricing model {i}",
+            url=f"https://x.com/u/status/{i}", venue_ids=[],
         ) for i in range(5)]
         _, manifest, _ = build_intake(
             items, eligibility=_registry(), now=NOW, max_assignments=10)
@@ -110,7 +115,10 @@ class TestSourceItems(TestCase):
         self.assertGreaterEqual(len(manifest["lane_counts"]), 3)
 
     def test_deferred_items_remain_eligible_for_next_run(self):
-        items = [_item(external_id=f"m-{i}", title=f"Market {i}") for i in range(3)]
+        items = [_item(
+            external_id=f"m-{i}", title=f"Market {i}",
+            product_family=f"family-{i}",
+        ) for i in range(3)]
         ledger, manifest, assignments = build_intake(
             items, eligibility=_registry(), now=NOW, max_assignments=1)
         self.assertEqual(manifest["backlog_deferred"], 2)
@@ -119,6 +127,53 @@ class TestSourceItems(TestCase):
             now=NOW, max_assignments=3)
         self.assertEqual(next_manifest["duplicates"], 1)
         self.assertEqual(len(next_assignments), 2)
+
+    def test_market_family_dedupes_contract_instances(self):
+        items = [_item(
+            external_id=f"m-{i}", title=f"Will event {i} happen?",
+            product_family="same-family",
+        ) for i in range(3)]
+        _, manifest, assignments = build_intake(
+            items, eligibility=_registry(), now=NOW)
+        self.assertEqual(len(assignments), 1)
+        self.assertEqual(
+            manifest["quality_rejection_reasons"]["duplicate_market_family"], 2)
+
+    def test_live_failure_modes_are_hard_rejected(self):
+        expired = _item(metadata={
+            "status": "MARKET_STATUS_RESOLVED",
+            "end_at": "2026-01-14T00:00:00Z",
+        })
+        generic_reply = _item(
+            source_type="social", source_name="X", external_id="post-1",
+            title="@user probabilities are interesting", venue_ids=[],
+        )
+        opaque_filing = _item(
+            source_type="regulatory_filing", source_name="CFTC",
+            external_id="filing-1", title="MLBEXTRAS1", venue_ids=[],
+        )
+        self.assertEqual(
+            quality_rejection_reason(expired, now=NOW), "terminal_market")
+        self.assertEqual(
+            quality_rejection_reason(generic_reply, now=NOW),
+            "low_signal_social_reply")
+        self.assertEqual(
+            quality_rejection_reason(opaque_filing, now=NOW),
+            "opaque_product_code")
+
+    def test_research_memory_blocks_killed_and_existing_hypotheses(self):
+        rules = [
+            {"id": "P-024", "status": "killed", "match_any": ["first inning"]},
+            {"id": "MLB-PROPS", "status": "existing", "match_any": ["home run"]},
+        ]
+        first_inning = _item(title="Will either team score in the first inning?")
+        home_run = _item(external_id="hr", title="Will this player hit a home run?")
+        self.assertEqual(
+            quality_rejection_reason(first_inning, now=NOW, memory_rules=rules),
+            "prior_research_killed")
+        self.assertEqual(
+            quality_rejection_reason(home_run, now=NOW, memory_rules=rules),
+            "prior_research_existing")
 
     def test_market_census_bridge_preserves_provenance(self):
         items = market_census_items({
@@ -159,8 +214,12 @@ class TestCollectors(TestCase):
         self.assertEqual(items[0].venue_ids, ["kalshi"])
 
     def test_newer_equal_score_sources_rank_first(self):
-        old = _item(external_id="old", title="Old", published_at="2026-07-01")
-        new = _item(external_id="new", title="New", published_at="2026-08-01")
+        old = _item(
+            external_id="old", title="Old", published_at="2026-07-01",
+            product_family="old-family")
+        new = _item(
+            external_id="new", title="New", published_at="2026-08-01",
+            product_family="new-family")
         _, _, assignments = build_intake(
             [old, new], eligibility=_registry(), now=NOW, max_assignments=2)
         self.assertEqual([item.title for item in assignments], ["New", "Old"])

@@ -60,4 +60,6 @@ collectors:
 intake:
   max_assignments: 50
   lane_concentration_cap: 0.40
+  quality:
+    family_cooldown_days: 30
   note: Source engagement is never used as evidence of edge.

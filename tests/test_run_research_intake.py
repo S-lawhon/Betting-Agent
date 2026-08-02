@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts.run_research_intake import _collect_x, main
+from scripts.run_research_intake import _collect_x, collect_live, main
 from src.research_intake import SourceItem
 
 
@@ -46,6 +46,21 @@ class _FakeXCollector:
 
 
 class TestRunResearchIntake(TestCase):
+    @patch("scripts.run_research_intake.FeedCollector.fetch", return_value=[])
+    def test_zero_item_academic_feed_is_reported_as_degraded(self, _fetch):
+        items, errors, counts, telemetry, changed = collect_live({
+            "collectors": {"feeds": [{
+                "id": "academic", "enabled": True, "name": "Academic",
+                "type": "paper", "url": "https://example.test/rss",
+            }]},
+        }, now=_utc("2026-08-02T04:05:00Z"))
+        self.assertEqual(items, [])
+        self.assertEqual(counts["feed:academic:raw"], 0)
+        self.assertEqual(errors[0]["source"], "feed:academic")
+        self.assertIn("zero raw items", errors[0]["error"])
+        self.assertEqual(telemetry["status"], "not_requested")
+        self.assertFalse(changed)
+
     def test_offline_run_writes_all_artifacts_without_network(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

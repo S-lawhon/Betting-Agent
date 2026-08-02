@@ -57,9 +57,30 @@ if [[ -n "$missing" ]]; then
   echo "ABORT: the test interpreter is missing: $missing"
   echo ""
   echo "  Test modules importorskip on these, so the suite would report green"
-  echo "  while silently not running them. Fix one of:"
+  echo "  while silently not running them."
+  echo ""
+  # Name a concrete interpreter that works rather than a placeholder. Note
+  # `bash` re-orders PATH relative to an interactive zsh, which is how the
+  # deploy came to use a different python3 than the one you get by typing
+  # python3 at a prompt — so "just fix your PATH" is not actionable advice.
+  for candidate in /usr/bin/python3 \
+                   /Library/Developer/CommandLineTools/usr/bin/python3 \
+                   /opt/homebrew/bin/python3 /usr/local/bin/python3; do
+    [[ -x "$candidate" ]] || continue
+    if "$candidate" - <<'PY' 2>/dev/null
+import importlib.util, sys
+required = ("pytest", "yaml", "requests", "numpy", "scipy", "cryptography")
+sys.exit(0 if all(importlib.util.find_spec(m) for m in required) else 1)
+PY
+    then
+      echo "  This interpreter has everything:"
+      echo "    PYTHON=$candidate bash scripts/deploy.sh $SERVER_IP ${RESTART}"
+      echo ""
+      break
+    fi
+  done
+  echo "  Or install into the current one:"
   echo "    $PYTHON -m pip install $missing"
-  echo "    PYTHON=/path/to/python3 bash scripts/deploy.sh $SERVER_IP ${RESTART}"
   echo ""
   echo "  Nothing was deployed."
   exit 1

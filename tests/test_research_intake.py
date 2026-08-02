@@ -152,6 +152,11 @@ class TestSourceItems(TestCase):
             source_type="regulatory_filing", source_name="CFTC",
             external_id="filing-1", title="MLBEXTRAS1", venue_ids=[],
         )
+        withdrawn_filing = _item(
+            source_type="regulatory_filing", source_name="CFTC",
+            external_id="filing-2", title="EOX Exchange LLC", venue_ids=[],
+            topics=["organizations"], metadata={"Status": "Withdrawn"},
+        )
         self.assertEqual(
             quality_rejection_reason(expired, now=NOW), "terminal_market")
         self.assertEqual(
@@ -160,6 +165,23 @@ class TestSourceItems(TestCase):
         self.assertEqual(
             quality_rejection_reason(opaque_filing, now=NOW),
             "opaque_product_code")
+        self.assertEqual(
+            quality_rejection_reason(withdrawn_filing, now=NOW),
+            "terminal_regulatory_filing")
+
+    def test_active_organization_listing_is_low_priority_not_edge_evidence(self):
+        organization = _item(
+            source_type="regulatory_filing", source_name="CFTC",
+            external_id="org-1", title="Active Exchange LLC", venue_ids=[],
+            topics=["organizations"], reliability="primary",
+            metadata={"Status": "Designated"},
+        )
+        _, _, assignments = build_intake(
+            [organization], eligibility=_registry(), now=NOW)
+        self.assertEqual(assignments[0].score, 68)
+        self.assertEqual(assignments[0].assignment["quality_flags"], [
+            "official_listing_is_not_edge_evidence",
+        ])
 
     def test_research_memory_blocks_killed_and_existing_hypotheses(self):
         rules = [

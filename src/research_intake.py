@@ -33,6 +33,10 @@ TERMINAL_MARKET_STATUSES = {
     "MARKET_STATUS_CLOSED", "MARKET_STATUS_RESOLVED", "RESOLVED", "SETTLED",
 }
 
+TERMINAL_REGULATORY_STATUSES = {
+    "DENIED", "REJECTED", "REVOKED", "TERMINATED", "VACATED", "WITHDRAWN",
+}
+
 SOCIAL_MARKET_TERMS = {
     "betting", "event contract", "forecast", "forecastex", "kalshi",
     "market making", "odds", "polymarket", "prediction market", "prophetx",
@@ -178,6 +182,10 @@ def _source_score(item: SourceItem) -> int:
         # An official product filing proves existence and terms provenance. It
         # does not by itself supply a mechanism, edge, or executable capacity.
         base = 45
+    if item.source_type == "regulatory_filing" and "organizations" in item.topics:
+        # Registration/application metadata is valuable universe discovery,
+        # but it contains no market mechanism, executable product, or edge.
+        base = 55
     if item.reliability == "primary":
         base += 10
     if item.url:
@@ -270,7 +278,9 @@ def quality_rejection_reason(
     memory_rules: Sequence[Mapping[str, Any]] = (),
 ) -> Optional[str]:
     """Hard rejects for facts that make a research packet non-actionable."""
-    status = str(item.metadata.get("status") or "").strip().upper()
+    status = str(
+        item.metadata.get("status") or item.metadata.get("Status") or ""
+    ).strip().upper()
     if item.source_type == "venue_market":
         if status in TERMINAL_MARKET_STATUSES:
             return "terminal_market"
@@ -286,6 +296,8 @@ def quality_rejection_reason(
         if not any(term in text for term in SOCIAL_MECHANISM_TERMS):
             return "social_missing_testable_mechanism"
     if item.source_type == "regulatory_filing":
+        if status in TERMINAL_REGULATORY_STATUSES:
+            return "terminal_regulatory_filing"
         title = item.title.strip()
         if (len(title) < 40 and " " not in title
                 and re.fullmatch(r"[A-Z0-9_-]+", title)):
@@ -458,9 +470,10 @@ def build_intake(
                 ),
                 "market_family_key": market_family_key(item),
                 "quality_flags": (
-                    ["official_product_listing_is_not_edge_evidence"]
+                    ["official_listing_is_not_edge_evidence"]
                     if (item.source_type == "regulatory_filing"
-                        and "products" in item.topics) else []),
+                        and ({"products", "organizations"} & set(item.topics)))
+                    else []),
             },
         ))
 

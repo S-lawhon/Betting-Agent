@@ -1,0 +1,29 @@
+[Unit]
+Description=Betting Pod Shop — deterministic market census
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_market_census --fetch-live --full-on-month-start
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=market-census
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=512M
+TimeoutStartSec=900
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/market_census
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

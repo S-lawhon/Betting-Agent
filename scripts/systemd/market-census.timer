@@ -1,0 +1,11 @@
+[Unit]
+Description=Betting Pod Shop — daily market census timer
+
+[Timer]
+OnCalendar=*-*-* 03:35:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=market-census.service
+
+[Install]
+WantedBy=timers.target

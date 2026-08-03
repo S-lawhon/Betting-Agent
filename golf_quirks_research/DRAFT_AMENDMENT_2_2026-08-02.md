@@ -1,170 +1,192 @@
 # DRAFT — Amendment 2 to `P022_DECISION_RULE.md`
 
 > **STATUS: UNAUTHORISED DRAFT. NOT IN FORCE.**
-> `P022_DECISION_RULE.md` is unchanged and `T = 24` remains the live gate.
+> `P022_DECISION_RULE.md` is unmodified and `T = 24` remains the live gate.
 > Nothing here takes effect until Sam authorises it in writing, in the rule
 > file itself, the way Amendment 1 was.
 >
-> Written 2026-08-02 by Claude, at Sam's request, after the estimator defect
-> in `quirks_common` was fixed (commit `e47d8e9`).
+> Written 2026-08-02 by Claude at Sam's request, after the estimator defect in
+> `quirks_common` was fixed (`e47d8e9`). Revised the same day to fold in the
+> added-block investigation this draft originally deferred.
 
 ---
 
-## 1. Why this draft exists
+## 1. Why `T = 24`'s stated justification is void
 
-Amendment 1 (2026-07-28) set `T = 24` as "the smallest sample with 90% power
-against the effect actually measured", solving §5's
+Amendment 1 set `T = 24` as "the smallest sample with 90% power against the
+effect actually measured", solving §5's
 
 ```
 T = ((2.0 + z_power) * sigma / d)^2
 ```
 
-with `d = +2.57¢/ct` and `sigma = 3.781¢/ct`.
+with `d = +2.57¢/ct` and `sigma = 3.781¢/ct`. **Both inputs came from the
+pooled estimator.**
 
-**Both inputs came from the pooled estimator, and both were wrong for this
-purpose.**
-
-- `d = +2.57¢` is the **pooled** contract-weighted mean. The rule's own
-  statistic (§2/§3, equal weight per tournament) on that same widened sample
-  is **+1.45¢**.
+- `d = +2.57¢` is the pooled contract-weighted mean. The rule's own statistic
+  (§2/§3) on that same sample is **+1.45¢**.
 - `sigma = 3.781¢` was back-derived from the Phase-2 bootstrap CI
-  `[+1.7, +5.1]` — which was the **pooled statistic's interval**, and is
-  therefore too narrow. The between-tournament SD is now measured directly:
-  **5.04¢** on the published sample, **10.44¢** on the widened one.
+  `[+1.7, +5.1]` — the **pooled statistic's interval**, and therefore too
+  narrow. Measured directly, between-tournament SD is **5.04¢** (published)
+  and **10.44¢** (widened).
 
-So the power calculation behind `T = 24` used an effect that is too large and
-a dispersion that is too small — the two errors compound in the same
-direction, both making the required sample look smaller than it is.
+Both errors push the same way, making the required sample look smaller than
+it is. Recomputing with §5's own method — which reproduces `T = 24` exactly
+from Amendment 1's inputs, confirming fidelity:
 
-This is a defect in the *arithmetic inputs*, discovered independently of any
-forward result. It is not a reaction to how the forward test is going.
+| basis | d | sigma | T @ 90% | power at T=24 |
+|---|---:|---:|---:|---:|
+| Amendment 1 (pooled) | +2.57¢ | 3.78¢ | **24** | 90.8% |
+| corrected published 364 | +3.80¢ | 5.04¢ | **19** | 95.5% |
+| corrected widened 404 | +1.45¢ | 10.44¢ | **556** | **9.3%** |
 
-## 2. THE INTEGRITY PROBLEM — read this before the numbers
+`T = 24`'s justification does not survive. What replaces it is the subject of
+§3–§4.
 
-**Amendment 1's legitimacy rested on being made at `T = 0`.** It says so
-verbatim: *"Made at T = 0, with zero forward observations in existence — the
-only moment this change can be made without touching evidence."*
+## 2. Integrity constraint
 
-**That is no longer true. `T = 2`.**
+**Amendment 1 was legitimate because it was made at `T = 0`** — verbatim,
+*"the only moment this change can be made without touching evidence."*
+
+**That no longer holds.** Production checkpoint, today:
 
 ```
-P-022 checkpoint, 2026-08-02 (production):
-  tournaments (T): 2    contracts: 109
-  tournaments +ve: 1/2
-  edge           : -2.18 c/contract (equal-weighted across tournaments)
-  between-tourn sd: 6.97 c   se: 4.93 c   z = -0.44
-  VERDICT: NO DECISION
+tournaments (T): 2   contracts: 109   tournaments +ve: 1/2
+edge: -2.18 c/ct (equal-weighted)   sd 6.97c   se 4.93c   z = -0.44
+VERDICT: NO DECISION
 ```
 
-Two observations decide nothing — `z = -0.44` at `T = 2` is noise, and the
-rule correctly refuses to read it. But their *existence* changes what this
-amendment may claim. Any change to `T` from here is made with forward
-evidence in existence, and that evidence is currently **negative**.
+Two observations decide nothing, but their existence constrains what may be
+proposed. The forward evidence is currently **negative**.
 
-The structural protection is direction: **a correction that RAISES the bar
-cannot be goalpost-moving**, because it makes the strategy harder to pass at
-a moment when it is not passing. That protection covers Options B, C and D
-below. **It does not cover Option A, which lowers the bar to `T = 19`.**
-Adopting Option A now would be indistinguishable from easing a gate that a
-strategy is currently failing, whatever its statistical motivation. I would
-not sign it, and I do not recommend it.
+The protection is direction: **a correction that RAISES the bar cannot be
+goalpost-moving.** The proposal in §4 raises the tournament requirement from
+**24 to 33**. It makes the strategy harder to pass, at a moment when it is not
+passing. Any variant that lowered the bar — notably the `T = 19` implied by
+the corrected *published* sample — is rejected on these grounds regardless of
+its statistical merit.
 
-## 3. The corrected arithmetic
+## 3. The investigation: why 19 and 556 disagree
 
-Method is §5's, unchanged. `z_power = 1.2816` (90%), `0.8416` (80%),
-critical `z = 2.0`. Reproduces Amendment 1's `T = 24` exactly from its own
-inputs, which is the check that this recomputation is faithful.
+The 29× spread was the reason this draft originally declined to set a
+threshold. It has a specific, identifiable cause.
 
-| basis | d (¢/ct) | sigma (¢/ct) | T @ 90% | T @ 80% | power at T=24 |
-|---|---:|---:|---:|---:|---:|
-| Amendment 1 (pooled) — **what T=24 rests on** | +2.57 | 3.78 | **24** | 18 | 90.8% |
-| CORRECTED published 364 (T=19) | +3.80 | 5.04 | **19** | 15 | 95.5% |
-| CORRECTED widened 404 (T=22) | +1.45 | 10.44 | **559** | 419 | **9.3%** |
+**It is one tournament.** `KIN26` aggregates to `x_t = -38.49¢/ct`, against a
+worst published tournament of `-11.86¢`. Drop it and the widened sample reads
+`+3.36¢, sd 5.56¢ → T = 30` — back in line with the published picture.
 
-Half-effect basis (the `T = 40` analogue, 80% power): pooled → 70;
-corrected published → 57; corrected widened → **1,675**.
+**But it cannot be dropped, and no filter removes it.** `KIN26` holds 53.7
+filled contracts, so it survives any contract-count screen. Screening makes
+matters worse, not better:
 
-**The single most important number in this table is 9.3%.** If the corrected
-widened sample is the right description of the effect, the live gate has
-essentially no power against it. A null result at `T = 24` would then be
-uninformative — which is the exact failure §5 exists to prevent when it says
-a sample below the powered threshold must be NO DECISION rather than a weak
-KILL.
+| inclusion rule | T | mean x_t | sd | T @ 90% |
+|---|---:|---:|---:|---:|
+| all tournaments | 22 | +1.45¢ | 10.44¢ | 556 |
+| drop worst (KIN26) — *post-hoc, not legitimate* | 21 | +3.36¢ | 5.56¢ | 30 |
+| ≥10 filled contracts | 20 | +0.90¢ | 10.79¢ | 1,552 |
+| ≥50 filled contracts | 17 | **−0.06¢** | 11.47¢ | — |
 
-**The second most important fact is the spread: 19 versus 559.** Those are
-the same rule, the same method, the same corrected statistic — applied to two
-samples that differ only by 40 markets. A 29× disagreement in required sample
-is not a detail to be split; it says the effect size is not pinned down well
-enough to power a test against at all.
+No defensible inclusion rule stabilises the estimate, and the strictest one
+sends the mean to zero. **The instability is not a data-quality problem to be
+screened away. It is the shape of the payoff.**
 
-## 4. Options
+**The payoff is a rare, large loss.** Across 183 filled markets:
 
-**Option A — `T = 19`** (corrected published basis).
-*Not recommended, on integrity grounds.* Lowers the bar while forward
-evidence is negative (§2), and abandons the widened sample that Amendment 1
-deliberately adopted as the more honest basis. Reverting to the friendlier of
-two samples, after correction, at a moment of negative evidence, is the
-pattern pre-registration exists to prevent.
+```
+adverse events (faded name won) : 7  = 3.83% of filled markets
+mean filled quote               : 7.66c  -> a winner costs 12.1x the credit
+P&L from those 7 events         : -$159.50
+P&L from all 183 fills          : +$110.12
+x_t skewness                    : -2.60      (median +5.00c vs mean +1.45c)
+```
 
-**Option B — `T = 559`** (corrected widened basis, faithful to Amendment 1's
-choice of basis plus the corrected statistic).
-Internally consistent and maximally conservative. But at §5's measured
-cadence — 13.7 qualifying tournaments/month, itself an *upper bound* that
-assumes every listed tournament is quoted, filled and settled — this is
-**~3.4 years minimum**. Adopting it is functionally a decision to retire the
-strategy while calling it "still testing". If that is the decision, it is
-more honest to retire it explicitly.
+Most tournaments are profitable; the mean is dragged by rare disasters. `KIN26`
+is not an anomaly — it is one draw from the tail, landing in a tournament with
+few filled markets so nothing dilutes it.
 
-**Option C — keep `T = 24`, record it as underpowered.**
-Changes no threshold; amends only the *claim*. `T = 24` stops being "90%
-power against the measured effect" and becomes "a fixed budget with 9.3%
-power against the widened corrected effect, 95.5% against the published one."
-Cheapest and cannot be goalpost-moving, but it leaves a gate whose null
-result the rule itself would call uninformative — and the pod keeps consuming
-paper capacity and attention on a test that mostly cannot conclude.
+**This is why §5's arithmetic is the wrong instrument.** `z = d√T/sigma` and
+`power = Φ(z − 2.0)` are normal-theory formulas. With skewness −2.60 and an
+estimate resting on **7 events**, the sampling distribution of `mean(x_t)` at
+T = 20–40 is still materially skewed, so a normal-theory `T` is untrustworthy
+in *either* direction. The 556 is not a real requirement; it is the formula
+failing on a distribution it does not fit.
 
-**Option D — resolve `d` before setting `T`. (Recommended.)**
-The 19-vs-559 spread is the finding. Do not set a threshold from a contested
-effect size; establish which sample describes the strategy first. Concretely:
+## 4. The re-derivation
 
-1. Record that `T = 24`'s stated justification is void, and that no powered
-   threshold is in force pending re-derivation. Keep `T = 24` as an interim
-   floor — no decision below it — so nothing is *eased* in the interim.
-2. Determine why published and widened diverge so violently. `sigma` doubles
-   (5.04 → 10.44) when 40 markets are added and `T` goes 19 → 22. That is not
-   ordinary sampling noise; three added tournaments should not double
-   between-tournament dispersion. Something in the added block is either a
-   different regime or a data defect. `analyze_p022_added_block.py` exists for
-   exactly this question and should be run and read before any threshold is
-   set.
-3. Only then re-derive `T`, in a further written amendment, from whichever
-   basis survives that inspection.
+**The unit that carries the information is the filled market, not the
+tournament.** The strategy sells a ~7.7¢ tail and pays ~12× when it lands. Its
+edge is the gap between the price and the true rate:
 
-This defers the threshold decision rather than making it under a number
-nobody currently trusts, and it eases nothing in the meantime.
+```
+edge = q - p     q = mean filled quote = 0.0766
+                 p = P(faded name wins) = 7/183 = 0.0383
 
-## 5. What this draft does NOT touch
+edge = +3.83c    SE = 1.42c    z = 2.70    95% CI [+1.05, +6.61]c
+```
 
-Unchanged in every option: the band, the offset, the window, the series set,
-every §7 cap, the HARD KILL at `z <= -2.0`, the single-extension structure,
-and the requirement that a pass needs `z >= 2.0`. The estimator fix
-(`e47d8e9`) changed how the statistic is *computed*, never what the gate
-*is*.
+Significant, and consistent with the corrected *published* equal-weight figure
+(+3.80¢) — the two independent routes agree.
 
-Also unchanged: **Phase 2's GREEN-LIGHT stands.** On the published sample the
-pooled and corrected estimators agree in conclusion — +3.41¢ vs +3.80¢, both
-`z > 3`. Nothing here reopens that decision.
+**Sample required for 90% power at critical z = 2.0: 270 filled markets.**
+183 are in hand. At the observed 8.3 filled markets per tournament that is
+**≈ 33 tournaments**.
 
-## 6. What I recommend
+This is not a new methodology invented to rescue a number.
+`analyze_p022_added_block.py` already identifies the market-level binomial as
+**"THE RIGHT TEST"** and the tournament-clustered permutation on a thin block
+as **"THE WRONG TEST … an artifact."** This applies the instrument the
+research already named, and it happens to raise the bar.
 
-**Option D**, and I would not adopt Option A under any framing.
+**Why tournament clustering can be relaxed *for this quantity* — and the
+condition under which it cannot.** Clustering exists to guard against
+correlated adverse events: one hot wave producing several winners at once. In
+183 filled markets that is **not observed** — the 7 adverse events fall in **7
+distinct tournaments, exactly one each**. With only 7 events the power to
+*detect* clustering is low, so this is a working assumption, not a proven
+one. It must be monitored, not assumed. Hence the guard below.
 
-The honest summary is that this is not a "retune T" situation. The estimator
-fix did not shift a threshold by a few tournaments; it revealed that the
-effect size the threshold was derived from is not established. `T = 24` was
-answering a question with a number that turns out to have a 29× uncertainty
-band around it, and the forward evidence so far — 2 tournaments, −2.18¢ — is
-at least not arguing that the larger estimate is the right one.
+### Proposed amendment
 
-— *Requires Sam's written authorisation. Until then `T = 24` stands as
-written and this file is a proposal, not a rule.*
+1. **`T = 24`'s justification is struck.** It was derived from a pooled effect
+   size and a pooled-CI dispersion, and is not "90% power against the measured
+   effect."
+2. **The gate threshold becomes `T = 33` tournaments** (equivalently ≈270
+   filled markets, whichever is reached later), derived from the market-level
+   adverse-rate calculation above. This *raises* the bar from 24.
+3. **The single extension moves `T = 40 → T = 55`**, preserving §5's structure
+   of "80% power against half the measured effect" on the same market-level
+   basis.
+4. **New guard — the clustering diagnostic.** At each checkpoint, report
+   adverse events per affected tournament. **If that ratio exceeds 1.5, the
+   market-level basis is void** and the threshold reverts to the conservative
+   tournament-level requirement computed at that time. This is the falsifier
+   for §4's central assumption, and it is checked continuously rather than
+   assumed once.
+5. **Unchanged:** band, offset, window, series set, every §7 cap, `z >= 2.0` to
+   pass, HARD KILL at `z <= -2.0`, and the single-extension structure.
+
+## 5. What this does not touch
+
+**Phase 2's GREEN-LIGHT stands.** On the published sample the pooled and
+corrected estimators agree in conclusion (+3.41¢ vs +3.80¢, both `z > 3`), and
+the market-level route agrees again (+3.83¢, `z = 2.70`). Nothing here reopens
+that decision.
+
+**No parameter of the strategy changes.** This amendment concerns only how
+much evidence is required before a decision, and by what arithmetic.
+
+## 6. Residual risk, stated plainly
+
+- **The market-level basis rests on 7 events.** `p = 3.83%` has a wide relative
+  uncertainty, and the required-sample figure inherits it. §4.4's diagnostic is
+  the check, and it should be read at every checkpoint rather than at the end.
+- **Independence within a tournament is supported but not proven.** 7 events in
+  7 tournaments is consistent with independence and also consistent with mild
+  clustering that 7 events cannot resolve.
+- **A tail strategy can look profitable for a long time and then not be.** The
+  edge is +3.83¢ against a 12× downside at a 3.83% rate; the whole result is
+  the difference between roughly +$270 of credit and −$160 of tail. Neither the
+  old gate nor this one changes that, and no sample size makes it go away.
+
+— *Requires Sam's written authorisation. Until then `T = 24` stands as written
+and this file is a proposal, not a rule.*

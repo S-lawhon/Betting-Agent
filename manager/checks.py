@@ -26,6 +26,12 @@ HERE = Path(__file__).resolve().parent
 
 SEVERITY_ORDER = {"critical": 0, "warn": 1, "action": 2, "info": 3}
 
+# Mirror of manager/collect.py MEASURABLE_HOSTS — the hosts one of the two
+# collectors can actually stat. Mirrored, not imported: collect.py hard-requires
+# PyYAML at import time and this module deliberately does not (see
+# load_registry). A sync test asserts the two tuples stay identical.
+MEASURABLE_HOSTS = ("droplet", "mac", "local", "laptop")
+
 
 class Finding:
     def __init__(self, key: str, severity: str, title: str,
@@ -253,17 +259,28 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
             # We did not look, so we know nothing. Say that out loud. Staying
             # silent here is what let the Mac-hosted weather jobs report a
             # confident "does not exist" from the droplet for weeks.
+            host = str(job.get("host", "droplet")).lower()
+            if host in MEASURABLE_HOSTS:
+                advice = ("Run manager/refresh.py from the Mac "
+                          "so local jobs are measured where they actually live.")
+            else:
+                # Third-host job (e.g. P-029's own VPS): the Mac cannot stat
+                # that box either, so refresh.py would change nothing. The
+                # uncheckable_reason above names the job's declared
+                # out-of-band measurement.
+                advice = ("No collector can reach host '{}'; this job's real "
+                          "measurement is out-of-band — see the reason above."
+                          .format(job.get("host")))
             out.append(Finding(
                 key="job.{}.uncheckable".format(jid),
                 severity="info",
                 title="{} could not be checked (state unknown)".format(jid),
                 detail=("{}\nHost: {}\nSchedule: {}\n\n{}\n\n"
                         "This is an admitted gap, NOT a healthy result and NOT "
-                        "a missing output. Run manager/refresh.py from the Mac "
-                        "so local jobs are measured where they actually live."
+                        "a missing output. {}"
                         .format(job.get("description", ""), job.get("host"),
                                 job.get("schedule"),
-                                job.get("uncheckable_reason", ""))),
+                                job.get("uncheckable_reason", ""), advice)),
                 value=None))
             continue
         if not job.get("measurable"):

@@ -9,6 +9,7 @@ import pytest
 from scripts.codex_research_provider import (
     CodexProviderError, _safe_stderr, invoke_codex,
 )
+from scripts.run_codex_research_week import action_for_day
 
 
 def test_codex_adapter_is_ephemeral_read_only_and_measures_usage(
@@ -193,3 +194,24 @@ def test_codex_pilot_setup_keeps_each_run_explicit_and_self_disabling():
     assert script.count('rm -f "$STATE/pilot-enabled"') == 2
     assert "systemctl enable" not in script
     assert "systemctl start \"$UNIT\"" in script
+
+
+def test_temporary_codex_week_has_fixed_dates_and_saturday_check():
+    from datetime import date
+
+    timer = Path("scripts/systemd/research-agent-codex-week.timer").read_text()
+    service = Path("scripts/systemd/research-agent-codex-week.service").read_text()
+    config = Path("config/research_agent_runtime_codex_pilot.yaml").read_text()
+
+    assert action_for_day(date(2026, 8, 3)) == "idle"
+    assert action_for_day(date(2026, 8, 4)) == "run"
+    assert action_for_day(date(2026, 8, 7)) == "run"
+    assert action_for_day(date(2026, 8, 8)) == "check"
+    assert action_for_day(date(2026, 8, 9)) == "check"
+    assert "OnUnitActiveSec" not in timer
+    assert timer.count("OnCalendar=") == 5
+    assert "2026-08-08 14:00:00 UTC" in timer
+    assert "User=bettingbot" in service
+    assert "trading_execution_allowed: false" in config
+    assert "max_attempts_per_day: 1" in config
+    assert "max_input_tokens_per_task: 250000" in config

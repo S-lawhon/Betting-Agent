@@ -1,0 +1,15 @@
+[Unit]
+Description=Temporary autonomous Codex research runs through 2026-08-08
+
+[Timer]
+OnCalendar=2026-08-04 05:10:00 UTC
+OnCalendar=2026-08-05 05:10:00 UTC
+OnCalendar=2026-08-06 05:10:00 UTC
+OnCalendar=2026-08-07 05:10:00 UTC
+OnCalendar=2026-08-08 14:00:00 UTC
+Persistent=true
+AccuracySec=1min
+Unit=research-agent-codex-week.service
+
+[Install]
+WantedBy=timers.target

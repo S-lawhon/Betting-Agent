@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "disposition": {
+      "type": "object",
+      "properties": {
+        "assignment_id": {"type": "string"},
+        "source_item_id": {"type": "string"},
+        "decided_at": {"type": "string"},
+        "decision": {"enum": ["reject", "defer", "advance"]},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "evidence_checked": {"type": "array", "items": {"type": "string"}},
+        "research_minutes": {"type": "integer", "minimum": 0},
+        "opportunity_id": {"type": ["string", "null"]},
+        "recheck_after": {"type": ["string", "null"]},
+        "notes": {"type": "string"}
+      },
+      "required": [
+        "assignment_id", "source_item_id", "decided_at", "decision",
+        "reason_codes", "evidence_checked", "research_minutes",
+        "opportunity_id", "recheck_after", "notes"
+      ],
+      "additionalProperties": false
+    },
+    "artifact_type": {
+      "enum": [
+        "research_disposition", "hypothesis_brief", "opportunity_card",
+        "scout_rejection"
+      ]
+    },
+    "artifact": {"type": "object"}
+  },
+  "required": ["disposition", "artifact_type", "artifact"],
+  "additionalProperties": false
+}

@@ -15,6 +15,7 @@ limits:
   max_output_tokens_per_task: 8000
   max_cost_usd_per_task: 2.00
   max_cost_usd_per_day: 10.00
+  max_attempts_per_day: 24
   max_output_bytes: 250000
 
 # Provider execution is intentionally not configured in Phase 1. Moving to an

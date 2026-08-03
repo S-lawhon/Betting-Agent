@@ -161,6 +161,21 @@ def test_daily_cost_reservation_blocks_before_claim(tmp_path):
     assert not list((tmp_path / "data/research_execution/claims").glob("*/*.json"))
 
 
+def test_daily_attempt_limit_blocks_before_claim(tmp_path):
+    runtime = worker(
+        tmp_path, FakeProvider(), execution_enabled=True,
+        limits=WorkerLimits(timeout_seconds=60, max_attempts_per_day=1))
+    run = tmp_path / "data/research_execution/runs/2026-08-03/old.json"
+    run.parent.mkdir(parents=True)
+    run.write_text(json.dumps({"usage": {"cost_usd": 0}}))
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "blocked"
+    assert "daily model-attempt limit" in result["error"]
+    assert not list((tmp_path / "data/research_execution/claims").glob("*/*.json"))
+
+
 def test_wrong_artifact_for_agent_is_released(tmp_path):
     output = FakeProvider().output | {
         "artifact_type": "opportunity_card",

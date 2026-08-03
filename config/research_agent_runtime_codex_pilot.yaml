@@ -1,0 +1,46 @@
+schema_version: 1
+enabled: true
+mode: execute
+worker_id: research-codex-pro-pilot-v1
+
+# The first subscription-backed pilot admits only the current strategy-scout
+# lane and exactly one model attempt per UTC day. It is not used by the hourly
+# dry-run timer.
+allowed_agents:
+  - strategy-scout
+
+limits:
+  max_minutes_per_task: 30
+  timeout_seconds: 600
+  max_input_tokens_per_task: 50000
+  max_output_tokens_per_task: 5000
+  max_cost_usd_per_task: 0.01
+  max_cost_usd_per_day: 0.01
+  max_attempts_per_day: 1
+  max_output_bytes: 150000
+
+provider:
+  type: command
+  name: openai-codex-pro
+  model: gpt-5.6-luna
+  billing_mode: chatgpt_subscription
+  argv:
+    - /opt/betting-pod-shop/venv/bin/python
+    - /opt/betting-pod-shop/scripts/codex_research_provider.py
+    - --model
+    - gpt-5.6-luna
+    - --schema
+    - /opt/betting-pod-shop/config/research_agent_output.schema.json
+    - --workspace
+    - /var/lib/research-codex/workspace
+    - --timeout-seconds
+    - "540"
+  pass_env:
+    - CODEX_HOME
+    - HOME
+
+safety:
+  trading_execution_allowed: false
+  queue_mutation_in_dry_run: false
+  service_mutation_allowed: false
+  secrets_allowed_in_output: false

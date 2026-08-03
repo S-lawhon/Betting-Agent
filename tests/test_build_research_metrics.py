@@ -210,6 +210,7 @@ class TestBuildResearchMetrics(TestCase):
                 "generated_at": "2026-08-03T12:00:00Z",
                 "worker_id": "research-runtime-v1", "status": "dry_run",
                 "mode": "dry_run", "provider_configured": False,
+                "billing_mode": "none",
                 "invocation_tracking_available": True,
                 "assignment_id": "a1",
                 "daily_usage": {"attempts": 0, "cost_usd": 0,
@@ -234,4 +235,5 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(operations["activity_24h"]["invoked"], 0)
             self.assertEqual(operations["worker"]["status"], "dry_run")
             self.assertFalse(operations["worker"]["provider_configured"])
+            self.assertEqual(operations["worker"]["billing_mode"], "none")
             self.assertEqual(operations["worker"]["daily_usage"]["cost_usd"], 0)

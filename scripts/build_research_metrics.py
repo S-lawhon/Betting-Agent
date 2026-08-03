@@ -263,7 +263,8 @@ def _research_operations(
     worker = ({
         key: worker_status.get(key) for key in (
             "generated_at", "worker_id", "status", "mode",
-            "provider_configured", "invocation_tracking_available",
+            "provider_configured", "billing_mode",
+            "invocation_tracking_available",
             "assignment_id", "error", "daily_usage", "limits", "safety")
     } if worker_status else {
         "status": "unavailable", "mode": None,

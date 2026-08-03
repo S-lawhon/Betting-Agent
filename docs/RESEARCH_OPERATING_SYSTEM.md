@@ -288,6 +288,24 @@ research.
 provider key or network egress to that unit. Phase 2 requires a separate review
 of provider selection, model budget, filesystem permissions, and tool access.
 
+### Codex Pro one-assignment pilot
+
+Phase 2 adds a separate, manual-only `research-agent-codex-pilot.service`; it
+does not change or replace the hourly dry-run timer. The pilot uses saved
+ChatGPT authentication in `/var/lib/research-codex`, an empty Codex workspace,
+an ephemeral `codex exec` session, live public web search, a read-only Codex
+sandbox, and a strict JSON output schema. It permits only `strategy-scout` and
+one model attempt per UTC day. Subscription usage is measured in tokens and
+reported as zero incremental API dollars; zero dollars must not be interpreted
+as zero ChatGPT-plan usage.
+
+The unit cannot start unless both `auth.json` and an operator-created
+`pilot-enabled` marker exist. It has no timer. The service masks the repository,
+environment backups, Kalshi private key, and legacy tree from its mount
+namespace. The adapter rejects any run in which Codex attempts a local command;
+only public web-search activity is admitted. Keep the Phase 1 service installed
+as the default until a human reviews the first durable artifact and disposition.
+
 ## Current limitations
 
 - The CFTC collector parses official filing tables; a site markup change will

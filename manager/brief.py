@@ -293,16 +293,28 @@ def render_markdown(b: Dict[str, Any]) -> str:
                 else "not tracked"))
         if worker.get("status") and worker.get("status") != "unavailable":
             usage = worker.get("daily_usage") or {}
-            L.append(
-                "**Research worker:** {} mode, status {}; provider {}; next {}; "
-                "daily model usage {} attempts / ${} of ${} hard limit.".format(
-                    worker.get("mode") or "unknown",
-                    worker.get("status") or "unknown",
-                    "configured" if worker.get("provider_configured") else "not configured",
-                    worker.get("assignment_id") or "none",
+            provider = ("configured ({})".format(
+                worker.get("billing_mode") or "unknown")
+                if worker.get("provider_configured") else "not configured")
+            if worker.get("billing_mode") == "chatgpt_subscription":
+                usage_text = (
+                    "{} of {} daily attempts, {} input / {} output tokens; "
+                    "$0 incremental API cost".format(
+                        _metric(usage.get("attempts")),
+                        _metric(usage.get("hard_attempt_limit")),
+                        _metric(usage.get("input_tokens")),
+                        _metric(usage.get("output_tokens"))))
+            else:
+                usage_text = "{} attempts / ${} of ${} hard limit".format(
                     _metric(usage.get("attempts")),
                     _metric(usage.get("cost_usd")),
-                    _metric(usage.get("hard_cost_limit_usd"))))
+                    _metric(usage.get("hard_cost_limit_usd")))
+            L.append(
+                "**Research worker:** {} mode, status {}; provider {}; next {}; "
+                "daily model usage {}.".format(
+                    worker.get("mode") or "unknown",
+                    worker.get("status") or "unknown", provider,
+                    worker.get("assignment_id") or "none", usage_text))
         L.append("")
         L.append(
             "- Lifetime funnel: {} assignments → {} dispatched → {} reviewed → "
@@ -677,16 +689,29 @@ def render_html(b: Dict[str, Any]) -> str:
                      e(started_tracking), e(model_tracking)))
         if worker.get("status") and worker.get("status") != "unavailable":
             usage = worker.get("daily_usage") or {}
+            provider = ("configured ({})".format(
+                worker.get("billing_mode") or "unknown")
+                if worker.get("provider_configured") else "not configured")
+            if worker.get("billing_mode") == "chatgpt_subscription":
+                usage_text = (
+                    "{} of {} daily attempts, {} input / {} output tokens; "
+                    "$0 incremental API cost".format(
+                        _metric(usage.get("attempts")),
+                        _metric(usage.get("hard_attempt_limit")),
+                        _metric(usage.get("input_tokens")),
+                        _metric(usage.get("output_tokens"))))
+            else:
+                usage_text = "{} attempts / ${} of ${} hard limit".format(
+                    _metric(usage.get("attempts")),
+                    _metric(usage.get("cost_usd")),
+                    _metric(usage.get("hard_cost_limit_usd")))
             P.append("<div class='card'><b>Research worker</b><br>{} mode, status {}; "
-                     "provider {}; next {}; daily model usage {} attempts / ${} of "
-                     "${} hard limit.</div>".format(
+                     "provider {}; next {}; daily model usage {}.</div>".format(
                          e(str(worker.get("mode") or "unknown")),
                          e(str(worker.get("status") or "unknown")),
-                         "configured" if worker.get("provider_configured") else "not configured",
+                         e(provider),
                          e(str(worker.get("assignment_id") or "none")),
-                         e(_metric(usage.get("attempts"))),
-                         e(_metric(usage.get("cost_usd"))),
-                         e(_metric(usage.get("hard_cost_limit_usd")))))
+                         e(usage_text)))
         P.append("<ul>")
         P.append("<li>Lifetime funnel: {} assignments → {} dispatched → {} reviewed "
                  "→ {} advanced</li>".format(

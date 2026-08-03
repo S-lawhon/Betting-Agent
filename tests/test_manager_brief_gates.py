@@ -317,3 +317,22 @@ def test_daily_brief_reports_missing_research_operations_as_unknown():
     md = brief.render_markdown(b)
     assert "Research operations unavailable" in md
     assert "metrics missing" in md
+
+
+def test_daily_brief_labels_subscription_usage_without_implying_api_spend():
+    snap = research_snap()
+    worker = snap["research_operations"]["operations"]["worker"] = {
+        "mode": "execute", "status": "completed",
+        "provider_configured": True,
+        "billing_mode": "chatgpt_subscription", "assignment_id": "a1",
+        "daily_usage": {"attempts": 1, "hard_attempt_limit": 1,
+                        "input_tokens": 1200, "output_tokens": 250,
+                        "cost_usd": 0},
+    }
+    assert worker["billing_mode"] == "chatgpt_subscription"
+
+    b = brief.build(snap, [])
+    for text in (brief.render_markdown(b), brief.render_html(b)):
+        assert "configured (chatgpt_subscription)" in text
+        assert "1 of 1 daily attempts" in text
+        assert "$0 incremental API cost" in text

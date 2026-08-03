@@ -68,7 +68,9 @@ def main(argv=None) -> int:
                 name=str(provider_config.get("name") or ""),
                 model=str(provider_config.get("model") or ""),
                 cwd=args.root,
-                pass_env=list(provider_config.get("pass_env") or []))
+                pass_env=list(provider_config.get("pass_env") or []),
+                billing_mode=str(
+                    provider_config.get("billing_mode") or "metered_api"))
             execution_enabled = True
         worker = ResearchAgentWorker(
             root=args.root, dispatches_dir=args.dispatches_dir,

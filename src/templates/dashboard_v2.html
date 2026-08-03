@@ -1108,10 +1108,15 @@ function renderResearchPipeline(r){
       "; completion requires a durable research disposition." +
       (worker.status && worker.status !== "unavailable" ?
         " Worker: " + (worker.mode || "unknown") + " / " + worker.status +
-        " / provider " + (worker.provider_configured ? "configured" : "not configured") +
+        " / provider " + (worker.provider_configured ?
+          "configured (" + (worker.billing_mode || "unknown") + ")" : "not configured") +
         " / next " + (worker.assignment_id || "none") +
-        " / daily model cost $" + numTxt(workerUsage.cost_usd) +
-        " of $" + numTxt(workerUsage.hard_cost_limit_usd) + "." : "")
+        (worker.billing_mode === "chatgpt_subscription" ?
+          " / daily attempts " + numTxt(workerUsage.attempts) +
+          " of " + numTxt(workerUsage.hard_attempt_limit) +
+          " / $0 incremental API cost." :
+          " / daily model cost $" + numTxt(workerUsage.cost_usd) +
+          " of $" + numTxt(workerUsage.hard_cost_limit_usd) + ".") : "")
     : (r.reason || "research metrics unavailable");
   el("r-day").textContent = r.available && operations.window_hours
     ? "Last " + numTxt(operations.window_hours) + "h: " +

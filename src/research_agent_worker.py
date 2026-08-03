@@ -68,6 +68,7 @@ class WorkerLimits:
     max_output_tokens_per_task: int = 8_000
     max_cost_usd_per_task: float = 2.00
     max_cost_usd_per_day: float = 10.00
+    max_attempts_per_day: int = 24
     max_output_bytes: int = 250_000
 
     def __post_init__(self) -> None:
@@ -120,7 +121,8 @@ class CommandProvider:
     """
 
     def __init__(self, *, argv: Sequence[str], name: str, model: str,
-                 cwd: Path, pass_env: Sequence[str] = ()) -> None:
+                 cwd: Path, pass_env: Sequence[str] = (),
+                 billing_mode: str = "metered_api") -> None:
         if not argv or not all(isinstance(value, str) and value for value in argv):
             raise ValueError("provider argv must contain non-empty strings")
         if not name.strip() or not model.strip():
@@ -130,6 +132,7 @@ class CommandProvider:
         self.model = model.strip()
         self.cwd = Path(cwd)
         self.pass_env = tuple(pass_env)
+        self.billing_mode = billing_mode.strip() or "metered_api"
 
     def invoke(self, request: Mapping[str, Any], *, timeout_seconds: int
                ) -> ProviderResult:
@@ -285,7 +288,11 @@ class ResearchAgentWorker:
             raise ResearchWorkerError(
                 f"packet budget {minutes}m exceeds worker limit "
                 f"{self.limits.max_minutes_per_task}m")
-        spent = self._daily_usage(now)["cost_usd"]
+        daily_usage = self._daily_usage(now)
+        if daily_usage["attempts"] >= self.limits.max_attempts_per_day:
+            raise ResearchWorkerError(
+                "daily model-attempt limit has been reached")
+        spent = daily_usage["cost_usd"]
         if spent + self.limits.max_cost_usd_per_task > self.limits.max_cost_usd_per_day:
             raise ResearchWorkerError(
                 "daily cost reservation would exceed the hard limit")
@@ -319,6 +326,9 @@ class ResearchAgentWorker:
             "assignment_id": request["assignment_id"],
             "assigned_agent": agent,
             "provider_configured": self.provider is not None,
+            "billing_mode": (
+                getattr(self.provider, "billing_mode", "metered_api")
+                if self.provider else "none"),
             "execution_enabled": self.execution_enabled,
             "daily_usage": self._daily_usage(now),
             "request": request,
@@ -444,6 +454,7 @@ class ResearchAgentWorker:
         return {"date": now.astimezone(UTC).date().isoformat(),
                 "attempts": attempts, "cost_usd": round(costs, 6),
                 "input_tokens": inputs, "output_tokens": outputs,
+                "hard_attempt_limit": self.limits.max_attempts_per_day,
                 "hard_cost_limit_usd": self.limits.max_cost_usd_per_day}
 
     def _run_record(self, status: str, claim: ResearchClaim,
@@ -461,6 +472,9 @@ class ResearchAgentWorker:
                 self.provider.name if self.provider else None),
             "model": result.model if result else (
                 self.provider.model if self.provider else None),
+            "billing_mode": (
+                getattr(self.provider, "billing_mode", "metered_api")
+                if self.provider else "none"),
             "usage": result.usage.to_dict() if result else {},
             "model_invocation_tracked": model_invocation_tracked,
             "artifact": artifact_record, "error": error,
@@ -480,6 +494,9 @@ class ResearchAgentWorker:
             "worker_id": self.worker_id, "status": status,
             "mode": "execute" if self.execution_enabled else "dry_run",
             "provider_configured": self.provider is not None,
+            "billing_mode": (
+                getattr(self.provider, "billing_mode", "metered_api")
+                if self.provider else "none"),
             "invocation_tracking_available": True,
             "plan": self._safe_plan(plan),
             "assignment_id": ((plan or {}).get("assignment_id")

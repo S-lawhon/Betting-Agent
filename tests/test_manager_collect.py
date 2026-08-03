@@ -188,6 +188,46 @@ def test_checks_surfaces_uncheckable_as_explicit_finding():
     finding = [f for f in found if f.key.endswith(".uncheckable")][0]
     assert finding.severity == "info", "an unknown is not an incident"
     assert "unknown" in finding.title.lower()
+    # Mac-hosted: refresh.py from the Mac IS the fix, so the advice stands.
+    assert "refresh.py" in finding.detail
+
+
+def test_uncheckable_third_host_does_not_advise_refresh():
+    """refresh.py runs the collectors on the Mac and the droplet. A job on a
+    third host (P-029's own VPS) is uncheckable from BOTH, so telling Sam to
+    run refresh.py is advice that cannot work — its real measurement is the
+    out-of-band check the uncheckable_reason already names."""
+    snap = {"jobs": [{
+        "id": "p029_shadow",
+        "host": "p029",
+        "schedule": "continuous (p029-shadow.service, Restart=always)",
+        "description": "P-029 Phase 0 public shadow logger",
+        "severity": "warn",
+        "state": "uncheckable",
+        "exists": None,
+        "stale": None,
+        "measurable": False,
+        "uncheckable_reason": ("job runs on 'p029', a host neither collector "
+                               "can stat; this collector is on 'droplet'. "
+                               "Measured by the p029-daily-health-check "
+                               "scheduled task instead."),
+    }]}
+    found = checks.check_jobs(snap)
+    finding = [f for f in found if f.key == "job.p029_shadow.uncheckable"][0]
+    assert finding.severity == "info"
+    assert "refresh.py" not in finding.detail
+    # The admitted-gap framing survives, and the detail still points at the
+    # declared out-of-band measurement instead.
+    assert "admitted gap" in finding.detail
+    assert "out-of-band" in finding.detail
+    assert "p029-daily-health-check" in finding.detail
+
+
+def test_measurable_hosts_mirror_stays_in_sync():
+    """checks.py mirrors collect.py's MEASURABLE_HOSTS instead of importing it
+    (collect.py hard-requires PyYAML; checks.py deliberately does not). This
+    test is the coupling."""
+    assert checks.MEASURABLE_HOSTS == collect.MEASURABLE_HOSTS
 
 
 def _init_repo(path: Path) -> None:

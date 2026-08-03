@@ -170,7 +170,17 @@ def taker_reference(recs: Sequence[Dict[str, Any]],
                         sv - ask - fee_per_contract(ask, maker=False), 1.0))
         asks.append(ask)
         spreads.append(ask - bid)
-    mean, lo, hi = qc.bootstrap_weighted(entries)
+    # Every entry is weighted 1.0 here, so "contract-weighted within a
+    # tournament" collapses to the tournament's simple mean — but the
+    # ACROSS-tournament aggregation still matters: pooling lets a
+    # many-market tournament dominate a figure this module reports as a
+    # "+4.8c/ct edge over 10 tournaments" with a tournament-clustered CI.
+    # That is the same defect fixed in the P-022 headline on 2026-08-02,
+    # and this module's own header warns that pooling "would launder" a
+    # marginal cohort into a strong one.
+    mean, lo, hi = qc.bootstrap_gate(entries)
+    pooled, _, _ = qc.bootstrap_pooled(entries)
+    T_g, sd_g, se_g, z_g = qc.gate_dispersion(entries)
     pt = qc.per_tournament(entries)
     return {
         "n_markets": len(entries), "n_tournaments": len(pt),
@@ -178,6 +188,10 @@ def taker_reference(recs: Sequence[Dict[str, Any]],
         "mean_spread": qc.r4(sum(spreads) / len(spreads)) if spreads else None,
         "net_per_contract": qc.r4(mean),
         "ci95_lo": qc.r4(lo), "ci95_hi": qc.r4(hi),
+        "estimator": "equal_weight_per_tournament",
+        "gate_T": T_g, "gate_sd_per_tournament": qc.r4(sd_g),
+        "gate_se": qc.r4(se_g), "gate_z": qc.r4(z_g),
+        "net_per_contract_pooled": qc.r4(pooled),
         "tournaments_positive": sum(1 for v in pt.values()
                                     if v["net_per_contract"] > 0),
         "per_tournament": pt,

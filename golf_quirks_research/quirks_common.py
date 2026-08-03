@@ -37,6 +37,7 @@ import json
 import math
 import os
 import random
+import statistics
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -272,17 +273,99 @@ def settlement_value(rec: Dict[str, Any]) -> Optional[float]:
 
 # ── clustered bootstrap ──────────────────────────────────────────────────
 
-def bootstrap_weighted(entries: Sequence[Tuple[str, float, float]],
-                       n_boot: int = N_BOOT,
-                       seed: int = BOOT_SEED
-                       ) -> Tuple[float, float, float]:
-    """Contract-weighted mean and 95% CI, resampling TOURNAMENTS with
-    replacement.
+def _tournament_means(entries: Sequence[Tuple[str, float, float]]
+                      ) -> Dict[str, float]:
+    """x_t for each tournament: the contract-weighted mean WITHIN it.
+
+    This is the inner half of the rule's statistic (§2): names inside one
+    tournament are weighted by contracts, because they are one bet placed
+    at different sizes.
+    """
+    num: Dict[str, float] = defaultdict(float)
+    den: Dict[str, float] = defaultdict(float)
+    for ev, pnl, w in entries:
+        num[ev] += pnl * w
+        den[ev] += w
+    return {ev: num[ev] / den[ev] for ev in den if den[ev] > 0}
+
+
+def bootstrap_gate(entries: Sequence[Tuple[str, float, float]],
+                   n_boot: int = N_BOOT,
+                   seed: int = BOOT_SEED
+                   ) -> Tuple[float, float, float]:
+    """THE GATE STATISTIC. `P022_DECISION_RULE.md` §2/§3:
+
+        x_t  = contract-weighted mean pnl_per_contract WITHIN tournament t
+        edge = mean(x_t)                    # EQUAL weight per tournament
 
     `entries` are (tournament, pnl_per_contract, contracts). Each tournament
     is ONE observation: within a tournament every name is decided by the same
     leaderboard, so per-contract resampling would understate the CI by an
     order of magnitude. This is the P-017M lesson, hard-coded.
+
+    ── Why this replaced `bootstrap_weighted` (2026-08-02) ──────────────
+    That function resampled tournaments correctly for the INTERVAL but
+    returned `sum(p*w)/total_w` as its POINT ESTIMATE — pooled across every
+    filled contract, so a large-field tournament dominated a figure the rule
+    says must count it once. The two agree until field sizes are imbalanced,
+    which is exactly when the difference matters and precisely when nobody
+    is looking: on the published 364-market sample +3.41 (pooled) vs +3.80
+    (rule), both z>3; on the widened 404-market sample +2.57 vs **+1.45,
+    z=0.65 — not significant**. Reproduce with
+    `golf_quirks_research/repro_estimator_check.py`.
+
+    The bootstrap draw now averages the drawn tournaments' x_t equally, so
+    the interval describes the same estimator as the point estimate. Use
+    `bootstrap_pooled` only to reproduce a published pooled figure, never
+    to decide a gate.
+    """
+    if not entries:
+        return 0.0, float("nan"), float("nan")
+    xs_by = _tournament_means(entries)
+    if not xs_by:
+        return 0.0, float("nan"), float("nan")
+    keys = list(xs_by.keys())
+    mean = sum(xs_by.values()) / len(keys)
+    if len(keys) < 2:
+        return mean, float("nan"), float("nan")
+    rng = random.Random(seed)
+    means: List[float] = []
+    for _ in range(n_boot):
+        acc = 0.0
+        for _ in range(len(keys)):
+            acc += xs_by[keys[rng.randrange(len(keys))]]
+        means.append(acc / len(keys))
+    means.sort()
+    return mean, means[int(0.025 * len(means))], means[int(0.975 * len(means))]
+
+
+def gate_dispersion(entries: Sequence[Tuple[str, float, float]]
+                    ) -> Tuple[int, float, float, float]:
+    """`(T, sd(x_t), se, z)` for the rule's statistic — §3's `se = sd/sqrt(T)`.
+
+    Emitted alongside the headline so the significance of a run can be read
+    off the artifact instead of being recomputed by hand (which is how the
+    pooled figure got quoted into Amendment 1's power calculation).
+    """
+    xs = list(_tournament_means(entries).values())
+    T = len(xs)
+    if T < 2:
+        return T, float("nan"), float("nan"), float("nan")
+    sd = statistics.stdev(xs)
+    se = sd / math.sqrt(T)
+    z = (statistics.mean(xs) / se) if se > 0 else float("nan")
+    return T, sd, se, z
+
+
+def bootstrap_pooled(entries: Sequence[Tuple[str, float, float]],
+                     n_boot: int = N_BOOT,
+                     seed: int = BOOT_SEED
+                     ) -> Tuple[float, float, float]:
+    """Pooled contract-weighted mean across EVERY filled contract.
+
+    **NOT the gate statistic** — a large-field tournament dominates it. Kept
+    only so published figures that quoted it stay reproducible. Anything
+    deciding advance/kill must call `bootstrap_gate`.
     """
     if not entries:
         return 0.0, float("nan"), float("nan")
@@ -351,13 +434,19 @@ def per_tournament(entries: Sequence[Tuple[str, float, float]]
 
 def leave_one_out(entries: Sequence[Tuple[str, float, float]]
                   ) -> Dict[str, float]:
-    """Contract-weighted mean with each tournament removed in turn."""
+    """The GATE statistic with each tournament removed in turn.
+
+    Uses `bootstrap_gate`'s estimator, not the pooled one. A robustness
+    check computed on a different statistic than the headline tells you
+    nothing about the headline's robustness — before 2026-08-02 this
+    pooled across contracts while the rule counts each tournament once.
+    """
     keys = sorted({ev for ev, _, _ in entries})
     out: Dict[str, float] = {}
     for k in keys:
         sub = [e for e in entries if e[0] != k]
-        w = sum(x[2] for x in sub)
-        out[k] = round(sum(p * c for _, p, c in sub) / w, 4) if w > 0 else float("nan")
+        xs = list(_tournament_means(sub).values())
+        out[k] = round(sum(xs) / len(xs), 4) if xs else float("nan")
     return out
 
 
@@ -526,7 +615,14 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
                 worst_market = (rec["ticker"], round(pnl * filled, 2),
                                 round(quote_px, 4), round(sv, 4), round(filled, 1))
 
-    mean, lo, hi = bootstrap_weighted(entries)
+    # net_per_contract IS the gate statistic (equal weight per tournament).
+    # The pooled figure is emitted alongside under its own name so a reader
+    # can reproduce published numbers, but can never mistake one for the
+    # other — that ambiguity is what put a pooled +2.57c into Amendment 1's
+    # power calculation as though it were the rule's effect size.
+    mean, lo, hi = bootstrap_gate(entries)
+    pooled, pooled_lo, pooled_hi = bootstrap_pooled(entries)
+    T_g, sd_g, se_g, z_g = gate_dispersion(entries)
     pt = per_tournament(entries)
     out = {
         "side": side, "hours": hours, "offset": offset,
@@ -539,6 +635,18 @@ def replay(recs: Sequence[Dict[str, Any]], side: str, hours: float,
         "contracts_filled": round(contracts, 1),
         "net_per_contract": r4(mean),
         "ci95_lo": r4(lo), "ci95_hi": r4(hi),
+        # Which estimator produced net_per_contract. Artifacts written
+        # before 2026-08-02 carry the pooled figure under this same key and
+        # have NO `estimator` field — that absence is how you tell them
+        # apart. Do not compare a headline across the two without checking.
+        "estimator": "equal_weight_per_tournament",
+        "gate_T": T_g,
+        "gate_sd_per_tournament": r4(sd_g),
+        "gate_se": r4(se_g),
+        "gate_z": r4(z_g),
+        # Pooled contract-weighted mean — NOT the gate statistic.
+        "net_per_contract_pooled": r4(pooled),
+        "pooled_ci95_lo": r4(pooled_lo), "pooled_ci95_hi": r4(pooled_hi),
         "n_fill_tournaments": len(pt),
         "e_settle_posted": r4(sum(posted_sv) / len(posted_sv)) if posted_sv else None,
         "e_settle_filled": r4(sv_fill_num / contracts) if contracts else None,

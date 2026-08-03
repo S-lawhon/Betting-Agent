@@ -1,24 +1,38 @@
 #!/usr/bin/env python3
-"""Which statistic is the P-022 backtest headline actually reporting?
+"""Guard: the P-022 backtest headline must BE the rule's gate statistic.
 
 Run:  python3 golf_quirks_research/repro_estimator_check.py
+Exits 1 if the harness headline is not the rule's statistic.
 
 WHY THIS EXISTS
 ───────────────
-P022_DECISION_RULE.md §3 defines the gate statistic as
+P022_DECISION_RULE.md §2/§3 define the gate statistic as
 
     x_t  = contract-weighted mean pnl_per_contract WITHIN tournament t
     edge = mean(x_t)                     # EQUAL weight per tournament
     se   = stdev(x_t) / sqrt(T)
 
-`quirks_common.bootstrap_weighted` returns, as its point estimate,
+Until 2026-08-02 `quirks_common.bootstrap_weighted` returned, as its point
+estimate,
 
     mean = sum(p * w) / total_w          # POOLED across every filled contract
 
-Those are different estimators. The bootstrap does resample TOURNAMENTS with
-replacement, so the CI is clustered correctly — it is only the point estimate
-that is not the rule's. A tournament with many filled contracts dominates the
-pooled figure and counts once in the rule's figure.
+Those are different estimators. The bootstrap did resample TOURNAMENTS with
+replacement, so the CI was clustered correctly — but it was the interval of
+the POOLED statistic, so both halves of the headline described something the
+rule does not define. A tournament with many filled contracts dominated the
+pooled figure and counts once in the rule's.
+
+FIXED 2026-08-02: `bootstrap_weighted` is gone, replaced by `bootstrap_gate`
+(the rule's statistic, point estimate AND interval) and `bootstrap_pooled`
+(explicitly labelled, for reproducing published pooled figures only).
+`quirks_common.replay` now emits `net_per_contract` = the gate statistic,
+`net_per_contract_pooled` alongside it, and an `estimator` field so an
+artifact says which one it carries. Artifacts written BEFORE that date hold
+the pooled figure under `net_per_contract` and have no `estimator` key.
+
+This script is now a REGRESSION GUARD rather than a diagnosis. The numbers
+below are the pre-fix measurement, kept because they are the evidence.
 
 This script computes both from the SAME per-tournament table the harness
 itself builds, so nothing here depends on re-deriving fills.
@@ -93,22 +107,40 @@ def estimators(head: Dict[str, Any]) -> Tuple[float, float, int, float, float, f
     return pooled, equal, T, sd, se, z
 
 
-def show(label: str, recs: Sequence[Dict[str, Any]]) -> None:
+def show(label: str, recs: Sequence[Dict[str, Any]]) -> bool:
+    """Print both estimators. Returns True if the headline IS the rule's.
+
+    The equal-weight figure here is recomputed from the ROUNDED
+    per_tournament table (4dp per tournament), so it can sit ~0.01c from
+    the harness headline, which averages raw values. The tolerance below
+    absorbs that; it is far tighter than the 1.11c divergence this exists
+    to catch.
+    """
     head = qc.replay(recs, "sell_yes", ANCHOR_H, OFFSET)
     pooled, equal, T, sd, se, z = estimators(head)
     headline = head["net_per_contract"]
+    is_rule = abs(headline - equal) < 2e-4
+    is_pooled = abs(headline - pooled) < 5e-5
     print(f"\n=== {label} ===")
     print(f"  markets in universe      : {len(recs)}")
     print(f"  tournaments with fills T : {T}")
-    print(f"  harness net_per_contract : {headline * 100:+.2f} c/ct")
+    print(f"  harness net_per_contract : {headline * 100:+.2f} c/ct"
+          f"   [{head.get('estimator', 'UNLABELLED (pre-2026-08-02 artifact)')}]")
+    print(f"  equal   mean(x_t)  [RULE]: {equal * 100:+.2f} c/ct"
+          f"   <- headline matches rule: {is_rule}")
     print(f"  pooled  sum(p*w)/sum(w)  : {pooled * 100:+.2f} c/ct"
-          f"   <- matches headline: {abs(pooled - headline) < 5e-4}")
-    print(f"  equal   mean(x_t)  [RULE]: {equal * 100:+.2f} c/ct")
+          f"   <- headline matches pooled: {is_pooled}")
     print(f"  divergence               : {(pooled - equal) * 100:+.2f} c/ct")
     print(f"  sd(x_t)={sd * 100:.2f}c  se={se * 100:.2f}c  z={z:.2f}"
           f"   -> {'z>=2.0 SIGNIFICANT' if z >= 2.0 else 'z<2.0 NOT significant'}")
     print(f"  harness CI95             : [{head['ci95_lo'] * 100:+.2f}, "
           f"{head['ci95_hi'] * 100:+.2f}] c/ct  (bootstrap, tournament-clustered)")
+    if not is_rule:
+        print("  *** FAIL: the headline is NOT the rule's statistic. ***")
+        if is_pooled:
+            print("      It is the POOLED figure. quirks_common.replay must "
+                  "call bootstrap_gate, not bootstrap_pooled.")
+    return is_rule
 
 
 def main() -> int:
@@ -120,8 +152,13 @@ def main() -> int:
     if missing:
         print(f"  WARNING: {len(missing)} pinned markets MISSING from the cache — "
               f"the published sample has been lost, not merely grown.")
-    show("PUBLISHED universe (pinned, the Phase-2 sample)", pinned)
-    show("WIDENED universe (full current cache)", all_recs)
+    ok_pub = show("PUBLISHED universe (pinned, the Phase-2 sample)", pinned)
+    ok_wide = show("WIDENED universe (full current cache)", all_recs)
+    if not (ok_pub and ok_wide):
+        print("\nEXIT 1 — the harness headline is not the gate statistic.")
+        return 1
+    print("\nOK — the harness headline is the rule's statistic on both "
+          "universes.")
     return 0
 
 

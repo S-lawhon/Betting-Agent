@@ -233,9 +233,45 @@ exposure — the guard rejected nothing, and only the pod's own
   (+3.41¢ vs +3.80¢, both z>3, so the Phase-2 GREEN-LIGHT stands on either), but
   on the widened 404-market sample they split — +2.57¢ pooled vs **+1.45¢
   equal-weighted, z=0.65, not significant**. The divergence grows with
-  field-size imbalance, so it is invisible exactly until it matters. Reproduce
-  with `python3 golf_quirks_research/repro_estimator_check.py`. The forward
-  reader `scripts/p022_checkpoint.py` is fine — it uses `statistics.mean(xs)`.
+  field-size imbalance, so it is invisible exactly until it matters. The forward
+  reader `scripts/p022_checkpoint.py` was always fine — it uses
+  `statistics.mean(xs)`.
+  **FIXED 2026-08-02.** `bootstrap_weighted` is GONE — do not reintroduce that
+  name. It is replaced by `bootstrap_gate` (the rule's statistic, point estimate
+  AND interval) and `bootstrap_pooled` (explicitly labelled, only for
+  reproducing published pooled figures). `leave_one_out` now uses the gate
+  estimator too — a robustness check computed on a different statistic than the
+  headline says nothing about the headline. `replay()` emits
+  `net_per_contract` = the gate statistic, plus `net_per_contract_pooled`,
+  `gate_T/gate_sd_per_tournament/gate_se/gate_z`, and an **`estimator`** field.
+  **Artifacts written BEFORE 2026-08-02 carry the POOLED figure under
+  `net_per_contract` and have NO `estimator` key — that absence is how you tell
+  them apart. Never compare a headline across the two without checking.**
+  `repro_estimator_check.py` is now a REGRESSION GUARD (exit 1 if the headline
+  is not the rule's statistic), not a diagnosis; `tests/test_p022_gate_estimator.py`
+  pins it synthetically so it holds without the tick cache.
+  **The CI moved too, and that is the bigger correction**: the widened
+  bootstrap was `[+0.08, +4.51]` — excluding zero — because it was the interval
+  of the *pooled* statistic. On the gate statistic it is `[-3.41, +5.07]`,
+  which crosses zero and agrees with z=0.65. The old interval said
+  "significant" about an effect the rule scores as not.
+- **Amendment 1's T = 24 rests on a pooled effect size and has NOT been
+  revisited.** It cites the widened +2.57¢ as the effect to power against; the
+  rule's statistic on that sample is +1.45¢ with sd(x_t) = 10.44¢ (vs 5.04¢
+  published), so the power calculation behind T = 24 uses an effect that is too
+  large and a dispersion that is too small. Changing T needs another written
+  amendment — the harness fix deliberately did NOT touch the gate. Phase-2's
+  GREEN-LIGHT is unaffected: on the published sample the estimators agree
+  (+3.41 vs +3.80, both z > 3).
+- **The same pooling defect was in `backtest_makecut_fills.py`** (fixed
+  2026-08-02, same commit). Its entries are weighted 1.0, so within-tournament
+  weighting is a no-op, but it still pooled markets ACROSS tournaments while
+  reporting "a +4.8¢/ct edge over 10 tournaments" with a tournament-clustered
+  CI. Deltas are large and BIDIRECTIONAL — the positive cohorts move UP
+  (`H48_off0.02_cancel24h` +2.00¢ → +7.07¢; `..._cancel36h_staleT` +9.52¢ →
+  +20.07¢), which is a reason for more scrutiny, not less.
+  **`makecut_fill_results.json` was deliberately NOT regenerated** — it is
+  committed evidence; re-run it as a conscious act and diff the headline.
 - **A backtest that ignores the pod's own caps is measuring a strategy you are
   not allowed to run.** The same harness replays at `quote_size=25`
   contracts/name; at the measured mean filled quote of $0.0763 that is

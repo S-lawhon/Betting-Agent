@@ -54,6 +54,33 @@ def _safe_stderr(stderr: str) -> str:
     return diagnostic[:500]
 
 
+def _safe_event_error(events: str) -> str | None:
+    """Return a bounded diagnostic from Codex JSONL failure events only."""
+    diagnostics: list[str] = []
+    for raw in events.splitlines():
+        if not raw.strip():
+            continue
+        try:
+            event = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, Mapping):
+            continue
+        event_type = str(event.get("type") or "").lower()
+        if event_type not in {"error", "turn.failed", "response.failed", "item.failed"}:
+            continue
+        error = event.get("error")
+        values = [event.get("message")]
+        if isinstance(error, Mapping):
+            values.extend((error.get("message"), error.get("code")))
+        elif isinstance(error, str):
+            values.append(error)
+        text = ": ".join(str(value) for value in values if value)
+        if text:
+            diagnostics.append(_safe_stderr(text))
+    return diagnostics[-1] if diagnostics else None
+
+
 def _prompt() -> str:
     return (
         "Execute exactly one research-only assignment from the JSON piped on "
@@ -129,9 +156,11 @@ def invoke_codex(
                 f"Codex process unavailable: {type(exc).__name__}") from exc
         if completed.returncode != 0:
             digest = hashlib.sha256(completed.stderr.encode()).hexdigest()
+            diagnostic = (_safe_event_error(completed.stdout)
+                          or _safe_stderr(completed.stderr))
             raise CodexProviderError(
                 "Codex exited {}; diagnostic={!r}; stderr_sha256={}".format(
-                    completed.returncode, _safe_stderr(completed.stderr), digest))
+                    completed.returncode, diagnostic, digest))
         usage, command_executed = _usage(completed.stdout)
         if command_executed:
             raise CodexProviderError(

@@ -102,6 +102,47 @@ def test_stderr_diagnostic_ignores_stdin_progress_when_error_is_unlabelled():
     assert diagnostic == "unexpected argument '--ignore-rules' found"
 
 
+def test_nonzero_exit_prefers_redacted_json_error_event(monkeypatch, tmp_path):
+    schema = tmp_path / "schema.json"
+    schema.write_text("{}")
+
+    def fake_run(argv, **kwargs):
+        events = "\n".join([
+            json.dumps({"type": "thread.started", "message": "ignore me"}),
+            json.dumps({
+                "type": "error",
+                "message": "request failed Authorization: Bearer secret-value",
+            }),
+        ])
+        return subprocess.CompletedProcess(
+            argv, 1, events, "Reading additional input from stdin...\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(CodexProviderError) as exc_info:
+        invoke_codex(
+            {}, codex="codex", model="gpt-test", schema=schema,
+            workspace=tmp_path / "workspace", timeout_seconds=30)
+    message = str(exc_info.value)
+    assert "request failed" in message
+    assert "secret-value" not in message
+    assert "[REDACTED]" in message
+
+
+def test_nonzero_exit_ignores_non_error_json_event(monkeypatch, tmp_path):
+    schema = tmp_path / "schema.json"
+    schema.write_text("{}")
+
+    def fake_run(argv, **kwargs):
+        events = json.dumps({"type": "item.completed", "message": "source text"})
+        return subprocess.CompletedProcess(argv, 1, events, "fatal: safe failure\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(CodexProviderError, match="fatal: safe failure"):
+        invoke_codex(
+            {}, codex="codex", model="gpt-test", schema=schema,
+            workspace=tmp_path / "workspace", timeout_seconds=30)
+
+
 def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():
     service = Path(
         "scripts/systemd/research-agent-codex-pilot.service").read_text()

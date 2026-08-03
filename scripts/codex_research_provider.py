@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -25,6 +26,25 @@ MAX_EVENT_BYTES = 2_000_000
 
 class CodexProviderError(RuntimeError):
     """A Codex invocation was unavailable, unsafe, or malformed."""
+
+
+def _safe_stderr(stderr: str) -> str:
+    """Return one bounded, credential-redacted diagnostic line."""
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    diagnostic = lines[-1] if lines else "no stderr"
+    patterns = (
+        r"(?i)(bearer\s+)(\S+)",
+        r"(?i)(authorization\s*[:=]\s*)(\S+)",
+        r"(?i)((?:access|refresh|id)[_-]?token\s*[:=]\s*)(\S+)",
+        r"(sk-[A-Za-z0-9_-]+)",
+    )
+    for pattern in patterns:
+        diagnostic = re.sub(
+            pattern,
+            lambda match: (match.group(1) if match.lastindex and
+                           match.lastindex > 1 else "") + "[REDACTED]",
+            diagnostic)
+    return diagnostic[:500]
 
 
 def _prompt() -> str:
@@ -103,7 +123,8 @@ def invoke_codex(
         if completed.returncode != 0:
             digest = hashlib.sha256(completed.stderr.encode()).hexdigest()
             raise CodexProviderError(
-                f"Codex exited {completed.returncode}; stderr_sha256={digest}")
+                "Codex exited {}; diagnostic={!r}; stderr_sha256={}".format(
+                    completed.returncode, _safe_stderr(completed.stderr), digest))
         usage, command_executed = _usage(completed.stdout)
         if command_executed:
             raise CodexProviderError(

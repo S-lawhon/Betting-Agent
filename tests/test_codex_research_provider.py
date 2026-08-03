@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from scripts.codex_research_provider import CodexProviderError, invoke_codex
+from scripts.codex_research_provider import (
+    CodexProviderError, _safe_stderr, invoke_codex,
+)
 
 
 def test_codex_adapter_is_ephemeral_read_only_and_measures_usage(
@@ -74,6 +76,17 @@ def test_codex_adapter_rejects_local_command_execution(tmp_path, monkeypatch):
         invoke_codex(
             {}, codex="codex", model="gpt-test", schema=schema,
             workspace=tmp_path / "workspace", timeout_seconds=30)
+
+
+def test_stderr_diagnostic_is_bounded_and_redacts_credentials():
+    diagnostic = _safe_stderr(
+        "context\nrequest failed Authorization: Bearer secret-value "
+        "access_token=also-secret sk-private\n")
+    assert "secret-value" not in diagnostic
+    assert "also-secret" not in diagnostic
+    assert "sk-private" not in diagnostic
+    assert "[REDACTED]" in diagnostic
+    assert len(diagnostic) <= 500
 
 
 def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():

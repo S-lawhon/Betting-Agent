@@ -31,11 +31,14 @@ class CodexProviderError(RuntimeError):
 def _safe_stderr(stderr: str) -> str:
     """Return one bounded, credential-redacted diagnostic line."""
     lines = [line.strip() for line in stderr.splitlines() if line.strip()]
-    informative = [line for line in lines if re.search(
-        r"(?i)\b(error|failed|invalid|denied|unsupported|unavailable|not found)\b",
-        line)]
-    diagnostic = informative[-1] if informative else (
-        lines[-1] if lines else "no stderr")
+    progress = re.compile(
+        r"(?i)^reading additional input from stdin(?:\.\.\.)?$")
+    candidates = [line for line in lines if not progress.fullmatch(line)]
+    explicit_errors = [line for line in candidates if re.search(
+        r"(?i)(?:^|\b)(?:error|fatal|failed|invalid|denied|unsupported|"
+        r"unavailable|not found|unexpected argument)(?:\b|:)", line)]
+    diagnostic = explicit_errors[-1] if explicit_errors else (
+        candidates[-1] if candidates else (lines[-1] if lines else "no stderr"))
     patterns = (
         r"(?i)(bearer\s+)(\S+)",
         r"(?i)(authorization\s*[:=]\s*)(\S+)",

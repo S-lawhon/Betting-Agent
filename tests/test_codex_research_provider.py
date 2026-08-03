@@ -95,6 +95,13 @@ def test_stderr_diagnostic_prefers_error_over_trailing_progress():
     assert diagnostic == "error: invalid value for --model"
 
 
+def test_stderr_diagnostic_ignores_stdin_progress_when_error_is_unlabelled():
+    diagnostic = _safe_stderr(
+        "unexpected argument '--ignore-rules' found\n"
+        "Reading additional input from stdin...\n")
+    assert diagnostic == "unexpected argument '--ignore-rules' found"
+
+
 def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():
     service = Path(
         "scripts/systemd/research-agent-codex-pilot.service").read_text()

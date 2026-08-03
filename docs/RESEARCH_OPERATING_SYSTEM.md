@@ -306,6 +306,37 @@ namespace. The adapter rejects any run in which Codex attempts a local command;
 only public web-search activity is admitted. Keep the Phase 1 service installed
 as the default until a human reviews the first durable artifact and disposition.
 
+Install and inspect the pilot from the DigitalOcean console:
+
+```bash
+cd /opt/betting-pod-shop
+sudo bash scripts/setup_codex_research_pilot.sh install
+```
+
+Provision `/var/lib/research-codex/auth.json` with a trusted device login; never
+copy it into the repository or print it in a terminal transcript:
+
+```bash
+sudo -u bettingbot env HOME=/var/lib/research-codex \
+  CODEX_HOME=/var/lib/research-codex \
+  /usr/local/bin/codex login --device-auth
+sudo bash scripts/setup_codex_research_pilot.sh check
+```
+
+The check reports only the auth file's owner and mode. Once authentication
+exists, run exactly one assignment:
+
+```bash
+sudo bash scripts/setup_codex_research_pilot.sh run-once
+```
+
+`run-once` creates the enable marker immediately before starting the unit and
+removes it after either success or failure. A successful unit exit is not the
+acceptance gate: inspect the archived claim, the new `research/dispositions/`
+artifact, and the journal's measured token usage. Keep the pilot manual-only if
+the output is missing, malformed, unsupported by public evidence, attempts a
+local command, exposes a secret, or advances strategy state.
+
 ## Current limitations
 
 - The CFTC collector parses official filing tables; a site markup change will

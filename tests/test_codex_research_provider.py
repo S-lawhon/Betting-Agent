@@ -95,3 +95,14 @@ def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():
     assert "KALSHI" not in config
     assert "PROPHETX" not in config
     assert "X_BEARER_TOKEN" not in config
+
+
+def test_codex_pilot_setup_keeps_each_run_explicit_and_self_disabling():
+    script = Path("scripts/setup_codex_research_pilot.sh").read_text()
+
+    assert "ACTION=${1:-check}" in script
+    assert '[[ -f "$STATE/auth.json" ]]' in script
+    assert 'install -o bettingbot -g bettingbot -m 0600 /dev/null "$STATE/pilot-enabled"' in script
+    assert script.count('rm -f "$STATE/pilot-enabled"') == 2
+    assert "systemctl enable" not in script
+    assert "systemctl start \"$UNIT\"" in script

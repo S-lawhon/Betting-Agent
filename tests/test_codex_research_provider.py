@@ -164,6 +164,24 @@ def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():
     assert "X_BEARER_TOKEN" not in config
 
 
+def test_codex_output_schema_is_strict_for_every_object():
+    schema = json.loads(Path("config/research_agent_output.schema.json").read_text())
+
+    def check(node):
+        if isinstance(node, dict):
+            if node.get("type") == "object":
+                assert node.get("additionalProperties") is False
+                properties = node.get("properties", {})
+                assert set(node.get("required", [])) == set(properties)
+            for value in node.values():
+                check(value)
+        elif isinstance(node, list):
+            for value in node:
+                check(value)
+
+    check(schema)
+
+
 def test_codex_pilot_setup_keeps_each_run_explicit_and_self_disabling():
     script = Path("scripts/setup_codex_research_pilot.sh").read_text()
 

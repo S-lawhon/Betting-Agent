@@ -24,12 +24,44 @@
       "additionalProperties": false
     },
     "artifact_type": {
-      "enum": [
-        "research_disposition", "hypothesis_brief", "opportunity_card",
-        "scout_rejection"
-      ]
+      "enum": ["opportunity_card", "scout_rejection"]
     },
-    "artifact": {"type": "object"}
+    "artifact": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "created_at": {"type": "string"},
+            "source_agent": {"const": "scout"},
+            "market_family": {"type": "string"},
+            "thesis": {"type": "string"},
+            "edge_source": {"type": "array", "items": {"type": "string"}},
+            "external_data_needed": {
+              "type": "array", "items": {"type": "string"}
+            },
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "urgency": {"type": "string"}
+          },
+          "required": [
+            "id", "created_at", "source_agent", "market_family", "thesis",
+            "edge_source", "external_data_needed", "confidence", "urgency"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "reason_codes": {"type": "array", "items": {"type": "string"}},
+            "evidence_checked": {
+              "type": "array", "items": {"type": "string"}
+            }
+          },
+          "required": ["reason_codes", "evidence_checked"],
+          "additionalProperties": false
+        }
+      ]
+    }
   },
   "required": ["disposition", "artifact_type", "artifact"],
   "additionalProperties": false

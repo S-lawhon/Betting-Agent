@@ -59,6 +59,16 @@ invariants:
     description: Presence of data/KILL_MAKER means P-016 was killed; surface it.
     severity: warn
 
+# Versioned unit sources do not install themselves during deploy. Measure drift
+# between these files and /etc/systemd/system on the droplet.
+systemd_units:
+  - {id: manager-collect.timer, unit: manager-collect.timer, source: scripts/systemd/manager-collect.timer, severity: warn}
+  - {id: manager-collect.service, unit: manager-collect.service, source: scripts/systemd/manager-collect.service, severity: warn}
+  - {id: manager-alert.timer, unit: manager-alert.timer, source: scripts/systemd/manager-alert.timer, severity: warn}
+  - {id: manager-alert.service, unit: manager-alert.service, source: scripts/systemd/manager-alert.service, severity: warn}
+  - {id: manager-brief.timer, unit: manager-brief.timer, source: scripts/systemd/manager-brief.timer, severity: warn}
+  - {id: manager-brief.service, unit: manager-brief.service, source: scripts/systemd/manager-brief.service, severity: warn}
+
 # -----------------------------------------------------------------------------
 # SERVICES — process-level liveness
 # -----------------------------------------------------------------------------
@@ -157,6 +167,30 @@ services:
 # not evidence of success; only fresh output is.
 # -----------------------------------------------------------------------------
 jobs:
+  - id: manager_collect_snapshot
+    host: droplet
+    schedule: "every 15 minutes (manager-collect.timer)"
+    description: Collects deterministic manager status snapshot
+    output: {file: manager/state/status.json, max_stale_hours: 1}
+    severity: warn
+    note: Enable manager-collect.timer; stale status makes all manager findings stale.
+
+  - id: manager_alert_dispatch
+    host: droplet
+    schedule: "every 15 minutes at +30 seconds (manager-alert.timer)"
+    description: Evaluates findings and sends deterministic alerts
+    output: {file: manager/state/alerts.json, max_stale_hours: 1}
+    severity: warn
+    note: Enable manager-alert.timer; stale state means alerts are not dispatching.
+
+  - id: manager_daily_brief
+    host: droplet
+    schedule: "daily at 12:30 UTC (manager-brief.timer)"
+    description: Sends the daily manager brief email
+    output: {file: manager/state/brief_runs.jsonl, max_stale_hours: 30}
+    severity: warn
+    note: brief_runs.jsonl is the timer heartbeat for the daily email path.
+
   - id: gemini_crossvenue_research
     host: droplet
     schedule: "every 5 minutes (systemd timer)"

@@ -399,6 +399,40 @@ def check_invariants(snap: Dict[str, Any]) -> List[Finding]:
     return out
 
 
+def check_systemd_units(snap: Dict[str, Any]) -> List[Finding]:
+    """Alert when a versioned unit is missing or differs on the droplet."""
+    block = snap.get("systemd_units") or {}
+    if not block.get("available"):
+        return []
+    out: List[Finding] = []
+    for rec in block.get("units") or []:
+        state = rec.get("state")
+        if state == "ok":
+            continue
+        unit = rec.get("unit") or rec.get("id") or "?"
+        severity = rec.get("severity", "warn")
+        if severity not in SEVERITY_ORDER:
+            severity = "warn"
+        if state == "not_installed":
+            title = "systemd unit {} is not installed".format(unit)
+            detail = "Repo unit exists at {} but no installed copy exists.".format(
+                rec.get("source"))
+        elif state == "differs":
+            title = "systemd unit {} differs from repo".format(unit)
+            detail = "Installed unit {} differs from {}.".format(
+                rec.get("installed"), rec.get("source"))
+        else:
+            title = "systemd source missing for {}".format(unit)
+            detail = "Configured source {} does not exist.".format(rec.get("source"))
+        out.append(Finding(
+            key="systemd.{}.{}".format(unit, state),
+            severity=severity,
+            title=title,
+            detail=detail,
+            value=state))
+    return out
+
+
 def check_config_drift(snap: Dict[str, Any],
                        local_fp: Optional[Dict[str, Any]]) -> List[Finding]:
     """Compare the live droplet config against the local working copy.
@@ -1097,6 +1131,7 @@ def run_checks(snap: Dict[str, Any], registry: Optional[Dict[str, Any]] = None,
     findings += check_services(snap)
     findings += check_invariants(snap)
     findings += check_config_drift(snap, local_config_fp)
+    findings += check_systemd_units(snap)
     findings += check_jobs(snap)
     findings += check_gates(snap, registry)
     if reconcilable:

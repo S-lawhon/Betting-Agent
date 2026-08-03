@@ -935,6 +935,20 @@ def render_html(b: Dict[str, Any]) -> str:
     return "\n".join(P)
 
 
+def record_brief_run(status: str, headline: str, *, emailed: bool) -> None:
+    """Append a durable heartbeat for the scheduled brief path."""
+    state = HERE / "state"
+    state.mkdir(parents=True, exist_ok=True)
+    row = {
+        "timestamp_utc": now().isoformat().replace("+00:00", "Z"),
+        "status": status,
+        "headline": headline,
+        "emailed": emailed,
+    }
+    with (state / "brief_runs.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True) + "\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Render the daily fund brief")
     ap.add_argument("--status", default=None)
@@ -975,6 +989,9 @@ def main() -> int:
             "[betting-fund] Daily brief — {}".format(b["headline"][:80]),
             md, render_html(b))
         print("\n[brief] " + res.summary(), file=sys.stderr)
+        record_brief_run(
+            "failed" if res.failed else "ok", b.get("headline", ""),
+            emailed=bool(res.sent))
     return 0
 
 

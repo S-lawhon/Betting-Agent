@@ -38,8 +38,8 @@ is judged on output freshness, never on exit code.
 | `checks.py` | both | Facts → findings with severity. Deterministic |
 | `alert.py` | droplet | Dispatches critical/warn findings with cooldown + dedupe |
 | `notify.py` | both | Email (SMTP) and push (ntfy) adapters |
-| `brief.py` | Mac | Renders the daily brief as markdown / HTML |
-| `refresh.py` | Mac | Runs the remote collector over SSH and pulls the snapshot back |
+| `brief.py` | droplet timer + Mac | Renders the daily brief and can email it without a local machine |
+| `refresh.py` | Mac (optional) | Pulls a fresh remote snapshot for ad-hoc inspection |
 
 Plus `/manager` and `/api/manager` routes on the existing dashboard, and the
 `fund-manager` agent in `.claude/agents/`.
@@ -105,6 +105,9 @@ when those metrics are more than roughly twenty minutes stale.
 
 ## Daily use
 
+Normal autonomous mode uses the droplet's collect, alert, and brief timers.
+For optional local inspection:
+
 ```bash
 cd "~/Desktop/Betting Fund Project"
 python3 manager/refresh.py && python3 manager/brief.py
@@ -147,7 +150,22 @@ Then verify — an untested alert path is an assumption, not a safety net:
 python3 manager/notify.py --selftest
 ```
 
-### 2. Droplet cron
+### 2. Droplet scheduling
+
+Install the versioned systemd units from a machine with droplet SSH access:
+
+```bash
+bash scripts/setup_manager_timers.sh
+```
+
+Cadence: collection every 15 minutes, alert evaluation 30 seconds later, and
+the emailed brief daily at 12:30 UTC. Verify with:
+
+```bash
+ssh root@129.212.176.202 'systemctl list-timers --all | grep -E "manager-(collect|alert|brief)"'
+```
+
+Legacy cron fallback:
 
 ```cron
 */15 * * * * cd /opt/betting-pod-shop && venv/bin/python manager/collect.py --root /opt/betting-pod-shop >> /var/log/manager_collect.log 2>&1

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fund manager collector — gathers facts, judges nothing.
 
-Runs on the droplet under cron. Reads the registry, measures the real system,
+Runs on the droplet under a systemd timer (or cron fallback). Reads the registry,
 and writes a status snapshot. No LLM, no network calls to anything but the
 local box, and no writes anywhere near the trading system's data.
 
@@ -28,6 +28,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import filecmp
 import json
 import os
 import re
@@ -416,6 +417,47 @@ class Collector:
     @safe("jobs")
     def jobs(self) -> List[Dict[str, Any]]:
         return [self.job_record(job) for job in self.registry.get("jobs", [])]
+
+    @safe("systemd_unit_drift")
+    def systemd_unit_drift(self) -> Dict[str, Any]:
+        """Compare versioned systemd units with the installed copies."""
+        specs = self.registry.get("systemd_units") or []
+        if not specs:
+            return {"available": False, "reason": "no systemd_units configured"}
+        if not Path("/run/systemd/system").exists():
+            return {"available": False, "reason": "not a systemd host"}
+
+        units: List[Dict[str, Any]] = []
+        for spec in specs:
+            unit = str(spec.get("unit") or "").strip()
+            if not unit:
+                continue
+            source = self.resolve(str(
+                spec.get("source") or ("scripts/systemd/" + unit)))
+            installed = Path("/etc/systemd/system") / unit
+            rec: Dict[str, Any] = {
+                "id": spec.get("id") or unit,
+                "unit": unit,
+                "source": str(source),
+                "installed": str(installed),
+                "severity": spec.get("severity", "warn"),
+            }
+            if not source.exists():
+                rec["state"] = "source_missing"
+            elif not installed.exists():
+                rec["state"] = "not_installed"
+            elif filecmp.cmp(str(source), str(installed), shallow=False):
+                rec["state"] = "ok"
+            else:
+                rec["state"] = "differs"
+            units.append(rec)
+        return {
+            "available": True,
+            "summary": {state: sum(
+                row.get("state") == state for row in units)
+                for state in ("ok", "differs", "not_installed", "source_missing")},
+            "units": units,
+        }
 
     def job_record(self, job: Dict[str, Any]) -> Dict[str, Any]:
         """Measure one registry job on THIS machine.
@@ -1313,6 +1355,7 @@ class Collector:
             "root": str(self.root),
             "registry_version": self.registry.get("meta", {}).get("version"),
             "services": self.services() or [],
+            "systemd_units": self.systemd_unit_drift() or {},
             "jobs": self.jobs() or [],
             "trade": trade,
             "maker": self.maker_gate() or {},

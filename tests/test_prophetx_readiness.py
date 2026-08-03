@@ -19,6 +19,7 @@ def _report(environment="sandbox", **overrides):
         "snapshot_rows": [{
             "k_yes_ask": .49, "px_other_ask_prob": .48,
             "schedule_skew_seconds": 60, "px_environment": environment,
+            "sport": "mlb",
         }],
         "generated_at": NOW,
     }
@@ -52,15 +53,17 @@ def test_production_report_fails_closed_on_policy_gates():
 def test_bad_schedule_or_quote_coverage_blocks_technical_readiness():
     rows = [
         {"k_yes_ask": .49, "px_other_ask_prob": None,
-         "schedule_skew_seconds": 901, "px_environment": "production"},
+         "schedule_skew_seconds": 901, "px_environment": "production",
+         "sport": "mlb"},
         {"k_yes_ask": .49, "px_other_ask_prob": .48,
-         "schedule_skew_seconds": 60, "px_environment": "production"},
+         "schedule_skew_seconds": 60, "px_environment": "production",
+         "sport": "mlb"},
     ]
     report = _report(environment="production", snapshot_rows=rows)
 
     assert report["technical_ready"] is False
-    assert "schedule_safe_matches" in report["blockers"]
-    assert "executable_quote_coverage" in report["blockers"]
+    assert "sport:mlb:schedule_alignment" in report["blockers"]
+    assert "sport:mlb:executable_quote_coverage" in report["blockers"]
 
 
 def test_post_start_rows_are_reported_but_not_quote_coverage_denominator():
@@ -98,10 +101,41 @@ def test_readiness_honors_audited_sport_specific_schedule_tolerance():
             "schedule_skew_seconds": 3 * 60 * 60,
             "schedule_tolerance_seconds": 6 * 60 * 60,
             "px_environment": "sandbox",
+            "sport": "tennis",
         }])
 
     assert report["technical_ready"] is True
     assert "schedule_safe_matches" not in report["blockers"]
+
+
+def test_mixed_sports_report_partial_readiness_without_weakening_rollout():
+    rows = [{
+        "sport": "mlb", "k_yes_ask": .49, "px_other_ask_prob": .48,
+        "schedule_skew_seconds": 60, "px_environment": "production",
+    }, {
+        "sport": "tennis", "k_yes_ask": .49, "px_other_ask_prob": None,
+        "schedule_skew_seconds": 3 * 60 * 60,
+        "schedule_tolerance_seconds": 6 * 60 * 60,
+        "px_environment": "production",
+    }]
+    report = _report(
+        environment="production",
+        pairs=[{"game_id": "m1", "sport": "mlb"},
+               {"game_id": "t1", "sport": "tennis"}],
+        snapshot_rows=rows, tax_gate0_resolved=True,
+        production_collection_approved=True)
+
+    assert report["status"] == "partially_ready"
+    assert report["adapter_ready"] is True
+    assert report["technical_ready"] is False
+    assert report["partially_technical_ready"] is True
+    assert report["ready_sports"] == ["mlb"]
+    assert report["blocked_sports"] == ["tennis"]
+    assert report["sport_readiness"]["mlb"]["status"] == "technical_ready"
+    assert report["sport_readiness"]["tennis"]["blockers"] == [
+        "executable_quote_coverage"]
+    assert report["rollout_ready"] is False
+    assert report["blockers"] == ["sport:tennis:executable_quote_coverage"]
 
 
 def test_live_runner_contract_does_not_write_observations(monkeypatch):
@@ -123,6 +157,7 @@ def test_live_runner_contract_does_not_write_observations(monkeypatch):
                             "k_yes_ask": .49, "px_other_ask_prob": .48,
                             "schedule_skew_seconds": 0,
                             "px_environment": pair["px_environment"],
+                            "sport": "unknown",
                         }])
 
     report = validate(environment="sandbox", client=Px(), kalshi=object())

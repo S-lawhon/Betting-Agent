@@ -94,9 +94,44 @@ def build_readiness_report(
             "coverage": (round(len(sport_priced) / len(sport_eligible), 6)
                          if sport_eligible else None),
         }
-    isolated = all(row.get("px_environment") == environment for row in rows)
+    isolated = bool(rows) and all(
+        row.get("px_environment") == environment for row in rows)
+    matched_by_sport = dict(sorted(Counter(
+        str(pair.get("sport") or "unknown") for pair in pairs).items()))
 
-    technical = [
+    sport_readiness = {}
+    for sport, matched_count in matched_by_sport.items():
+        sport_rows = [row for row in rows
+                      if str(row.get("sport") or "unknown") == sport]
+        sport_skews = [row.get("schedule_skew_seconds") for row in sport_rows]
+        sport_aligned = bool(sport_rows) and all(
+            isinstance(value, (int, float)) and 0 <= value <= (
+                row.get("schedule_tolerance_seconds")
+                if isinstance(row.get("schedule_tolerance_seconds"), (int, float))
+                else MAX_START_SKEW_SECONDS)
+            for row, value in zip(sport_rows, sport_skews))
+        sport_coverage = quote_coverage_by_sport.get(sport) or {}
+        coverage_value = sport_coverage.get("coverage")
+        coverage_ready = (isinstance(coverage_value, (int, float))
+                          and coverage_value >= MIN_EXECUTABLE_QUOTE_COVERAGE)
+        labels_ready = bool(sport_rows) and all(
+            row.get("px_environment") == environment for row in sport_rows)
+        sport_blockers = []
+        if not sport_aligned:
+            sport_blockers.append("schedule_alignment")
+        if not coverage_ready:
+            sport_blockers.append("executable_quote_coverage")
+        if not labels_ready:
+            sport_blockers.append("environment_labels")
+        sport_readiness[sport] = {
+            "status": "technical_ready" if not sport_blockers else "blocked",
+            "technical_ready": not sport_blockers,
+            "blockers": sport_blockers,
+            "matched_events": matched_count,
+            "quote_coverage": sport_coverage,
+        }
+
+    adapter_checks = [
         _check("credentials_present", bool(probe.get("has_credentials")),
                "credential pair is configured" if probe.get("has_credentials")
                else "credential pair is absent"),
@@ -107,6 +142,10 @@ def build_readiness_report(
                f"{event_count} sport events returned"),
         _check("main_moneyline_shape", moneyline_count > 0,
                f"{moneyline_count} exact main-game moneylines parsed"),
+        _check("environment_labels", isolated,
+               f"all {len(rows)} rows identify {environment}"),
+    ]
+    summary_checks = [
         _check("schedule_safe_matches", aligned,
                f"{len(pairs)} uniquely schedule-aligned matches; "
                f"{int(unmatched_reasons.get('ambiguous_px_market') or 0)} ambiguous"),
@@ -114,8 +153,6 @@ def build_readiness_report(
                bool(eligible) and coverage >= MIN_EXECUTABLE_QUOTE_COVERAGE,
                f"{len(priced)}/{len(eligible)} eligible pre-start/unknown rows "
                f"({coverage:.1%}) have both asks; {len(post_start)} post-start excluded"),
-        _check("environment_labels", bool(rows) and isolated,
-               f"all {len(rows)} rows identify {environment}"),
     ]
     policy = [
         _check("production_environment", environment == "production",
@@ -128,21 +165,40 @@ def build_readiness_report(
                if production_collection_approved
                else "production collection has not been approved", "policy"),
     ]
-    technical_ready = all(row["status"] == "passed" for row in technical)
+    adapter_ready = all(row["status"] == "passed" for row in adapter_checks)
+    ready_sports = sorted(sport for sport, row in sport_readiness.items()
+                          if row["technical_ready"])
+    blocked_sports = sorted(set(sport_readiness) - set(ready_sports))
+    technical_ready = (adapter_ready and bool(sport_readiness)
+                       and not blocked_sports)
+    partially_technical_ready = (adapter_ready and bool(ready_sports)
+                                 and bool(blocked_sports))
     rollout_ready = technical_ready and all(
         row["status"] == "passed" for row in policy)
-    blockers = [row["id"] for row in technical + policy
+    blockers = [row["id"] for row in adapter_checks
                 if row["status"] != "passed"]
+    blockers.extend(
+        f"sport:{sport}:{blocker}"
+        for sport in blocked_sports
+        for blocker in sport_readiness[sport]["blockers"])
+    blockers.extend(row["id"] for row in policy
+                    if row["status"] != "passed")
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": timestamp.isoformat().replace("+00:00", "Z"),
         "venue": "prophetx", "environment": environment,
         "mode": "read_only_validation",
         "status": ("rollout_ready" if rollout_ready else
-                   "technical_ready" if technical_ready else "blocked"),
+                   "technical_ready" if technical_ready else
+                   "partially_ready" if partially_technical_ready else "blocked"),
         "technical_ready": technical_ready,
+        "partially_technical_ready": partially_technical_ready,
+        "adapter_ready": adapter_ready,
+        "ready_sports": ready_sports,
+        "blocked_sports": blocked_sports,
+        "sport_readiness": sport_readiness,
         "rollout_ready": rollout_ready,
-        "checks": technical + policy,
+        "checks": adapter_checks + summary_checks + policy,
         "blockers": blockers,
         "counts": {
             "events": event_count, "main_moneylines": moneyline_count,
@@ -153,8 +209,7 @@ def build_readiness_report(
             "executable_quote_coverage": round(coverage, 6),
             "quote_coverage_by_sport": quote_coverage_by_sport,
             "unmatched_reasons": dict(unmatched_reasons),
-            "matched_by_sport": dict(sorted(Counter(
-                str(pair.get("sport") or "unknown") for pair in pairs).items())),
+            "matched_by_sport": matched_by_sport,
         },
         "safety": {
             "execution_enabled": False,

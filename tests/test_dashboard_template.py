@@ -93,6 +93,8 @@ def test_crossvenue_research_has_a_dashboard_surface(html):
     assert "cvPxProduction.rollout_ready" in html
     assert "cvPxQuoteSports" in html
     assert "missing PX" in html
+    assert "cvPxSandbox.ready_sports" in html
+    assert "cvPxSandbox.blocked_sports" in html
     assert "quote completeness" in html
     assert "persistent episodes" in html
     assert "research alerts" in html

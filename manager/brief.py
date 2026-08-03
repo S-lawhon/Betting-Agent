@@ -410,10 +410,12 @@ def render_markdown(b: Dict[str, Any]) -> str:
                 sandbox = px_validation.get("sandbox") or {}
                 production = px_validation.get("production") or {}
                 L.append("ProphetX readiness: sandbox {}; production {}; rollout {}. "
-                         "Blockers: {}.".format(
+                         "Sports ready: {}; blocked: {}. Blockers: {}.".format(
                              sandbox.get("status") or "not run",
                              production.get("status") or "not run",
                              "ready" if production.get("rollout_ready") else "blocked",
+                             ", ".join(sandbox.get("ready_sports") or []) or "none",
+                             ", ".join(sandbox.get("blocked_sports") or []) or "none",
                              ", ".join(production.get("blockers") or [])
                              or prophetx.get("collection_state") or "unknown"))
                 sport_quotes = ((sandbox.get("counts") or {})
@@ -773,10 +775,13 @@ def render_html(b: Dict[str, Any]) -> str:
                 sandbox = px_validation.get("sandbox") or {}
                 production = px_validation.get("production") or {}
                 P.append("<div class='dim'>ProphetX readiness: sandbox {}; "
-                         "production {}; rollout {}. Blockers: {}.</div>".format(
+                         "production {}; rollout {}. Sports ready: {}; blocked: {}. "
+                         "Blockers: {}.</div>".format(
                              e(str(sandbox.get("status") or "not run")),
                              e(str(production.get("status") or "not run")),
                              "ready" if production.get("rollout_ready") else "blocked",
+                             e(", ".join(sandbox.get("ready_sports") or []) or "none"),
+                             e(", ".join(sandbox.get("blocked_sports") or []) or "none"),
                              e(", ".join(production.get("blockers") or [])
                                or str(prophetx.get("collection_state") or "unknown"))))
                 sport_quotes = ((sandbox.get("counts") or {})

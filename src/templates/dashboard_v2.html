@@ -1228,6 +1228,9 @@ function renderResearchPipeline(r){
       (cvPxSandbox.status || "not run") + " / production " +
       (cvPxProduction.status || "not run") + " / rollout " +
       (cvPxProduction.rollout_ready ? "ready" : "blocked") +
+      (cvPxSandbox.generated_at ? " / sports ready " +
+        ((cvPxSandbox.ready_sports || []).join(", ") || "none") +
+        " / blocked " + ((cvPxSandbox.blocked_sports || []).join(", ") || "none") : "") +
       (Object.keys(cvPxQuoteSports).length ? " / quotes " +
         Object.keys(cvPxQuoteSports).sort().map(function(sport){
           var row = cvPxQuoteSports[sport] || {};

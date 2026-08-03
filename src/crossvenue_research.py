@@ -34,7 +34,13 @@ def _read_validation_reports(config_path: Path, venue_id: str) -> Dict[str, Any]
             "generated_at": payload.get("generated_at"),
             "status": payload.get("status") or "unknown",
             "technical_ready": bool(payload.get("technical_ready")),
+            "partially_technical_ready": bool(
+                payload.get("partially_technical_ready")),
+            "adapter_ready": bool(payload.get("adapter_ready")),
             "rollout_ready": bool(payload.get("rollout_ready")),
+            "ready_sports": list(payload.get("ready_sports") or []),
+            "blocked_sports": list(payload.get("blocked_sports") or []),
+            "sport_readiness": dict(payload.get("sport_readiness") or {}),
             "blockers": list(payload.get("blockers") or []),
             "counts": dict(payload.get("counts") or {}),
         }

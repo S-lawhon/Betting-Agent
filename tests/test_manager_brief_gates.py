@@ -191,6 +191,8 @@ def research_snap() -> dict:
                     "validation": {
                         "sandbox": {"status": "technical_ready",
                                     "technical_ready": True,
+                                    "ready_sports": ["mlb"],
+                                    "blocked_sports": ["tennis"],
                                     "counts": {"quote_coverage_by_sport": {
                                         "mlb": {"coverage": 1.0,
                                                 "executable_rows": 16,
@@ -257,6 +259,7 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "ProphetX readiness: sandbox technical_ready" in text
         assert "production blocked; rollout blocked" in text
         assert "Blockers: tax_gate0" in text
+        assert "Sports ready: mlb; blocked: tennis" in text
         assert "mlb 100.0% (16/16 executable; 0 missing PX asks)" in text
         assert "tennis 0.0% (0/12 executable; 12 missing PX asks)" in text
         assert "settlement terms unverified" in text

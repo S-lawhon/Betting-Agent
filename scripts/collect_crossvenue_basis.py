@@ -78,6 +78,7 @@ SANDBOX_OUT_DIR = os.path.join(ROOT, "data", "crossvenue_basis_sandbox")
 log = logging.getLogger("crossvenue_basis")
 EASTERN = ZoneInfo("America/New_York")
 MAX_START_SKEW_SECONDS = 15 * 60
+MAX_START_SKEW_BY_SPORT = {"tennis": 6 * 60 * 60}
 
 # Kalshi series that carry a two-sided game winner. Off-season series simply
 # return zero open markets, so leaving them all on costs one cheap call each.
@@ -138,14 +139,30 @@ def kalshi_games(kp: KalshiPublic, series: dict = None) -> dict:
             if not tk or "-" not in tk or not abbr:
                 continue
             gid = tk.rsplit("-", 1)[0]
-            start = _kalshi_start(gid)
+            # Tennis tickers encode only the date, not the scheduled time.
+            # `occurrence_datetime` is Kalshi's explicit event timestamp and is
+            # preferred for every sport; the ticker timestamp remains a
+            # verified fallback for older game-market payloads.
+            ticker_start = _kalshi_start(gid)
+            explicit_start = _iso_start(m.get("occurrence_datetime"))
+            start = ticker_start or explicit_start
             g = games.setdefault(gid, {"series": stick, "sport": sport,
                                        "tickers": {}, "titles": {},
-                                       "scheduled_start_at": (start.isoformat()
-                                                              if start else None)})
+                                       "_scheduled_starts": set()})
+            if start:
+                g["_scheduled_starts"].add(start.isoformat())
             g["tickers"][abbr] = tk
             g["titles"][abbr] = m.get("yes_sub_title") or m.get("title") or ""
-    return {gid: g for gid, g in games.items() if len(g["tickers"]) == 2}
+    out = {}
+    for gid, game in games.items():
+        if len(game["tickers"]) != 2:
+            continue
+        starts = game.pop("_scheduled_starts")
+        # Opposing contracts must agree on the event time. Conflicting or
+        # absent timestamps become None and are rejected by match_pairs.
+        game["scheduled_start_at"] = next(iter(starts)) if len(starts) == 1 else None
+        out[gid] = game
+    return out
 
 
 # ── ProphetX side ────────────────────────────────────────────────────────────
@@ -190,13 +207,14 @@ def prophetx_moneylines(px: ProphetXClient, max_events: int = 400) -> list:
 
 
 # ── matching ─────────────────────────────────────────────────────────────────
-# Kalshi keys teams by its own ticker-suffix abbreviation; ProphetX uses display
-# names. The vocab map below covers MLB (verified against Kalshi's live vocab in
-# collect_inplay_basis.py). NBA/NHL/tennis maps are INTENTIONALLY EMPTY: they
-# must be built from an authenticated --discover dump rather than guessed, and
-# `match_pairs` refuses to match a sport with no map instead of fuzzy-matching
-# into a wrong game. A wrong match is worse than no match here -- it would
-# manufacture a basis between two different events.
+# Kalshi supplies display titles as well as ticker abbreviations. Exact
+# normalized display-name pairs are the primary path and work for changing
+# player universes such as tennis without maintaining a guessed alias table.
+# MLB retains the verified canonical fallback because Kalshi uses city labels
+# ("Boston") while ProphetX uses full club names ("Boston Red Sox"). NBA/NHL
+# maps remain empty until their live title shapes can be verified in season.
+# There is deliberately no fuzzy fallback: a wrong match is worse than no match
+# because it manufactures a basis between two different events.
 
 VOCAB = {
     "mlb": {
@@ -219,10 +237,12 @@ VOCAB = {
 
 
 def match_pairs(kgames: dict, pxmls: list) -> tuple:
-    """Return (pairs, unmatched_reasons). Matches on the unordered pair of
-    canonical team keys. No fuzzy fallback -- see the VOCAB note."""
-    by_pair = {}
+    """Return exact/schedule-safe pairs and explicit unmatched diagnostics."""
+    by_pair, by_names = {}, {}
     for m in pxmls:
+        normalized_names = [_norm(name) for name in m["names"]]
+        if all(normalized_names) and len(set(normalized_names)) == 2:
+            by_names.setdefault(frozenset(normalized_names), []).append(m)
         sport_map = None
         keys = []
         for sport, vocab in VOCAB.items():
@@ -239,34 +259,59 @@ def match_pairs(kgames: dict, pxmls: list) -> tuple:
         "no_px_market": 0, "no_vocab_for_sport": 0,
         "schedule_unavailable": 0, "schedule_mismatch": 0,
         "ambiguous_px_market": 0,
+        "by_sport": {},
     }
+
+    def reject(sport, reason):
+        reasons[reason] += 1
+        sport_row = reasons["by_sport"].setdefault(sport, {
+            "matched": 0, "no_px_market": 0, "no_vocab_for_sport": 0,
+            "schedule_unavailable": 0, "schedule_mismatch": 0,
+            "ambiguous_px_market": 0,
+        })
+        sport_row[reason] += 1
+
     for gid, g in kgames.items():
-        if not VOCAB.get(g["sport"]):
-            reasons["no_vocab_for_sport"] += 1
+        sport = g["sport"]
+        title_map = {_norm(title): abbr for abbr, title in g["titles"].items()
+                     if _norm(title)}
+        exact = []
+        if len(title_map) == 2:
+            for market in by_names.get(frozenset(title_map), []):
+                exact.append((market, {
+                    title_map[_norm(name)]: name for name in market["names"]
+                }))
+        if exact:
+            cands = exact
+        elif VOCAB.get(sport):
+            cands = by_pair.get(frozenset(g["tickers"].keys()))
+        else:
+            reject(sport, "no_vocab_for_sport" if len(title_map) != 2
+                   else "no_px_market")
             continue
-        cands = by_pair.get(frozenset(g["tickers"].keys()))
         if not cands:
-            reasons["no_px_market"] += 1
+            reject(sport, "no_px_market")
             continue
         kalshi_start = _iso_start(g.get("scheduled_start_at"))
         if not kalshi_start:
-            reasons["schedule_unavailable"] += 1
+            reject(sport, "schedule_unavailable")
             continue
         aligned = []
         had_px_start = False
+        tolerance = MAX_START_SKEW_BY_SPORT.get(sport, MAX_START_SKEW_SECONDS)
         for m, keymap in cands:
             px_start = _iso_start(m.get("scheduled_start_at"))
             if not px_start:
                 continue
             had_px_start = True
-            if abs((kalshi_start - px_start).total_seconds()) <= MAX_START_SKEW_SECONDS:
+            if abs((kalshi_start - px_start).total_seconds()) <= tolerance:
                 aligned.append((m, keymap, px_start))
         if not aligned:
-            reasons["schedule_mismatch" if had_px_start
-                    else "schedule_unavailable"] += 1
+            reject(sport, "schedule_mismatch" if had_px_start
+                   else "schedule_unavailable")
             continue
         if len(aligned) != 1:
-            reasons["ambiguous_px_market"] += 1
+            reject(sport, "ambiguous_px_market")
             continue
         m, keymap, px_start = aligned[0]
         pairs.append({"game_id": gid, "series": g["series"], "sport": g["sport"],
@@ -274,7 +319,14 @@ def match_pairs(kgames: dict, pxmls: list) -> tuple:
                       "px_event_id": m["event_id"], "px_title": m["title"],
                       "px_names": keymap, "px_book": m["book"],
                       "kalshi_scheduled_start_at": kalshi_start.isoformat(),
-                      "px_scheduled_start_at": px_start.isoformat()})
+                      "px_scheduled_start_at": px_start.isoformat(),
+                      "schedule_tolerance_seconds": tolerance})
+        sport_row = reasons["by_sport"].setdefault(sport, {
+            "matched": 0, "no_px_market": 0, "no_vocab_for_sport": 0,
+            "schedule_unavailable": 0, "schedule_mismatch": 0,
+            "ambiguous_px_market": 0,
+        })
+        sport_row["matched"] += 1
     return pairs, reasons
 
 
@@ -334,6 +386,8 @@ def snapshot(kp: KalshiPublic, px: ProphetXClient, pair: dict,
             "kalshi_scheduled_start_at": pair.get("kalshi_scheduled_start_at"),
             "px_scheduled_start_at": pair.get("px_scheduled_start_at"),
             "schedule_skew_seconds": schedule_skew,
+            "schedule_tolerance_seconds": pair.get("schedule_tolerance_seconds",
+                                                   MAX_START_SKEW_SECONDS),
             "kalshi_ticker": pair["kalshi_tickers"][abbr],
             "px_event_id": pair["px_event_id"],
             "k_yes_bid": k_bid, "k_yes_ask": k_ask, "k_mid": k_mid,

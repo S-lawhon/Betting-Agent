@@ -416,6 +416,19 @@ def render_markdown(b: Dict[str, Any]) -> str:
                              "ready" if production.get("rollout_ready") else "blocked",
                              ", ".join(production.get("blockers") or [])
                              or prophetx.get("collection_state") or "unknown"))
+                sport_quotes = ((sandbox.get("counts") or {})
+                                .get("quote_coverage_by_sport") or {})
+                if sport_quotes:
+                    L.append("ProphetX sandbox quotes: {}.".format(
+                        "; ".join("{} {} ({}/{} executable; {} missing PX asks)".format(
+                            sport,
+                            ("{:.1f}%".format(row["coverage"] * 100)
+                             if isinstance(row.get("coverage"), (int, float))
+                             else "unmeasured"),
+                            _metric(row.get("executable_rows")),
+                            _metric(row.get("eligible_rows")),
+                            _metric(row.get("missing_prophetx_ask")))
+                            for sport, row in sorted(sport_quotes.items()))))
             risk_dimensions = basis.get("risk_dimensions")
             risk_text = (", ".join(risk_dimensions)
                          if isinstance(risk_dimensions, list) else "unknown")
@@ -766,6 +779,19 @@ def render_html(b: Dict[str, Any]) -> str:
                              "ready" if production.get("rollout_ready") else "blocked",
                              e(", ".join(production.get("blockers") or [])
                                or str(prophetx.get("collection_state") or "unknown"))))
+                sport_quotes = ((sandbox.get("counts") or {})
+                                .get("quote_coverage_by_sport") or {})
+                if sport_quotes:
+                    P.append("<div class='dim'>ProphetX sandbox quotes: {}.</div>".format(
+                        e("; ".join("{} {} ({}/{} executable; {} missing PX asks)".format(
+                            sport,
+                            ("{:.1f}%".format(row["coverage"] * 100)
+                             if isinstance(row.get("coverage"), (int, float))
+                             else "unmeasured"),
+                            _metric(row.get("executable_rows")),
+                            _metric(row.get("eligible_rows")),
+                            _metric(row.get("missing_prophetx_ask")))
+                            for sport, row in sorted(sport_quotes.items())))))
             risk_dimensions = basis.get("risk_dimensions")
             risk_text = (", ".join(risk_dimensions)
                          if isinstance(risk_dimensions, list) else "unknown")

@@ -7,6 +7,7 @@ they are safe to surface in operational dashboards.
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Mapping, Optional
 
@@ -51,7 +52,11 @@ def build_readiness_report(
     skews = [row.get("schedule_skew_seconds") for row in rows]
     valid_skews = [v for v in skews if isinstance(v, (int, float))]
     aligned = bool(pairs) and len(valid_skews) == len(rows) and all(
-        0 <= value <= MAX_START_SKEW_SECONDS for value in valid_skews)
+        0 <= value <= (row.get("schedule_tolerance_seconds")
+                       if isinstance(row.get("schedule_tolerance_seconds"),
+                                     (int, float))
+                       else MAX_START_SKEW_SECONDS)
+        for row, value in zip(rows, skews) if isinstance(value, (int, float)))
     timestamp = (generated_at or datetime.now(UTC)).astimezone(UTC)
     # A started market can legitimately have no remaining executable stake.
     # It is useful evidence, but not a valid denominator for pregame collector
@@ -65,6 +70,30 @@ def build_readiness_report(
               if row.get("k_yes_ask") is not None
               and row.get("px_other_ask_prob") is not None]
     coverage = len(priced) / len(eligible) if eligible else 0.0
+    quote_coverage_by_sport = {}
+    for sport in sorted({str(row.get("sport") or "unknown") for row in rows}):
+        sport_rows = [row for row in rows
+                      if str(row.get("sport") or "unknown") == sport]
+        sport_post = [row for row in sport_rows if row in post_start]
+        sport_eligible = [row for row in sport_rows if row not in post_start]
+        sport_priced = [row for row in sport_eligible
+                        if row.get("k_yes_ask") is not None
+                        and row.get("px_other_ask_prob") is not None]
+        quote_coverage_by_sport[sport] = {
+            "eligible_rows": len(sport_eligible),
+            "executable_rows": len(sport_priced),
+            "missing_kalshi_ask": sum(
+                row.get("k_yes_ask") is None for row in sport_eligible),
+            "missing_prophetx_ask": sum(
+                row.get("px_other_ask_prob") is None for row in sport_eligible),
+            "missing_both_asks": sum(
+                row.get("k_yes_ask") is None
+                and row.get("px_other_ask_prob") is None
+                for row in sport_eligible),
+            "post_start_rows_excluded": len(sport_post),
+            "coverage": (round(len(sport_priced) / len(sport_eligible), 6)
+                         if sport_eligible else None),
+        }
     isolated = all(row.get("px_environment") == environment for row in rows)
 
     technical = [
@@ -122,7 +151,10 @@ def build_readiness_report(
             "post_start_rows_excluded": len(post_start),
             "executable_rows": len(priced),
             "executable_quote_coverage": round(coverage, 6),
+            "quote_coverage_by_sport": quote_coverage_by_sport,
             "unmatched_reasons": dict(unmatched_reasons),
+            "matched_by_sport": dict(sorted(Counter(
+                str(pair.get("sport") or "unknown") for pair in pairs).items())),
         },
         "safety": {
             "execution_enabled": False,

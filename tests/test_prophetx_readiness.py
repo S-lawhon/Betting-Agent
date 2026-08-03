@@ -14,7 +14,8 @@ def _report(environment="sandbox", **overrides):
         "environment": environment,
         "probe": {"has_credentials": True, "authenticated": True},
         "event_count": 10, "moneyline_count": 4,
-        "pairs": [{"game_id": "g1"}], "unmatched_reasons": {},
+        "pairs": [{"game_id": "g1", "sport": "mlb"}],
+        "unmatched_reasons": {},
         "snapshot_rows": [{
             "k_yes_ask": .49, "px_other_ask_prob": .48,
             "schedule_skew_seconds": 60, "px_environment": environment,
@@ -66,10 +67,12 @@ def test_post_start_rows_are_reported_but_not_quote_coverage_denominator():
     rows = [{
         "k_yes_ask": .49, "px_other_ask_prob": None,
         "schedule_skew_seconds": 60, "px_environment": "sandbox",
+        "sport": "mlb",
         "kalshi_scheduled_start_at": "2026-08-02T23:00:00Z",
     }, {
         "k_yes_ask": .49, "px_other_ask_prob": .48,
         "schedule_skew_seconds": 60, "px_environment": "sandbox",
+        "sport": "mlb",
         "kalshi_scheduled_start_at": "2026-08-03T01:00:00Z",
     }]
     report = _report(snapshot_rows=rows)
@@ -78,6 +81,27 @@ def test_post_start_rows_are_reported_but_not_quote_coverage_denominator():
     assert report["counts"]["post_start_rows_excluded"] == 1
     assert report["counts"]["eligible_quote_rows"] == 1
     assert report["counts"]["executable_quote_coverage"] == 1.0
+    assert report["counts"]["matched_by_sport"] == {"mlb": 1}
+    assert report["counts"]["quote_coverage_by_sport"]["mlb"] == {
+        "eligible_rows": 1, "executable_rows": 1,
+        "missing_kalshi_ask": 0, "missing_prophetx_ask": 0,
+        "missing_both_asks": 0,
+        "post_start_rows_excluded": 1, "coverage": 1.0,
+    }
+
+
+def test_readiness_honors_audited_sport_specific_schedule_tolerance():
+    report = _report(
+        pairs=[{"game_id": "t1", "sport": "tennis"}],
+        snapshot_rows=[{
+            "k_yes_ask": .49, "px_other_ask_prob": .48,
+            "schedule_skew_seconds": 3 * 60 * 60,
+            "schedule_tolerance_seconds": 6 * 60 * 60,
+            "px_environment": "sandbox",
+        }])
+
+    assert report["technical_ready"] is True
+    assert "schedule_safe_matches" not in report["blockers"]
 
 
 def test_live_runner_contract_does_not_write_observations(monkeypatch):

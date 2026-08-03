@@ -292,6 +292,12 @@ non-empty events, an exact main-game moneyline shape, uniquely schedule-aligned
 matches, at least 90% executable cross-venue quote coverage among pre-start or
 unknown-phase rows, and correct environment labels. Post-start rows are
 reported but excluded from that denominator because closed stake is expected.
+The report also breaks executable coverage out by sport so an exploratory,
+illiquid market cannot be mistaken for a parser or authentication failure.
+Team sports use a 15-minute start tolerance. Tennis uses exact participant
+pairs plus a six-hour tolerance because Kalshi publishes a coarse occurrence
+time while ProphetX publishes a match estimate; multi-day discrepancies remain
+rejected. The applied tolerance and observed skew are retained on every row.
 
 Production validation requires an explicit acknowledgement:
 

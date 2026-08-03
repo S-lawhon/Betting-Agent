@@ -91,6 +91,8 @@ def test_crossvenue_research_has_a_dashboard_surface(html):
     assert "r.crossvenue_pilot" in html
     assert "ProphetX sandbox" in html
     assert "cvPxProduction.rollout_ready" in html
+    assert "cvPxQuoteSports" in html
+    assert "missing PX" in html
     assert "quote completeness" in html
     assert "persistent episodes" in html
     assert "research alerts" in html

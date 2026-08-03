@@ -190,7 +190,17 @@ def research_snap() -> dict:
                     "collection_state": "blocked_production_credentials",
                     "validation": {
                         "sandbox": {"status": "technical_ready",
-                                    "technical_ready": True},
+                                    "technical_ready": True,
+                                    "counts": {"quote_coverage_by_sport": {
+                                        "mlb": {"coverage": 1.0,
+                                                "executable_rows": 16,
+                                                "eligible_rows": 16,
+                                                "missing_prophetx_ask": 0},
+                                        "tennis": {"coverage": 0.0,
+                                                   "executable_rows": 0,
+                                                   "eligible_rows": 12,
+                                                   "missing_prophetx_ask": 12},
+                                    }}},
                         "production": {"status": "blocked",
                                        "rollout_ready": False,
                                        "blockers": ["tax_gate0"]},
@@ -247,6 +257,8 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "ProphetX readiness: sandbox technical_ready" in text
         assert "production blocked; rollout blocked" in text
         assert "Blockers: tax_gate0" in text
+        assert "mlb 100.0% (16/16 executable; 0 missing PX asks)" in text
+        assert "tennis 0.0% (0/12 executable; 12 missing PX asks)" in text
         assert "settlement terms unverified" in text
         assert "87.5% quote completeness" in text
         assert "2 persistent episodes" in text

@@ -359,6 +359,43 @@ def test_matcher_refuses_sports_with_no_vocab():
     assert pairs == [] and reasons["no_vocab_for_sport"] == 1
 
 
+def test_kalshi_tennis_uses_explicit_occurrence_datetime():
+    import scripts.collect_crossvenue_basis as C
+
+    class FakeK:
+        def open_markets(self, series):
+            return [{
+                "ticker": "KXATPMATCH-26AUG03MUNBLO-MUN",
+                "yes_sub_title": "Jaume Munar",
+                "occurrence_datetime": "2026-08-03T18:00:00Z",
+            }, {
+                "ticker": "KXATPMATCH-26AUG03MUNBLO-BLO",
+                "yes_sub_title": "Alexander Blockx",
+                "occurrence_datetime": "2026-08-03T18:00:00Z",
+            }]
+
+    games = C.kalshi_games(FakeK(), {"KXATPMATCH": "tennis"})
+
+    assert games["KXATPMATCH-26AUG03MUNBLO"]["scheduled_start_at"] == (
+        "2026-08-03T18:00:00+00:00")
+
+
+def test_kalshi_game_fails_closed_when_contract_times_conflict():
+    import scripts.collect_crossvenue_basis as C
+
+    class FakeK:
+        def open_markets(self, series):
+            base = "KXATPMATCH-26AUG03MUNBLO-"
+            return [{"ticker": base + "MUN", "yes_sub_title": "Jaume Munar",
+                     "occurrence_datetime": "2026-08-03T18:00:00Z"},
+                    {"ticker": base + "BLO", "yes_sub_title": "Alexander Blockx",
+                     "occurrence_datetime": "2026-08-03T19:00:00Z"}]
+
+    games = C.kalshi_games(FakeK(), {"KXATPMATCH": "tennis"})
+
+    assert games["KXATPMATCH-26AUG03MUNBLO"]["scheduled_start_at"] is None
+
+
 def test_matcher_pairs_mlb_on_canonical_abbreviations():
     import scripts.collect_crossvenue_basis as C
     kg = {"KXMLBGAME-26JUL29NYYBOS": {
@@ -374,6 +411,81 @@ def test_matcher_pairs_mlb_on_canonical_abbreviations():
     assert len(pairs) == 1
     assert pairs[0]["px_names"] == {"NYY": "New York Yankees",
                                     "BOS": "Boston Red Sox"}
+
+
+def test_matcher_pairs_tennis_on_exact_player_titles_without_vocab():
+    import scripts.collect_crossvenue_basis as C
+    kg = {"KXATPMATCH-26AUG03MUNBLO": {
+        "series": "KXATPMATCH", "sport": "tennis",
+        "tickers": {"MUN": "tk-MUN", "BLO": "tk-BLO"},
+        "titles": {"MUN": "Jaume Munar", "BLO": "Alexander Blockx"},
+        "scheduled_start_at": "2026-08-03T15:00:00Z"}}
+    px = [{"event_id": "e1", "title": "Munar vs Blockx",
+           "names": ["Alexander Blockx", "Jaume Munar"],
+           "scheduled_start_at": "2026-08-03T15:05:00Z", "book": {}}]
+
+    pairs, reasons = C.match_pairs(kg, px)
+
+    assert len(pairs) == 1
+    assert pairs[0]["px_names"] == {
+        "MUN": "Jaume Munar", "BLO": "Alexander Blockx"}
+    assert pairs[0]["schedule_tolerance_seconds"] == 6 * 60 * 60
+    assert reasons["by_sport"]["tennis"]["matched"] == 1
+
+
+def test_tennis_exact_names_allow_coarse_same_session_time_but_not_multiday():
+    import scripts.collect_crossvenue_basis as C
+    game = {"series": "KXATPMATCH", "sport": "tennis",
+            "tickers": {"MUN": "a", "BLO": "b"},
+            "titles": {"MUN": "Jaume Munar", "BLO": "Alexander Blockx"},
+            "scheduled_start_at": "2026-08-03T15:00:00Z"}
+    base = {"title": "Munar vs Blockx",
+            "names": ["Jaume Munar", "Alexander Blockx"], "book": {}}
+
+    pairs, _ = C.match_pairs({"game": game}, [{
+        **base, "event_id": "same-session",
+        "scheduled_start_at": "2026-08-03T18:00:00Z"}])
+    rejected, reasons = C.match_pairs({"game": game}, [{
+        **base, "event_id": "multiday",
+        "scheduled_start_at": "2026-08-05T18:00:00Z"}])
+
+    assert len(pairs) == 1
+    assert rejected == []
+    assert reasons["schedule_mismatch"] == 1
+
+
+def test_exact_titles_still_reject_ambiguous_same_time_markets():
+    import scripts.collect_crossvenue_basis as C
+    game = {"series": "KXWTAMATCH", "sport": "tennis",
+            "tickers": {"GAU": "tk-GAU", "SAB": "tk-SAB"},
+            "titles": {"GAU": "Coco Gauff", "SAB": "Aryna Sabalenka"},
+            "scheduled_start_at": "2026-08-03T15:00:00Z"}
+    market = {"title": "Gauff vs Sabalenka",
+              "names": ["Coco Gauff", "Aryna Sabalenka"],
+              "scheduled_start_at": "2026-08-03T15:00:00Z", "book": {}}
+    px = [{**market, "event_id": "e1"}, {**market, "event_id": "e2"}]
+
+    pairs, reasons = C.match_pairs({"game": game}, px)
+
+    assert pairs == []
+    assert reasons["ambiguous_px_market"] == 1
+    assert reasons["by_sport"]["tennis"]["ambiguous_px_market"] == 1
+
+
+def test_exact_title_match_requires_both_distinct_nonempty_titles():
+    import scripts.collect_crossvenue_basis as C
+    kg = {"game": {"series": "KXATPMATCH", "sport": "tennis",
+                   "tickers": {"ONE": "a", "TWO": "b"},
+                   "titles": {"ONE": "Player One", "TWO": ""},
+                   "scheduled_start_at": "2026-08-03T15:00:00Z"}}
+    px = [{"event_id": "e1", "title": "event",
+           "names": ["Player One", "Player Two"],
+           "scheduled_start_at": "2026-08-03T15:00:00Z", "book": {}}]
+
+    pairs, reasons = C.match_pairs(kg, px)
+
+    assert pairs == []
+    assert reasons["no_vocab_for_sport"] == 1
 
 
 def test_matcher_rejects_same_teams_on_wrong_date():
@@ -442,6 +554,7 @@ def test_snapshot_row_carries_every_gate_input():
     assert len(rows) == 2
     assert all(row["px_environment"] == "sandbox" for row in rows)
     assert all(row["schedule_skew_seconds"] == 300 for row in rows)
+    assert all(row["schedule_tolerance_seconds"] == 900 for row in rows)
     r = rows[0]
     for k in ("gap", "breakeven_fees_only", "breakeven_with_tax",
               "px_leg_edge_vs_fmv", "rule46_ceiling", "rule46_bustable",

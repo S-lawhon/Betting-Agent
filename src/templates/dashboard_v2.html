@@ -1199,6 +1199,7 @@ function renderResearchPipeline(r){
       cvPxValidation = cvProphet.validation || {},
       cvPxSandbox = cvPxValidation.sandbox || {},
       cvPxProduction = cvPxValidation.production || {},
+      cvPxQuoteSports = (cvPxSandbox.counts || {}).quote_coverage_by_sport || {},
       cvCases = cv.research_cases || {},
       cvBasis = cvCases.settlement_basis || {},
       cvEvidence = cvCases.outcome_evidence || {};
@@ -1226,7 +1227,14 @@ function renderResearchPipeline(r){
       numTxt(cvVenueSummary.excluded) + " excluded · ProphetX sandbox " +
       (cvPxSandbox.status || "not run") + " / production " +
       (cvPxProduction.status || "not run") + " / rollout " +
-      (cvPxProduction.rollout_ready ? "ready" : "blocked") + " · case ledger " +
+      (cvPxProduction.rollout_ready ? "ready" : "blocked") +
+      (Object.keys(cvPxQuoteSports).length ? " / quotes " +
+        Object.keys(cvPxQuoteSports).sort().map(function(sport){
+          var row = cvPxQuoteSports[sport] || {};
+          return sport + " " + (isNum(row.coverage) ?
+            (100 * row.coverage).toFixed(1) + "%" : "unmeasured") +
+            (row.missing_prophetx_ask ? " (" + row.missing_prophetx_ask + " missing PX)" : "");
+        }).join(", ") : "") + " · case ledger " +
       numTxt(cvCases.lifetime_cases) + " lifetime / " +
       numTxt(cvCases.cases_last_24h) + " 24h / " +
       numTxt(cvCases.cases_last_7d) + " 7d · " +

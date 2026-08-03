@@ -255,14 +255,35 @@ exposure — the guard rejected nothing, and only the pod's own
   of the *pooled* statistic. On the gate statistic it is `[-3.41, +5.07]`,
   which crosses zero and agrees with z=0.65. The old interval said
   "significant" about an effect the rule scores as not.
-- **Amendment 1's T = 24 rests on a pooled effect size and has NOT been
-  revisited.** It cites the widened +2.57¢ as the effect to power against; the
-  rule's statistic on that sample is +1.45¢ with sd(x_t) = 10.44¢ (vs 5.04¢
-  published), so the power calculation behind T = 24 uses an effect that is too
-  large and a dispersion that is too small. Changing T needs another written
-  amendment — the harness fix deliberately did NOT touch the gate. Phase-2's
-  GREEN-LIGHT is unaffected: on the published sample the estimators agree
-  (+3.41 vs +3.80, both z > 3).
+- **P-022 AMENDMENT 2 (2026-08-02, authorised by Sam): T = 24 → 33, extension
+  40 → 98, new §4b clustering guard.** Amendment 1's T = 24 was powered against
+  the POOLED +2.57¢ with a sigma back-derived from the pooled bootstrap CI;
+  re-solving §5 as written gives T = 556 and shows the old gate had **9.3%
+  power**. But 556 is §5's normal-theory formula failing: x_t is skewed −2.60
+  because the payoff is a rare large loss (7 adverse events in 183 filled
+  markets, each ~12× the credit; KIN26 alone doubles sigma and cannot be
+  screened out). **The thresholds are now derived on the FILLED MARKET, not the
+  tournament**: `edge = q − p = 0.0766 − 7/183 = +3.83¢`, z = 2.70 → 270 filled
+  markets (T = 33) to decide, 808 (T = 98) for the extension. **Both gates must
+  clear** — T is only a proxy at 8.32 filled/tournament and must not arrive
+  early if the pod fills thinly. Phase-2's GREEN-LIGHT is unaffected.
+- **Made at T = 2 with NEGATIVE forward evidence, so it could only tighten.**
+  The T = 19 implied by the corrected *published* sample was rejected: a gate
+  may be tightened with evidence in hand, never loosened. Any future amendment
+  faces the same test.
+- **§4b is a real falsifier, not a formality.** The market-level basis holds
+  only while adverse events do not cluster (observed: 7 events in 7 DISTINCT
+  tournaments = 1.00). `p022_checkpoint` prints the ratio EVERY run and returns
+  NO DECISION above 1.5 — basis void, recompute before any verdict. Only HARD
+  KILL outranks it.
+- **The draft asserted an extension of 55 without solving it; the solve is 98.**
+  At T = 55 the power against half-effect is 55.5% — almost exactly the ~53%
+  defect Amendment 1 flagged at T = 40, i.e. shipping it would have rebuilt the
+  flaw the amendment exists to fix. Caught by a test that re-derives the
+  threshold instead of hard-coding it. **Solve the criterion; never assert a
+  threshold**, and keep the docstring, the printed rule line and the tests
+  moving WITH the constants — Amendment 1 moved a constant and left the prose
+  saying `T >= 14`.
 - **The same pooling defect was in `backtest_makecut_fills.py`** (fixed
   2026-08-02, same commit). Its entries are weighted 1.0, so within-tournament
   weighting is a no-op, but it still pooled markets ACROSS tournaments while

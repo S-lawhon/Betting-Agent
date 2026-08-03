@@ -89,9 +89,9 @@ venues:
     collection_state: blocked_production_credentials
     research_adapter: scripts.collect_crossvenue_basis
     next_action: >-
-      Obtain production API credentials, repeat the fail-closed shape and match
-      checks against production, resolve tax Gate 0, then separately approve a
-      time-boxed production collection service.
+      Obtain production API credentials, run validate_prophetx_readiness.py
+      with the explicit production read-only acknowledgement, resolve tax Gate
+      0, then separately approve a time-boxed production collection service.
     evidence:
       - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations
       - https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/58754

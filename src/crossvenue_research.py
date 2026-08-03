@@ -6,6 +6,7 @@ Execution authority remains governed by settlement and eligibility policies.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional
@@ -15,6 +16,29 @@ import yaml
 
 DEFAULT_EXPANSION_VENUES = ("prophetx", "novig", "underdog_predict")
 UTC = timezone.utc
+
+
+def _read_validation_reports(config_path: Path, venue_id: str) -> Dict[str, Any]:
+    """Load safe runtime readiness summaries; malformed reports fail closed."""
+    report_dir = config_path.resolve().parent.parent / "data" / f"{venue_id}_readiness"
+    reports: Dict[str, Any] = {}
+    for environment in ("sandbox", "production"):
+        path = report_dir / f"{environment}.json"
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, Mapping) or payload.get("venue") != venue_id:
+            continue
+        reports[environment] = {
+            "generated_at": payload.get("generated_at"),
+            "status": payload.get("status") or "unknown",
+            "technical_ready": bool(payload.get("technical_ready")),
+            "rollout_ready": bool(payload.get("rollout_ready")),
+            "blockers": list(payload.get("blockers") or []),
+            "counts": dict(payload.get("counts") or {}),
+        }
+    return reports
 
 
 def _parse_timestamp(value: Any) -> Optional[datetime]:
@@ -53,6 +77,7 @@ def load_venue_pipeline(
             "collection_state": state,
             "adapter": venue.get("research_adapter"),
             "next_action": venue.get("next_action"),
+            "validation": _read_validation_reports(config_path, str(venue["id"])),
         })
     rows.sort(key=lambda row: row["id"])
     found = {row["id"] for row in rows}

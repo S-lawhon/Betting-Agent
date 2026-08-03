@@ -18,6 +18,12 @@ Wants=network-online.target
 #        python3 scripts/collect_crossvenue_basis.py --discover   # build VOCAB maps
 #   4. Sanity-check schedule-aligned matching:
 #        python3 scripts/collect_crossvenue_basis.py --env production --match-only
+#   5. Generate a fail-closed readiness report (this never enables the unit):
+#        python3 scripts/validate_prophetx_readiness.py --env production \
+#          --ack-production-read-only
+#
+# Only after all five succeed, tax Gate 0 is resolved, and collection receives
+# a separate human approval should this unit be installed.
 #
 # Deploy after edits:
 #   scp scripts/betting-crossvenue-basis.service root@129.212.176.202:/etc/systemd/system/

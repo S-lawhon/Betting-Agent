@@ -44,6 +44,7 @@ later looks like evidence. Sandbox rows are written to a separate directory
 and carry `px_environment=sandbox` so they cannot enter the production gate.
 
 Usage:
+  python3 scripts/validate_prophetx_readiness.py --env sandbox
   python3 scripts/collect_crossvenue_basis.py --probe        # credential/liveness check
   python3 scripts/collect_crossvenue_basis.py --discover     # dump ProphetX vocab, no writes
   python3 scripts/collect_crossvenue_basis.py --match-only   # show matched pairs, no writes

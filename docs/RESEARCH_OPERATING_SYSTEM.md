@@ -281,3 +281,27 @@ small early sample must not permanently starve new sources or market families.
 - No repository daemon invokes the model-driven agents automatically. The
   claim/completion lifecycle is ready, but live model execution remains
   fail-closed until a headless runtime and explicit API budget are provisioned.
+
+### ProphetX production-readiness gate
+
+Run `python3 scripts/validate_prophetx_readiness.py --env sandbox` for a
+read-only sandbox check. The command writes a secret-free report to
+`data/prophetx_readiness/sandbox.json`; it never writes basis observations,
+installs a service, or enables execution. The report requires authentication,
+non-empty events, an exact main-game moneyline shape, uniquely schedule-aligned
+matches, at least 90% executable cross-venue quote coverage among pre-start or
+unknown-phase rows, and correct environment labels. Post-start rows are
+reported but excluded from that denominator because closed stake is expected.
+
+Production validation requires an explicit acknowledgement:
+
+```bash
+python3 scripts/validate_prophetx_readiness.py \
+  --env production --ack-production-read-only
+```
+
+Technical readiness is deliberately separate from rollout readiness. A
+production validation can pass technically while rollout stays blocked by tax
+Gate 0 or missing collection approval. The validator cannot enable the systemd
+collector and its report always declares execution disabled. Readiness status
+is included in the venue pipeline consumed by the dashboard and daily brief.

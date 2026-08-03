@@ -183,9 +183,20 @@ def research_snap() -> dict:
                 "net_edge_usd": {"p95": .041},
             },
             "research_signals": [],
-            "venue_pipeline": {"summary": {
-                "collecting": 0, "blocked": 1, "excluded": 2,
-            }},
+            "venue_pipeline": {
+                "summary": {"collecting": 0, "blocked": 1, "excluded": 2},
+                "venues": [{
+                    "id": "prophetx",
+                    "collection_state": "blocked_production_credentials",
+                    "validation": {
+                        "sandbox": {"status": "technical_ready",
+                                    "technical_ready": True},
+                        "production": {"status": "blocked",
+                                       "rollout_ready": False,
+                                       "blockers": ["tax_gate0"]},
+                    },
+                }],
+            },
             "research_cases": {
                 "lifetime_cases": 4, "cases_last_24h": 1,
                 "cases_last_7d": 3, "active_cases": 1,
@@ -233,6 +244,9 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "10 dispatched" in text
         assert "8 pending" in text
         assert "Gemini/Kalshi research: healthy" in text
+        assert "ProphetX readiness: sandbox technical_ready" in text
+        assert "production blocked; rollout blocked" in text
+        assert "Blockers: tax_gate0" in text
         assert "settlement terms unverified" in text
         assert "87.5% quote completeness" in text
         assert "2 persistent episodes" in text

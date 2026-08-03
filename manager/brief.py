@@ -372,6 +372,11 @@ def render_markdown(b: Dict[str, Any]) -> str:
             signal_count = len(signals) if isinstance(signals, list) else None
             venue_summary = ((crossvenue.get("venue_pipeline") or {})
                              .get("summary") or {})
+            venue_rows = ((crossvenue.get("venue_pipeline") or {})
+                          .get("venues") or [])
+            prophetx = next((row for row in venue_rows
+                             if row.get("id") == "prophetx"), {})
+            px_validation = prophetx.get("validation") or {}
             cases = crossvenue.get("research_cases") or {}
             basis = cases.get("settlement_basis") or {}
             evidence = cases.get("outcome_evidence") or {}
@@ -401,6 +406,16 @@ def render_markdown(b: Dict[str, Any]) -> str:
                          _metric(venue_summary.get("collecting")),
                          _metric(venue_summary.get("blocked")),
                          _metric(venue_summary.get("excluded"))))
+            if prophetx:
+                sandbox = px_validation.get("sandbox") or {}
+                production = px_validation.get("production") or {}
+                L.append("ProphetX readiness: sandbox {}; production {}; rollout {}. "
+                         "Blockers: {}.".format(
+                             sandbox.get("status") or "not run",
+                             production.get("status") or "not run",
+                             "ready" if production.get("rollout_ready") else "blocked",
+                             ", ".join(production.get("blockers") or [])
+                             or prophetx.get("collection_state") or "unknown"))
             risk_dimensions = basis.get("risk_dimensions")
             risk_text = (", ".join(risk_dimensions)
                          if isinstance(risk_dimensions, list) else "unknown")
@@ -707,6 +722,11 @@ def render_html(b: Dict[str, Any]) -> str:
             signal_count = len(signals) if isinstance(signals, list) else None
             venue_summary = ((crossvenue.get("venue_pipeline") or {})
                              .get("summary") or {})
+            venue_rows = ((crossvenue.get("venue_pipeline") or {})
+                          .get("venues") or [])
+            prophetx = next((row for row in venue_rows
+                             if row.get("id") == "prophetx"), {})
+            px_validation = prophetx.get("validation") or {}
             cases = crossvenue.get("research_cases") or {}
             basis = cases.get("settlement_basis") or {}
             evidence = cases.get("outcome_evidence") or {}
@@ -736,6 +756,16 @@ def render_html(b: Dict[str, Any]) -> str:
                          e(_metric(venue_summary.get("collecting"))),
                          e(_metric(venue_summary.get("blocked"))),
                          e(_metric(venue_summary.get("excluded")))))
+            if prophetx:
+                sandbox = px_validation.get("sandbox") or {}
+                production = px_validation.get("production") or {}
+                P.append("<div class='dim'>ProphetX readiness: sandbox {}; "
+                         "production {}; rollout {}. Blockers: {}.</div>".format(
+                             e(str(sandbox.get("status") or "not run")),
+                             e(str(production.get("status") or "not run")),
+                             "ready" if production.get("rollout_ready") else "blocked",
+                             e(", ".join(production.get("blockers") or [])
+                               or str(prophetx.get("collection_state") or "unknown"))))
             risk_dimensions = basis.get("risk_dimensions")
             risk_text = (", ".join(risk_dimensions)
                          if isinstance(risk_dimensions, list) else "unknown")

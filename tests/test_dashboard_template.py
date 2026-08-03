@@ -89,6 +89,8 @@ def test_the_unknown_helpers_exist(html):
 def test_crossvenue_research_has_a_dashboard_surface(html):
     assert 'id="r-crossvenue"' in html
     assert "r.crossvenue_pilot" in html
+    assert "ProphetX sandbox" in html
+    assert "cvPxProduction.rollout_ready" in html
     assert "quote completeness" in html
     assert "persistent episodes" in html
     assert "research alerts" in html

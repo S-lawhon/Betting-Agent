@@ -46,6 +46,87 @@ has been quoted. Do not renegotiate.**
 > made — `MIN_T_EXTENSION` stays 40, now **inconsistent with its own
 > rationale**, until Sam rules on it.
 
+> ## AMENDMENT 2 — 2026-08-02: T = 24 → **T = 33**, extension 40 → **98**, new §4b clustering guard
+>
+> **Authorised by Sam, 2026-08-02, in writing.** Full derivation and the
+> rejected alternatives: `golf_quirks_research/DRAFT_AMENDMENT_2_2026-08-02.md`.
+>
+> **⚠ Made at T = 2, NOT at T = 0.** Amendment 1 could claim it touched no
+> evidence. **This one cannot.** Two forward observations existed when it was
+> made, and they were **negative** (edge −2.18¢/ct, 1/2 positive, z = −0.44).
+> The protection is direction, not timing: **this amendment RAISES every
+> threshold** (24 → 33, 40 → 98). It makes a PASS harder at a moment when the
+> pod is not passing, which is the opposite of the P-013 failure. The
+> friendlier reading available from the same correction — `T = 19`, implied by
+> the corrected *published* sample — was **rejected on these grounds**, despite
+> being defensible arithmetic. A gate may be tightened with evidence in hand;
+> it may not be loosened.
+>
+> **What changed:** §4's decision point (24 → 33), §4a's extension (40 → 98),
+> §5's arithmetic basis, and a new §4b. Everything else — band, offset, window,
+> series set, every §7 cap, `z ≥ 2.0` to pass, the HARD KILL at z ≤ −2.0, and
+> the single-extension structure — is **untouched**. §8.1 is not triggered: no
+> quoting parameter moves and the pod's behaviour is byte-identical.
+>
+> **Why. `T = 24`'s stated justification was void.** It solved §5 with
+> `d = +2.57¢` and `σ = 3.781¢`. Both came from the **pooled** estimator, which
+> `quirks_common` reported as its headline until it was fixed on 2026-08-02
+> (`e47d8e9`). `d` should have been the rule's own §2/§3 statistic (**+1.45¢**
+> on that sample), and `σ` was back-derived from a bootstrap CI that was the
+> *pooled* statistic's interval and so too narrow — measured directly it is
+> **10.44¢**. Both errors understate the required sample. Re-solving §5 as
+> written gives **T = 556**, and shows the live gate had **9.3% power** against
+> the effect it was supposedly powered for.
+>
+> **But 556 is not a real requirement — it is §5's formula failing.**
+> `z = d√T/σ` and `Φ(z − 2.0)` are normal-theory. The per-tournament statistic
+> is skewed **−2.60** (median +5.00¢ vs mean +1.45¢) because the payoff is a
+> rare large loss: across 183 filled markets there are **7** adverse events
+> (3.83%), each costing **12.1×** the credit — −$159.50 against +$110.12 total.
+> One of them lands in `KIN26`, which aggregates to −38.49¢/ct and single-
+> handedly doubles σ. It cannot be screened out (53.7 filled contracts, so it
+> survives any contract filter) and stricter screens make it worse: at ≥50
+> contracts the mean goes to **−0.06¢**.
+>
+> **The unit that carries the information is the filled market, not the
+> tournament.** Estimating the price of the tail directly:
+>
+> ```
+> edge = q − p = 0.0766 − 7/183 = +3.83¢    SE 1.42¢    z = 2.70
+> 95% CI [+1.05, +6.61]¢
+> T for 90% power = 270 filled markets (183 in hand)
+>                 ≈ 33 tournaments at the observed 8.3 filled markets/tournament
+> ```
+>
+> This agrees with the corrected *published* equal-weight figure (+3.80¢) by an
+> independent route, and it is the instrument
+> `analyze_p022_added_block.py` already names **"THE RIGHT TEST"**, against the
+> clustered permutation on a thin block which it calls **"THE WRONG TEST … an
+> artifact"**.
+>
+> **Relaxing tournament clustering for this quantity is conditional, and §4b is
+> the condition.** Clustering guards against correlated adverse events. In 183
+> filled markets that correlation is **absent** — the 7 adverse events fall in
+> **7 distinct tournaments, exactly one each**. Seven events cannot *prove*
+> independence, so it is monitored rather than assumed.
+>
+> **Resolves the item Amendment 1 left open.** `MIN_T_EXTENSION` is no longer
+> inconsistent with its own rationale. Solving the SAME criterion — "80% power
+> against **half** the measured effect" — on the market-level basis:
+>
+> ```
+> half-effect = +1.92¢     n = (2.0 + 0.8416)² · p(1−p) / half²  =  808 filled
+>                          808 / 8.32 filled per tournament       =  T = 98
+> ```
+>
+> **A first draft of this amendment asserted 55 without solving it. That was
+> wrong**: at T = 55 the power against half-effect is **55.5%**, which
+> reproduces almost exactly the ~53% defect Amendment 1 flagged at T = 40 —
+> the very thing this amendment claims to resolve. Corrected to 98 before
+> authorisation took effect. The number is large because half of a +3.83¢ edge
+> is a small effect against a 3.83% event rate; that is the honest cost of the
+> extension, not a reason to round it down.
+
 This document exists because P-013 lost **$2,094** while its criteria
 were still being decided after the fact. P-015's rule was locked in
 advance for the same reason. P-022 is written down before it can trade
@@ -166,11 +247,18 @@ outcome the pod exists to harvest, and the settler fix of 2026-07-26
 | Tournaments (T) | Rule |
 |---|---|
 | **any** | **HARD KILL** if `z ≤ −2.0` (significantly negative). Stop immediately; no extension, no re-parameterisation. |
-| **T < 24** | **NO DECISION** — underpowered. Do not act, do not raise caps, do not report a verdict. *(was T < 14; see Amendment 1)* |
-| **T ≥ 24** | **KILL** if `edge ≤ 0`. |
-| **T ≥ 24** | **CONTINUE (single extension)** if `edge > 0` and `z < 2.0` — see §4a. |
-| **T ≥ 24** | **PASS** if `edge > 0` and `z ≥ 2.0`. |
-| **T ≥ 40** | **KILL** if `edge > 0` and `z < 2.0`. The extension is spent. |
+| **T < 33** | **NO DECISION** — underpowered. Do not act, do not raise caps, do not report a verdict. *(was T < 14, then T < 24; see Amendments 1 and 2)* |
+| **T ≥ 33** | **KILL** if `edge ≤ 0`. |
+| **T ≥ 33** | **CONTINUE (single extension)** if `edge > 0` and `z < 2.0` — see §4a. |
+| **T ≥ 33** | **PASS** if `edge > 0` and `z ≥ 2.0`. |
+| **T ≥ 98** | **KILL** if `edge > 0` and `z < 2.0`. The extension is spent. *(and ≥808 filled markets, same both-gates rule)* |
+| **any** | **§4b clustering guard** — if adverse events per affected tournament > 1.5, the market-level basis of Amendment 2 is void; revert to the tournament-level threshold computed at that time before reading any verdict. |
+
+**T = 33 is reached only when BOTH `T ≥ 33` and `filled markets ≥ 270` hold**
+(whichever lands later). The threshold was derived on filled markets; the
+tournament count is the convenient proxy at the observed 8.3 filled
+markets/tournament, and the proxy must not be allowed to arrive early if the
+pod fills more thinly than the backtest did.
 
 "PASS" means the forward test replicated. It authorises **more paper
 allocation within the caps in §7 and a written promotion proposal** — it
@@ -182,12 +270,30 @@ grants it.
 
 Modelled on P-016's: **one extension, at unchanged parameters.**
 
-If at T = 24 the estimate is positive but not separable from zero
-(`0 < edge`, `z < 2.0`), the pod continues to **T = 40 and no further**,
+If at T = 33 the estimate is positive but not separable from zero
+(`0 < edge`, `z < 2.0`), the pod continues to **T = 98 and no further**,
 with `offset`, the H = 12–24h posting window, the [0.03, 0.12] anchor
-band, the series set, and every cap in §7 **byte-identical**. At T = 40
+band, the series set, and every cap in §7 **byte-identical**. At T = 98
 the verdict is PASS (z ≥ 2.0) or **KILL**. There is no second extension
 and no "it was close, let's give it one more month."
+*(was T = 24 → 40; see Amendment 2, which also resolves the inconsistency
+Amendment 1 flagged and left open.)*
+
+### 4b. Clustering guard — the falsifier for Amendment 2's basis
+
+Amendment 2 derives its thresholds from a **market-level** adverse-event rate,
+which is legitimate only while adverse events do not cluster within
+tournaments. At the time it was written they did not: 7 adverse events in 7
+distinct tournaments, exactly 1.00 per affected tournament.
+
+**At every checkpoint, report `adverse events / affected tournaments`.** If
+that ratio **exceeds 1.5**, the market-level basis is void: the thresholds in
+§4 revert to the tournament-level requirement computed from the data in hand
+at that moment, and **no verdict may be read until it has been recomputed**.
+
+This is a falsifier, not a formality. Seven events cannot prove independence —
+they can only fail to contradict it. The guard is what makes relying on it
+honest.
 
 Changing any parameter mid-flight is a **new hypothesis (P-022b)** with
 its own registration and its own counter reset to T = 0. Tuning on live
@@ -224,6 +330,16 @@ Solving `T = ((2.0 + z_power) * sigma / d)^2`:
 |---|---:|---:|---:|
 | 80% power | 10.0 | 17.8 | 39.9 |
 | **90% power** | **13.3** | 23.7 | 53.3 |
+
+> **SUPERSEDED AS THE BASIS BY AMENDMENT 2 (2026-08-02).** Everything in
+> this section is normal-theory (`z = d√T/σ`, `power = Φ(z − 2.0)`) and the
+> per-tournament statistic is skewed −2.60, so the solve below is not a
+> reliable requirement in either direction. It is retained as the record of
+> how T = 14 and T = 24 were set. The live thresholds (T = 33 / 55) come from
+> the market-level adverse-rate derivation in Amendment 2. **The σ = 3.781¢
+> used throughout this section was back-derived from a POOLED bootstrap CI
+> and is too narrow; measured directly it is 5.04¢ (published) / 10.44¢
+> (widened).**
 
 - **T = 14** is `ceil(13.3)`: the smallest sample with **90% power against
   the effect actually measured**. Below it a null result is
@@ -328,7 +444,7 @@ These are **conditions of the gate, not tuning knobs**:
    partial payouts, not voids. Excluding them, or booking them at $0,
    deletes the entire mechanism under test. This was a live bug in
    `KalshiGolfSettler` until 2026-07-26.
-4. **Silence is not confirmation.** If the pod never reaches T = 24, the
+4. **Silence is not confirmation.** If the pod never reaches T = 33, the
    verdict stays NO DECISION and it stays in paper indefinitely. An
    unfalsifiable strategy is not promoted by default.
 5. **No CLV substitute.** Round-leader markets have no sharp external
@@ -471,7 +587,7 @@ quote. Starting T is Sam's call.
 |---|---|
 | **T starts** | **2026-07-26 22:36:52 UTC** (`betting-round-leader-fade` restarted onto the reconciled code) |
 | T before this | **0** — the service had been up since 2026-07-23 but could not quote, so no observation was made or lost |
-| Threshold | **T = 14** (§4), single extension to T = 40 (§4a) |
+| Threshold | **T = 33** AND ≥270 filled markets (§4), single extension to T = 98 (§4a), §4b clustering guard *(was T = 14, then 24; Amendments 1 and 2)* |
 | Reader | `scripts/p022_checkpoint.py` — the only sanctioned reader (§10) |
 | Expected T=14 | ~~~3–4 weeks at 15–19/month~~ → **~4.4 weeks at the measured 3.16 event codes/week**, from the FIRST QUOTE (not from T-start: the pod could not quote until 2026-07-29). Corrected 2026-07-28. |
 

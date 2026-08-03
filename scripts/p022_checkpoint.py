@@ -21,15 +21,23 @@ Rule summary (see the doc for the derivation)
     Rounds of the same golf event pool into ONE observation.
   * edge = mean(x_t), se = sd(x_t)/sqrt(T), z = edge/se.
   * any T  -> HARD KILL if z <= -2.0.
-  * T < 24 -> NO DECISION (underpowered: 91% power at T=24 vs the
-              measured +3.4c effect, only 71% at T=8).
-  * T >= 24 -> KILL if edge <= 0; PASS if z >= 2.0; else CONTINUE, the
-              single extension, to T = 40 at UNCHANGED parameters.
-              (was T >= 14 in this docstring until 2026-08-02, contradicting
-               the T < 24 line directly above it; Amendment 1 raised the
-               threshold on 2026-07-28 and only the prose was left behind.
-               The CODE was always right -- MIN_T_DECISION = 24 below.)
-  * T >= 40 -> KILL if still z < 2.0.  The extension is spent.
+  * SECTION 4b GUARD (Amendment 2): if adverse events per affected
+              tournament > 1.5, the market-level basis of the thresholds
+              below is VOID -> NO DECISION until it is recomputed. Checked
+              before every threshold; only HARD KILL outranks it.
+  * T < 33 OR filled markets < 270 -> NO DECISION (underpowered). BOTH must
+              hold: the threshold was derived on filled markets and T is the
+              proxy at 8.3 filled/tournament, so the proxy must not arrive
+              early if the pod fills thinly.
+  * T >= 33 -> KILL if edge <= 0; PASS if z >= 2.0; else CONTINUE, the
+              single extension, to T = 98 at UNCHANGED parameters.
+  * T >= 98 (and >= 808 filled markets) -> KILL if still z < 2.0.
+              The extension is spent.
+
+  (Thresholds were 14, then 24 (Amendment 1), now 33/55 (Amendment 2,
+   2026-08-02). This docstring once said T >= 14 while the code said 24 --
+   Amendment 1 moved the constant and left the prose behind. Whenever a
+   threshold moves, move BOTH; the docstring is not decoration.)
 
 PASS authorises more paper allocation within the caps and a written
 promotion proposal.  It does NOT authorise live money.
@@ -86,12 +94,37 @@ POD_ID = "P-022"
 # effect from +3.4c to +2.57c/ct, and re-solving the SAME formula with the SAME
 # sigma=3.781 gives ((2.0+1.2816)*3.781/2.57)^2 = 23.3 -> 24. Section 5's own
 # table already carried the row. At T=14 the power against +2.57c is 71%.
-MIN_T_DECISION = 24          # 90% power vs the widened +2.57c effect
-# NOT amended, and now INCONSISTENT with its own stated rationale ("80% power
-# vs half the measured effect"): half of +2.57c is +1.29c, which solves to
-# T ~ 70, and at T=40 the power against half the revised effect is ~53%.
-# Raising it is a separate decision Sam has not made.
-MIN_T_EXTENSION = 40         # rationale drifted — see golf_quirks_research/P022_DECISION_RULE.md
+#
+# AMENDMENT 2 (2026-08-02, authorised by Sam): 24 -> 33, extension 40 -> 55.
+# The +2.57c above was the POOLED estimate and sigma=3.781 was back-derived
+# from a pooled bootstrap CI, so BOTH inputs to the solve were wrong; the
+# rule's own statistic gives +1.45c and sigma=10.44c on that sample, and
+# re-solving section 5 as written gives T=556 with only 9.3% power at T=24.
+# But 556 is section 5's normal-theory formula failing on a distribution
+# skewed -2.60 that rests on 7 adverse events. The thresholds below are
+# instead derived on the unit that carries the information -- the filled
+# market:  edge = q - p = 0.0766 - 7/183 = +3.83c, SE 1.42c, z=2.70, and
+# 270 filled markets for 90% power ~= 33 tournaments at 8.3 filled/tournament.
+# Made at T=2 with NEGATIVE forward evidence, so it may only tighten: the
+# friendlier T=19 from the corrected published sample was rejected.
+MIN_T_DECISION = 33          # AND >= MIN_FILLED_DECISION, whichever is later
+MIN_T_EXTENSION = 98         # 80% power vs HALF the effect, market-level basis
+# 808 filled markets is the actual solve; 98 is that over 8.32 filled/tournament.
+# A draft of Amendment 2 asserted 55 here WITHOUT solving it — at T=55 the power
+# against half-effect is 55.5%, reproducing the ~53% defect Amendment 1 flagged
+# at T=40. Solve the criterion; never assert a threshold.
+MIN_FILLED_EXTENSION = 808
+
+# The threshold was derived on filled markets; T is the convenient proxy. Hold
+# BOTH so the proxy cannot arrive early if the pod fills more thinly than the
+# backtest did (8.3 filled markets/tournament).
+MIN_FILLED_DECISION = 270
+
+# Section 4b guard. Amendment 2's market-level basis is legitimate only while
+# adverse events do not cluster within tournaments. Observed at authorisation:
+# 7 events across 7 distinct tournaments = 1.00. Above this ratio the basis is
+# void and no verdict may be read until the threshold is recomputed.
+MAX_ADVERSE_PER_TOURNAMENT = 1.5
 PASS_Z = 2.0
 HARD_KILL_Z = -2.0
 
@@ -288,6 +321,30 @@ def per_contract_cents(rec: Dict[str, Any]) -> float:
     return 100.0 * float(rec.get("pnl_usd") or 0) / contracts
 
 
+def is_adverse(rec: Dict[str, Any]) -> bool:
+    """Did the faded name WIN — i.e. is this one of the rare large losses?
+
+    P-022 sells YES at ~0.03-0.12, so an outright adverse settlement costs
+    roughly -88 to -97c/ct against a +3 to +12c credit when it does not. That
+    asymmetry is the whole risk profile, and section 4b's guard counts these
+    events, so the definition has to be stable.
+
+    Prefers the recorded settlement value (>0.5 means the name led, including
+    a dead heat that pays the YES side most of the notional). Falls back to
+    the realised loss: anything worse than -50c/ct on a <=12c quote can only
+    be an adverse settlement.
+    """
+    extra = rec.get("extra") or {}
+    for field in ("settlement_value", "settlement_value_dollars"):
+        v = extra.get(field)
+        if v is not None:
+            try:
+                return float(v) > 0.5
+            except (TypeError, ValueError):
+                pass
+    return per_contract_cents(rec) <= -50.0
+
+
 def _latest_settlement(rows: List[Dict[str, Any]]) -> Optional[str]:
     """Latest valid settlement timestamp for one tournament, normalized UTC."""
     parsed = []
@@ -376,13 +433,36 @@ def evaluate(trades: List[Dict[str, Any]],
         for key, rows in sorted(excluded_records.items())
     ]
 
+    # §4b clustering guard (Amendment 2). The market-level basis that sets
+    # MIN_T_DECISION holds only while adverse events do NOT cluster within
+    # tournaments. Checked BEFORE any threshold so a clustered sample cannot
+    # produce a verdict off a basis it has already falsified. HARD KILL still
+    # outranks it: a significantly negative result needs no basis.
+    n_adverse = sum(1 for r in trades if is_adverse(r))
+    adverse_tourns = len({tournament_key(r) for r in trades if is_adverse(r)})
+    adverse_ratio = (n_adverse / adverse_tourns) if adverse_tourns else 0.0
+    n_filled = len(trades)
+
     if not math.isnan(z) and z <= HARD_KILL_Z:
         verdict, reason = "HARD KILL", f"significantly negative (z={z:.2f})"
-    elif T < MIN_T_DECISION:
+    elif adverse_ratio > MAX_ADVERSE_PER_TOURNAMENT:
         verdict = "NO DECISION"
-        reason = (f"T={T} < {MIN_T_DECISION} tournaments; underpowered — "
-                  f"do not act, do not raise caps "
-                  f"({MIN_T_DECISION - T} more needed)")
+        reason = (f"§4b: adverse events cluster "
+                  f"({n_adverse} events in {adverse_tourns} tournaments = "
+                  f"{adverse_ratio:.2f} > {MAX_ADVERSE_PER_TOURNAMENT}). "
+                  "Amendment 2's market-level basis is VOID — recompute the "
+                  "threshold on the tournament-level requirement before "
+                  "reading any verdict.")
+    elif T < MIN_T_DECISION or n_filled < MIN_FILLED_DECISION:
+        verdict = "NO DECISION"
+        need = []
+        if T < MIN_T_DECISION:
+            need.append(f"{MIN_T_DECISION - T} more tournaments")
+        if n_filled < MIN_FILLED_DECISION:
+            need.append(f"{MIN_FILLED_DECISION - n_filled} more filled markets")
+        reason = (f"T={T}/{MIN_T_DECISION}, filled={n_filled}/"
+                  f"{MIN_FILLED_DECISION}; underpowered — do not act, do not "
+                  f"raise caps (need {' and '.join(need)})")
     elif edge <= 0:
         verdict, reason = "KILL", f"edge {edge:+.2f}c/ct <= 0 at T={T}"
     elif z >= PASS_Z:
@@ -391,10 +471,11 @@ def evaluate(trades: List[Dict[str, Any]],
                   "forward test replicated. Authorises more PAPER "
                   "allocation within caps + a written promotion "
                   "proposal. NOT live money.")
-    elif T >= MIN_T_EXTENSION:
+    elif T >= MIN_T_EXTENSION and n_filled >= MIN_FILLED_EXTENSION:
         verdict = "KILL"
         reason = (f"edge {edge:+.2f}c/ct but z={z:.2f} < {PASS_Z} at "
-                  f"T={T} >= {MIN_T_EXTENSION} — the single extension is "
+                  f"T={T} >= {MIN_T_EXTENSION} and filled={n_filled} >= "
+                  f"{MIN_FILLED_EXTENSION} — the single extension is "
                   "spent. No second extension.")
     else:
         verdict = "CONTINUE"
@@ -403,6 +484,11 @@ def evaluate(trades: List[Dict[str, Any]],
                   f"UNCHANGED parameters ({MIN_T_EXTENSION - T} more).")
 
     return {"T": T, "progress": T, "threshold": MIN_T_DECISION,
+            "n_filled_markets": n_filled,
+            "filled_threshold": MIN_FILLED_DECISION,
+            "n_adverse": n_adverse, "adverse_tournaments": adverse_tourns,
+            "adverse_per_tournament": adverse_ratio,
+            "adverse_ratio_limit": MAX_ADVERSE_PER_TOURNAMENT,
             "n_contracts": n_contracts, "edge_cents": edge,
             "sd_cents": sd, "se_cents": se, "z": z, "pnl_usd": pnl,
             "tournaments_positive": positive,
@@ -458,6 +544,18 @@ def main() -> int:
         for ev, kinds in sorted(r["excluded"].items()):
             print(f"                   {ev}: {', '.join(kinds)}")
     print(f"  tournaments (T): {r['T']}   contracts: {r['n_contracts']:,}")
+    if r.get("n_filled_markets") is not None:
+        print(f"  filled markets : {r['n_filled_markets']}"
+              f" / {r.get('filled_threshold')} required")
+        # §4b. Printed every run, not only on breach: the guard is only
+        # honest if it is read continuously.
+        ratio = r.get("adverse_per_tournament") or 0.0
+        flag = "  <- §4b BREACHED, basis void" if ratio > (
+            r.get("adverse_ratio_limit") or 1.5) else ""
+        print(f"  adverse events : {r.get('n_adverse', 0)} in "
+              f"{r.get('adverse_tournaments', 0)} tournaments"
+              f" = {ratio:.2f}/tournament"
+              f" (limit {r.get('adverse_ratio_limit')}){flag}")
     print(f"  tournaments +ve: {r['tournaments_positive']}/{r['T']}")
     print(f"  edge           : {r['edge_cents']:+.2f} c/contract "
           f"(equal-weighted across tournaments)")
@@ -466,7 +564,9 @@ def main() -> int:
     print(f"  paper P&L      : ${r['pnl_usd']:+,.2f}")
     print(f"\n  VERDICT: {r['verdict']}")
     print(f"  {r['reason']}")
-    print(f"\n  Rule: no decision < {MIN_T_DECISION} tournaments; kill if "
+    print(f"\n  Rule: no decision < {MIN_T_DECISION} tournaments or "
+          f"< {MIN_FILLED_DECISION} filled markets; §4b voids the basis "
+          f"above {MAX_ADVERSE_PER_TOURNAMENT} adverse/tournament; kill if "
           f"edge<=0; pass only at z>=2.0;")
     print(f"        ONE extension to T={MIN_T_EXTENSION} at unchanged "
           f"parameters; hard kill at z<=-2.0.")

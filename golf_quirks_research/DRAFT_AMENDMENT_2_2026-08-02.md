@@ -1,9 +1,15 @@
 # DRAFT — Amendment 2 to `P022_DECISION_RULE.md`
 
-> **STATUS: UNAUTHORISED DRAFT. NOT IN FORCE.**
-> `P022_DECISION_RULE.md` is unmodified and `T = 24` remains the live gate.
-> Nothing here takes effect until Sam authorises it in writing, in the rule
-> file itself, the way Amendment 1 was.
+> **STATUS: AUTHORISED BY SAM 2026-08-02 AND NOW IN FORCE.**
+> Written into `P022_DECISION_RULE.md` as **AMENDMENT 2**; that file, not this
+> one, is the rule. This document is retained as the derivation and the record
+> of the rejected alternatives.
+>
+> **ONE FIGURE IN THIS DRAFT WAS WRONG.** §4.3 below proposed an extension of
+> `T = 55`, asserted rather than solved. Solving the same criterion gives
+> **T = 98** (808 filled markets); at T = 55 the power against half-effect is
+> 55.5%, reproducing the ~53% defect Amendment 1 flagged at T = 40. **The rule
+> as enacted uses 98.** Corrected before the amendment took effect.
 >
 > Written 2026-08-02 by Claude at Sam's request, after the estimator defect in
 > `quirks_common` was fixed (`e47d8e9`). Revised the same day to fold in the
@@ -153,9 +159,11 @@ one. It must be monitored, not assumed. Hence the guard below.
 2. **The gate threshold becomes `T = 33` tournaments** (equivalently ≈270
    filled markets, whichever is reached later), derived from the market-level
    adverse-rate calculation above. This *raises* the bar from 24.
-3. **The single extension moves `T = 40 → T = 55`**, preserving §5's structure
-   of "80% power against half the measured effect" on the same market-level
-   basis.
+3. **The single extension moves `T = 40 → T = 98`** (808 filled markets),
+   preserving §5's structure of "80% power against half the measured effect"
+   on the same market-level basis:
+   `n = (2.0 + 0.8416)² · p(1−p) / (edge/2)² = 808` → `808 / 8.32 = T = 98`.
+   *(This draft originally said 55, asserted without solving. See the banner.)*
 4. **New guard — the clustering diagnostic.** At each checkpoint, report
    adverse events per affected tournament. **If that ratio exceeds 1.5, the
    market-level basis is void** and the threshold reverts to the conservative

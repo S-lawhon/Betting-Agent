@@ -271,25 +271,52 @@ def test_no_breaches_leaves_the_verdict_untouched(tmp_path):
 
 # ── AMENDMENT 1 (2026-07-28): T = 14 -> 24 ───────────────────────────
 
-def test_decision_threshold_is_24_and_matches_the_rules_own_arithmetic():
-    """The threshold is not a chosen number — it is the solve of the rule's own
-    criterion, and this test re-derives it rather than hard-coding trust.
+def test_decision_threshold_is_33_on_the_market_level_basis():
+    """AMENDMENT 2 (2026-08-02). The threshold is re-derived here rather than
+    trusted, as it was for 14 and 24.
 
-    §5 fixes the criterion as "the smallest sample with 90% power against the
-    effect actually measured" and gives the formula and sigma. T=14 was
-    ceil(13.3) for the Phase-2 estimate of +3.4c/ct. The 2026-07-28 widening
-    revised the pooled estimate to +2.57c/ct; the same solve gives 23.3 -> 24.
+    §5's normal-theory solve is no longer the basis: the per-tournament
+    statistic is skewed -2.60 and its sigma was back-derived from a POOLED
+    bootstrap CI. The live thresholds come from the market-level adverse rate:
+
+        edge = q - p = 0.0766 - 7/183 = +3.83c,  SE = sqrt(p(1-p)/n)
+        n(90% power) = (2.0 + 1.2816)^2 * p(1-p) / edge^2 = 270 filled markets
+        270 / 8.3 filled markets per tournament ~= 33 tournaments
     """
     import math
-    se19 = (5.1 - 1.7) / 2 / 1.95996          # the published T=19 CI
-    sigma = se19 * math.sqrt(19)
-    assert abs(sigma - 3.781) < 0.01, "sigma drifted from the rule's stated 3.781"
+    q, k, n = 0.0766, 7, 183
+    p_adv = k / n
+    edge = q - p_adv
+    assert abs(edge - 0.0383) < 5e-4, "the market-level edge drifted"
+    need = ((2.0 + 1.2815515655) ** 2) * p_adv * (1 - p_adv) / edge ** 2
+    assert math.ceil(need) == cp.MIN_FILLED_DECISION == 270
+    assert math.ceil(need / (n / 22)) == cp.MIN_T_DECISION == 33
 
-    def solve(effect_cents, z_power=1.2816):   # 1.2816 = 90% power
-        return ((2.0 + z_power) * sigma / effect_cents) ** 2
 
-    assert math.ceil(solve(3.40)) == 14, "the ORIGINAL threshold must still solve to 14"
-    assert math.ceil(solve(2.57)) == cp.MIN_T_DECISION == 24
+def test_amendment_2_only_ever_tightened_the_gate():
+    """Made at T=2 with NEGATIVE forward evidence, so it may only raise the
+    bar. The T=19 implied by the corrected published sample was rejected for
+    exactly this reason; this test is what stops it coming back."""
+    assert cp.MIN_T_DECISION > 24, "Amendment 1's threshold was 24"
+    assert cp.MIN_T_EXTENSION > 40, "Amendment 1's extension was 40"
+    assert cp.MIN_T_EXTENSION != 55, (
+        "55 was an unsolved assertion in a draft; it delivers 55.5% power "
+        "against half-effect, not the 80% its own rationale requires")
+    assert cp.MIN_T_DECISION != 19, (
+        "T=19 is the corrected-published read; it LOWERS the bar and was "
+        "rejected on integrity grounds")
+
+
+def test_both_tournament_and_filled_market_gates_must_clear(tmp_path):
+    """T is only a proxy for filled markets. If the pod fills more thinly than
+    the backtest, the proxy must not let a verdict arrive early."""
+    rows = [_settle(f"f{i}", f"KXPGAR1LEAD-T{i}26-A", f"T{i}26", "no", 0.0, 0.06, 5)
+            for i in range(cp.MIN_T_DECISION)]
+    r = cp.evaluate(cp.load_settled([_write(tmp_path, rows)]))
+    assert r["T"] == cp.MIN_T_DECISION          # tournament gate cleared
+    assert r["n_filled_markets"] < cp.MIN_FILLED_DECISION
+    assert r["verdict"] == "NO DECISION"
+    assert "filled markets" in r["reason"]
 
 
 def test_the_amendment_only_moved_the_threshold():
@@ -299,26 +326,28 @@ def test_the_amendment_only_moved_the_threshold():
     assert cp.HARD_KILL_Z == -2.0
 
 
-def test_extension_is_still_40_and_known_to_be_inconsistent():
-    """Deliberately NOT amended. Its stated rationale is 80% power vs HALF the
-    measured effect; half of +2.57c solves to ~70, and 40 now delivers ~53%.
-    Sam has not ruled on it, so it stays 40 — this test exists so the
-    inconsistency is visible rather than forgotten."""
+def test_extension_is_55_and_no_longer_inconsistent():
+    """Amendment 1 left the extension at 40 while flagging it as inconsistent
+    with its own "80% power vs HALF the measured effect" rationale. Amendment 2
+    resolves it on the market-level basis."""
     import math
-    se19 = (5.1 - 1.7) / 2 / 1.95996
-    sigma = se19 * math.sqrt(19)
-    consistent = ((2.0 + 0.8416) * sigma / (2.57 / 2)) ** 2
-    assert cp.MIN_T_EXTENSION == 40
-    assert math.ceil(consistent) == 70, "the rationale-consistent extension"
-    assert cp.MIN_T_EXTENSION < consistent, "40 is below its own rationale"
+    q, k, n = 0.0766, 7, 183
+    p_adv = k / n
+    half = (q - p_adv) / 2
+    need = ((2.0 + 0.8416212336) ** 2) * p_adv * (1 - p_adv) / half ** 2
+    assert math.ceil(need) == cp.MIN_FILLED_EXTENSION == 808
+    assert cp.MIN_T_EXTENSION == 98
+    assert math.ceil(need / (n / 22)) == cp.MIN_T_EXTENSION, (
+        "the extension must equal its own stated rationale, not merely exceed "
+        "the decision threshold")
 
 
-def test_a_sample_between_14_and_24_is_now_NO_DECISION(tmp_path):
-    """The behavioural consequence: a T=19 sample that would have produced a
-    verdict under the old threshold must now report NO DECISION."""
+def test_a_sample_below_the_threshold_is_NO_DECISION(tmp_path):
+    """A T=19 sample — enough under the ORIGINAL T=14, and the friendlier read
+    Amendment 2 rejected — must still report NO DECISION."""
     rows = [_settle(f"f{i}", f"KXPGAR1LEAD-T{i}26-A", f"T{i}26", "no", 0.0, 0.06, 5)
             for i in range(19)]
     r = cp.evaluate(cp.load_settled([_write(tmp_path, rows)]))
     assert r["T"] == 19
     assert r["verdict"] == "NO DECISION"
-    assert "24" in r["reason"]
+    assert str(cp.MIN_T_DECISION) in r["reason"]

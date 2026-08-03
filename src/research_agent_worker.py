@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import time
 from dataclasses import asdict, dataclass
@@ -42,6 +43,22 @@ HYPOTHESIS_KEYS = {
     "title", "mechanism", "null_hypothesis", "decisive_test",
     "evidence", "execution_eligibility",
 }
+
+
+def _trusted_provider_diagnostic(stderr: str) -> Optional[str]:
+    """Extract the already-sanitized Codex adapter error, if present."""
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    if not lines or not lines[-1].startswith("codex research provider error:"):
+        return None
+    diagnostic = lines[-1]
+    for pattern in (
+        r"(?i)(bearer\s+)(\S+)",
+        r"(?i)(authorization\s*[:=]\s*)(\S+)",
+        r"(?i)((?:access|refresh|id)[_-]?token\s*[:=]\s*)(\S+)",
+        r"(sk-[A-Za-z0-9_-]+)",
+    ):
+        diagnostic = re.sub(pattern, "[REDACTED]", diagnostic)
+    return diagnostic[:600]
 
 
 class ResearchWorkerError(RuntimeError):
@@ -152,9 +169,12 @@ class CommandProvider:
                 f"provider timed out after {timeout_seconds}s") from exc
         if completed.returncode != 0:
             stderr_hash = hashlib.sha256(completed.stderr.encode()).hexdigest()
+            diagnostic = _trusted_provider_diagnostic(completed.stderr)
             raise ResearchWorkerError(
-                f"provider exited {completed.returncode}; "
-                f"stderr_sha256={stderr_hash}")
+                "provider exited {}; {}stderr_sha256={}".format(
+                    completed.returncode,
+                    "diagnostic={!r}; ".format(diagnostic) if diagnostic else "",
+                    stderr_hash))
         try:
             envelope = json.loads(completed.stdout)
             usage = envelope["usage"]

@@ -221,6 +221,23 @@ def test_command_provider_does_not_persist_stderr_text(tmp_path):
     assert "stderr_sha256=" in str(caught.value)
 
 
+def test_command_provider_surfaces_only_redacted_codex_diagnostic(tmp_path):
+    code = (
+        "import sys; print(\"codex research provider error: model rejected "
+        "Bearer secret-token\", file=sys.stderr); raise SystemExit(2)")
+    provider = CommandProvider(
+        argv=[sys.executable, "-c", code], name="local", model="fixture",
+        cwd=tmp_path)
+
+    with pytest.raises(ResearchWorkerError) as caught:
+        provider.invoke({}, timeout_seconds=5)
+
+    message = str(caught.value)
+    assert "model rejected" in message
+    assert "secret-token" not in message
+    assert "[REDACTED]" in message
+
+
 def test_worker_module_has_no_trading_imports():
     source = Path("src/research_agent_worker.py").read_text()
     for forbidden in ("kalshi_private", "multi_executor", "place_order",

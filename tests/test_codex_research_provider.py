@@ -169,6 +169,8 @@ def test_codex_output_schema_is_strict_for_every_object():
 
     def check(node):
         if isinstance(node, dict):
+            if "const" in node:
+                assert "type" in node
             if node.get("type") == "object":
                 assert node.get("additionalProperties") is False
                 properties = node.get("properties", {})

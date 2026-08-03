@@ -33,7 +33,7 @@
           "properties": {
             "id": {"type": "string"},
             "created_at": {"type": "string"},
-            "source_agent": {"const": "scout"},
+            "source_agent": {"type": "string", "const": "scout"},
             "market_family": {"type": "string"},
             "thesis": {"type": "string"},
             "edge_source": {"type": "array", "items": {"type": "string"}},

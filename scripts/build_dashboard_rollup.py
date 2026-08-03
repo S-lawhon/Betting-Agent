@@ -100,6 +100,25 @@ DEFAULT_OUT = "data/dashboard/rollup.json"
 ACTIVE_LOG_REL = "data/trade_logs/trade_log.jsonl"
 CLV_LOG_REL = "data/trade_logs/clv_log.jsonl"
 
+#: Trades the aggregate risk guard WOULD have blocked while running in
+#: shadow mode (``aggregate_risk.enforce: false``).
+#:
+#: This has to be its own source. Under enforcement these showed up in the
+#: trade log as skip_reason rows ("aggregate risk guard",
+#: "aggregate_risk_limit"); in shadow mode the pod is approved and PLACES
+#: the trade, so those rows stop being written entirely. Without reading
+#: this file the dashboard's skip panel simply goes quiet and the
+#: constraint looks like it disappeared — which is the opposite of what
+#: shadow mode is for.
+SHADOW_LOG_REL = "data/trade_logs/aggregate_risk_shadow.jsonl"
+
+#: NOTHING ROTATES THE SHADOW LOG. It is recomputed from scratch each run
+#: (like CLV), so it gets slower as it grows — roughly 2-3 MB/day at the
+#: measured block rate. Warn rather than silently take longer; if this
+#: fires, either enforcement has been off for a long time or the caps need
+#: revisiting.
+SHADOW_LOG_WARN_BYTES = 100 * 1024 * 1024
+
 #: Read files in bounded chunks so a 50 MB log never lands in RAM whole.
 CHUNK_BYTES = 4_000_000
 
@@ -600,6 +619,109 @@ def _iter_file_chunked(path: Path) -> Iterable[str]:
 # ── the job ───────────────────────────────────────────────────────────
 
 
+def _shadow_risk(root: Path) -> Dict[str, Any]:
+    """Aggregate the aggregate-risk shadow log.
+
+    Deliberately NOT part of the archive/tail checkpoint machinery: this
+    file is append-only, is never rotated, and carries no fingerprints to
+    deduplicate on. Recomputed in full each run, like CLV.
+
+    ``available: False`` means the file is absent — which is the normal
+    state when the guard is ENFORCING, since nothing writes it then.
+    """
+    path = root / SHADOW_LOG_REL
+    out: Dict[str, Any] = {
+        "available": False,
+        "by_day_retention_days": SKIP_DAILY_DAYS,
+        "source": SHADOW_LOG_REL,
+        "note": (
+            "Trades the aggregate risk guard would have blocked and let "
+            "through (aggregate_risk.enforce: false). Verdicts are measured "
+            "against the UNCONSTRAINED book, so they identify which trades "
+            "touched a limit — not what a constrained portfolio would have "
+            "held. Pod-level caps (e.g. P-017 max_open_positions) are part "
+            "of each strategy's spec and still apply; they are not counted "
+            "here."
+        ),
+    }
+    if not path.exists():
+        return out
+
+    try:
+        size = path.stat().st_size
+        if size > SHADOW_LOG_WARN_BYTES:
+            logger.warning(
+                "aggregate-risk shadow log is %.0f MB and nothing rotates it "
+                "— this rebuild re-reads it in full every run",
+                size / 1e6)
+    except OSError:
+        size = 0
+
+    by_kind: Dict[str, int] = {}
+    by_pod: Dict[str, Dict[str, int]] = {}
+    by_day: Dict[str, Dict[str, int]] = {}
+    usd = 0.0
+    rows = 0
+    unparseable = 0
+    last_utc: Optional[str] = None
+
+    try:
+        for raw in _iter_file_chunked(path):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                rec = json.loads(raw)
+            except ValueError:
+                unparseable += 1
+                continue
+            if not isinstance(rec, dict):
+                unparseable += 1
+                continue
+
+            rows += 1
+            kind = str(rec.get("breach_kind") or "unknown")
+            pid = str(rec.get("pod_id") or DEFAULT_POD)
+            ts = rec.get("timestamp_utc")
+
+            by_kind[kind] = by_kind.get(kind, 0) + 1
+            by_pod.setdefault(pid, {})
+            by_pod[pid][kind] = by_pod[pid].get(kind, 0) + 1
+            usd += _f(rec.get("position_size_usd"))
+
+            day = _day(ts)
+            if day:
+                by_day.setdefault(day, {})
+                by_day[day][kind] = by_day[day].get(kind, 0) + 1
+            if isinstance(ts, str) and (last_utc is None or ts > last_utc):
+                last_utc = ts
+    except OSError as exc:
+        logger.warning("cannot read %s: %s", SHADOW_LOG_REL, exc)
+        return out
+
+    # Same retention as skip_reasons.by_day — lifetime totals stay whole.
+    if len(by_day) > SKIP_DAILY_DAYS:
+        for stale in sorted(by_day)[:-SKIP_DAILY_DAYS]:
+            by_day.pop(stale, None)
+
+    out.update({
+        "available": True,
+        "lifetime": {
+            "total": rows,
+            "usd_passed_through": round(usd, 2),
+            "by_kind": dict(sorted(by_kind.items(), key=lambda kv: -kv[1])),
+            "by_pod": {p: dict(sorted(c.items(), key=lambda kv: -kv[1]))
+                       for p, c in sorted(by_pod.items())},
+        },
+        "by_day": {d: dict(sorted(c.items(), key=lambda kv: -kv[1]))
+                   for d, c in sorted(by_day.items())},
+        "last_utc": last_utc,
+        "rows_unparseable": unparseable,
+        "bytes": size,
+    })
+    return out
+
+
 def build(root: Path, out_path: Path,
           full: bool = False) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Build the rollup. Returns ``(payload, summary)``; writes nothing."""
@@ -725,9 +847,13 @@ def build(root: Path, out_path: Path,
         ),
     }
 
+    # ── 5. aggregate-risk shadow log (unrotated — recomputed each run) ─
+    shadow = _shadow_risk(root)
+
     payload: Dict[str, Any] = {"schema": SCHEMA,
                               "built_at_utc": _now().isoformat()}
     payload.update(roll.core())
+    payload["shadow_risk"] = shadow
     payload["_checkpoint"] = checkpoint
     payload["_archived"] = archived_blob
 
@@ -748,6 +874,7 @@ def build(root: Path, out_path: Path,
         "realized_pnl": lt["realized_pnl"],
         "days": len(payload["daily"]),
         "pods": list(payload["by_pod"]),
+        "shadow_risk_rows": (shadow.get("lifetime") or {}).get("total", 0),
     }
     return payload, summary
 

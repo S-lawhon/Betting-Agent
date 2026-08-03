@@ -13,11 +13,41 @@ constraints:
 
 The AggregateRiskGuard wraps around PodRunner: it can veto scan
 cycles, throttle individual pods, or halt all trading.
+
+── SHADOW MODE (``enforce=False``, added 2026-08-02) ─────────────────
+During research the guard's job is inverted: it should MEASURE the
+portfolio constraint, not impose it.  Vetoing trades in paper corrupts
+the very estimates the research exists to produce, because the drops
+are not random — a trade is blocked when the book is already full,
+which correlates with periods of high opportunity density.  Deleting
+those observations and then comparing pods on the survivors biases
+every per-pod edge estimate, and the portfolio-wide daily-loss halt
+couples the pods to each other, so one pod's bad hour erases another
+pod's data.
+
+With ``enforce=False`` the guard evaluates every limit exactly as
+before, records the verdict, and then lets the trade through.  The
+asymmetry is the point: a veto is destructive and irreversible, a log
+is replayable.  From an unconstrained log you can reconstruct what any
+cap setting would have done; from a constrained log you can never
+recover the trades that were blocked.
+
+CAVEAT — the verdicts recorded in shadow mode are evaluated against
+the UNCONSTRAINED book (nothing was ever blocked, so exposure grows
+past the caps).  They tell you which trades touched a limit, not what
+the constrained portfolio would have held.  For that, replay the
+shadow log offline; it carries the pod, venue, size and exposure state
+at each decision, which is the raw material a replay needs.
+
+Shadow mode is PAPER-ONLY and fails closed: ``from_config`` refuses to
+disable enforcement unless the caller passes ``mode="paper"``.
 """
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from src.constants import DEFAULT_BANKROLL
@@ -36,8 +66,24 @@ class RiskSnapshot:
     daily_pnl: float
     daily_pnl_pct: float       # as fraction of bankroll
     open_positions: int
+    # `halted` means TRADING IS ACTUALLY STOPPED, and is consumed as
+    # such by health_check, manager/checks (raises service.*.halted),
+    # web_dashboard (engine_status) and both HTML templates.  In shadow
+    # mode nothing is stopped, so this stays False however bad the day
+    # is — reporting True there would page the whole monitoring stack
+    # for a halt that halted nothing.  Use `would_halt` for the
+    # observed state.
     halted: bool
     halt_reason: Optional[str] = None
+    # ── Shadow mode ─────────────────────────────────────────────────
+    # enforcing=False means the halt and the caps are OBSERVED, not
+    # applied: nothing was actually blocked.  shadow_counts maps a
+    # breach kind (total_exposure / venue_exposure / pod_exposure /
+    # position_count / halted) → how many trades would have been
+    # rejected since process start.
+    enforcing: bool = True
+    would_halt: bool = False
+    shadow_counts: Dict[str, int] = field(default_factory=dict)
 
 
 class AggregateRiskGuard:
@@ -55,6 +101,18 @@ class AggregateRiskGuard:
         if guard.check_pre_cycle():
             report = runner.run_once()
             guard.update_post_cycle(report)
+
+    Args:
+        enforce: When False the guard runs in SHADOW MODE — every limit
+            is still evaluated and every breach recorded, but no trade
+            or cycle is ever blocked.  See the module docstring for why
+            this is the right default during research and why it is
+            paper-only.
+        shadow_log_path: JSONL file that shadow verdicts are appended
+            to.  One line per would-have-been-blocked trade, carrying
+            the pod, venue, size and exposure state at decision time so
+            the constrained portfolio can be replayed offline.  None
+            keeps the counters but writes nothing.
     """
 
     def __init__(
@@ -67,6 +125,8 @@ class AggregateRiskGuard:
         max_open_positions: int = 20,
         cooldown_minutes: float = 60.0,
         exempt_pods: Optional[List[str]] = None,
+        enforce: bool = True,
+        shadow_log_path: Optional[Path] = None,
         _now_fn: Optional[Callable] = None,
     ):
         self.bankroll = bankroll
@@ -77,7 +137,16 @@ class AggregateRiskGuard:
         self.max_open_positions = max_open_positions
         self.cooldown_minutes = cooldown_minutes
         self.exempt_pods: set = set(exempt_pods or [])
+        self.enforce = enforce
+        self.shadow_log_path = Path(shadow_log_path) if shadow_log_path else None
         self._now_fn = _now_fn or (lambda: datetime.now(timezone.utc))
+
+        # Shadow bookkeeping: breach kind → count since process start.
+        self._shadow_counts: Dict[str, int] = {}
+        # Markets already recorded as blocked THIS cycle.  A market is
+        # checked more than once per scan (pod pre-check, then executor),
+        # and double-counting would overstate the constraint in replay.
+        self._shadow_blocked: set = set()
 
         # State
         self._halted = False
@@ -107,8 +176,17 @@ class AggregateRiskGuard:
         """Check if trading is allowed. Returns True if safe to scan.
 
         Checks halt status, cooldown, and exposure limits.
+
+        In shadow mode the halt state is still tracked and reported (so
+        ``snapshot().halted`` tells you the portfolio WOULD be halted),
+        but this always returns True — a portfolio-wide halt in paper
+        would blank every pod at once, which is the single most
+        damaging thing for per-pod attribution.
         """
         now = self._now_fn()
+
+        # Shadow dedup is per-cycle, same lifetime as reservations.
+        self._shadow_blocked.clear()
 
         # Backstop: reservations belong to one cycle.  update_post_cycle
         # normally clears them, but a cycle that dies before its callback
@@ -140,14 +218,16 @@ class AggregateRiskGuard:
                 "aggregate_risk: trading halted — %s",
                 self._halt_reason or "unknown reason",
             )
-            return False
+            if self.enforce:
+                return False
 
         # Check daily loss
         if self.bankroll > 0:
             daily_loss_pct = abs(min(0, self._daily_pnl)) / self.bankroll
             if daily_loss_pct >= self.max_daily_loss_pct:
                 self._halt("daily_loss_limit: {:.1%}".format(daily_loss_pct))
-                return False
+                if self.enforce:
+                    return False
 
         # Check total exposure
         total_exp = sum(self._open_positions.values())
@@ -184,6 +264,9 @@ class AggregateRiskGuard:
                     result.pod_id, result.venue, result.market_id,
                     usd,
                 )
+
+        # Shadow dedup has the same one-cycle lifetime as reservations.
+        self._shadow_blocked.clear()
 
         # Anything still reserved never became a position — release it.
         leaked = self.clear_reservations()
@@ -246,6 +329,93 @@ class AggregateRiskGuard:
         )
         return len(self._open_positions) + pending
 
+    def _evaluate_trade(
+        self, pod_id: str, venue: str, position_size_usd: float,
+        market_id: Optional[str] = None,
+    ) -> Optional[dict]:
+        """Evaluate a trade against every aggregate limit.
+
+        Pure measurement — never mutates state, never consults
+        ``self.enforce``.  ``check_trade`` decides what to DO with the
+        verdict; keeping the two apart is what makes shadow mode a
+        one-line branch instead of a second code path that can drift
+        out of sync with the enforcing one.
+
+        Returns:
+            None if the trade is within all limits, otherwise a dict
+            describing the first breach: ``kind``, ``detail``, and the
+            measured/limit fractions.
+        """
+        if self._halted:
+            return {
+                "kind": "halted",
+                "detail": self._halt_reason or "unknown reason",
+                "measured_pct": None,
+                "limit_pct": None,
+            }
+
+        is_exempt = pod_id in self.exempt_pods
+
+        # Check total exposure with this trade (exempt pods skip this)
+        if not is_exempt:
+            total_exp = (
+                sum(self._open_positions.values())
+                + self._reserved(exclude=market_id)
+                + position_size_usd
+            )
+            if self.bankroll > 0 and total_exp / self.bankroll > self.max_total_exposure_pct:
+                return {
+                    "kind": "total_exposure",
+                    "detail": "total exposure would be {:.1f}%".format(
+                        total_exp / self.bankroll * 100),
+                    "measured_pct": total_exp / self.bankroll,
+                    "limit_pct": self.max_total_exposure_pct,
+                }
+
+        # Check venue exposure
+        venue_exp = (
+            self._venue_exposure.get(venue, 0)
+            + self._reserved(venue=venue, exclude=market_id)
+            + position_size_usd
+        )
+        if self.bankroll > 0 and venue_exp / self.bankroll > self.max_venue_exposure_pct:
+            return {
+                "kind": "venue_exposure",
+                "detail": "{} exposure would be {:.1f}%".format(
+                    venue, venue_exp / self.bankroll * 100),
+                "measured_pct": venue_exp / self.bankroll,
+                "limit_pct": self.max_venue_exposure_pct,
+            }
+
+        # Check per-pod exposure
+        pod_exp = (
+            self._pod_exposure.get(pod_id, 0)
+            + self._reserved(pod_id=pod_id, exclude=market_id)
+            + position_size_usd
+        )
+        if self.bankroll > 0 and pod_exp / self.bankroll > self.max_pod_exposure_pct:
+            return {
+                "kind": "pod_exposure",
+                "detail": "{} exposure would be {:.1f}% (max {:.1f}%)".format(
+                    pod_id, pod_exp / self.bankroll * 100,
+                    self.max_pod_exposure_pct * 100),
+                "measured_pct": pod_exp / self.bankroll,
+                "limit_pct": self.max_pod_exposure_pct,
+            }
+
+        # Check total open positions
+        count = self._position_count(exclude=market_id)
+        if count >= self.max_open_positions:
+            return {
+                "kind": "position_count",
+                "detail": "{} open positions (max {})".format(
+                    count, self.max_open_positions),
+                "measured_pct": None,
+                "limit_pct": None,
+            }
+
+        return None
+
     def check_trade(
         self, pod_id: str, venue: str, position_size_usd: float,
         market_id: Optional[str] = None,
@@ -261,67 +431,93 @@ class AggregateRiskGuard:
         trickling positions out across cycles.  This is a read-only
         check — call ``reserve_trade`` to hold the capacity.
 
+        In SHADOW MODE (``enforce=False``) a breach is recorded to the
+        shadow log and the counters, then approved anyway.
+
         Args:
             market_id: If this trade already holds a reservation, pass its
                 market_id so the reservation isn't counted against itself.
         """
-        if self._halted:
-            return False
-
-        is_exempt = pod_id in self.exempt_pods
-
-        # Check total exposure with this trade (exempt pods skip this)
-        if not is_exempt:
-            total_exp = (
-                sum(self._open_positions.values())
-                + self._reserved(exclude=market_id)
-                + position_size_usd
-            )
-            if self.bankroll > 0 and total_exp / self.bankroll > self.max_total_exposure_pct:
-                logger.debug(
-                    "aggregate_risk: trade rejected — total exposure would be %.1f%%",
-                    total_exp / self.bankroll * 100,
-                )
-                return False
-
-        # Check venue exposure
-        venue_exp = (
-            self._venue_exposure.get(venue, 0)
-            + self._reserved(venue=venue, exclude=market_id)
-            + position_size_usd
+        breach = self._evaluate_trade(
+            pod_id, venue, position_size_usd, market_id=market_id,
         )
-        if self.bankroll > 0 and venue_exp / self.bankroll > self.max_venue_exposure_pct:
-            logger.debug(
-                "aggregate_risk: trade rejected — %s exposure would be %.1f%%",
-                venue, venue_exp / self.bankroll * 100,
-            )
+        if breach is None:
+            return True
+
+        if self.enforce:
+            logger.debug("aggregate_risk: trade rejected — %s", breach["detail"])
             return False
 
-        # Check per-pod exposure
-        pod_exp = (
-            self._pod_exposure.get(pod_id, 0)
-            + self._reserved(pod_id=pod_id, exclude=market_id)
-            + position_size_usd
-        )
-        if self.bankroll > 0 and pod_exp / self.bankroll > self.max_pod_exposure_pct:
-            logger.debug(
-                "aggregate_risk: trade rejected — %s exposure would be %.1f%% "
-                "(max %.1f%%)",
-                pod_id, pod_exp / self.bankroll * 100,
-                self.max_pod_exposure_pct * 100,
-            )
-            return False
-
-        # Check total open positions
-        count = self._position_count(exclude=market_id)
-        if count >= self.max_open_positions:
-            logger.debug(
-                "aggregate_risk: trade rejected — %d open positions (max %d)",
-                count, self.max_open_positions,
-            )
-            return False
-
+        self._record_shadow(breach, pod_id, venue, position_size_usd, market_id)
         return True
+
+    # ── Shadow recording ────────────────────────────────────────────
+
+    def _record_shadow(
+        self, breach: dict, pod_id: str, venue: str,
+        position_size_usd: float, market_id: Optional[str],
+    ) -> None:
+        """Record a trade that WOULD have been blocked, and let it through.
+
+        Deduplicated per market per cycle: the same trade is checked by
+        the pod and again by the executor, and counting it twice would
+        overstate the constraint when the log is replayed.  A trade with
+        no market_id cannot be deduplicated and is always recorded.
+        """
+        if market_id:
+            if market_id in self._shadow_blocked:
+                return
+            self._shadow_blocked.add(market_id)
+
+        kind = breach["kind"]
+        self._shadow_counts[kind] = self._shadow_counts.get(kind, 0) + 1
+
+        logger.info(
+            "aggregate_risk[shadow]: would have rejected %s %s $%.2f — %s "
+            "(allowed through: enforce=False)",
+            pod_id, market_id or venue, position_size_usd, breach["detail"],
+        )
+
+        if self.shadow_log_path is None:
+            return
+
+        # Exposure state at decision time is what makes the log
+        # replayable — a reconstruction needs to know what the book
+        # looked like, not just that a limit was touched.
+        record = {
+            "timestamp_utc": self._now_fn().isoformat(),
+            "pod_id": pod_id,
+            "venue": venue,
+            "market_id": market_id,
+            "position_size_usd": position_size_usd,
+            "breach_kind": kind,
+            "breach_detail": breach["detail"],
+            "measured_pct": breach["measured_pct"],
+            "limit_pct": breach["limit_pct"],
+            "bankroll": self.bankroll,
+            "total_exposure_usd": sum(self._open_positions.values()),
+            "reserved_usd": self._reserved(),
+            "venue_exposure_usd": self._venue_exposure.get(venue, 0.0),
+            "pod_exposure_usd": self._pod_exposure.get(pod_id, 0.0),
+            "open_positions": len(self._open_positions),
+            "daily_pnl": self._daily_pnl,
+            "halted": self._halted,
+        }
+        try:
+            self.shadow_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.shadow_log_path, "a") as fh:
+                fh.write(json.dumps(record) + "\n")
+        except Exception as exc:      # noqa: BLE001
+            # Never let observability break the scan loop.
+            logger.warning(
+                "aggregate_risk: shadow log write failed (%s): %s",
+                self.shadow_log_path, exc,
+            )
+
+    @property
+    def shadow_counts(self) -> Dict[str, int]:
+        """Breach kind → trades let through since process start."""
+        return dict(self._shadow_counts)
 
     # ── Intra-cycle reservations ────────────────────────────────────
 
@@ -439,8 +635,12 @@ class AggregateRiskGuard:
             daily_pnl=self._daily_pnl,
             daily_pnl_pct=self._daily_pnl / self.bankroll if self.bankroll > 0 else 0,
             open_positions=len(self._open_positions),
-            halted=self._halted,
+            # Actually stopped vs merely observed — see RiskSnapshot.
+            halted=self._halted and self.enforce,
             halt_reason=self._halt_reason,
+            enforcing=self.enforce,
+            would_halt=self._halted,
+            shadow_counts=dict(self._shadow_counts),
         )
 
     @property
@@ -583,10 +783,47 @@ class AggregateRiskGuard:
             logger.warning("aggregate_risk: bootstrap_from_trade_log failed: %s", exc)
 
     @classmethod
-    def from_config(cls, config: dict) -> "AggregateRiskGuard":
-        """Build from config dict."""
+    def from_config(
+        cls, config: dict, mode: Optional[str] = None,
+    ) -> "AggregateRiskGuard":
+        """Build from config dict.
+
+        Args:
+            mode: Execution mode of the process being built ("paper" or
+                "live").  Shadow mode (``aggregate_risk.enforce: false``)
+                is honoured ONLY when this is "paper".  Any other value,
+                including the default None, forces enforcement on and
+                logs an error.
+
+                This fails closed on purpose.  The repo runs live units
+                (P-016 `betting-live-maker`, P-029 on subaccount 1) off
+                the same config tree, and a repo-wide research flag that
+                silently disarmed a live guard is exactly the failure
+                this project has already had once with the loss guard.
+                A caller that cannot state its mode does not get to
+                disable the guard.
+        """
         risk_cfg = config.get("risk", {})
         agg_cfg = config.get("aggregate_risk", {})
+
+        enforce = bool(agg_cfg.get("enforce", True))
+        if not enforce and mode != "paper":
+            logger.error(
+                "aggregate_risk: config requests enforce=false (shadow mode) "
+                "but execution mode is %r, not 'paper' — FORCING enforcement "
+                "ON. Shadow mode is paper-only.",
+                mode,
+            )
+            enforce = True
+
+        shadow_log = agg_cfg.get("shadow_log")
+        if not enforce:
+            logger.warning(
+                "aggregate_risk: SHADOW MODE — limits are measured and "
+                "recorded but NOT enforced. No trade or cycle will be "
+                "blocked. Shadow log: %s", shadow_log or "(counters only)",
+            )
+
         return cls(
             bankroll=risk_cfg.get("initial_bankroll", DEFAULT_BANKROLL),
             max_total_exposure_pct=agg_cfg.get("max_total_exposure_pct", 0.50),
@@ -596,4 +833,6 @@ class AggregateRiskGuard:
             max_open_positions=agg_cfg.get("max_open_positions", 20),
             cooldown_minutes=agg_cfg.get("cooldown_minutes", 60.0),
             exempt_pods=agg_cfg.get("exempt_pods", []),
+            enforce=enforce,
+            shadow_log_path=Path(shadow_log) if shadow_log else None,
         )

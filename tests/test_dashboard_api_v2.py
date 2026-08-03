@@ -736,6 +736,53 @@ def test_skip_reasons_window_and_lifetime():
     assert sk["coverage"]["rows_missing_pod_id"] == 630
 
 
+# ── aggregate-risk shadow ─────────────────────────────────────────────
+
+
+def test_shadow_risk_absent_reads_as_enforcing_not_as_zero():
+    """No shadow section means the guard is ENFORCING. The panel must say
+    so rather than render an empty shadow card."""
+    sh = api.build_v2(src(rollup=ROLLUP,
+                          sources=sources(rollup=meta())))["pipeline"]["shadow_risk"]
+    assert sh["available"] is False
+    assert sh["enforcing"] is True
+    assert sh["reason"]
+
+
+def test_shadow_risk_window_and_lifetime():
+    import copy
+    from datetime import datetime, timedelta, timezone
+
+    ru = copy.deepcopy(ROLLUP)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    old = (datetime.now(timezone.utc)
+           - timedelta(days=api.SKIP_WINDOW_DAYS + 5)).strftime("%Y-%m-%d")
+    ru["shadow_risk"] = {
+        "available": True,
+        "by_day_retention_days": 45,
+        "lifetime": {
+            "total": 140, "usd_passed_through": 3500.0,
+            "by_kind": {"venue_exposure": 100, "total_exposure": 40},
+            "by_pod": {"P-017": {"venue_exposure": 100}},
+        },
+        "by_day": {today: {"venue_exposure": 12},
+                   old: {"total_exposure": 40}},
+        "last_utc": today + "T12:00:00+00:00",
+        "note": "n",
+    }
+    sh = api.build_v2(src(rollup=ru,
+                          sources=sources(rollup=meta())))["pipeline"]["shadow_risk"]
+
+    assert sh["available"] is True
+    assert sh["enforcing"] is False
+    assert sh["lifetime_total"] == 140
+    assert sh["usd_passed_through"] == 3500.0
+    assert sh["lifetime"][0] == ["venue_exposure", 100]
+    # The stale day falls outside the window; the recent one does not.
+    assert sh["windowed"] == [["venue_exposure", 12]]
+    assert sh["lifetime_by_pod"]["P-017"] == [["venue_exposure", 100]]
+
+
 # ── findings ──────────────────────────────────────────────────────────
 
 

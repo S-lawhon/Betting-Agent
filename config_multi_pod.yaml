@@ -106,12 +106,54 @@ cross_venue_matcher:
 
 # ── Aggregate risk ─────────────────────────────────────────────────
 aggregate_risk:
+  # ── SHADOW MODE (2026-08-02) ──────────────────────────────────────
+  # While the fund is in research and no money is live, the guard
+  # MEASURES the portfolio constraint instead of imposing it. Every
+  # limit below is still evaluated and every breach recorded, but no
+  # trade or cycle is blocked.
+  #
+  # WHY: vetoing paper trades corrupts the estimates the research
+  # exists to produce. A trade is dropped when the book is already
+  # full, which correlates with high opportunity density — so the
+  # skips delete observations from busy regimes and keep the quiet
+  # ones, and pods are then compared on the survivors. The portfolio-
+  # wide daily-loss halt is worse: it couples the pods, so one pod's
+  # bad hour blanks every other pod's data collection for 60 minutes.
+  # With the pod set changing constantly, that also means trades from
+  # before and after a pod is added are not comparable.
+  #
+  # A veto is destructive; a log is replayable. shadow_log records the
+  # pod, venue, size and exposure state at every blocked decision, so
+  # any cap setting can be reconstructed offline. The reverse is
+  # impossible.
+  #
+  # NOTE the caps below are NOT dead while this is false — they still
+  # determine what gets recorded. Keep them meaningful.
+  #
+  # PAPER-ONLY, FAILS CLOSED: from_config forces enforcement back on
+  # unless the process declares mode="paper". The P-016/P-029 live
+  # units and the P-022 standalone maker are unaffected by this flag.
+  #
+  # FLIP THIS BACK TO true BEFORE FUNDING ANYTHING.
+  enforce: false
+  shadow_log: data/trade_logs/aggregate_risk_shadow.jsonl
+
   max_total_exposure_pct: 0.50   # 50% of bankroll across all pods
+  # NOTE: with P-002/P-006 shelved, every pod trades Kalshi — so this
+  # 30% ($300 of the $1k paper bankroll) is the cap that actually binds
+  # first, not the 50% total above.
   max_venue_exposure_pct: 0.30   # 30% of bankroll per venue
   max_pod_exposure_pct:   0.25   # 25% of bankroll per pod
   max_open_positions:     200
+  # Was inherited from `risk:` by from_config's default (0.05 = $50 on a
+  # $1k bankroll, halting EVERY pod for 60 min). Set explicitly so it is
+  # visible rather than defaulted; under enforce: false it is recorded,
+  # not applied.
+  max_daily_loss_pct:     0.05
   cooldown_minutes:       60.0
   exempt_pods:                   # Pods that bypass aggregate exposure cap
+    # NOTE: exempt_pods bypasses ONLY the total-exposure check. Venue,
+    # per-pod, position-count and halt checks still apply to these pods.
     - P-014                      # Live Game Agent — trades even when portfolio is over 50%
 
 # ── Settlement ──────────────────────────────────────────────────────

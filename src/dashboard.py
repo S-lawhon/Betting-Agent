@@ -137,27 +137,56 @@ def render_risk_panel(
     pos      = snapshot.open_positions
     halted   = snapshot.halted
     reason   = getattr(snapshot, "halt_reason", None) or ""
+    enforcing = getattr(snapshot, "enforcing", True)
+    would_halt = getattr(snapshot, "would_halt", False)
+    shadow    = getattr(snapshot, "shadow_counts", None) or {}
 
     # P&L with colour applied *after* formatting (correct ANSI alignment)
     pnl_plain = _pnl_str(dpnl)
     pnl_text  = _col(pnl_plain, _pnl_color(dpnl)) if use_color else pnl_plain
 
-    # Status
+    # Status.  In shadow mode a halt is OBSERVED, not applied — saying
+    # plain "HALTED" would read as "the engine stopped trading", which
+    # is the opposite of what happened.
     if halted:
         status_plain = "HALTED" + (f" — {reason}" if reason else "")
         status_text  = _col(status_plain, _C.RED, bold=True)
+    elif would_halt:
+        status_plain = "ACTIVE (would be halted"
+        status_plain += f": {reason})" if reason else ")"
+        status_text   = _col(status_plain, _C.YELLOW, bold=True)
     else:
         status_text = _col("ACTIVE", _C.GREEN, bold=True)
 
     title = _col("  RISK SNAPSHOT", _C.CYAN, bold=True)
+    if not enforcing:
+        title += _col("  [SHADOW — limits measured, not enforced]", _C.YELLOW)
 
-    return [
+    lines = [
         title,
         f"  {'Exposure':<14} ${exp_usd:>10,.2f}  ({exp_pct:.1f}%)",
         f"  {'Daily P&L':<14} {pnl_text}  ({dpnl_pct:+.2f}%)",
         f"  {'Positions':<14} {pos} open",
         f"  {'Status':<14} {status_text}",
     ]
+
+    # Trades the guard WOULD have blocked and let through anyway. This
+    # is the number the shadow run exists to produce — it is the size of
+    # the constraint the strategies will meet once enforcement is back
+    # on, without having paid for it in lost sample.
+    if not enforcing and shadow:
+        total = sum(shadow.values())
+        detail = ", ".join(
+            f"{kind}={n}" for kind, n in sorted(
+                shadow.items(), key=lambda kv: -kv[1])
+        )
+        lines.append(
+            f"  {'Shadow':<14} "
+            + _col(f"{total} trade(s) passed through", _C.YELLOW)
+        )
+        lines.append(f"  {'':<14} {detail}")
+
+    return lines
 
 
 def render_cycle_panel(

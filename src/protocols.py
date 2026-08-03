@@ -129,6 +129,13 @@ class AggregateRiskProtocol(Protocol):
     and ``release_reservation(market_id)``.  These are deliberately NOT
     part of the protocol: callers probe for them with ``getattr`` and
     fall back to ``check_trade``, so a minimal double stays conformant.
+
+    Callers must not infer that a True verdict means the trade is within
+    limits.  A guard in SHADOW MODE (``enforce=False``) evaluates every
+    limit, records the breach, and returns True anyway — enforcement is
+    the guard's decision, not the caller's.  Do not add a call site that
+    re-derives a limit locally to "double check"; it would silently
+    reinstate the veto that shadow mode exists to remove.
     """
 
     def check_trade(

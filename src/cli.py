@@ -213,7 +213,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     shared = build_shared_deps(config, clients)
 
     allocator = CapitalAllocator.from_config(config)
-    guard = AggregateRiskGuard.from_config(config)
+    # Shadow mode (aggregate_risk.enforce: false) is honoured only for a
+    # paper process; from_config fails closed on any other mode.
+    #
+    # `--mode` defaults to None, and this engine is paper unless the flag
+    # says otherwise (BasePod defaults to mode="paper", and going live
+    # requires passing --mode live), so None resolves to "paper" here.
+    # The live-capable surfaces — the P-016 maker and P-029 — are
+    # SEPARATE systemd units that do not build their guard through this
+    # path, and the P-022 standalone maker calls from_config() with no
+    # mode at all, so they all stay enforcing regardless of config.
+    engine_mode = args.mode or "paper"
+    guard = AggregateRiskGuard.from_config(config, mode=engine_mode)
 
     shared["aggregate_risk"] = guard
 

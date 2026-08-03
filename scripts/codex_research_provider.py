@@ -31,7 +31,11 @@ class CodexProviderError(RuntimeError):
 def _safe_stderr(stderr: str) -> str:
     """Return one bounded, credential-redacted diagnostic line."""
     lines = [line.strip() for line in stderr.splitlines() if line.strip()]
-    diagnostic = lines[-1] if lines else "no stderr"
+    informative = [line for line in lines if re.search(
+        r"(?i)\b(error|failed|invalid|denied|unsupported|unavailable|not found)\b",
+        line)]
+    diagnostic = informative[-1] if informative else (
+        lines[-1] if lines else "no stderr")
     patterns = (
         r"(?i)(bearer\s+)(\S+)",
         r"(?i)(authorization\s*[:=]\s*)(\S+)",

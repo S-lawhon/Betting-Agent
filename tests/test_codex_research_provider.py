@@ -89,6 +89,12 @@ def test_stderr_diagnostic_is_bounded_and_redacts_credentials():
     assert len(diagnostic) <= 500
 
 
+def test_stderr_diagnostic_prefers_error_over_trailing_progress():
+    diagnostic = _safe_stderr(
+        "error: invalid value for --model\nReading additional input from stdin...\n")
+    assert diagnostic == "error: invalid value for --model"
+
+
 def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():
     service = Path(
         "scripts/systemd/research-agent-codex-pilot.service").read_text()

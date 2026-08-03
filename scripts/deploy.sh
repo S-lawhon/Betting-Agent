@@ -3,7 +3,7 @@
 # scripts/deploy.sh
 # Push the Betting Pod Shop project to your DigitalOcean server.
 #
-# Usage (from your Mac, inside the Betting Fund Project folder):
+# Usage (local shell or CI checkout, inside the repository root):
 #   bash scripts/deploy.sh YOUR_SERVER_IP           # sync only
 #   bash scripts/deploy.sh YOUR_SERVER_IP restart    # sync + restart service
 #
@@ -91,6 +91,10 @@ echo "==> Running local tests ..."
 if ! "$PYTHON" -m pytest tests/ -q --tb=no 2>&1 | tail -3; then
   echo ""
   echo "WARNING: Some tests failed. Review output above."
+  if [[ "${CI:-}" == "true" || ! -t 0 ]]; then
+    echo "CI/non-interactive mode detected; aborting deploy on test failure."
+    exit 1
+  fi
   read -p "Continue with deploy? [y/N] " -n 1 -r
   echo ""
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then

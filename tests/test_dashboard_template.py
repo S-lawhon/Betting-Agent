@@ -95,6 +95,13 @@ def test_crossvenue_research_has_a_dashboard_surface(html):
     assert "missing PX" in html
     assert "cvPxSandbox.ready_sports" in html
     assert "cvPxSandbox.blocked_sports" in html
+
+
+def test_research_worker_mode_and_model_budget_have_dashboard_surface(html):
+    assert "operations.worker" in html
+    assert "worker.provider_configured" in html
+    assert "workerUsage.hard_cost_limit_usd" in html
+    assert "model-invoked" in html
     assert "quote completeness" in html
     assert "persistent episodes" in html
     assert "research alerts" in html

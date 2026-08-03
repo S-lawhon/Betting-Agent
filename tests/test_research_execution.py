@@ -11,6 +11,8 @@ from src.research_execution import (
     claim_next,
     complete_claim,
     execution_status,
+    mark_claim_invoked,
+    preview_next,
     release_claim,
 )
 
@@ -47,6 +49,44 @@ def test_claim_is_priority_ordered_and_prevents_double_claim(tmp_path):
     assert first and first.assignment_id == "a2"
     assert second and second.assignment_id == "a1"
     assert execution_status(state, now=NOW)["active"] == 2
+
+
+def test_preview_is_read_only_and_uses_claim_availability(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    state = tmp_path / "execution"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    packet(dispatches / "strategy-scout/a1.json", "a1", "high", 70)
+
+    preview = preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, now=NOW)
+
+    assert preview and preview[1]["assignment_id"] == "a1"
+    assert not state.exists()
+
+
+def test_model_invocation_is_attached_once_to_active_claim(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    state = tmp_path / "execution"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    packet(dispatches / "strategy-scout/a1.json", "a1", "high", 70)
+    claim = claim_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="worker-1", now=NOW)
+    path = state / "claims/strategy-scout/a1.json"
+
+    marked = mark_claim_invoked(
+        claim_path=path, state_dir=state, provider="fake", model="fixture",
+        budget={"max_cost_usd": 1}, now=NOW)
+
+    assert claim and marked["model_invocation_tracked"] is True
+    assert marked["provider"] == "fake"
+    with pytest.raises(ResearchExecutionError, match="already recorded"):
+        mark_claim_invoked(
+            claim_path=path, state_dir=state, provider="fake", model="fixture",
+            budget={}, now=NOW)
 
 
 def test_expired_claim_is_recovered(tmp_path):

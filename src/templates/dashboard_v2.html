@@ -1094,6 +1094,7 @@ function renderResearchPipeline(r){
   var dispatch = r.dispatch || {}, pending = dispatch.pending_review;
   var operations = r.operations || {}, activity = operations.activity_24h || {};
   var queue = operations.queue || {}, semantics = operations.semantics || {};
+  var worker = operations.worker || {}, workerUsage = worker.daily_usage || {};
   var health = r.collector_health || {}, zeroFeeds = health.zero_academic_feeds || [];
   var expectedFeeds = health.expected_empty_academic_feeds || [];
   var quality = r.quality_control || {};
@@ -1104,12 +1105,19 @@ function renderResearchPipeline(r){
       (semantics.started_tracking_available === true ? "tracked" : "not tracked") +
       "; model invocation is " +
       (semantics.agent_invocation_tracked === true ? "tracked" : "not tracked") +
-      "; completion requires a durable research disposition."
+      "; completion requires a durable research disposition." +
+      (worker.status && worker.status !== "unavailable" ?
+        " Worker: " + (worker.mode || "unknown") + " / " + worker.status +
+        " / provider " + (worker.provider_configured ? "configured" : "not configured") +
+        " / next " + (worker.assignment_id || "none") +
+        " / daily model cost $" + numTxt(workerUsage.cost_usd) +
+        " of $" + numTxt(workerUsage.hard_cost_limit_usd) + "." : "")
     : (r.reason || "research metrics unavailable");
   el("r-day").textContent = r.available && operations.window_hours
     ? "Last " + numTxt(operations.window_hours) + "h: " +
       numTxt(activity.dispatched) + " dispatched · " +
       numTxt(activity.started) + " started · " +
+      numTxt(activity.invoked) + " model-invoked · " +
       numTxt(activity.reviewed) + " reviewed · " +
       numTxt(activity.advance) + " advanced · " +
       numTxt(activity.reject) + " rejected · " +

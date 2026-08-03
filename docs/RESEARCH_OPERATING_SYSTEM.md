@@ -266,6 +266,28 @@ completion signal.
 Maintain a 15–20% exploration floor even after source metrics accumulate. A
 small early sample must not permanently starve new sources or market families.
 
+## Autonomous research worker
+
+Phase 1 turns the deterministic dispatch queue into a provider-neutral worker
+contract without enabling model spend. `scripts.run_research_agent_worker`
+selects the highest-priority available packet, validates its agent prompt and
+allocated research minutes, reserves against hard token/cost/time ceilings, and
+emits a secret-free plan summary. Dry-run mode does not create a claim, invoke a
+model, or write a disposition.
+
+The execution path exists for integration testing but is triply gated: runtime
+configuration must be enabled, configuration mode must be `execute`, and the
+caller must pass `--execute`. A provider receives JSON over stdin without a
+shell and inherits only explicitly allow-listed environment variables. Output
+must include measured usage, a valid `ResearchDisposition`, and an artifact
+allowed for the assigned role. Budget violations and invalid artifacts release
+the claim and are recorded as failed attempts; they never count as completed
+research.
+
+`research-agent-worker.service` remains network-denied in Phase 1. Do not add a
+provider key or network egress to that unit. Phase 2 requires a separate review
+of provider selection, model budget, filesystem permissions, and tool access.
+
 ## Current limitations
 
 - The CFTC collector parses official filing tables; a site markup change will

@@ -200,3 +200,38 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(
                 health["expected_empty_academic_feeds"], ["feed:arxiv"])
             self.assertEqual(health["unexpected_zero_academic_feeds"], [])
+
+    def test_worker_status_enables_invocation_tracking_without_implying_invocation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("assignments", "dispositions", "triage", "execution"):
+                (root / name).mkdir()
+            (root / "execution/worker_status.json").write_text(json.dumps({
+                "generated_at": "2026-08-03T12:00:00Z",
+                "worker_id": "research-runtime-v1", "status": "dry_run",
+                "mode": "dry_run", "provider_configured": False,
+                "invocation_tracking_available": True,
+                "assignment_id": "a1",
+                "daily_usage": {"attempts": 0, "cost_usd": 0,
+                                "hard_cost_limit_usd": 10},
+                "limits": {"max_cost_usd_per_day": 10},
+                "safety": {"model_invoked": False},
+            }))
+            output = root / "metrics.json"
+
+            self.assertEqual(main([
+                "--assignments-dir", str(root / "assignments"),
+                "--dispositions-dir", str(root / "dispositions"),
+                "--dispatches-dir", str(root / "triage"),
+                "--execution-dir", str(root / "execution"),
+                "--intake-manifest", str(root / "missing.json"),
+                "--output", str(output),
+                "--now", "2026-08-03T12:00:00Z",
+            ]), 0)
+            operations = json.loads(output.read_text())["operations"]
+
+            self.assertTrue(operations["semantics"]["agent_invocation_tracked"])
+            self.assertEqual(operations["activity_24h"]["invoked"], 0)
+            self.assertEqual(operations["worker"]["status"], "dry_run")
+            self.assertFalse(operations["worker"]["provider_configured"])
+            self.assertEqual(operations["worker"]["daily_usage"]["cost_usd"], 0)

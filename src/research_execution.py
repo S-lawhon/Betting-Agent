@@ -158,6 +158,33 @@ def _ranked_packets(dispatches_dir: Path, agent: Optional[str]) -> List[Tuple[Pa
     return packets
 
 
+def preview_next(
+    *, dispatches_dir: Path, state_dir: Path, dispositions_dir: Path,
+    agent: Optional[str] = None, now: Optional[datetime] = None,
+) -> Optional[Tuple[Path, Dict[str, Any]]]:
+    """Return the next available packet without mutating claim state.
+
+    Expired leases are treated as available, but are not archived here. The
+    mutating ``claim_next`` call performs that recovery under the state lock.
+    """
+    now = now or datetime.now(timezone.utc)
+    active_ids = set()
+    for path in (state_dir / "claims").glob("*/*.json"):
+        payload = _read_json(path)
+        expires = _parse_time(payload.get("lease_expires_at"))
+        if expires and expires > now:
+            active_ids.add(str(payload.get("assignment_id") or path.stem))
+    disposition_ids = set()
+    for path in dispositions_dir.glob("*.json"):
+        payload = _read_json(path)
+        disposition_ids.add(str(payload.get("assignment_id") or path.stem))
+    for packet_path, packet in _ranked_packets(dispatches_dir, agent):
+        assignment_id = str(packet["assignment_id"])
+        if assignment_id not in active_ids and assignment_id not in disposition_ids:
+            return packet_path, packet
+    return None
+
+
 def claim_next(
     *,
     dispatches_dir: Path,
@@ -270,6 +297,43 @@ def complete_claim(
             "decision": disposition.decision,
         })
         return disposition
+
+
+def mark_claim_invoked(
+    *, claim_path: Path, state_dir: Path, provider: str, model: str,
+    budget: Mapping[str, Any], now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Attach a model invocation to an active claim before accepting output."""
+    if not provider.strip() or not model.strip():
+        raise ResearchExecutionError("provider and model are required")
+    now = now or datetime.now(timezone.utc)
+    with _state_lock(state_dir):
+        payload = _read_json(claim_path)
+        if not payload:
+            raise ResearchExecutionError("active claim does not exist")
+        expires = _parse_time(payload.get("lease_expires_at"))
+        if not expires or expires <= now:
+            raise ResearchExecutionError("claim lease has expired")
+        if payload.get("model_invocation_tracked"):
+            raise ResearchExecutionError("claim invocation is already recorded")
+        payload.update({
+            "model_invocation_tracked": True,
+            "invoked_at": _utc_iso(now),
+            "provider": provider.strip(),
+            "model": model.strip(),
+            "invocation_budget": dict(budget),
+        })
+        _write_atomic(claim_path, payload)
+        _append_event(state_dir, {
+            "event": "model_invoked", "at": _utc_iso(now),
+            "claim_id": payload.get("claim_id"),
+            "assignment_id": payload.get("assignment_id"),
+            "worker_id": payload.get("worker_id"),
+            "assigned_agent": payload.get("assigned_agent"),
+            "provider": provider.strip(), "model": model.strip(),
+            "budget": dict(budget),
+        })
+        return payload
 
 
 def release_claim(

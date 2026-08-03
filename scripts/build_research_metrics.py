@@ -10,7 +10,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -122,6 +122,7 @@ def _research_operations(
     claims: List[Dict[str, Any]],
     *,
     now: datetime,
+    worker_status: Optional[Mapping[str, Any]] = None,
     window_hours: int = 24,
     overdue_hours: int = 48,
 ) -> Dict[str, Any]:
@@ -185,6 +186,12 @@ def _research_operations(
             if claimed_at and claimed_at >= cutoff:
                 row["started_24h"] += 1
                 activity["started"] += 1
+            if claim.get("model_invocation_tracked"):
+                row["invoked"] += 1
+                invoked_at = _parse_timestamp(claim.get("invoked_at"))
+                if invoked_at and invoked_at >= cutoff:
+                    row["invoked_24h"] += 1
+                    activity["invoked"] += 1
 
         disposition = latest_disposition.get(assignment_id)
         completed = bool(disposition) and (
@@ -233,7 +240,7 @@ def _research_operations(
                 "dispatched", "pending", "overdue", "reviewed", "advance",
                 "reject", "defer", "allocated_minutes", "research_minutes",
                 "started", "in_progress", "stale_claims", "dispatched_24h",
-                "started_24h", "reviewed_24h", "advance_24h",
+                "started_24h", "invoked", "invoked_24h", "reviewed_24h", "advance_24h",
                 "reject_24h", "defer_24h", "research_minutes_24h")
         } | {
             "pending": pending,
@@ -252,10 +259,21 @@ def _research_operations(
     total_overdue = sum(item["overdue"] for item in agent_stats.values())
     total_in_progress = sum(item["in_progress"] for item in agent_stats.values())
     total_stale_claims = sum(item["stale_claims"] for item in agent_stats.values())
+    worker_status = dict(worker_status or {})
+    worker = ({
+        key: worker_status.get(key) for key in (
+            "generated_at", "worker_id", "status", "mode",
+            "provider_configured", "invocation_tracking_available",
+            "assignment_id", "error", "daily_usage", "limits", "safety")
+    } if worker_status else {
+        "status": "unavailable", "mode": None,
+        "invocation_tracking_available": False,
+    })
     return {
         "semantics": {
             "dispatch_means": "task_packet_created",
-            "agent_invocation_tracked": False,
+            "agent_invocation_tracked": bool(
+                worker.get("invocation_tracking_available")),
             "started_tracking_available": True,
             "started_means": "active_worker_claim_created",
             "completion_signal": "durable_research_disposition",
@@ -264,7 +282,7 @@ def _research_operations(
         "overdue_after_hours": overdue_hours,
         "activity_24h": {
             key: activity[key] for key in (
-                "dispatched", "started", "reviewed", "advance", "reject", "defer",
+                "dispatched", "started", "invoked", "reviewed", "advance", "reject", "defer",
                 "research_minutes")
         },
         "queue": {
@@ -281,6 +299,7 @@ def _research_operations(
                 if oldest_pending else None),
         },
         "agents": agents,
+        "worker": worker,
     }
 
 
@@ -405,8 +424,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             triage_manifest.get("quarantined_assignment_ids") or {}),
     }
     generated_at = _parse_now(args.now)
+    worker_status = _read_json(args.execution_dir / "worker_status.json", {})
     metrics["operations"] = _research_operations(
-        assignments, dispositions, dispatches, claims, now=generated_at)
+        assignments, dispositions, dispatches, claims, now=generated_at,
+        worker_status=worker_status)
     metrics["generated_at"] = generated_at.isoformat().replace("+00:00", "Z")
     _write_atomic(args.output, metrics)
     print(

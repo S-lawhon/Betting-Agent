@@ -1,0 +1,31 @@
+[Unit]
+Description=Betting Pod Shop — research agent worker dry-run planner
+After=research-intake.service
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_agent_worker
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=research-agent-worker
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=160M
+TimeoutStartSec=120
+
+# Phase 1 has no provider and no network. Do not loosen this for Phase 2 without
+# a separate review of provider credentials, tool permissions, and egress.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/research_execution
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+

@@ -1,0 +1,12 @@
+[Unit]
+Description=Betting Pod Shop — hourly research agent dry-run planning
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=120
+Unit=research-agent-worker.service
+
+[Install]
+WantedBy=timers.target
+

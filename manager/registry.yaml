@@ -236,6 +236,20 @@ jobs:
       agent reviewed the packets. Review and advancement yield live in
       data/research_intake/metrics.json.
 
+  - id: research_agent_worker
+    host: droplet
+    schedule: "hourly (systemd timer)"
+    description: Provider-neutral research worker planning and budget telemetry
+    output:
+      file: data/research_execution/worker_status.json
+      max_stale_hours: 2.5
+    severity: warn
+    note: >
+      Phase 1 is dry-run and network-denied. A fresh status proves the worker
+      selected and budget-checked a packet; it does not prove a model ran or
+      research was completed. Only a tracked invocation plus a durable,
+      schema-valid disposition can do that.
+
   - id: clv_settlement
     host: droplet
     schedule: "30 7 * * *"

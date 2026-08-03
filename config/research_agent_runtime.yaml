@@ -1,0 +1,35 @@
+schema_version: 1
+enabled: true
+mode: dry_run
+worker_id: research-runtime-v1
+
+allowed_agents:
+  - literature-scout
+  - social-scout
+  - strategy-scout
+
+limits:
+  max_minutes_per_task: 45
+  timeout_seconds: 900
+  max_input_tokens_per_task: 50000
+  max_output_tokens_per_task: 8000
+  max_cost_usd_per_task: 2.00
+  max_cost_usd_per_day: 10.00
+  max_output_bytes: 250000
+
+# Provider execution is intentionally not configured in Phase 1. Moving to an
+# actual model requires all three changes: mode=execute, provider.type=command,
+# and an explicit --execute CLI flag. The command is passed JSON over stdin and
+# receives only the environment variables named in pass_env.
+provider:
+  type: none
+  name: null
+  model: null
+  argv: []
+  pass_env: []
+
+safety:
+  trading_execution_allowed: false
+  queue_mutation_in_dry_run: false
+  service_mutation_allowed: false
+  secrets_allowed_in_output: false

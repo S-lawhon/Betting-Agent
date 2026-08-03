@@ -63,15 +63,39 @@ Research discovery has a separate deterministic attention queue:
 - `research/dispositions/` is the only durable proof a packet was reviewed
 - `scripts/run_research_execution.py` atomically claims, releases, and completes
   bounded packets; `data/research_execution/` preserves the attempt history
+- `scripts/run_research_agent_worker.py` previews the next packet through a
+  provider-neutral, budgeted invocation contract. Phase 1 defaults to dry-run,
+  creates no claims, invokes no model, and writes only safe worker telemetry.
 - `data/research_intake/metrics.json` measures assignment → dispatch → review →
   advancement yield, 24-hour activity, per-agent pending/overdue queue age,
   and the conservative X pilot cost
 
 The dashboard and emailed daily brief both read that shared operations contract.
 They explicitly report that dispatch means a task packet was created, a worker
-claim means work started, model invocation is still untracked, and only a
-durable disposition proves review. This prevents a healthy queue generator—or
-an abandoned claim—from being reported as completed research labor.
+claim means work started, and model invocation is a separate tracked event.
+Only a durable disposition proves review; a dry-run plan, invocation, or
+abandoned claim does not. This prevents a healthy queue generator from being
+reported as completed research labor.
+
+The Phase 1 worker adds a deliberately narrow automation boundary:
+
+- `config/research_agent_runtime.yaml` contains hard time, token, output-size,
+  per-task cost, and daily cost limits.
+- Dry-run status records a request hash, never source text or agent prompts.
+- Actual invocation requires `mode: execute`, `provider.type: command`, and an
+  explicit `--execute` flag. Provider subprocesses receive only environment
+  variables named in `pass_env`; betting credentials are not inherited.
+- Output must include measured usage, a schema-valid disposition, and an
+  agent-appropriate artifact. Invalid or over-budget output releases the claim
+  and cannot count as reviewed research.
+- The Phase 1 systemd unit denies network access. Wiring a provider is a
+  separate Phase 2 deployment with an egress and credential review.
+
+Safe local preview:
+
+```bash
+python3 -m scripts.run_research_agent_worker --no-write-status
+```
 
 The separate five-minute Gemini/Kalshi research collector writes public,
 read-only quote snapshots under `data/gemini_crossvenue/`. Its live metrics feed

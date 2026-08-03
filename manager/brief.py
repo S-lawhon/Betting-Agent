@@ -281,6 +281,7 @@ def render_markdown(b: Dict[str, Any]) -> str:
         semantics = operations.get("semantics") or {}
         activity = operations.get("activity_24h") or {}
         queue = operations.get("queue") or {}
+        worker = operations.get("worker") or {}
         funnel = research.get("funnel") or {}
         L.append(
             "**Execution status:** task packets are created automatically; "
@@ -290,6 +291,18 @@ def render_markdown(b: Dict[str, Any]) -> str:
                 else "not tracked",
                 "tracked" if semantics.get("agent_invocation_tracked")
                 else "not tracked"))
+        if worker.get("status") and worker.get("status") != "unavailable":
+            usage = worker.get("daily_usage") or {}
+            L.append(
+                "**Research worker:** {} mode, status {}; provider {}; next {}; "
+                "daily model usage {} attempts / ${} of ${} hard limit.".format(
+                    worker.get("mode") or "unknown",
+                    worker.get("status") or "unknown",
+                    "configured" if worker.get("provider_configured") else "not configured",
+                    worker.get("assignment_id") or "none",
+                    _metric(usage.get("attempts")),
+                    _metric(usage.get("cost_usd")),
+                    _metric(usage.get("hard_cost_limit_usd"))))
         L.append("")
         L.append(
             "- Lifetime funnel: {} assignments → {} dispatched → {} reviewed → "
@@ -299,10 +312,11 @@ def render_markdown(b: Dict[str, Any]) -> str:
                 _metric(funnel.get("dispatched_reviewed")),
                 _metric(funnel.get("dispatched_advanced"))))
         L.append(
-            "- Last 24h: {} dispatched, {} started, {} reviewed ({} advanced / "
+            "- Last 24h: {} dispatched, {} started, {} model-invoked, {} reviewed ({} advanced / "
             "{} rejected / {} deferred), {} research minutes".format(
                 _metric(activity.get("dispatched")),
                 _metric(activity.get("started")),
+                _metric(activity.get("invoked")),
                 _metric(activity.get("reviewed")),
                 _metric(activity.get("advance")),
                 _metric(activity.get("reject")),
@@ -650,6 +664,7 @@ def render_html(b: Dict[str, Any]) -> str:
         semantics = operations.get("semantics") or {}
         activity = operations.get("activity_24h") or {}
         queue = operations.get("queue") or {}
+        worker = operations.get("worker") or {}
         funnel = research.get("funnel") or {}
         started_tracking = ("tracked" if semantics.get("started_tracking_available")
                             else "not tracked")
@@ -660,6 +675,18 @@ def render_html(b: Dict[str, Any]) -> str:
                  "invocation is {}. Completion requires a durable research "
                  "disposition.</div>".format(
                      e(started_tracking), e(model_tracking)))
+        if worker.get("status") and worker.get("status") != "unavailable":
+            usage = worker.get("daily_usage") or {}
+            P.append("<div class='card'><b>Research worker</b><br>{} mode, status {}; "
+                     "provider {}; next {}; daily model usage {} attempts / ${} of "
+                     "${} hard limit.</div>".format(
+                         e(str(worker.get("mode") or "unknown")),
+                         e(str(worker.get("status") or "unknown")),
+                         "configured" if worker.get("provider_configured") else "not configured",
+                         e(str(worker.get("assignment_id") or "none")),
+                         e(_metric(usage.get("attempts"))),
+                         e(_metric(usage.get("cost_usd"))),
+                         e(_metric(usage.get("hard_cost_limit_usd")))))
         P.append("<ul>")
         P.append("<li>Lifetime funnel: {} assignments → {} dispatched → {} reviewed "
                  "→ {} advanced</li>".format(
@@ -667,10 +694,11 @@ def render_html(b: Dict[str, Any]) -> str:
                      e(_metric(funnel.get("dispatched"))),
                      e(_metric(funnel.get("dispatched_reviewed"))),
                      e(_metric(funnel.get("dispatched_advanced")))))
-        P.append("<li>Last 24h: {} dispatched, {} started, {} reviewed ({} advanced / "
+        P.append("<li>Last 24h: {} dispatched, {} started, {} model-invoked, {} reviewed ({} advanced / "
                  "{} rejected / {} deferred), {} research minutes</li>".format(
                      e(_metric(activity.get("dispatched"))),
                      e(_metric(activity.get("started"))),
+                     e(_metric(activity.get("invoked"))),
                      e(_metric(activity.get("reviewed"))),
                      e(_metric(activity.get("advance"))),
                      e(_metric(activity.get("reject"))),

@@ -288,6 +288,28 @@ def test_daily_brief_renders_research_operations_without_implying_agent_start():
         assert "1 legacy packets quarantined" in text
 
 
+def test_daily_brief_surfaces_dry_run_worker_and_zero_model_spend():
+    snap = research_snap()
+    operations = snap["research_operations"]["operations"]
+    operations["semantics"]["agent_invocation_tracked"] = True
+    operations["activity_24h"]["invoked"] = 0
+    operations["worker"] = {
+        "mode": "dry_run", "status": "dry_run",
+        "provider_configured": False, "assignment_id": "a-next",
+        "daily_usage": {"attempts": 0, "cost_usd": 0,
+                        "hard_cost_limit_usd": 10},
+    }
+
+    b = brief.build(snap, [])
+    for text in (brief.render_markdown(b), brief.render_html(b)):
+        assert "model invocation is tracked" in text.lower()
+        assert "dry_run mode, status dry_run" in text
+        assert "provider not configured" in text
+        assert "next a-next" in text
+        assert "0 model-invoked" in text
+        assert "$0 of $10 hard limit" in text
+
+
 def test_daily_brief_reports_missing_research_operations_as_unknown():
     b = brief.build({"research_operations": {
         "available": False, "reason": "metrics missing",

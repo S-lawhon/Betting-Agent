@@ -251,6 +251,13 @@ class ResearchAgentWorker:
         claim_path = (self.state_dir / "claims" / claim.assigned_agent
                       / f"{claim.assignment_id}.json")
         budget = self._invocation_budget(packet)
+        plan["request"]["claim_context"] = {
+            "claimed_at": claim.claimed_at,
+            "decided_at_requirement": (
+                "disposition.decided_at must be an ISO-8601 UTC timestamp "
+                "greater than or equal to claimed_at"
+            ),
+        }
         started = time.monotonic()
         provider_result: Optional[ProviderResult] = None
         invocation_recorded = False
@@ -387,6 +394,17 @@ class ResearchAgentWorker:
             raise ResearchWorkerError("output assignment_id does not match claim")
         if disposition.source_item_id != claim.source_item_id:
             raise ResearchWorkerError("output source_item_id does not match claim")
+        try:
+            decided_at = datetime.fromisoformat(
+                disposition.decided_at.replace("Z", "+00:00"))
+            claimed_at = datetime.fromisoformat(
+                claim.claimed_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ResearchWorkerError(
+                "output decided_at is not valid ISO-8601") from exc
+        if (decided_at.tzinfo is None or claimed_at.tzinfo is None
+                or decided_at < claimed_at):
+            raise ResearchWorkerError("output disposition predates the claim")
         if not disposition.reason_codes or not disposition.evidence_checked:
             raise ResearchWorkerError(
                 "disposition requires reason_codes and evidence_checked")

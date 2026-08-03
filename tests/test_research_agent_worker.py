@@ -46,6 +46,7 @@ class FakeProvider:
 
     def __init__(self, output=None, usage=None):
         self.calls = 0
+        self.last_request = None
         self.output = output or {
             "disposition": {
                 "assignment_id": "a1", "source_item_id": "s1",
@@ -63,6 +64,7 @@ class FakeProvider:
 
     def invoke(self, request, *, timeout_seconds):
         self.calls += 1
+        self.last_request = request
         assert request["safety"]["trading_execution_allowed"] is False
         assert timeout_seconds == 60
         return ProviderResult(self.name, self.model, self.output, self.usage)
@@ -111,6 +113,14 @@ def test_valid_provider_result_completes_claim_and_records_usage(tmp_path):
     runtime = worker(tmp_path, provider, execution_enabled=True)
 
     result = runtime.run_once(execute=True)
+
+    assert provider.last_request["claim_context"] == {
+        "claimed_at": "2026-08-03T12:00:00Z",
+        "decided_at_requirement": (
+            "disposition.decided_at must be an ISO-8601 UTC timestamp "
+            "greater than or equal to claimed_at"
+        ),
+    }
 
     assert result["status"] == "completed"
     assert provider.calls == 1
@@ -188,6 +198,23 @@ def test_wrong_artifact_for_agent_is_released(tmp_path):
     assert result["status"] == "failed"
     assert "invalid for strategy-scout" not in result["error"]
     assert "OpportunityCard" in result["error"] or "missing" in result["error"]
+
+
+def test_predated_disposition_is_rejected_before_artifact_write(tmp_path):
+    output = FakeProvider().output | {
+        "disposition": FakeProvider().output["disposition"] | {
+            "decided_at": "2026-08-03T11:59:59Z",
+        },
+    }
+    runtime = worker(
+        tmp_path, FakeProvider(output=output), execution_enabled=True)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "failed"
+    assert "predates the claim" in result["error"]
+    artifact = (tmp_path / "data/research_execution/artifacts/strategy-scout/a1.json")
+    assert not artifact.exists()
 
 
 def test_command_provider_passes_only_allowlisted_environment(tmp_path, monkeypatch):

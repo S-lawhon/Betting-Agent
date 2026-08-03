@@ -1,0 +1,11 @@
+[Unit]
+Description=Fund manager deterministic alert dispatcher timer
+
+[Timer]
+OnCalendar=*-*-* *:00/15:30
+Persistent=true
+RandomizedDelaySec=0
+Unit=manager-alert.service
+
+[Install]
+WantedBy=timers.target

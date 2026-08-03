@@ -1,0 +1,32 @@
+[Unit]
+Description=Fund manager snapshot collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+EnvironmentFile=-/opt/betting-pod-shop/manager/manager.env
+
+ExecStart=/opt/betting-pod-shop/venv/bin/python manager/collect.py --root /opt/betting-pod-shop
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=manager-collect
+
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=512M
+TimeoutStartSec=600
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/manager/state /opt/betting-agent-mirror
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

@@ -1,0 +1,11 @@
+[Unit]
+Description=Fund manager daily brief email timer
+
+[Timer]
+OnCalendar=*-*-* 12:30:00 UTC
+Persistent=true
+RandomizedDelaySec=0
+Unit=manager-brief.service
+
+[Install]
+WantedBy=timers.target

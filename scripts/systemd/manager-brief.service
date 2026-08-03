@@ -1,0 +1,32 @@
+[Unit]
+Description=Fund manager daily brief email
+After=network-online.target manager-collect.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+EnvironmentFile=-/opt/betting-pod-shop/manager/manager.env
+
+ExecStart=/opt/betting-pod-shop/venv/bin/python manager/brief.py --email
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=manager-brief
+
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=256M
+TimeoutStartSec=300
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/manager/state
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

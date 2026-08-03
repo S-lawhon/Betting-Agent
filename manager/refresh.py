@@ -2,10 +2,9 @@
 """Pull live status from the droplet to the Mac.
 
 The collector runs ON the droplet (that is where the trading system lives and
-where the box is always on). This script runs the remote collector over SSH and
-copies the resulting snapshot back, so Mac-side tools — brief.py and the
-fund-manager agent — work from real production facts rather than the stale local
-checkout.
+where the box is always on). This script is an optional local helper: it runs
+the remote collector over SSH and copies the resulting snapshot back for
+ad-hoc Mac-side inspection.
 
 If the droplet is unreachable this exits non-zero and leaves the previous
 snapshot alone. Callers must treat a failure as "state unknown", never as

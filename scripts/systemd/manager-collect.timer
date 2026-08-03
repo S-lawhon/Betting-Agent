@@ -1,0 +1,11 @@
+[Unit]
+Description=Fund manager snapshot collector timer
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=0
+Unit=manager-collect.service
+
+[Install]
+WantedBy=timers.target

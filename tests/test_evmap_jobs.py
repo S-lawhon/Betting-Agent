@@ -185,7 +185,7 @@ def _f(jobs):
 
 
 def _healthy(**kw):
-    base = {"ok": True, "age_min": 30.0, "rows_added": 100, "rows_today": 100,
+    base = {"ok": True, "age_min": 30.0, "rows_added": 100, "rows_24h": 100,
             "consecutive_failures": 0, "exit_code": 0, "stderr_tail": []}
     base.update(kw)
     return base
@@ -205,7 +205,7 @@ def test_a_job_that_stops_running_is_critical():
 
 
 def test_a_day_that_collects_nothing_alarms_even_when_every_run_exited_zero():
-    f = _f({"paper_maker": _healthy(rows_today=0)})
+    f = _f({"paper_maker": _healthy(rows_24h=0)})
     assert [x.key for x in f] == ["evmap.paper_maker.empty_day"]
     assert f[0].severity == "warn"
 

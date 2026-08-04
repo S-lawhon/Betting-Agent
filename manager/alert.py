@@ -43,6 +43,13 @@ COOLDOWN = {"critical": timedelta(hours=2), "warn": timedelta(hours=12)}
 # A warn must be seen this many consecutive runs before it pages. Criticals
 # page immediately — a dead service should not wait for confirmation.
 WARN_CONFIRMATIONS = 2
+# A snapshot older than one collect cycle must not be judged: the 2026-08-04
+# false "0 rows today" page came from an alerter re-reading the PREVIOUS
+# cycle's snapshot while the current collect was still writing, which counted
+# one transient warn twice. Skipping is safe only briefly — past DEAD the
+# collector itself is the emergency, and that pages as critical.
+SNAPSHOT_SKIP_AFTER = timedelta(minutes=12)
+SNAPSHOT_DEAD_AFTER = timedelta(minutes=60)
 
 
 def now() -> datetime:
@@ -140,7 +147,31 @@ def run(dry_run: bool = False, status_path: Optional[Path] = None) -> int:
             print("[alert] " + res.summary())
         return 1
 
-    findings = checks.run_checks(snap, local_config_fp=local_config_fingerprint())
+    collected = parse(snap.get("collected_at"))
+    age = (now() - collected) if collected else None
+    if age is not None and age >= SNAPSHOT_DEAD_AFTER:
+        # Do not evaluate hours-old data as if it were current — but a
+        # collector that has stopped producing snapshots is itself a page.
+        findings: List[checks.Finding] = [checks.Finding(
+            key="manager.snapshot.stale",
+            severity="critical",
+            title="Manager snapshot is {:.0f}h old — collector is not "
+                  "producing".format(age.total_seconds() / 3600),
+            detail="state/status.json was collected at {} and nothing newer "
+                   "has appeared. Every downstream check is blind until the "
+                   "collector runs again.".format(snap.get("collected_at")),
+            fix="ssh root@129.212.176.202 'systemctl status "
+                "manager-collect.timer manager-collect.service'")]
+    elif age is not None and age >= SNAPSHOT_SKIP_AFTER:
+        print("[alert] snapshot is {:.1f} min old (>{:.0f} min) — a fresher "
+              "collect is due or in flight; skipping this evaluation rather "
+              "than judging on stale data".format(
+                  age.total_seconds() / 60,
+                  SNAPSHOT_SKIP_AFTER.total_seconds() / 60))
+        return 0
+    else:
+        findings = checks.run_checks(snap,
+                                     local_config_fp=local_config_fingerprint())
     pageable = [f for f in findings if f.severity in ("critical", "warn")]
 
     state = load_alert_state()

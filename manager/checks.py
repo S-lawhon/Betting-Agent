@@ -936,8 +936,9 @@ def check_p022_window(snap: Dict[str, Any]) -> List[Finding]:
 
 
 # How stale a job's last run may be before it is treated as not running, and
-# how many quote intents the paper maker must produce in a day. Both are
-# generous: the point is to catch a DEAD collector, not to page on jitter.
+# how many quote intents the paper maker must produce over a trailing 24h.
+# Both are generous: the point is to catch a DEAD collector, not to page on
+# jitter.
 EVMAP_MAX_AGE_MIN = {
     "weather_sheet": 60 * 30,     # daily 06:53 local
     "weather_depth": 60 * 30,     # 09:23 and 12:23 local
@@ -945,9 +946,12 @@ EVMAP_MAX_AGE_MIN = {
     "paper_eval": 60 * 30,        # daily 07:37 local
     "archive_settled": 60 * 24 * 9,   # weekly, plus two days of slack
 }
-# A day in which the maker collected nothing is a dead day, whatever the exit
-# codes said. Set well below the ~1,200/day the Mac used to produce.
-EVMAP_MIN_ROWS_TODAY = {"paper_maker": 1}
+# A 24h span in which the maker collected nothing is a dead day, whatever the
+# exit codes said. Trailing 24h, not the UTC calendar day — the maker's local
+# quoting window straddles UTC midnight, and the calendar-day version of this
+# check paged a false positive at 00:15 UTC on 2026-08-04. Set well below the
+# ~1,200/day the Mac used to produce.
+EVMAP_MIN_ROWS_24H = {"paper_maker": 1}
 
 
 def check_evmap(snap: Dict[str, Any]) -> List[Finding]:
@@ -965,7 +969,7 @@ def check_evmap(snap: Dict[str, Any]) -> List[Finding]:
       1. the job FAILED (nonzero exit, or exit 0 having written nothing it
          was contracted to write);
       2. the job has not RUN inside its own cadence;
-      3. the job ran and the DAY collected nothing.
+      3. the job ran and the trailing 24h collected nothing.
     """
     ev = snap.get("evmap") or {}
     if not ev:
@@ -1017,15 +1021,15 @@ def check_evmap(snap: Dict[str, Any]) -> List[Finding]:
                 value=round(age, 1)))
             continue
 
-        need = EVMAP_MIN_ROWS_TODAY.get(job)
-        if need and int(rec.get("rows_today") or 0) < need:
+        need = EVMAP_MIN_ROWS_24H.get(job)
+        if need and int(rec.get("rows_24h") or 0) < need:
             out.append(Finding(
                 key="evmap.{}.empty_day".format(job),
                 severity="warn",
-                title="EV-Map {} collected 0 rows today".format(job),
-                detail="Every run exited 0 and the day produced nothing. That "
-                       "is the same outcome as not running at all, and it is "
-                       "the half of the failure an exit code cannot see.",
+                title="EV-Map {} collected 0 rows in 24h".format(job),
+                detail="Every run exited 0 and the last 24h produced nothing. "
+                       "That is the same outcome as not running at all, and it "
+                       "is the half of the failure an exit code cannot see.",
                 workstream="EV-Map",
                 value=0))
     return out

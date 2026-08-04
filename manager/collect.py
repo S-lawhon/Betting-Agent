@@ -915,8 +915,14 @@ class Collector:
                     "error": "no kalshi-ev-map/data/job_status.jsonl — no "
                              "EV-Map job has run on this host"}
         jobs: Dict[str, Any] = {}
-        rows_today: Dict[str, int] = {}
-        today = now().date().isoformat()
+        # Trailing 24h, NOT the UTC calendar day: the paper maker's quoting
+        # window (07:13-19:43 Chicago) straddles UTC midnight, so a UTC-day
+        # counter reset to 0 mid-window every night and paged a false
+        # "collected 0 rows today" on 2026-08-04. Any healthy 24h span
+        # contains a full quoting window; zero over 24h is a genuinely
+        # dead day.
+        rows_24h: Dict[str, int] = {}
+        cutoff = now() - timedelta(hours=24)
         for line in tail_lines(path, count=400):
             try:
                 rec = json.loads(line)
@@ -925,8 +931,9 @@ class Collector:
             job = rec.get("job")
             if not job:
                 continue
-            if (rec.get("iso") or "")[:10] == today:
-                rows_today[job] = rows_today.get(job, 0) + int(
+            rec_ts = parse_ts(rec.get("iso"))
+            if rec_ts and rec_ts >= cutoff:
+                rows_24h[job] = rows_24h.get(job, 0) + int(
                     rec.get("rows_added") or 0)
             jobs[job] = rec                       # last write wins
         out: Dict[str, Any] = {"available": True, "jobs": {}}
@@ -940,7 +947,7 @@ class Collector:
                 "exit_code": rec.get("exit_code"),
                 "rows_added": rec.get("rows_added"),
                 "rows_after": rec.get("rows_after"),
-                "rows_today": rows_today.get(job, 0),
+                "rows_24h": rows_24h.get(job, 0),
                 "consecutive_failures": rec.get("consecutive_failures") or 0,
                 "empty_reason": rec.get("empty_reason"),
                 "stderr_tail": (rec.get("stderr_tail") or [])[-2:],

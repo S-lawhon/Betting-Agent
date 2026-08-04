@@ -754,8 +754,12 @@ def test_shadow_risk_window_and_lifetime():
     from datetime import datetime, timedelta, timezone
 
     ru = copy.deepcopy(ROLLUP)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    old = (datetime.now(timezone.utc)
+    # Anchor to the fixture's pinned generated_at_utc — that is what the API
+    # windows against. Wall-clock dates rot: on 2026-08-04 "now - 35d" landed
+    # exactly ON the cutoff and this test broke a year after it was written.
+    anchor = datetime(2026, 7, 30, 12, tzinfo=timezone.utc)
+    recent = anchor.strftime("%Y-%m-%d")
+    old = (anchor
            - timedelta(days=api.SKIP_WINDOW_DAYS + 5)).strftime("%Y-%m-%d")
     ru["shadow_risk"] = {
         "available": True,
@@ -765,9 +769,9 @@ def test_shadow_risk_window_and_lifetime():
             "by_kind": {"venue_exposure": 100, "total_exposure": 40},
             "by_pod": {"P-017": {"venue_exposure": 100}},
         },
-        "by_day": {today: {"venue_exposure": 12},
+        "by_day": {recent: {"venue_exposure": 12},
                    old: {"total_exposure": 40}},
-        "last_utc": today + "T12:00:00+00:00",
+        "last_utc": recent + "T12:00:00+00:00",
         "note": "n",
     }
     sh = api.build_v2(src(rollup=ru,

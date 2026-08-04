@@ -1769,7 +1769,9 @@ workstreams:
       note: >
         Days are counted from the paper maker's own rows, not from calendar:
         a day on which evmap_paper_maker collected zero rows is not a day
-        live, and manager/checks.py alarms on exactly that.
+        live, and manager/checks.py alarms on exactly that (measured over a
+        trailing 24h, not the UTC calendar day — the quoting window straddles
+        UTC midnight, which paged a false positive on 2026-08-04).
     open_questions:
       - id: build3-gate
         blocked_on: data

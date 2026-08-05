@@ -247,11 +247,30 @@ and 256M on the rollup.
 
 ---
 
-## One decision I left for you
+## ~~One decision I left for you~~ — RESOLVED 2026-08-05
 
-`scripts/rotate_trade_logs.py` is the only writer of the monthly
-`data/trade_logs/archive/YYYY-MM.jsonl.gz` convention, and it is **not**
-registered as a cron in `manager/registry.yaml`. Without it, the 12-archive prune
-is the only history horizon — which is exactly what makes `rollup.json`
-irreplaceable. Registering it is the cheapest way to reduce that exposure. Out of
-scope for the rebuild; worth a decision.
+The decision was "register `scripts/rotate_trade_logs.py` as a cron so the
+12-archive prune stops being the only history horizon". Investigating it showed
+that registering that script would have been **harmful, not cheap**: it read
+only the active log (which holds ~1.5 days of traffic — nothing 30 days old to
+archive) *except* the carried-forward open PLACED rows, which are precisely the
+rows it would have stripped, reintroducing the 2026-07-26 orphaned-positions
+incident. The script is deleted.
+
+What shipped instead: `rotate_active_log.py`'s prune step now **consolidates
+instead of deleting** — a doomed archive's raw gzip bytes are appended (as an
+independent gzip member, atomically) to `archive/YYYY-MM.jsonl.gz` and recorded
+in `archive/consolidated_manifest.json` *before* the rotated file is unlinked.
+Consolidation failing keeps the rotated archive (fail closed; the archive count
+runs past 12 rather than losing rows). No new cron or unit: the existing 06:00
+root cron does it.
+
+The manifest is load-bearing for `build_dashboard_rollup.py`: members whose
+rotated original was already counted are marked done without reading, and
+members the rollup never saw (pruned during a rollup outage) are read from the
+monthly file by byte range — rows that previously would have been lost.
+Consequence: **`rollup.json` is no longer irreplaceable** for rows pruned after
+2026-08-05 — a `--full` rebuild can now recover them from the monthly files.
+Rows pruned before then (none had been: the first prune had not yet fired when
+this shipped) and the pre-June-28 history still live only in the rollup
+counters, so keep backing it up.

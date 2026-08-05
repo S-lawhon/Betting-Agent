@@ -153,16 +153,18 @@ venv/bin/python -m scripts.build_dashboard_rollup --dry-run --json
 
 ### ⚠ Back up `rollup.json`
 
-Once `rotate_active_log` prunes an archive (`KEEP_ARCHIVES = 12`), the rows it
-held survive **only** in these counters and are not derivable from anything on
-disk. `--full` can rebuild only from surviving archives, so a full rebuild
-silently shortens history — it prints a warning saying so. The timer passes
-`--backup`, which writes `rollup.json.bak.gz`.
-
-The cheapest way to reduce this exposure is to register
-`scripts/rotate_trade_logs.py` (monthly `archive/YYYY-MM.jsonl.gz`) as a cron —
-it is currently the only writer of that convention and is **not** in
-`manager/registry.yaml`. Out of scope for the rebuild; noted as a decision.
+Since 2026-08-05, `rotate_active_log`'s prune step **consolidates instead of
+deleting**: a pruned archive's bytes move into `archive/YYYY-MM.jsonl.gz`
+(recorded in `archive/consolidated_manifest.json` before the unlink), so rows
+pruned after that date ARE recoverable from disk and a `--full` rebuild reads
+them back via the manifest's byte ranges. Rows that left the window before the
+consolidation shipped — and the pre-June-2026 history — survive **only** in
+these counters, which is why the timer passes `--backup`
+(`rollup.json.bak.gz`) and the file must stay in whatever backs up
+`manager/state/`. The rollup marks manifest members whose rotated original it
+already counted as done *without* re-reading them; a monthly file appearing
+with no readable manifest is skipped, never ingested as a plain source —
+either path would double-count.
 
 ---
 

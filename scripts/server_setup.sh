@@ -73,9 +73,17 @@ systemctl enable "$SERVICE_NAME"
 systemctl start  "$SERVICE_NAME"
 
 # ── Set up trade log rotation cron ──────────────────────────────────────────
-echo "==> Installing trade log rotation cron job ..."
-CRON_CMD="0 3 1 * * ${VENV_PYTHON} ${APP_DIR}/scripts/rotate_trade_logs.py --log-path ${APP_DIR}/data/trade_logs/trade_log.jsonl --archive-dir ${APP_DIR}/data/trade_logs/archive --days 30"
-(crontab -u "$SERVICE_USER" -l 2>/dev/null | grep -v rotate_trade_logs; echo "$CRON_CMD") | crontab -u "$SERVICE_USER" -
+# rotate_active_log.py (NOT the retired rotate_trade_logs.py, which rewrote the
+# active log by timestamp and would orphan long-open PLACED positions from
+# TradeStore — the 2026-07-26 incident). It carries open rows forward, and its
+# prune step consolidates aged archives into archive/YYYY-MM.jsonl.gz so no
+# history is ever deleted. Runs as root: it preserves file ownership and needs
+# chown after writes.
+echo "==> Installing trade log rotation cron job (root) ..."
+CRON_CMD="0 6 * * * cd ${APP_DIR} && /usr/bin/python3 scripts/rotate_active_log.py >> /var/log/trade_log_rotate.log 2>&1"
+(crontab -l 2>/dev/null | grep -v -E "rotate_active_log|rotate_trade_logs"; echo "$CRON_CMD") | crontab -
+# Remove any legacy rotate_trade_logs entry from the service user's crontab.
+(crontab -u "$SERVICE_USER" -l 2>/dev/null | grep -v rotate_trade_logs) | crontab -u "$SERVICE_USER" - || true
 
 # ── Configure journald log size cap ─────────────────────────────────────────
 echo "==> Configuring journald log rotation ..."
@@ -101,4 +109,4 @@ echo "    Useful commands:"
 echo "      systemctl status  $SERVICE_NAME   # check health"
 echo "      systemctl restart $SERVICE_NAME   # restart engine"
 echo "      journalctl -u $SERVICE_NAME -f    # live logs"
-echo "      sudo -u $SERVICE_USER ${VENV_PYTHON} ${APP_DIR}/scripts/rotate_trade_logs.py --dry-run  # preview log rotation"
+echo "      python3 ${APP_DIR}/scripts/rotate_active_log.py --dry-run  # preview log rotation"

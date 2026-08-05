@@ -34,6 +34,9 @@ from pathlib import Path
 import pytest
 
 from scripts.rotate_active_log import (
+    MANIFEST_NAME,
+    _prune_archives,
+    month_key,
     open_placed_rows,
     recent_archives,
     recover_open_from_archives,
@@ -174,6 +177,150 @@ def test_rotation_prunes_to_twelve_archives(tmp_path):
         rotate(log, cap_bytes=1,
                _now_fn=lambda i=i: datetime(2026, 7, 1, 0, 0, i, tzinfo=timezone.utc))
     assert len(recent_archives(log, 100)) == 12
+
+
+# ── consolidation at prune time ──────────────────────────────────────
+#
+# Pruning must never delete history: the doomed archive's bytes move into
+# archive/YYYY-MM.jsonl.gz and are recorded in the consolidation manifest
+# BEFORE the rotated file is unlinked.
+
+
+def _rotate_n(log: Path, n: int, month: int = 7):
+    """n rotations with distinct rows and strictly increasing archive stamps."""
+    import os as _os
+    for i in range(n):
+        _write(log, [_placed(f"fp{i}", "AAA")])
+        out = rotate(log, cap_bytes=1,
+                     _now_fn=lambda i=i: datetime(2026, month, 1 + i // 60, 0, i % 60,
+                                                  tzinfo=timezone.utc))
+        # mtime drives recent_archives' ordering; make it deterministic.
+        if out.get("archive"):
+            _os.utime(out["archive"], (1_000_000 + i, 1_000_000 + i))
+
+
+def _manifest(log: Path) -> dict:
+    return json.loads((log.parent / "archive" / MANIFEST_NAME).read_text())
+
+
+def test_month_key_parses_the_archive_stamp():
+    assert month_key("trade_log.archive_20260628_191829.jsonl.gz") == "2026-06"
+    assert month_key("not_an_archive.jsonl.gz") is None
+
+
+def test_prune_consolidates_into_monthly_archive(tmp_path):
+    log = tmp_path / "trade_log.jsonl"
+    _rotate_n(log, 14)  # 14 archives -> 2 pruned
+
+    assert len(recent_archives(log, 100)) == 12
+    monthly = log.parent / "archive" / "2026-07.jsonl.gz"
+    assert monthly.exists()
+
+    # The pruned rows are readable back out (multi-member gzip).
+    with gzip.open(monthly, "rt") as fh:
+        rows = [json.loads(l) for l in fh.read().splitlines() if l.strip()]
+    assert {r["fingerprint"] for r in rows} == {"fp0", "fp1"}
+
+    m = _manifest(log)["monthly"]["2026-07.jsonl.gz"]
+    assert len(m["members"]) == 2
+    assert m["members"][0]["offset"] == 0
+    assert m["members"][1]["offset"] == m["members"][0]["length"]
+    assert m["bytes"] == monthly.stat().st_size
+
+
+def test_prune_members_carry_exact_byte_ranges(tmp_path):
+    """The rollup reads members by (offset, length) — they must be exact."""
+    log = tmp_path / "trade_log.jsonl"
+    _rotate_n(log, 14)
+    monthly = log.parent / "archive" / "2026-07.jsonl.gz"
+    blob = monthly.read_bytes()
+    for mem in _manifest(log)["monthly"]["2026-07.jsonl.gz"]["members"]:
+        piece = blob[mem["offset"]:mem["offset"] + mem["length"]]
+        rows = [json.loads(l) for l in gzip.decompress(piece).decode().splitlines() if l.strip()]
+        assert len(rows) == 1 and rows[0]["action"] == "PLACED"
+
+
+def test_prune_failure_keeps_the_rotated_archive(tmp_path, monkeypatch):
+    """Fail closed: if the bytes cannot be consolidated, nothing is deleted."""
+    import scripts.rotate_active_log as ral
+    log = tmp_path / "trade_log.jsonl"
+    _rotate_n(log, 12)
+
+    monkeypatch.setattr(ral, "_atomic_append_file",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+    _write(log, [_placed("fp_last", "AAA")])
+    out = rotate(log, cap_bytes=1, _now_fn=lambda: NOW)
+
+    assert out["rotated"] is True
+    assert out["pruned"] == []
+    assert len(recent_archives(log, 100)) == 13  # over the cap, but nothing lost
+    assert not (log.parent / "archive" / "2026-07.jsonl.gz").exists()
+
+
+def test_prune_adopts_bytes_from_a_run_that_died_before_the_manifest(tmp_path):
+    """Crash between the byte-append and the manifest write must not
+    duplicate the member on the next run."""
+    log = tmp_path / "trade_log.jsonl"
+    _rotate_n(log, 12)
+    oldest = recent_archives(log, 100)[0]
+
+    # Simulate the dead run: bytes are already in the monthly file, no manifest.
+    mdir = log.parent / "archive"
+    mdir.mkdir()
+    monthly = mdir / "2026-07.jsonl.gz"
+    monthly.write_bytes(oldest.read_bytes())
+
+    pruned = _prune_archives(log, keep=11, now=NOW)
+    assert [p.name for p in pruned] == [oldest.name]
+    assert not oldest.exists()
+
+    m = _manifest(log)["monthly"]["2026-07.jsonl.gz"]
+    assert [x["archive"] for x in m["members"]] == [oldest.name]
+    assert m["bytes"] == monthly.stat().st_size  # adopted, not re-appended
+
+
+def test_prune_refuses_a_monthly_file_it_cannot_explain(tmp_path):
+    """Unexplained bytes in the monthly file -> keep the rotated archive."""
+    log = tmp_path / "trade_log.jsonl"
+    _rotate_n(log, 12)
+    oldest = recent_archives(log, 100)[0]
+
+    mdir = log.parent / "archive"
+    mdir.mkdir()
+    (mdir / "2026-07.jsonl.gz").write_bytes(b"garbage that is no gzip member")
+
+    pruned = _prune_archives(log, keep=11, now=NOW)
+    assert pruned == []
+    assert oldest.exists()
+    manifest_file = mdir / MANIFEST_NAME
+    if manifest_file.exists():
+        assert _manifest(log)["monthly"].get("2026-07.jsonl.gz", {}).get("members", []) == []
+
+
+def test_prune_unlinks_an_already_recorded_member_without_reappending(tmp_path):
+    """Crash between the manifest write and the unlink: next run just unlinks."""
+    log = tmp_path / "trade_log.jsonl"
+    _rotate_n(log, 12)
+    oldest = recent_archives(log, 100)[0]
+
+    _prune_archives(log, keep=11, now=NOW)
+    assert not oldest.exists()
+    monthly = log.parent / "archive" / "2026-07.jsonl.gz"
+    size_before = monthly.stat().st_size
+
+    # Resurrect the rotated file as if unlink never happened.
+    with gzip.open(monthly, "rb") as fh:
+        pass  # (sanity: file is a readable gzip)
+    member = _manifest(log)["monthly"]["2026-07.jsonl.gz"]["members"][0]
+    monthly_blob = monthly.read_bytes()
+    oldest.write_bytes(monthly_blob[member["offset"]:member["offset"] + member["length"]])
+    import os as _os
+    _os.utime(oldest, (1, 1))  # make it the oldest again
+
+    pruned = _prune_archives(log, keep=11, now=NOW)
+    assert [p.name for p in pruned] == [oldest.name]
+    assert monthly.stat().st_size == size_before  # nothing re-appended
+    assert len(_manifest(log)["monthly"]["2026-07.jsonl.gz"]["members"]) == 1
 
 
 # ── recovery of an already-orphaned book ─────────────────────────────

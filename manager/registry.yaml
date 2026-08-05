@@ -324,11 +324,22 @@ jobs:
   - id: rotate_active_log
     host: droplet
     schedule: "0 6 * * *"
-    description: Size-rotates trade_log.jsonl into gzipped archives
+    description: Size-rotates trade_log.jsonl into gzipped archives; prune consolidates into monthly files
     output:
       glob: data/trade_logs/trade_log.archive_*.jsonl.gz
       max_stale_hours: 48
     severity: info
+    note: >
+      Since 2026-08-05 the prune step no longer deletes history: an archive
+      aging out of the 12-file window has its bytes appended to
+      data/trade_logs/archive/YYYY-MM.jsonl.gz and recorded in
+      archive/consolidated_manifest.json BEFORE the rotated file is unlinked
+      (fail closed — consolidation failure keeps the rotated archive and the
+      count runs past 12). The manifest is load-bearing for
+      build_dashboard_rollup.py's double-count guard; do not hand-edit or
+      delete it. The retired rotate_trade_logs.py (active-log rewrite by
+      timestamp) must NOT be resurrected — it would orphan long-open PLACED
+      rows, the 2026-07-26 incident.
 
   # Maintains data/dashboard/rollup.json — the dashboard's lifetime aggregates.
   #

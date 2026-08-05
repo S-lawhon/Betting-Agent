@@ -534,3 +534,94 @@ def test_shadow_survives_corrupt_lines(root: Path):
     sh = build(root, root / "data" / "dashboard" / "rollup.json")[0]["shadow_risk"]
     assert sh["lifetime"]["total"] == 2
     assert sh["rows_unparseable"] == 1
+
+
+# ── consolidation at prune time (rotate_active_log + manifest) ────────
+#
+# When rotate_active_log prunes a rotated archive it appends the bytes to
+# archive/YYYY-MM.jsonl.gz and records the member in the consolidation
+# manifest. The rollup must (a) never re-count members whose rotated
+# original it already ingested, and (b) recover members it never saw —
+# rows that before consolidation were simply lost at prune time.
+
+
+def _real_rotate(root: Path, i: int):
+    """A real rotate_active_log.rotate(), with deterministic archive mtimes."""
+    from datetime import datetime, timezone
+    from scripts.rotate_active_log import rotate as ral_rotate
+    out = ral_rotate(
+        log_path(root), cap_bytes=1,
+        _now_fn=lambda: datetime(2026, 7, 1 + i // 60, 0, i % 60,
+                                 tzinfo=timezone.utc))
+    if out.get("archive"):
+        os.utime(out["archive"], (1_000_000 + i, 1_000_000 + i))
+    return out
+
+
+def test_prune_consolidation_no_double_count_steady_state(root: Path):
+    """Rollup runs hourly between rotations; prune fires at rotation 13.
+    The monthly file's members were all counted from their rotated
+    originals, so they must be marked done WITHOUT reading."""
+    for i in range(14):
+        append(root, [placed(f"fp{i}", ts=f"2026-07-{(i % 27) + 1:02d}T12:00:00Z")])
+        _real_rotate(root, i)
+        run(root)
+
+    payload, summary = run(root)
+    assert payload["lifetime"]["placed"] == 14
+    assert payload["lifetime"]["rows"] == 14
+
+    monthly_rel = os.path.join("data", "trade_logs", "archive", "2026-07.jsonl.gz")
+    entry = payload["_checkpoint"]["archived_sources"][monthly_rel]
+    assert entry["state"] == "managed"
+    assert entry["members"] and all(
+        m["via"] == "rotated" for m in entry["members"].values())
+
+
+def test_member_recovered_when_rotated_original_was_never_seen(root: Path):
+    """Prune fires before the rollup's first-ever run: the pruned rows
+    exist only in the monthly file and must be read from it exactly once."""
+    for i in range(13):
+        append(root, [placed(f"fp{i}", ts=f"2026-07-{(i % 27) + 1:02d}T12:00:00Z")])
+        _real_rotate(root, i)
+
+    monthly = root / "data" / "trade_logs" / "archive" / "2026-07.jsonl.gz"
+    assert monthly.exists(), "precondition: prune consolidated archive #1"
+
+    payload, _ = run(root)
+    assert payload["lifetime"]["placed"] == 13
+
+    monthly_rel = os.path.join("data", "trade_logs", "archive", "2026-07.jsonl.gz")
+    entry = payload["_checkpoint"]["archived_sources"][monthly_rel]
+    assert [m["via"] for m in entry["members"].values()] == ["monthly"]
+
+    # And a re-run stays put.
+    payload2, _ = run(root)
+    assert life(payload2) == life(payload)
+
+
+def test_full_rebuild_after_consolidation_counts_everything_once(root: Path):
+    for i in range(14):
+        append(root, [placed(f"fp{i}", ts=f"2026-07-{(i % 27) + 1:02d}T12:00:00Z")])
+        _real_rotate(root, i)
+        run(root)
+    incremental, _ = run(root)
+    full, _ = run(root, full=True)
+    assert life(full) == life(incremental)
+    assert full["lifetime"]["placed"] == 14
+
+
+def test_unreadable_manifest_skips_unconsumed_monthly_files(root: Path):
+    """A corrupt manifest must not cause the monthly file to be ingested as
+    a plain source — that would double-count every already-counted member."""
+    for i in range(13):
+        append(root, [placed(f"fp{i}", ts=f"2026-07-{(i % 27) + 1:02d}T12:00:00Z")])
+        _real_rotate(root, i)
+        run(root)
+    before, _ = run(root)
+
+    manifest = root / "data" / "trade_logs" / "archive" / "consolidated_manifest.json"
+    manifest.write_text("{ not json", encoding="utf-8")
+
+    after, _ = run(root)
+    assert life(after) == life(before)

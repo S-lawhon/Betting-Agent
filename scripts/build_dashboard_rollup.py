@@ -186,8 +186,9 @@ def archive_sources(root: Path) -> List[str]:
     Enumeration reuses ``manager.throughput._trade_log_paths`` so the dashboard
     and the throughput reader agree on which files exist — including both
     archive naming conventions (``trade_log.archive_*.jsonl.gz`` from
-    ``rotate_active_log.py`` and ``archive/YYYY-MM.jsonl.gz`` from
-    ``rotate_trade_logs.py``).
+    ``rotate_active_log.py``'s rotation and ``archive/YYYY-MM.jsonl.gz`` from
+    its consolidate-at-prune step; legacy monthly files predating the
+    consolidation manifest are plain sources).
 
     Order is load-bearing: the PLACED dedupe depends on seeing an open
     placement before the copy of it that the next rotation carried forward.
@@ -581,6 +582,65 @@ def _iter_gz_or_plain(path: str) -> Iterable[str]:
             yield line
 
 
+class _ByteRange:
+    """A read-only window of *length* bytes over an already-seeked file."""
+
+    def __init__(self, fh, length: int) -> None:
+        self._fh = fh
+        self._left = length
+
+    def read(self, n: int = -1) -> bytes:
+        if self._left <= 0:
+            return b""
+        if n is None or n < 0:
+            n = self._left
+        data = self._fh.read(min(n, self._left))
+        self._left -= len(data)
+        return data
+
+
+def _iter_monthly_member_lines(path: str, offset: int,
+                               length: int) -> Iterable[str]:
+    """Stream the lines of ONE consolidated member of a monthly archive.
+
+    ``rotate_active_log`` appends each pruned rotated archive to
+    ``archive/YYYY-MM.jsonl.gz`` verbatim, as an independent gzip member, and
+    records its byte range in the consolidation manifest. Decompression is
+    streamed — a member can be a 60 MB gzip holding hundreds of MB of rows,
+    and this job runs under a memory cap.
+    """
+    import io
+    with open(path, "rb") as fh:
+        fh.seek(offset)
+        gz = gzip.GzipFile(fileobj=_ByteRange(fh, length))  # type: ignore[arg-type]
+        with io.TextIOWrapper(gz, encoding="utf-8", errors="replace") as txt:
+            for line in txt:
+                yield line
+
+
+#: ``None`` (file unreadable) is different from ``{}`` (no manifest yet):
+#: with no manifest, every monthly file is a legacy plain source; with an
+#: unreadable one, unconsumed monthly files must be SKIPPED, because reading
+#: one as a plain source would double-count every member the rotated-archive
+#: ingestion already counted.
+MANIFEST_REL = "data/trade_logs/archive/consolidated_manifest.json"
+
+
+def _consolidation_manifest(root: Path) -> Optional[Dict[str, Any]]:
+    path = root / MANIFEST_REL
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        monthly = data.get("monthly") if isinstance(data, dict) else None
+        return monthly if isinstance(monthly, dict) else {}
+    except (OSError, ValueError) as exc:
+        logger.warning("cannot read %s (%s) — unconsumed monthly archives "
+                       "will be skipped until it is readable again",
+                       MANIFEST_REL, exc)
+        return None
+
+
 def _consume_lines(roll: Rollup, lines: Iterable[str]) -> int:
     n = 0
     for raw in lines:
@@ -755,11 +815,84 @@ def build(root: Path, out_path: Path,
                             .get("archived_sources") or {})
 
     # ── 1. immutable archives, consumed exactly once ──────────────────
+    #
+    # Two source kinds since consolidation-at-prune landed:
+    #
+    # * plain sources (rotated archives, legacy monthly files): immutable,
+    #   consumed once by filename — unchanged behaviour;
+    # * manifest-managed monthly files (archive/YYYY-MM.jsonl.gz written by
+    #   rotate_active_log's prune): these GROW, one gzip member per pruned
+    #   rotated archive. They are consumed per MEMBER, and a member whose
+    #   rotated original was already counted is marked done without reading —
+    #   its rows are the same bytes. A member whose original was pruned
+    #   before this job ever saw it is read from the monthly file, which is
+    #   the outage-recovery path: those rows used to be lost.
+    manifest_members = _consolidation_manifest(root)
     archives_added = 0
+    members_counted = 0
     touched: List[str] = []
     for abs_path in archive_sources(root):
         rel = _rel(root, abs_path)
+        name = Path(abs_path).name
+        is_monthly = "/archive/" in rel.replace("\\", "/")
         entry = arch_sources.get(rel)
+
+        managed = manifest_members.get(name) if (is_monthly and manifest_members) else None
+        if is_monthly and manifest_members is None and not (
+                entry and entry.get("state") in ("complete", "counted_pruned")):
+            logger.warning("skipping monthly %s: consolidation manifest unreadable", rel)
+            continue
+
+        if managed is not None:
+            if entry and entry.get("state") in ("complete", "counted_pruned"):
+                # Consumed whole as a plain source before the manifest existed.
+                # Terminal: its pre-manifest rows are counted; members added
+                # since resolve through their rotated originals as usual.
+                continue
+            if not entry or entry.get("state") != "managed":
+                entry = arch_sources[rel] = {"state": "managed", "members": {}}
+            members_state = entry.setdefault("members", {})
+            new_rows = 0
+            for mem in managed.get("members") or []:
+                aname = mem.get("archive")
+                if not aname or aname in members_state:
+                    continue
+                if (root / "data" / "trade_logs" / aname).exists():
+                    # The rotated original survived (crash between manifest
+                    # write and unlink, or a --full rebuild racing a prune).
+                    # Let the plain pass below count it; this member resolves
+                    # via its state on a later run.
+                    continue
+                arch_rel = _rel(root, str(root / "data" / "trade_logs" / aname))
+                src = arch_sources.get(arch_rel)
+                if src and src.get("state") in ("complete", "counted_pruned"):
+                    members_state[aname] = {"rows": src.get("rows"), "via": "rotated"}
+                    members_counted += 1
+                    continue
+                off = int(mem.get("offset") or 0)
+                ln = int(mem.get("length") or 0)
+                try:
+                    if off + ln > Path(abs_path).stat().st_size:
+                        logger.warning(
+                            "monthly %s: member %s claims bytes %d..%d beyond "
+                            "EOF — manifest ahead of the file, retrying next run",
+                            rel, aname, off, off + ln)
+                        continue
+                    n = _consume_lines(
+                        roll, _iter_monthly_member_lines(abs_path, off, ln))
+                except OSError as exc:
+                    logger.warning("cannot read member %s of %s: %s", aname, rel, exc)
+                    continue
+                members_state[aname] = {"rows": n, "via": "monthly"}
+                arch_sources[arch_rel] = {"state": "counted_pruned", "rows": n,
+                                          "via_monthly": rel}
+                members_counted += 1
+                archives_added += n
+                new_rows += n
+            if new_rows:
+                touched.append(rel)
+            continue
+
         if entry and entry.get("state") in ("complete", "counted_pruned"):
             continue
         try:
@@ -832,6 +965,7 @@ def build(root: Path, out_path: Path,
         "archive_rows_added_this_run": archives_added,
         "archives_complete": sum(1 for e in arch_sources.values()
                                  if e.get("state") == "complete"),
+        "monthly_members_counted_this_run": members_counted,
         "pruned_sources_counted": pruned,
         "sources_touched": touched,
         "active_log_rows_this_run": tail_rows,

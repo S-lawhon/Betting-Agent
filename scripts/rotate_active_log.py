@@ -40,7 +40,21 @@ What this does instead
 ──────────────────────
 1. Gzip the active log to ``trade_log.archive_<ts>.jsonl.gz`` (unchanged).
 2. Rewrite the active log containing ONLY the still-open PLACED rows, verbatim.
-3. Prune to the 12 most recent archives (unchanged).
+3. Prune to the 12 most recent archives — but a pruned archive is CONSOLIDATED,
+   never deleted: its raw gzip bytes are appended (atomically, as an
+   independent gzip member) to ``archive/YYYY-MM.jsonl.gz``, keyed by the
+   month in the archive's own filename, and recorded in
+   ``archive/consolidated_manifest.json`` BEFORE the rotated file is
+   unlinked. Consolidation failing leaves the rotated archive in place
+   (fail closed — the archive count runs past 12 rather than losing rows).
+
+   The manifest is load-bearing for ``scripts/build_dashboard_rollup.py``:
+   it is how the rollup knows a newly-appeared monthly file contains bytes
+   it already counted from the rotated archives (each member carries its
+   byte ``offset``/``length`` in the monthly file, so the rollup can read
+   exactly the members it has never seen). Without it, the rollup would
+   ingest the monthly file as a brand-new source and double-count every
+   row — the precise failure class its archive/tail split exists to kill.
 
 Carrying the rows verbatim (same ``fingerprint``) is what makes this safe:
 ``TradeStore._index_entry`` keys ``_placed`` by fingerprint and settlement
@@ -73,6 +87,7 @@ import gzip
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -86,6 +101,14 @@ logger = logging.getLogger(__name__)
 DEFAULT_LOG_PATH = Path("data/trade_logs/trade_log.jsonl")
 DEFAULT_CAP_BYTES = 50 * 1024 * 1024
 KEEP_ARCHIVES = 12
+
+#: Monthly consolidation target: <log dir>/archive/YYYY-MM.jsonl.gz plus the
+#: manifest the dashboard rollup reads to avoid double-counting.
+MONTHLY_DIR_NAME = "archive"
+MANIFEST_NAME = "consolidated_manifest.json"
+MANIFEST_SCHEMA = 1
+
+_ARCHIVE_MONTH_RE = re.compile(r"\.archive_(\d{4})(\d{2})\d{2}_\d{6}\.jsonl\.gz$")
 
 SETTLEMENT_OUTCOMES = ("WIN", "LOSS", "VOID")
 
@@ -197,12 +220,195 @@ def _atomic_write(path: Path, payload: str) -> None:
         raise
 
 
-def _prune_archives(log_path: Path, keep: int = KEEP_ARCHIVES) -> List[Path]:
+def _restore_owner(tmp_name: str, like: Path, fallback_mode: int = 0o644) -> None:
+    """Give *tmp_name* the ownership/mode of *like* (or of its parent, with
+    *fallback_mode*, when *like* does not exist yet). Matters because this
+    script runs from root's crontab over bettingbot-owned data."""
+    uid = gid = -1
+    mode = fallback_mode
+    try:
+        st = like.stat()
+        uid, gid, mode = st.st_uid, st.st_gid, (st.st_mode & 0o777) or fallback_mode
+    except OSError:
+        try:
+            st = like.parent.stat()
+            uid, gid = st.st_uid, st.st_gid
+        except OSError:
+            pass
+    if uid != -1:
+        try:
+            os.chown(tmp_name, uid, gid)
+        except PermissionError:
+            logger.warning("could not restore ownership on %s", like)
+    os.chmod(tmp_name, mode)
+
+
+def month_key(archive_name: str) -> Optional[str]:
+    """``trade_log.archive_20260628_191829.jsonl.gz`` -> ``2026-06``."""
+    m = _ARCHIVE_MONTH_RE.search(archive_name)
+    return f"{m.group(1)}-{m.group(2)}" if m else None
+
+
+def _manifest_path(log_path: Path) -> Path:
+    return log_path.parent / MONTHLY_DIR_NAME / MANIFEST_NAME
+
+
+def _load_manifest(path: Path) -> dict:
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("monthly"), dict):
+                return data
+        except (OSError, ValueError) as exc:
+            # Refusing to guess: a corrupt manifest means we can no longer
+            # prove which bytes are already in the monthly files, so the
+            # caller keeps every rotated archive until a human looks.
+            raise RuntimeError(f"unreadable consolidation manifest {path}: {exc}")
+    return {
+        "schema": MANIFEST_SCHEMA,
+        "note": (
+            "Written by scripts/rotate_active_log.py at prune time; read by "
+            "scripts/build_dashboard_rollup.py. Each member records the byte "
+            "range of one pruned rotated archive inside its monthly file. "
+            "Do not hand-edit."
+        ),
+        "monthly": {},
+    }
+
+
+def _atomic_append_file(dest: Path, src: Path) -> None:
+    """Append *src*'s raw bytes to *dest* atomically (temp + fsync + replace).
+
+    The bytes are appended verbatim, so a gzip *src* becomes an independent
+    gzip member of *dest* — concatenated members are a valid gzip stream and
+    every reader in this repo (``gzip.open`` text mode) handles them.
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=str(dest.parent), prefix=".consolidate_", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as out:
+            if dest.exists():
+                with open(dest, "rb") as fh:
+                    shutil.copyfileobj(fh, out)
+            with open(src, "rb") as fh:
+                shutil.copyfileobj(fh, out)
+            out.flush()
+            os.fsync(out.fileno())
+        _restore_owner(tmp_name, dest)
+        os.replace(tmp_name, dest)
+    except BaseException:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+        raise
+
+
+def _tail_matches(monthly: Path, offset: int, archive: Path) -> bool:
+    """True when ``monthly[offset:]`` is byte-identical to *archive*."""
+    chunk = 1 << 20
+    with open(monthly, "rb") as mfh, open(archive, "rb") as afh:
+        mfh.seek(offset)
+        while True:
+            a = afh.read(chunk)
+            m = mfh.read(len(a) or chunk)
+            if a != m:
+                return False
+            if not a:
+                return True
+
+
+def _consolidate_one(archive: Path, manifest: dict, now: datetime) -> bool:
+    """Record *archive*'s bytes in its monthly file. True = safe to unlink.
+
+    Idempotent across crashes at any point of the prune sequence
+    (append bytes -> write manifest -> unlink):
+
+    - already in the manifest       -> nothing to do, safe to unlink;
+    - bytes present but unrecorded  -> adopt them (verified byte-for-byte)
+      instead of appending a duplicate copy;
+    - monthly size disagrees with the manifest in any other way -> refuse,
+      keep the rotated archive, and let a human look. A duplicated member
+      would silently double those rows in any future full rollup rebuild,
+      which is worse than an archive count stuck above the keep limit.
+    """
+    mk = month_key(archive.name)
+    if mk is None:
+        logger.error("consolidate: %s does not match the archive naming "
+                     "convention; keeping it", archive.name)
+        return False
+
+    monthly = archive.parent / MONTHLY_DIR_NAME / f"{mk}.jsonl.gz"
+    entry = manifest["monthly"].setdefault(monthly.name, {"bytes": 0, "members": []})
+
+    if any(m.get("archive") == archive.name for m in entry["members"]):
+        return True  # recorded by a prior run that died before unlinking
+
+    expected = int(entry.get("bytes") or 0)
+    actual = monthly.stat().st_size if monthly.exists() else 0
+    asize = archive.stat().st_size
+
+    if actual == expected + asize and _tail_matches(monthly, expected, archive):
+        offset = expected  # a prior run appended the bytes, then died
+        logger.info("consolidate: adopted existing bytes for %s in %s",
+                    archive.name, monthly.name)
+    elif actual == expected:
+        offset = actual
+        _atomic_append_file(monthly, archive)
+    else:
+        logger.error(
+            "consolidate: %s is %d bytes but the manifest records %d — "
+            "cannot prove what the extra bytes are; keeping %s",
+            monthly.name, actual, expected, archive.name,
+        )
+        return False
+
+    entry["members"].append({
+        "archive": archive.name,
+        "offset": offset,
+        "length": asize,
+        "consolidated_utc": now.isoformat(),
+    })
+    entry["bytes"] = offset + asize
+    return True
+
+
+def _prune_archives(log_path: Path, keep: int = KEEP_ARCHIVES,
+                    now: Optional[datetime] = None) -> List[Path]:
+    """Consolidate-then-unlink the oldest archives beyond *keep*.
+
+    Every row that leaves the rotated-archive window survives in
+    ``archive/YYYY-MM.jsonl.gz`` — pruning no longer deletes history.
+    """
     archives = recent_archives(log_path, count=10_000)
     doomed = archives[: max(0, len(archives) - keep)]
+    if not doomed:
+        return []
+
+    now = now or datetime.now(timezone.utc)
+    mdir = log_path.parent / MONTHLY_DIR_NAME
+    if not mdir.exists():
+        mdir.mkdir(parents=True)
+        _restore_owner(str(mdir), mdir.parent)
+
+    mpath = _manifest_path(log_path)
+    try:
+        manifest = _load_manifest(mpath)
+    except RuntimeError as exc:
+        logger.error("prune: %s — keeping all %d prunable archive(s)", exc, len(doomed))
+        return []
+
+    pruned: List[Path] = []
     for p in doomed:
-        p.unlink()
-    return doomed
+        try:
+            ok = _consolidate_one(p, manifest, now)
+            if ok:
+                # Manifest lands BEFORE the unlink: a crash between the two
+                # leaves a recorded member plus a stale rotated file, which
+                # the next run recognises and simply unlinks.
+                _atomic_write(mpath, json.dumps(manifest, indent=2) + "\n")
+                p.unlink()
+                pruned.append(p)
+        except (OSError, RuntimeError) as exc:
+            logger.error("prune: consolidation of %s failed (%s); keeping it", p.name, exc)
+    return pruned
 
 
 def rotate(
@@ -245,7 +451,7 @@ def rotate(
         shutil.copyfileobj(src, dst)
 
     _atomic_write(log_path, payload)
-    pruned = _prune_archives(log_path)
+    pruned = _prune_archives(log_path, now=now)
     result["rotated"] = True
     result["pruned"] = [str(p) for p in pruned]
     logger.info(

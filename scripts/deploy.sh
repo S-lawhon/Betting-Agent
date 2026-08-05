@@ -10,7 +10,7 @@
 # Features:
 #   - Pre-deploy: runs pytest locally (aborts on new failures)
 #   - Sync: rsync to server (excludes data, git, cache)
-#   - Post-deploy: health check via web dashboard /api/state
+#   - Post-deploy: health check via standalone dashboard /healthz (:8081)
 #   - Auto-rollback: if health check fails after restart, rolls back to
 #     the previous deployment and restarts again
 # =============================================================================
@@ -22,7 +22,11 @@ RESTART="${2:-}"
 REMOTE_DIR="/opt/betting-pod-shop"
 REMOTE_USER="root"
 SERVICE_NAME="betting-pod-shop"
-HEALTH_URL="http://localhost:8080/health"
+# Phase 3 cutover (2026-08-05): the gate targets the standalone dashboard on
+# :8081, not the engine — the engine no longer serves HTTP. /healthz returns
+# JSON with HTTP 200 (the curl -sf below asserts only on status). This line
+# and the --web removal in betting-pod-shop.service must revert TOGETHER.
+HEALTH_URL="http://localhost:8081/healthz"
 HEALTH_TIMEOUT=60      # seconds to wait for healthy response
 HEALTH_INTERVAL=5      # seconds between health check retries
 BACKUP_SUFFIX=".deploy-backup"
@@ -198,7 +202,7 @@ if [[ "$RESTART" == "restart" ]]; then
     echo "==> Health check PASSED"
     ssh "${REMOTE_USER}@${SERVER_IP}" "systemctl status ${SERVICE_NAME} --no-pager"
     echo ""
-    echo "==> Deploy successful. Dashboard: http://${SERVER_IP}:8080"
+    echo "==> Deploy successful. Dashboard: https://dashboard.htxtrades.org (standalone, :8081)"
     # Clean up backup after successful deploy
     ssh "${REMOTE_USER}@${SERVER_IP}" "rm -rf '${REMOTE_DIR}${BACKUP_SUFFIX}'" 2>/dev/null || true
   else

@@ -16,7 +16,10 @@ WorkingDirectory=/opt/betting-pod-shop
 Environment="PYTHONPATH=/opt/betting-pod-shop/Legacy/Kalshi Arb Project/src"
 
 # __PYTHON__ is replaced by server_setup.sh with the real venv Python path
-ExecStart=__PYTHON__ -m src.main --loop --interval 300 --web --no-browser
+# Phase 3 cutover (2026-08-05): no --web — the engine no longer serves HTTP.
+# The dashboard is the standalone betting-dashboard unit on :8081; the --web
+# flag remains in src/cli.py for local dev only.
+ExecStart=__PYTHON__ -m src.main --loop --interval 300
 
 # Restart automatically if the engine crashes, with a 30-second cooldown
 Restart=on-failure

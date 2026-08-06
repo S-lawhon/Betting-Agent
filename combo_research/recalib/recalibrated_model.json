@@ -1,0 +1,70 @@
+{
+ "leg_map": {
+  "a": -0.16846,
+  "b": 1.268493,
+  "form": "logit(p_cal) = a + b*logit(mid_side_adjusted)",
+  "fit_on": "two-sided unique (leg,side), event days <= 2026-08-01",
+  "n_train": 25047,
+  "fitted": "2026-08-05"
+ },
+ "rho": {
+  "cross": 0.0,
+  "same_day": 0.0153,
+  "same_game": 0.379,
+  "same_player": 0.9007
+ },
+ "rho_meta": {
+  "cross": {
+   "n": 16135,
+   "days": 8,
+   "ci95": [
+    0.0,
+    0.05679679384446208
+   ]
+  },
+  "same_day": {
+   "n": 362419,
+   "days": 8,
+   "ci95": [
+    0.0,
+    0.20453904318271413
+   ]
+  },
+  "same_game": {
+   "n": 102763,
+   "days": 8,
+   "ci95": [
+    0.3180974434338727,
+    0.4425531460994673
+   ]
+  },
+  "same_player": {
+   "n": 2059,
+   "days": 8,
+   "ci95": [
+    0.43772799576918253,
+    0.945
+   ],
+   "note": "extended grid to 0.95 (first fit pegged the 0.60 cap)"
+  }
+ },
+ "rho_train_days": {
+  "cross": 0.0244,
+  "same_day": 0.0586,
+  "same_game": 0.336,
+  "same_player": 0.6
+ },
+ "sign_correction": "corr_ij = s_i*s_j*rho[relation]; s=+1 yes / -1 no",
+ "fitted": "2026-08-05",
+ "window": [
+  "2026-07-29",
+  "2026-08-05"
+ ],
+ "estimator": "moment match E[price]=E[settle] per pure-relation class, Gauss-Hermite one-factor; day-clustered bootstrap CI",
+ "realized_zone_seller_edge_fit_window": {
+  "mean_c": 1.4,
+  "day_se_c": 1.12,
+  "n": 62578,
+  "days": 7
+ }
+}

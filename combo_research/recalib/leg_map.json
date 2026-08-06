@@ -1,0 +1,8 @@
+{
+ "a": -0.16846,
+ "b": 1.268493,
+ "form": "logit(p_cal) = a + b*logit(mid_side_adjusted)",
+ "fit_on": "two-sided unique (leg,side), event days <= 2026-08-01",
+ "n_train": 25047,
+ "fitted": "2026-08-05"
+}

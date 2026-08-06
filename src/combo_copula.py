@@ -123,23 +123,39 @@ def relation(a: str, b: str) -> str:
 
 
 def correlation_matrix(tickers: Sequence[str],
-                       rho: Optional[Dict[str, float]] = None) -> np.ndarray:
+                       rho: Optional[Dict[str, float]] = None,
+                       sides: Optional[Sequence[str]] = None) -> np.ndarray:
     """Build the leg correlation matrix from the block structure.
 
     Args:
         tickers: Leg market tickers, in order.
         rho: Block → correlation. Defaults to :data:`DEFAULT_RHO`.
+        sides: Per-leg ``"yes"``/``"no"``, in ticker order. A NO leg flips the
+            SIGN of its correlations: if two legs' YES outcomes are positively
+            correlated, then YES-on-one and NO-on-the-other are negatively
+            correlated. Omitting this reproduces the pre-2026-08-05 unsigned
+            matrix, which OVERPRICES every mixed-side combo — measured +1.3¢ of
+            joint bias on the shadow tape (see
+            ``combo_research/recalib/REPORT_P029_Recalibration_2026-08-05.md``).
+            Pass it everywhere a real price is wanted; the default exists only
+            so historical numbers can be reproduced.
 
     Returns:
         An ``n × n`` positive-definite correlation matrix.
     """
     rho = {**DEFAULT_RHO, **(rho or {})}
     n = len(tickers)
+    if sides is not None and len(sides) != n:
+        raise ValueError("sides and tickers differ in length")
+    s = [1.0 if sides is None or (sides[i] or "yes").lower() != "no" else -1.0
+         for i in range(n)]
     m = np.eye(n)
     for i in range(n):
         for j in range(i + 1, n):
             r = float(rho.get(relation(tickers[i], tickers[j]), 0.0))
-            m[i, j] = m[j, i] = r
+            m[i, j] = m[j, i] = s[i] * s[j] * r
+    # Sign flips are a congruence by diag(s), which preserves eigenvalues, so
+    # this cannot make a PSD block structure indefinite that wasn't already.
     return _nearest_psd(m)
 
 
@@ -243,12 +259,16 @@ class ComboCopula:
         if len(legs) != len(leg_yes_probs):
             raise ValueError("legs and marginals differ in length")
         tickers = [t for t, _ in legs]
-        # Apply each leg's side: a NO leg contributes (1 - p).
+        # Apply each leg's side: a NO leg contributes (1 - p) — and flips the
+        # sign of its correlations (passed via ``sides`` below). Until
+        # 2026-08-05 the sides never reached the matrix, so every mixed-side
+        # combo was priced with the WRONG correlation sign.
         eff = [
             (1.0 - float(q)) if (side or "yes").lower() == "no" else float(q)
             for (_, side), q in zip(legs, leg_yes_probs)
         ]
-        corr = correlation_matrix(tickers, self.rho)
+        corr = correlation_matrix(tickers, self.rho,
+                                  sides=[side for _, side in legs])
         indep = float(np.prod(eff))
         joint = self.joint_yes(eff, corr)
         off = corr[~np.eye(len(tickers), dtype=bool)]

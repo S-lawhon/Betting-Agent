@@ -1,0 +1,21 @@
+[Unit]
+Description=Betting Pod Shop - P-029 Gate 0c remote checkpoint
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/betting-pod-shop
+Environment=PYTHONUNBUFFERED=1
+Environment=P029_GATE0C_SSH_KEY=/root/.ssh/p029_probe
+ExecStart=/opt/betting-pod-shop/venv/bin/python /opt/betting-pod-shop/scripts/run_p029_gate0c_remote_checkpoint.py
+TimeoutStartSec=21660
+Nice=15
+IOSchedulingClass=idle
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/data/p029_gate0c
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+

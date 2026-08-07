@@ -76,6 +76,7 @@ def test_reader_stays_blind_before_the_registered_date(tmp_path):
     assert result["verdict"] == "NO DECISION"
     assert "blind" in result["reason"]
     assert "margin_median_c" not in result
+    assert result["data_qualification"]["known_tape_gaps"] == gate.KNOWN_TAPE_GAPS
 
 
 def test_model_hash_is_load_bearing(tmp_path):
@@ -110,9 +111,36 @@ def test_reader_uses_only_forward_window_and_settled_rows(tmp_path):
     assert result["model_health_n"] == 2
 
 
+def test_extension_read_includes_registered_extra_week(tmp_path):
+    rows = [
+        _row("INITIAL", seen="2026-08-19T23:59:59Z"),
+        _row("EXTENSION", seen="2026-08-25T12:00:00Z"),
+        _row("TOO_LATE", seen="2026-08-27T00:00:00Z"),
+    ]
+    archive = _archive(tmp_path, {
+        "INITIAL": 0.0, "EXTENSION": 0.0, "TOO_LATE": 0.0,
+    })
+    db = _db(tmp_path, rows)
+
+    initial = gate.evaluate(db, archive, gate.DEFAULT_MODEL, AFTER_READ, 20)
+    extended = gate.evaluate(
+        db, archive, gate.DEFAULT_MODEL,
+        datetime(2026, 8, 30, 12, tzinfo=timezone.utc), 20,
+    )
+
+    assert initial["progress"] == 1
+    assert initial["window_end_utc"] == gate.WINDOW_END
+    assert extended["progress"] == 2
+    assert extended["window_end_utc"] == gate.EXTENSION_WINDOW_END
+    assert extended["extension_final"] is True
+
+
 def test_dual_condition_decision_rule():
     assert gate.decide(500, 2.1, 1.2, [0.1, 2.0])[0] == "CONTINUE"
     assert gate.decide(500, 0.9, 4.0, [1.0, 5.0])[0] == "STOP"
     assert gate.decide(500, 3.0, 0.0, [-1.0, 1.0])[0] == "STOP"
     assert gate.decide(500, 2.1, 1.2, [-0.1, 2.0])[0] == "EXTEND"
     assert gate.decide(499, 2.1, 1.2, [0.1, 2.0])[0] == "EXTEND"
+    assert gate.decide(
+        500, 2.1, 1.2, [-0.1, 2.0], extension_final=True,
+    )[0] == "INCONCLUSIVE"

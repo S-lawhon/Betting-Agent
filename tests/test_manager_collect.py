@@ -123,9 +123,11 @@ def test_job_record_can_expose_latest_heartbeat_telemetry(tmp_path):
             "file": "data/p029_heartbeat/p029_shadow.jsonl",
             "max_stale_hours": 3,
             "inspect_last_row": True,
+            "inspect_recent_rows": 48,
         },
     })
     assert rec["last_row"]["shadow_memory_utilization_pct"] == 95.8
+    assert rec["recent_rows"] == [rec["last_row"]]
 
 
 def test_stale_local_job_is_reported_stale(tmp_path):
@@ -272,6 +274,42 @@ def test_p029_memory_pressure_is_warn_but_process_loss_is_critical():
     assert by_key["job.p029_shadow.process_loss"].severity == "critical"
 
 
+def test_p029_memory_warning_includes_bounded_pressure_trend():
+    def row(ts, utilization, events, swap, backlog):
+        return {
+            "timestamp_utc": ts,
+            "shadow_main_pid": 224158,
+            "shadow_memory_utilization_pct": utilization,
+            "shadow_memory_swap_bytes": swap,
+            "shadow_memory_max_events": events,
+            "shadow_due_in_zone": backlog,
+            "shadow_restart_delta": 0,
+            "shadow_oom_kill_events": 0,
+        }
+
+    recent = [
+        row("2026-08-07T12:00:00Z", 94.0, 1_000, 10_000_000, 189),
+        row("2026-08-07T13:00:00Z", 95.0, 1_200, 20_000_000, 80),
+        row("2026-08-07T14:00:00Z", 95.8, 1_500, 21_000_000, 50),
+    ]
+    job = {
+        "id": "p029_shadow", "measurable": True, "stale": False,
+        "last_row": recent[-1] | {
+            "shadow_memory_current_bytes": 771_575_808,
+            "shadow_memory_peak_bytes": 805_810_176,
+        },
+        "recent_rows": recent,
+    }
+
+    finding = {f.key: f for f in checks.check_jobs({"jobs": [job]})}[
+        "job.p029_shadow.memory_pressure"]
+
+    assert "3 samples / 2.0h" in finding.detail
+    assert "memory.max +500 (250.0/h)" in finding.detail
+    assert "backlog peak/latest 189/50" in finding.detail
+    assert finding.value["trend"]["pid_stable"] is True
+
+
 def test_p029_healthy_memory_emits_no_pressure_findings():
     job = {
         "id": "p029_shadow",
@@ -284,6 +322,49 @@ def test_p029_healthy_memory_emits_no_pressure_findings():
         },
     }
     assert not checks.check_jobs({"jobs": [job]})
+
+
+def test_p029_remote_checkpoint_is_preferred_and_hash_checked(tmp_path):
+    project = tmp_path / "opt" / "betting-pod-shop"
+    output = project / "data" / "p029_gate0c" / "latest.json"
+    output.parent.mkdir(parents=True)
+    payload = {
+        "pod": "P-029",
+        "model_sha256": (
+            "01411d863de04075a38f02b40b7e0c4a7e21463a96b42d8194e8ccd8325956af"
+        ),
+        "verdict": "EXTEND",
+        "progress": 500,
+    }
+    output.write_text(json.dumps(payload), encoding="utf-8")
+    local = tmp_path / "local"
+    local.mkdir()
+    reg = write_registry(tmp_path, str(local), str(project))
+    col = collect.Collector(reg, root=project, local_root=local)
+
+    result = col.p029_gate()
+
+    assert result["available"] is True
+    assert result["checkpoint"] == payload
+    payload["model_sha256"] = "wrong"
+    output.write_text(json.dumps(payload), encoding="utf-8")
+    assert col.p029_gate()["available"] is False
+
+
+def test_p029_gate_findings_surface_terminal_verdicts_and_gap():
+    base = {
+        "progress": 500,
+        "data_qualification": {"known_tape_gaps": [{"backfillable": False}]},
+    }
+    for verdict, key, severity in (
+        ("CONTINUE", "gate.P-029.continue", "action"),
+        ("STOP", "gate.P-029.stop", "warn"),
+        ("INCONCLUSIVE", "gate.P-029.inconclusive", "warn"),
+    ):
+        snap = {"p029": {"checkpoint": base | {"verdict": verdict}}}
+        found = {f.key: f for f in checks.check_gates(snap, {})}
+        assert found[key].severity == severity
+        assert "1 known non-backfillable tape gap" in found[key].detail
 
 
 def test_measurable_hosts_mirror_stays_in_sync():

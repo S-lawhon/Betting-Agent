@@ -24,6 +24,16 @@ frozen, forward-only **Gate 0c** before its window opened.
 - The hourly `p029-health-check` heartbeat verifies the effective memory limit
   and records current/peak/swap usage, cgroup memory events, PID/restart delta,
   and the in-zone resolver backlog throughout the forward window.
+- The primary droplet owns registered reads via
+  `p029-gate0c-checkpoint.timer`: August 23 at 12:30 UTC, then August 30 only
+  when the first result is mixed or insufficient. Results are immutable,
+  timestamped JSON plus an atomic `latest.json`; the manager consumes that
+  remote result rather than trying to read `/var/lib/p029` locally.
+- **Reader extension bug fixed before the first permitted read:** the August 30
+  path now includes first-seen combos through August 26. The prior reader kept
+  its SQL end date frozen at August 19 even on the extension date, which would
+  have called the same sample an extension. A final mixed result is reported
+  `INCONCLUSIVE`; it cannot silently grant a second extension.
 - **Operational deviation, 2026-08-07:** the Gate 0c deployment restart left
   `p029-shadow.service` unable to traverse its root-owned `combo_research/`
   working directory from 00:17:11 to 00:23:01 UTC (about six minutes). The tape
@@ -33,8 +43,9 @@ frozen, forward-only **Gate 0c** before its window opened.
   crash-loop attempts. The repaired logger has remained running at the frozen
   `MemoryMax=768M`; the first and subsequent resolver cycles reported
   `due 0 in-zone`.
-- Phase 1 is still unauthorized. It requires a separate explicit decision and
-  a rotated, read-only Kalshi key.
+- Sam confirmed the exposed account RSA key was rotated on 2026-08-07. Phase 1
+  is still unauthorized and, if Gate 0c passes, requires a separate explicit
+  decision plus confirmation or creation of a distinct read-only Kalshi key.
 
 On the P-029 host, the eventual read is:
 

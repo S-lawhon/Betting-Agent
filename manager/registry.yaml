@@ -68,6 +68,8 @@ systemd_units:
   - {id: manager-alert.service, unit: manager-alert.service, source: scripts/systemd/manager-alert.service, severity: warn}
   - {id: manager-brief.timer, unit: manager-brief.timer, source: scripts/systemd/manager-brief.timer, severity: warn}
   - {id: manager-brief.service, unit: manager-brief.service, source: scripts/systemd/manager-brief.service, severity: warn}
+  - {id: p029-gate0c-checkpoint.timer, unit: p029-gate0c-checkpoint.timer, source: scripts/systemd/p029-gate0c-checkpoint.timer, severity: warn}
+  - {id: p029-gate0c-checkpoint.service, unit: p029-gate0c-checkpoint.service, source: scripts/systemd/p029-gate0c-checkpoint.service, severity: warn}
 
 # -----------------------------------------------------------------------------
 # SERVICES — process-level liveness
@@ -473,6 +475,7 @@ jobs:
       file: data/p029_heartbeat/p029_shadow.jsonl
       max_stale_hours: 3
       inspect_last_row: true
+      inspect_recent_rows: 48
     severity: warn
     note: >
       Heartbeat cadence is hourly, so the on-box 2h-freshness rule lives in
@@ -500,6 +503,21 @@ jobs:
       Worth running even if P-029 is killed at Gate 0. Archived files must be
       pulled down and committed under combo_research/archive/ — see the
       check_research_committed.sh convention in CLAUDE.md.
+
+  - id: p029_gate0c_checkpoint
+    host: droplet
+    schedule: "2026-08-23 and 2026-08-30 at 12:30 UTC (second run only if extension is needed)"
+    description: Frozen P-029 Gate 0c remote decision reader
+    output:
+      file: data/p029_gate0c/latest.json
+    expected_after_utc: 2026-08-23T18:30:00Z
+    severity: warn
+    note: >
+      The primary droplet invokes the sanctioned reader on the P-029 host with
+      the dedicated probe key, then writes an immutable timestamped result plus
+      latest.json atomically. The August 30 timer refuses to run when August 23
+      already produced CONTINUE or STOP. Every artifact carries the known
+      six-minute non-backfillable tape gap.
 
   - id: evmap_weather_sheet
     host: droplet
@@ -1352,8 +1370,10 @@ workstreams:
       CURRENT STATE: Gate 0c public-data collection on the dedicated VPS
       (143.198.162.120), with no credentials, capital, or order path. Collect
       first-seen combos 2026-08-06 through 2026-08-19 and read no earlier than
-      2026-08-23. Phase 1 remains a separate explicit decision and needs a
-      rotated read-only key; Phase 3 is the real execution gate at <=$500.
+      2026-08-23. The exposed account key rotation was confirmed complete
+      2026-08-07. Phase 1 remains a separate explicit decision and requires a
+      separate read-only key that has not been confirmed; Phase 3 is the real
+      execution gate at <=$500.
       WHY THE TWO 0-for-5 PRIORS DO NOT AUTOMATICALLY APPLY: the maker/fade 0-for-5
       all fought a fee and died on fills, and the fee half does not carry over
       here (it is zero). The FILL half does, which is precisely what the gate
@@ -1381,6 +1401,8 @@ workstreams:
       window_start_utc: 2026-08-06T00:00:00Z
       window_end_utc: 2026-08-19T23:59:59Z
       read_not_before: 2026-08-23
+      extension_window_end_utc: 2026-08-26T23:59:59Z
+      extension_read_not_before: 2026-08-30
       decision: >
         BOTH conditions must pass: (1) median(first print - frozen-model fair)
         >= +2.0c at n>=500, and (2) mean(first print - settlement) >= +1.0c
@@ -1413,10 +1435,12 @@ workstreams:
         combos resolve scalar, and booking them at $0 repeats the golf-settler
         error exactly.
       - >
-        OPEN ACTION (Sam): the RSA private key in .env was exposed in a Cowork
-        transcript 2026-07-28 and can place and cancel real trades. Rotate it,
-        and create a SEPARATE read-only key for Phases 0-1. Phase 0 needs no
-        credentials, so this does not block collection — it blocks Phase 1.
+        RSA ROTATION COMPLETE: Sam confirmed 2026-08-07 that the account key
+        exposed in the 2026-07-28 Cowork transcript was rotated. Do not keep
+        reporting rotation as an open action. Phase 0 needs no credentials.
+        If Gate 0c returns CONTINUE and Sam separately authorizes Phase 1,
+        confirm or create a SEPARATE read-only key; never reuse an order-capable
+        account key for the read-only phase.
       - >
         The archiver is worth running EVEN IF P-029 is killed at Gate 0. Every
         day it does not run is a day of season combo data that will not exist

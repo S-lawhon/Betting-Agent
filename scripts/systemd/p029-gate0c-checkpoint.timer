@@ -1,0 +1,11 @@
+[Unit]
+Description=Betting Pod Shop - P-029 Gate 0c registered reads
+
+[Timer]
+OnCalendar=2026-08-23 12:30:00 UTC
+OnCalendar=2026-08-30 12:30:00 UTC
+Persistent=true
+Unit=p029-gate0c-checkpoint.service
+
+[Install]
+WantedBy=timers.target

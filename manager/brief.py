@@ -139,6 +139,21 @@ def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any
             "note": "NO DECISION until n=120 (~Jan 2027). "
                     "US Open quals Aug 17-21 is the first volume spike.",
         })
+    p029_cp = (snap.get("p029") or {}).get("checkpoint") or {}
+    if p029_cp:
+        current = p029_cp.get("progress")
+        threshold = p029_cp.get("threshold") or 500
+        gates.append({
+            "id": "P-029",
+            "label": "Combo maker - frozen forward Gate 0c",
+            "current": current,
+            "threshold": threshold,
+            "pct": (min(100.0, 100.0 * current / max(1, threshold))
+                    if isinstance(current, (int, float)) else 0.0),
+            "verdict": p029_cp.get("verdict"),
+            "note": "{} Read no earlier than 2026-08-23; one extension only."
+                    .format(p029_cp.get("reason") or ""),
+        })
 
     # Accumulating (blocked on time) — one line each, no detail.
     accumulating = [
@@ -310,11 +325,18 @@ def render_markdown(b: Dict[str, Any]) -> str:
                     _metric(usage.get("cost_usd")),
                     _metric(usage.get("hard_cost_limit_usd")))
             L.append(
-                "**Research worker:** {} mode, status {}; provider {}; next {}; "
+                "**Default research planner:** {} mode, status {}; provider {}; next {}; "
                 "daily model usage {}.".format(
                     worker.get("mode") or "unknown",
                     worker.get("status") or "unknown", provider,
                     worker.get("assignment_id") or "none", usage_text))
+        if (activity.get("invoked") or 0) > 0:
+            L.append(
+                "**Provider-backed pilot:** {} tracked model invocation(s) and "
+                "{} durable review(s) in the last 24h. The default planner "
+                "status above is a separate, deliberately dry-run service."
+                .format(_metric(activity.get("invoked")),
+                        _metric(activity.get("reviewed"))))
         L.append("")
         L.append(
             "- Lifetime funnel: {} assignments → {} dispatched → {} reviewed → "
@@ -705,13 +727,21 @@ def render_html(b: Dict[str, Any]) -> str:
                     _metric(usage.get("attempts")),
                     _metric(usage.get("cost_usd")),
                     _metric(usage.get("hard_cost_limit_usd")))
-            P.append("<div class='card'><b>Research worker</b><br>{} mode, status {}; "
+            P.append("<div class='card'><b>Default research planner</b><br>{} mode, status {}; "
                      "provider {}; next {}; daily model usage {}.</div>".format(
                          e(str(worker.get("mode") or "unknown")),
                          e(str(worker.get("status") or "unknown")),
                          e(provider),
                          e(str(worker.get("assignment_id") or "none")),
                          e(usage_text)))
+        if (activity.get("invoked") or 0) > 0:
+            P.append(
+                "<div class='card'><b>Provider-backed pilot</b><br>{} tracked "
+                "model invocation(s) and {} durable review(s) in the last 24h. "
+                "The default planner status above is a separate, deliberately "
+                "dry-run service.</div>".format(
+                    e(_metric(activity.get("invoked"))),
+                    e(_metric(activity.get("reviewed")))))
         P.append("<ul>")
         P.append("<li>Lifetime funnel: {} assignments → {} dispatched → {} reviewed "
                  "→ {} advanced</li>".format(

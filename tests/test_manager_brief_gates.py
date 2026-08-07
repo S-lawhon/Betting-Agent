@@ -310,6 +310,25 @@ def test_daily_brief_surfaces_dry_run_worker_and_zero_model_spend():
         assert "$0 of $10 hard limit" in text
 
 
+def test_daily_brief_does_not_confuse_default_dry_run_with_provider_pilot():
+    snap = research_snap()
+    operations = snap["research_operations"]["operations"]
+    operations["activity_24h"].update({"invoked": 1, "reviewed": 1})
+    operations["worker"] = {
+        "mode": "dry_run", "status": "dry_run",
+        "provider_configured": False, "assignment_id": "next",
+        "daily_usage": {"attempts": 0, "cost_usd": 0,
+                        "hard_cost_limit_usd": 10},
+    }
+
+    b = brief.build(snap, [])
+    for text in (brief.render_markdown(b), brief.render_html(b)):
+        assert "Default research planner" in text
+        assert "Provider-backed pilot" in text
+        assert "1 tracked model invocation" in text
+        assert "1 durable review" in text
+
+
 def test_daily_brief_reports_missing_research_operations_as_unknown():
     b = brief.build({"research_operations": {
         "available": False, "reason": "metrics missing",

@@ -170,6 +170,21 @@ def last_json_row(path: Path) -> Optional[Dict[str, Any]]:
     return None
 
 
+def recent_json_rows(path: Path, count: int) -> List[Dict[str, Any]]:
+    """Return up to ``count`` recent JSON objects using a bounded tail read."""
+    if count <= 0:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for line in tail_lines(path, count=count, max_bytes=1_000_000):
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            rows.append(obj)
+    return rows[-count:]
+
+
 def count_lines_since(path: Path, since: datetime,
                       max_scan_bytes: int = 60_000_000) -> Tuple[int, bool]:
     """Count rows with a timestamp >= `since`, scanning backwards.
@@ -483,6 +498,7 @@ class Collector:
             "severity": job.get("severity", "info"),
             "max_stale_hours": max_hours,
             "note": job.get("note"),
+            "expected_after_utc": job.get("expected_after_utc"),
         }
 
         if not self.can_check(job):
@@ -551,6 +567,10 @@ class Collector:
         })
         if spec.get("inspect_last_row"):
             base_rec["last_row"] = last
+        recent_count = spec.get("inspect_recent_rows")
+        if (target and exists and str(target).endswith(".jsonl")
+                and isinstance(recent_count, int) and recent_count > 0):
+            base_rec["recent_rows"] = recent_json_rows(target, recent_count)
         return base_rec
 
     def can_check(self, job: Dict[str, Any]) -> bool:
@@ -858,7 +878,25 @@ class Collector:
 
     @safe("p029_gate")
     def p029_gate(self) -> Dict[str, Any]:
-        """P-029 Gate 0c reader; blind until its registered read date."""
+        """P-029 Gate 0c result from the remote reader, blind until read date."""
+        latest = self.root / "data/p029_gate0c/latest.json"
+        if latest.exists():
+            try:
+                payload = json.loads(latest.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                return {"id": "P-029", "reader": str(latest),
+                        "available": False, "error": str(exc)}
+            expected_hash = (
+                "01411d863de04075a38f02b40b7e0c4a7e21463a96b42d8194e8ccd8325956af"
+            )
+            if (not isinstance(payload, dict)
+                    or payload.get("pod") != "P-029"
+                    or payload.get("model_sha256") != expected_hash):
+                return {"id": "P-029", "reader": str(latest),
+                        "available": False,
+                        "error": "remote checkpoint identity/hash mismatch"}
+            return {"id": "P-029", "reader": str(latest),
+                    "available": True, "checkpoint": payload}
         return self._checkpoint("scripts/p029_gate0c_checkpoint.py", "P-029")
 
     @safe("p022_window")

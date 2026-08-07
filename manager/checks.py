@@ -305,6 +305,69 @@ def _minutes_since_window_open(at: Optional[datetime] = None) -> float:
     return hours * 60 + et.minute
 
 
+def _p029_pressure_trend(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Summarize the trailing 24h of bounded P-029 heartbeat telemetry."""
+    parsed = []
+    for row in rows:
+        ts = _parse(row.get("timestamp_utc"))
+        if ts is not None:
+            parsed.append((ts, row))
+    if not parsed:
+        return None
+    parsed.sort(key=lambda item: item[0])
+    latest_ts = parsed[-1][0]
+    parsed = [item for item in parsed
+              if item[0] >= latest_ts - timedelta(hours=24)]
+    if not parsed:
+        return None
+
+    latest_pid = parsed[-1][1].get("shadow_main_pid")
+    same_process = [item for item in parsed
+                    if item[1].get("shadow_main_pid") == latest_pid]
+    if not same_process:
+        same_process = parsed
+    start_ts, first = same_process[0]
+    end_ts, last = same_process[-1]
+    hours = max(0.0, (end_ts - start_ts).total_seconds() / 3600.0)
+
+    utilization = [float(row["shadow_memory_utilization_pct"])
+                   for _, row in same_process
+                   if isinstance(row.get("shadow_memory_utilization_pct"),
+                                 (int, float))]
+    swaps = [int(row["shadow_memory_swap_bytes"])
+             for _, row in same_process
+             if isinstance(row.get("shadow_memory_swap_bytes"), int)]
+    backlogs = [int(row["shadow_due_in_zone"])
+                for _, row in same_process
+                if isinstance(row.get("shadow_due_in_zone"), int)]
+    first_events = first.get("shadow_memory_max_events")
+    last_events = last.get("shadow_memory_max_events")
+    event_delta = None
+    event_rate = None
+    if (isinstance(first_events, int) and isinstance(last_events, int)
+            and last_events >= first_events):
+        event_delta = last_events - first_events
+        if hours > 0:
+            event_rate = event_delta / hours
+
+    return {
+        "samples": len(same_process),
+        "window_hours": round(hours, 2),
+        "pid": latest_pid,
+        "pid_stable": len(same_process) == len(parsed),
+        "utilization_min_pct": round(min(utilization), 1) if utilization else None,
+        "utilization_avg_pct": (round(sum(utilization) / len(utilization), 1)
+                                 if utilization else None),
+        "utilization_max_pct": round(max(utilization), 1) if utilization else None,
+        "swap_peak_bytes": max(swaps) if swaps else None,
+        "memory_max_event_delta": event_delta,
+        "memory_max_events_per_hour": (round(event_rate, 1)
+                                       if event_rate is not None else None),
+        "backlog_peak": max(backlogs) if backlogs else None,
+        "backlog_latest": backlogs[-1] if backlogs else None,
+    }
+
+
 def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
     out: List[Finding] = []
     for job in snap.get("jobs", []):
@@ -339,28 +402,53 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
             continue
         if not job.get("measurable"):
             # Output path is visible from here but nothing is there to measure.
+            expected = _parse(job.get("expected_after_utc"))
+            if expected is not None and datetime.now(UTC) >= expected:
+                out.append(Finding(
+                    key="job.{}.missing_after_deadline".format(jid),
+                    severity=job.get("severity", "warn"),
+                    title="{} did not produce its registered output".format(jid),
+                    detail=("Expected after {} but no measurable output exists. "
+                            "A scheduled decision read that produces nothing is "
+                            "a failed gate instrument, not a zero result."
+                            .format(job.get("expected_after_utc"))),
+                    value=None))
             continue
         if jid == "p029_shadow":
             row = job.get("last_row") or {}
+            trend = _p029_pressure_trend(job.get("recent_rows") or [])
             memory_pct = row.get("shadow_memory_utilization_pct")
             if isinstance(memory_pct, (int, float)) and memory_pct >= 90.0:
+                trend_text = "24h trend unavailable (fewer than two timed samples)."
+                if trend and trend.get("samples", 0) >= 2:
+                    trend_text = (
+                        "Trailing trend: {samples} samples / {window_hours}h, "
+                        "utilization {utilization_min_pct}-"
+                        "{utilization_max_pct}% (avg "
+                        "{utilization_avg_pct}%), swap peak "
+                        "{swap_peak_bytes} bytes, memory.max +"
+                        "{memory_max_event_delta} ({memory_max_events_per_hour}/h), "
+                        "in-zone backlog peak/latest {backlog_peak}/"
+                        "{backlog_latest}, PID stable={pid_stable}."
+                    ).format(**trend)
                 out.append(Finding(
                     key="job.p029_shadow.memory_pressure",
                     severity="warn",
                     title="P-029 shadow memory is {:.1f}% of its 768 MiB cap".format(
                         memory_pct),
                     detail=("Current={} bytes, peak={} bytes, swap={} bytes, "
-                            "memory.max events={}. The Gate 0c tape cannot be "
+                            "memory.max events={}. {} The Gate 0c tape cannot be "
                             "backfilled; keep the frozen cap unchanged until "
                             "the pressure trend is reviewed."
                             .format(row.get("shadow_memory_current_bytes"),
                                     row.get("shadow_memory_peak_bytes"),
                                     row.get("shadow_memory_swap_bytes"),
-                                    row.get("shadow_memory_max_events"))),
+                                    row.get("shadow_memory_max_events"),
+                                    trend_text)),
                     fix=("Inspect `systemctl show p029-shadow.service "
                          "--property=MemoryCurrent,MemoryPeak,MemorySwapCurrent,"
                          "MemoryMax,NRestarts` on the P-029 VPS."),
-                    value=memory_pct))
+                    value={"memory_pct": memory_pct, "trend": trend}))
             restart_delta = row.get("shadow_restart_delta")
             oom_kills = row.get("shadow_oom_kill_events")
             if ((isinstance(restart_delta, int) and restart_delta > 0)
@@ -669,6 +757,50 @@ def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]
                 severity="warn",
                 title="P-015 reached n={} with edge <= 0 — rule says KILL".format(n),
                 workstream="P-015", value=n))
+
+    # ---- P-029 Gate 0c (remote, forward-only reader) ----
+    p029 = snap.get("p029", {}) or {}
+    p029_cp = p029.get("checkpoint") or {}
+    verdict = p029_cp.get("verdict")
+    if verdict in {"CONTINUE", "STOP", "INCONCLUSIVE"}:
+        gaps = ((p029_cp.get("data_qualification") or {})
+                .get("known_tape_gaps") or [])
+        qualification = (
+            "Data qualification: {} known non-backfillable tape gap(s)."
+            .format(len(gaps)))
+        if verdict == "CONTINUE":
+            out.append(Finding(
+                key="gate.P-029.continue",
+                severity="action",
+                title="P-029 Gate 0c says CONTINUE - Phase 1 decision due",
+                detail=("Both locked forward conditions passed. This authorizes "
+                        "only a separate human decision on Phase 1; it does not "
+                        "authorize credentials, quotes, or capital. {} {}"
+                        .format(qualification, p029_cp.get("reason") or "")),
+                workstream="P-029", value=p029_cp.get("progress")))
+        elif verdict == "STOP":
+            out.append(Finding(
+                key="gate.P-029.stop", severity="warn",
+                title="P-029 Gate 0c reached its final STOP condition",
+                detail="{} {}".format(
+                    p029_cp.get("reason") or "", qualification),
+                workstream="P-029", value=p029_cp.get("progress")))
+        else:
+            out.append(Finding(
+                key="gate.P-029.inconclusive", severity="warn",
+                title="P-029 used its single extension and remains inconclusive",
+                detail=("No further extension is authorized. Promotion conditions "
+                        "did not pass and no registered STOP condition fired. {}"
+                        .format(qualification)),
+                workstream="P-029", value=p029_cp.get("progress")))
+    if p029_cp.get("model_health_refit_required"):
+        out.append(Finding(
+            key="gate.P-029.model_refit_required", severity="warn",
+            title="P-029 Gate 0c model-health check requires a refit",
+            detail=("Absolute forward model bias exceeded 1.0c. The registration "
+                    "requires a refit before any Phase 1 decision, regardless of "
+                    "the headline gate verdict."),
+            workstream="P-029", value=p029_cp.get("model_bias_mean_c")))
     return out
 
 

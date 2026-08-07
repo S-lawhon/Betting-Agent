@@ -36,7 +36,17 @@ DEFAULT_MODEL = ROOT / "combo_research" / "recalib" / "recalibrated_model.json"
 MODEL_SHA256 = "01411d863de04075a38f02b40b7e0c4a7e21463a96b42d8194e8ccd8325956af"
 WINDOW_START = "2026-08-06T00:00:00Z"
 WINDOW_END = "2026-08-19T23:59:59Z"
+EXTENSION_WINDOW_END = "2026-08-26T23:59:59Z"
 READ_NOT_BEFORE = datetime(2026, 8, 23, tzinfo=timezone.utc)
+EXTENSION_READ_NOT_BEFORE = datetime(2026, 8, 30, tzinfo=timezone.utc)
+
+KNOWN_TAPE_GAPS = [{
+    "start_utc": "2026-08-07T00:17:11Z",
+    "end_utc": "2026-08-07T00:23:01Z",
+    "duration_seconds": 350,
+    "cause": "Gate 0c deployment temporarily removed p029 checkout traversal",
+    "backfillable": False,
+}]
 
 MIN_LEGS, MAX_LEGS = 2, 4
 MIN_PRICE, MAX_PRICE = 0.10, 0.35
@@ -101,7 +111,8 @@ def price_from_marks(legs_json: str, marks_json: str,
     return copula.joint_yes(eff, corr)
 
 
-def load_forward_rows(db_path: Path, model: Dict[str, Any], copula: ComboCopula
+def load_forward_rows(db_path: Path, model: Dict[str, Any], copula: ComboCopula,
+                      window_end: str = WINDOW_END,
                       ) -> Tuple[List[Dict[str, Any]], int]:
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
@@ -110,7 +121,7 @@ def load_forward_rows(db_path: Path, model: Dict[str, Any], copula: ComboCopula
             " leg_marks_json, first_trade_px, traded FROM combo"
             " WHERE datetime(seen_ts) >= datetime(?)"
             " AND datetime(seen_ts) <= datetime(?)",
-            (WINDOW_START, WINDOW_END),
+            (WINDOW_START, window_end),
         ).fetchall()
     finally:
         con.close()
@@ -191,7 +202,8 @@ def cluster_bootstrap(values: Sequence[Tuple[str, float]], statistic: Callable,
 
 
 def decide(n: int, margin_c: float, realized_c: float,
-           realized_ci: Optional[Sequence[float]]) -> Tuple[str, str]:
+           realized_ci: Optional[Sequence[float]], *, extension_final: bool = False
+           ) -> Tuple[str, str]:
     if margin_c < MARGIN_STOP_C:
         return "STOP", f"margin {margin_c:+.2f}c is below +{MARGIN_STOP_C:.1f}c"
     if realized_c <= 0.0:
@@ -205,11 +217,17 @@ def decide(n: int, margin_c: float, realized_c: float,
     )
     if margin_c >= MARGIN_CONTINUE_C and realized_pass:
         return "CONTINUE", "both preregistered conditions pass"
+    if extension_final:
+        return ("INCONCLUSIVE",
+                "mixed result after the single preregistered extension; "
+                "no further extension is authorized")
     return "EXTEND", "mixed result; the single preregistered extension applies"
 
 
 def evaluate(db_path: Path, archive_dir: Path, model_path: Path,
              now: datetime, boot: int) -> Dict[str, Any]:
+    extension_final = now >= EXTENSION_READ_NOT_BEFORE
+    window_end = EXTENSION_WINDOW_END if extension_final else WINDOW_END
     base = {
         "pod": POD_ID,
         "metric": "gate0c_forward_dual_condition",
@@ -217,8 +235,14 @@ def evaluate(db_path: Path, archive_dir: Path, model_path: Path,
         "threshold": MIN_N,
         "model_sha256": MODEL_SHA256,
         "window_start_utc": WINDOW_START,
-        "window_end_utc": WINDOW_END,
+        "window_end_utc": window_end,
         "read_not_before": READ_NOT_BEFORE.date().isoformat(),
+        "extension_read_not_before": EXTENSION_READ_NOT_BEFORE.date().isoformat(),
+        "extension_final": extension_final,
+        "data_qualification": {
+            "known_tape_gaps": KNOWN_TAPE_GAPS,
+            "collection_complete": False,
+        },
     }
     if now < READ_NOT_BEFORE:
         return base | {
@@ -237,7 +261,8 @@ def evaluate(db_path: Path, archive_dir: Path, model_path: Path,
         }
 
     model, copula = _model(model_path)
-    all_rows, unpriceable = load_forward_rows(db_path, model, copula)
+    all_rows, unpriceable = load_forward_rows(
+        db_path, model, copula, window_end=window_end)
     settlements = load_settlements(archive_dir, {r["ticker"] for r in all_rows})
     model_health_rows = [r | {"settlement": settlements[r["ticker"]]}
                          for r in all_rows if r["ticker"] in settlements]
@@ -272,7 +297,9 @@ def evaluate(db_path: Path, archive_dir: Path, model_path: Path,
     realized_day_ci = cluster_bootstrap(
         [(r["day"], x) for r, x in zip(matched, realized)], mean, boot,
         seed=BOOTSTRAP_SEED + 2)
-    verdict, reason = decide(n, margin_c, realized_c, realized_day_ci)
+    verdict, reason = decide(
+        n, margin_c, realized_c, realized_day_ci,
+        extension_final=extension_final)
     model_bias = float(mean(bias))
     return base | {
         "margin_median_c": margin_c,

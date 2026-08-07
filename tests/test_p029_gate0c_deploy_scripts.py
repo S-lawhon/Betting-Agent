@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCAL_DEPLOY = (ROOT / "scripts" / "deploy_p029_gate0c.sh").read_text()
+READER_DEPLOY = (ROOT / "scripts" / "deploy_p029_gate0c_reader.sh").read_text()
 HOST_UPGRADE = (ROOT / "scripts" / "upgrade_p029_gate0c.sh").read_text()
 
 
@@ -16,6 +17,13 @@ def test_local_deploy_transfers_only_sanctioned_artifacts():
     assert "rsync -az --relative" in LOCAL_DEPLOY
     assert "--no-perms --no-owner --no-group" in LOCAL_DEPLOY
     assert "chmod 0755" in LOCAL_DEPLOY
+
+
+def test_reader_only_deploy_cannot_restart_or_reconfigure_shadow_logger():
+    assert "scripts/p029_gate0c_checkpoint.py" in READER_DEPLOY
+    assert "systemctl restart" not in READER_DEPLOY
+    assert "upgrade_p029_gate0c.sh" not in READER_DEPLOY
+    assert "--no-perms --no-owner --no-group" in READER_DEPLOY
 
 
 def test_host_upgrade_uses_dropin_and_never_rewrites_main_unit():

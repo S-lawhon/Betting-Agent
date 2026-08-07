@@ -50,6 +50,8 @@ def test_p029_registry_records_closed_gate_and_frozen_forward_gate():
         "01411d863de04075a38f02b40b7e0c4a7e21463a96b42d8194e8ccd8325956af"
     )
     assert str(gate["read_not_before"]) == "2026-08-23"
+    assert str(gate["extension_window_end_utc"]) == "2026-08-26 23:59:59+00:00"
+    assert str(gate["extension_read_not_before"]) == "2026-08-30"
 
 
 def test_closed_tennis_research_is_not_waiting_on_sam():

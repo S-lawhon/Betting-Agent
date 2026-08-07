@@ -141,15 +141,15 @@ def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any
         })
     p029_cp = (snap.get("p029") or {}).get("checkpoint") or {}
     if p029_cp:
-        current = p029_cp.get("progress")
+        progress = p029_cp.get("progress")
+        current = progress if isinstance(progress, (int, float)) else 0
         threshold = p029_cp.get("threshold") or 500
         gates.append({
             "id": "P-029",
             "label": "Combo maker - frozen forward Gate 0c",
             "current": current,
             "threshold": threshold,
-            "pct": (min(100.0, 100.0 * current / max(1, threshold))
-                    if isinstance(current, (int, float)) else 0.0),
+            "pct": min(100.0, 100.0 * current / max(1, threshold)),
             "verdict": p029_cp.get("verdict"),
             "note": "{} Read no earlier than 2026-08-23; one extension only."
                     .format(p029_cp.get("reason") or ""),

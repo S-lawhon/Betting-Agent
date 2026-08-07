@@ -144,6 +144,23 @@ def test_live_gate_still_renders_a_bar():
     assert "CLOSED" not in md
 
 
+def test_p029_blind_checkpoint_renders_zero_progress():
+    snap = {
+        "p029": {"checkpoint": {
+            "progress": None,
+            "threshold": 500,
+            "verdict": "NO DECISION",
+            "reason": "reader remains blind until 2026-08-23",
+        }},
+    }
+
+    b = brief.build(snap, [])
+    assert b["gates"][0]["current"] == 0
+    for text in (brief.render_markdown(b), brief.render_html(b)):
+        assert "0/500" in text
+        assert "None/500" not in text
+
+
 def research_snap() -> dict:
     return {"research_operations": {
         "available": True,

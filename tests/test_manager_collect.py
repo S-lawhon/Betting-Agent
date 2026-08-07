@@ -310,6 +310,30 @@ def test_p029_memory_warning_includes_bounded_pressure_trend():
     assert finding.value["trend"]["pid_stable"] is True
 
 
+def test_p029_pressure_trend_ignores_legacy_rows_without_pid():
+    recent = [
+        {
+            "timestamp_utc": "2026-08-07T12:00:00Z",
+            "shadow_memory_max_bytes": 805_306_368,
+        },
+        {
+            "timestamp_utc": "2026-08-07T13:00:00Z",
+            "shadow_main_pid": 224158,
+            "shadow_memory_utilization_pct": 95.8,
+        },
+        {
+            "timestamp_utc": "2026-08-07T14:00:00Z",
+            "shadow_main_pid": 224158,
+            "shadow_memory_utilization_pct": 95.9,
+        },
+    ]
+
+    trend = checks._p029_pressure_trend(recent)
+
+    assert trend["samples"] == 2
+    assert trend["pid_stable"] is True
+
+
 def test_p029_healthy_memory_emits_no_pressure_findings():
     job = {
         "id": "p029_shadow",

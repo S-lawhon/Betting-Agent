@@ -322,6 +322,8 @@ def _p029_pressure_trend(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]
         return None
 
     latest_pid = parsed[-1][1].get("shadow_main_pid")
+    known_pids = {item[1].get("shadow_main_pid") for item in parsed
+                  if item[1].get("shadow_main_pid") is not None}
     same_process = [item for item in parsed
                     if item[1].get("shadow_main_pid") == latest_pid]
     if not same_process:
@@ -354,7 +356,9 @@ def _p029_pressure_trend(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]
         "samples": len(same_process),
         "window_hours": round(hours, 2),
         "pid": latest_pid,
-        "pid_stable": len(same_process) == len(parsed),
+        # Older heartbeat rows may predate PID telemetry. Missing data does not
+        # imply a restart; two distinct observed PIDs do.
+        "pid_stable": len(known_pids) <= 1,
         "utilization_min_pct": round(min(utilization), 1) if utilization else None,
         "utilization_avg_pct": (round(sum(utilization) / len(utilization), 1)
                                  if utilization else None),
@@ -445,9 +449,9 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
                                     row.get("shadow_memory_swap_bytes"),
                                     row.get("shadow_memory_max_events"),
                                     trend_text)),
-                    fix=("Inspect `systemctl show p029-shadow.service "
+                    fix=("Inspect systemctl show p029-shadow.service "
                          "--property=MemoryCurrent,MemoryPeak,MemorySwapCurrent,"
-                         "MemoryMax,NRestarts` on the P-029 VPS."),
+                         "MemoryMax,NRestarts on the P-029 VPS."),
                     value={"memory_pct": memory_pct, "trend": trend}))
             restart_delta = row.get("shadow_restart_delta")
             oom_kills = row.get("shadow_oom_kill_events")

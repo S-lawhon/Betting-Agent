@@ -154,6 +154,21 @@ def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any
             "note": "{} Read no earlier than 2026-08-23; one extension only."
                     .format(p029_cp.get("reason") or ""),
         })
+    mlb_cp = (snap.get("mlb_props") or {}).get("checkpoint") or {}
+    if mlb_cp:
+        progress = mlb_cp.get("progress")
+        current = progress if isinstance(progress, (int, float)) else 0
+        threshold = mlb_cp.get("threshold") or 27
+        gates.append({
+            "id": "R-MLB-PROPS",
+            "label": "MLB props - clean execution game-days",
+            "current": current,
+            "threshold": threshold,
+            "pct": min(100.0, 100.0 * current / max(1, threshold)),
+            "verdict": mlb_cp.get("verdict"),
+            "note": "{} Outcomes stay blind until 2026-08-18 00:30 ET and 27 clean days."
+                    .format(mlb_cp.get("reason") or ""),
+        })
 
     # Accumulating (blocked on time) — one line each, no detail.
     accumulating = [

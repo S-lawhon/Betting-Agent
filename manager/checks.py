@@ -659,7 +659,8 @@ def _gate_progress(snap: Dict[str, Any], pod_id: str,
 
     key = {"p017_checkpoint": "p017", "p001_checkpoint": "p001",
            "p015_checkpoint": "p015", "p022_checkpoint": "p022",
-           "p014_checkpoint": "p014", "p029_checkpoint": "p029"}.get(source)
+           "p014_checkpoint": "p014", "p029_checkpoint": "p029",
+           "mlb_props_checkpoint": "mlb_props"}.get(source)
     if not key:
         return None
     block = snap.get(key) or {}
@@ -782,6 +783,7 @@ def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]
                         "authorize credentials, quotes, or capital. {} {}"
                         .format(qualification, p029_cp.get("reason") or "")),
                 workstream="P-029", value=p029_cp.get("progress")))
+
         elif verdict == "STOP":
             out.append(Finding(
                 key="gate.P-029.stop", severity="warn",
@@ -805,6 +807,32 @@ def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]
                     "requires a refit before any Phase 1 decision, regardless of "
                     "the headline gate verdict."),
             workstream="P-029", value=p029_cp.get("model_bias_mean_c")))
+
+    # ---- MLB props forward execution gate (locked 2026-08-07) ----
+    mlb_cp = ((snap.get("mlb_props") or {}).get("checkpoint") or {})
+    mlb_verdict = mlb_cp.get("verdict")
+    if mlb_verdict == "BUILD_CANDIDATE":
+        out.append(Finding(
+            key="gate.R-MLB-PROPS.build_candidate", severity="action",
+            title="MLB props execution gate passed - build decision due",
+            detail=("The locked 27-day gate has a positive 95% lower bound and "
+                    "at least $10/day of displayed size-capped paper P&L. This "
+                    "authorizes only a build/canary proposal, not credentials, "
+                    "orders, or capital. {}".format(mlb_cp.get("reason") or "")),
+            workstream="R-MLB-PROPS", value=mlb_cp.get("progress")))
+    elif mlb_verdict == "STOP":
+        out.append(Finding(
+            key="gate.R-MLB-PROPS.stop", severity="warn",
+            title="MLB props execution gate reached its locked STOP condition",
+            detail=("No extension is permitted by the rule. {}"
+                    .format(mlb_cp.get("reason") or "")),
+            workstream="R-MLB-PROPS", value=mlb_cp.get("progress")))
+    elif mlb_verdict == "RESULTS_PENDING":
+        out.append(Finding(
+            key="gate.R-MLB-PROPS.results_pending", severity="warn",
+            title="MLB props gate sample is frozen but settlements are incomplete",
+            detail=mlb_cp.get("reason") or "Selected markets have missing results.",
+            workstream="R-MLB-PROPS", value=mlb_cp.get("settlements_missing")))
     return out
 
 

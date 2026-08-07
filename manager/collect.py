@@ -64,6 +64,12 @@ UTC = timezone.utc
 # development history from a dedicated read-only clone of the public repo. See
 # manager/README.md § git mirror. Overridable via MANAGER_GIT_REPO.
 MIRROR_PATH = Path("/opt/betting-agent-mirror")
+MLB_PROPS_CHECKPOINT_PATH = Path(
+    "/opt/mlb-props/mlb_props_research/data/execution_gate/latest.json"
+)
+MLB_PROPS_RULE_SHA256 = (
+    "c76296909b878b70de7eab4a82fb24ee0c7c45158ae0e1d8bb6ed7cc589c8c60"
+)
 
 
 # --------------------------------------------------------------------------
@@ -899,6 +905,35 @@ class Collector:
                     "available": True, "checkpoint": payload}
         return self._checkpoint("scripts/p029_gate0c_checkpoint.py", "P-029")
 
+    @safe("mlb_props_gate")
+    def mlb_props_gate(self) -> Dict[str, Any]:
+        """Read the separate MLB collector tree's sanctioned checkpoint.
+
+        The daily reader scans the large snapshot tape once and writes this
+        compact artifact. Re-scanning it in the 15-minute manager loop would
+        waste I/O and create a second implementation of the gate.
+        """
+        latest = MLB_PROPS_CHECKPOINT_PATH
+        out: Dict[str, Any] = {"id": "R-MLB-PROPS", "reader": str(latest)}
+        if not latest.exists():
+            out["available"] = False
+            return out
+        try:
+            payload = json.loads(latest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            out.update({"available": False, "error": str(exc)})
+            return out
+        if (not isinstance(payload, dict)
+                or payload.get("id") != "R-MLB-PROPS"
+                or payload.get("metric") != "clean_execution_game_days"
+                or payload.get("threshold") != 27
+                or payload.get("rule_sha256") != MLB_PROPS_RULE_SHA256):
+            out.update({"available": False,
+                        "error": "MLB props checkpoint identity mismatch"})
+            return out
+        out.update({"available": True, "checkpoint": payload})
+        return out
+
     @safe("p022_window")
     def p022_window(self) -> Dict[str, Any]:
         """P-022's quotable-window detector, surfaced to the alert path.
@@ -1417,6 +1452,7 @@ class Collector:
             "p001": self.p001_gate() or {},
             "p022": self.p022_gate() or {},
             "p029": self.p029_gate() or {},
+            "mlb_props": self.mlb_props_gate() or {},
             "p022_window": self.p022_window() or {},
             "evmap": self.evmap_jobs() or {},
             "p014": self.p014_gate() or {},

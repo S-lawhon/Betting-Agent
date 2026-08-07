@@ -1,0 +1,28 @@
+[Unit]
+Description=MLB props 27-day blinded execution checkpoint
+After=network-online.target mlb-props-collector.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/mlb-props/mlb_props_research
+ExecStart=/usr/bin/python3 /opt/mlb-props/mlb_props_research/execution_checkpoint.py --persist --fetch-results --json
+TimeoutStartSec=2h
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=512M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/mlb-props/mlb_props_research/data/execution_gate
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
+

@@ -70,6 +70,8 @@ systemd_units:
   - {id: manager-brief.service, unit: manager-brief.service, source: scripts/systemd/manager-brief.service, severity: warn}
   - {id: p029-gate0c-checkpoint.timer, unit: p029-gate0c-checkpoint.timer, source: scripts/systemd/p029-gate0c-checkpoint.timer, severity: warn}
   - {id: p029-gate0c-checkpoint.service, unit: p029-gate0c-checkpoint.service, source: scripts/systemd/p029-gate0c-checkpoint.service, severity: warn}
+  - {id: mlb-props-execution-checkpoint.timer, unit: mlb-props-execution-checkpoint.timer, source: scripts/mlb-props-execution-checkpoint.timer, severity: warn}
+  - {id: mlb-props-execution-checkpoint.service, unit: mlb-props-execution-checkpoint.service, source: scripts/mlb-props-execution-checkpoint.service, severity: warn}
 
 # -----------------------------------------------------------------------------
 # SERVICES — process-level liveness
@@ -522,6 +524,19 @@ jobs:
       latest.json atomically. The August 30 timer refuses to run when August 23
       already produced CONTINUE or STOP. Every artifact carries the known
       six-minute non-backfillable tape gap.
+
+  - id: mlb_props_execution_checkpoint
+    host: droplet
+    schedule: "*-*-* 00:30 America/New_York"
+    description: Outcome-blind MLB props 27-day execution checkpoint
+    output:
+      file: /opt/mlb-props/mlb_props_research/data/execution_gate/latest.json
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      Scans the separate /opt/mlb-props snapshot tape once daily after the
+      collector closes. Before both the read time and 27 clean completed ET
+      game-days it emits coverage only and does not load or fetch outcomes.
 
   - id: evmap_weather_sheet
     host: droplet
@@ -1499,6 +1514,7 @@ workstreams:
     stage: build
     owner_dir: mlb_props_research
     blocked_on: time
+    recheck_after: 2026-08-18
     action_required: >
       PHASE 3 COMPLETE 2026-07-20 with two NEGATIVE results (PHASE3_REPORT.md).
       Next step is a live paper EXECUTION test, NOT more modelling: every edge so
@@ -1506,8 +1522,8 @@ workstreams:
       measure whether fills are actually available at the ask near first pitch,
       using the collector orderbook snapshots in mlb_props_research/data/live/.
 
-      BLOCKED ON DATA UNTIL ~2026-08-17 — do not run the execution test before
-      then. PHASE3_REPORT.md:115 is explicit that the existing 2-day / 170-market
+      BLOCKED ON DATA UNTIL AT LEAST 2026-08-18 00:30 ET — do not read outcomes
+      before then. PHASE3_REPORT.md:115 is explicit that the existing 2-day / 170-market
       Test A is badly underpowered and must NOT be read as a refutation; running
       it again on the same thin sample would only relaunder that error. See
       collection_status below. Nothing is required of a human until the sample
@@ -1518,9 +1534,9 @@ workstreams:
       unit: mlb-props-collector.timer -> .service (droplet, 10:00 ET daily)
       data_path: /opt/mlb-props/mlb_props_research/data/live/snapshots_YYYYMMDD.jsonl
       started: 2026-07-21
-      game_days_collected: 3      # 07-19, 07-20, 07-21 — verified by ET bucket
+      game_days_collected: derived by mlb_props_research/execution_checkpoint.py
       game_days_target: 27
-      expected_complete: 2026-08-17   # +/- rainouts and off-days
+      expected_complete: 2026-08-18   # earliest possible; later if a day fails coverage
       consolidated: >
         All data now lives on the droplet at the data_path above. The two
         historical Mac runs were copied 2026-07-21 as
@@ -1574,6 +1590,13 @@ workstreams:
       cost — positive in both windows but DECLINING.
     gate:
       question: Are fills actually available at the ask near first pitch?
+      metric: clean_execution_game_days
+      threshold: 27
+      source: mlb_props_checkpoint
+      reader: mlb_props_research/execution_checkpoint.py
+      rule_document: mlb_props_research/MLB_PROPS_EXECUTION_RULE.md
+      rule_sha256: c76296909b878b70de7eab4a82fb24ee0c7c45158ae0e1d8bb6ed7cc589c8c60
+      read_not_before: 2026-08-18
       decision: >
         CAPACITY IS THE BINDING CONSTRAINT, not edge. Median qualifying market
         trades only 86 contracts in the final 30 min (~$4.30 theoretical edge at

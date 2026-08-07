@@ -111,6 +111,7 @@ CLV_LOG_REL = "data/trade_logs/clv_log.jsonl"
 #: constraint looks like it disappeared — which is the opposite of what
 #: shadow mode is for.
 SHADOW_LOG_REL = "data/trade_logs/aggregate_risk_shadow.jsonl"
+PNL_CORRECTIONS_REL = "data/corrections/dashboard_pnl_corrections.jsonl"
 
 #: NOTHING ROTATES THE SHADOW LOG. It is recomputed from scratch each run
 #: (like CLV), so it gets slower as it grows — roughly 2-3 MB/day at the
@@ -660,6 +661,80 @@ def _consume_lines(roll: Rollup, lines: Iterable[str]) -> int:
     return n
 
 
+def _apply_pnl_corrections(roll: Rollup, root: Path) -> Dict[str, Any]:
+    """Apply idempotent dollar-only corrections outside archived counters.
+
+    Completed archives are immutable to the incremental checkpoint. When a
+    historical settlement's P&L is corrected in place, rereading that archive
+    would double-count all of its other rows. This small ledger carries only
+    the delta and is applied after the archived restore point is captured, so
+    every build applies it exactly once to the published view.
+    """
+    path = root / PNL_CORRECTIONS_REL
+    meta: Dict[str, Any] = {
+        "source": PNL_CORRECTIONS_REL,
+        "available": path.exists(),
+        "rows": 0,
+        "pnl_delta_usd": 0.0,
+        "by_pod": {},
+    }
+    if not path.exists():
+        return meta
+
+    records: Dict[str, Dict[str, Any]] = {}
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line_no, raw in enumerate(fh, 1):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                rec = json.loads(raw)
+            except ValueError as exc:
+                raise ValueError(
+                    f"invalid P&L correction JSON at {path}:{line_no}"
+                ) from exc
+            cid = str(rec.get("correction_id") or "")
+            pid = str(rec.get("pod_id") or "")
+            day = str(rec.get("day") or "")
+            if not cid or not pid or _day(day) != day:
+                raise ValueError(
+                    f"invalid P&L correction identity at {path}:{line_no}"
+                )
+            try:
+                delta = float(rec["pnl_delta_usd"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"invalid P&L correction delta at {path}:{line_no}"
+                ) from exc
+            normalized = {"correction_id": cid, "pod_id": pid,
+                          "day": day, "pnl_delta_usd": delta}
+            prior = records.get(cid)
+            if prior is not None and prior != normalized:
+                raise ValueError(f"conflicting P&L correction id {cid!r}")
+            records[cid] = normalized
+
+    by_pod: Dict[str, float] = collections.defaultdict(float)
+    for rec in records.values():
+        pid = rec["pod_id"]
+        day = rec["day"]
+        delta = rec["pnl_delta_usd"]
+        roll._pod(pid)["realized_pnl"] += delta
+        roll._daily(day)["realized_pnl"] += delta
+        roll._daily_pod(pid, day)["realized_pnl"] += delta
+        week = _week(day)
+        if week:
+            roll._weekly_pod(pid, week)["realized_pnl"] += delta
+        by_pod[pid] += delta
+
+    meta.update({
+        "rows": len(records),
+        "pnl_delta_usd": round(sum(by_pod.values()), 4),
+        "by_pod": {pid: round(delta, 4)
+                   for pid, delta in sorted(by_pod.items())},
+    })
+    return meta
+
+
 def _iter_file_chunked(path: Path) -> Iterable[str]:
     """Yield complete lines from *path*, never holding more than CHUNK_BYTES."""
     leftover = b""
@@ -981,13 +1056,17 @@ def build(root: Path, out_path: Path,
         ),
     }
 
-    # ── 5. aggregate-risk shadow log (unrotated — recomputed each run) ─
+    # ── 5. historical P&L corrections (small, append-only) ───────────
+    pnl_corrections = _apply_pnl_corrections(roll, root)
+
+    # ── 6. aggregate-risk shadow log (unrotated — recomputed each run) ─
     shadow = _shadow_risk(root)
 
     payload: Dict[str, Any] = {"schema": SCHEMA,
                               "built_at_utc": _now().isoformat()}
     payload.update(roll.core())
     payload["shadow_risk"] = shadow
+    payload["pnl_corrections"] = pnl_corrections
     payload["_checkpoint"] = checkpoint
     payload["_archived"] = archived_blob
 
@@ -1009,6 +1088,8 @@ def build(root: Path, out_path: Path,
         "days": len(payload["daily"]),
         "pods": list(payload["by_pod"]),
         "shadow_risk_rows": (shadow.get("lifetime") or {}).get("total", 0),
+        "pnl_correction_rows": pnl_corrections["rows"],
+        "pnl_correction_delta_usd": pnl_corrections["pnl_delta_usd"],
     }
     return payload, summary
 

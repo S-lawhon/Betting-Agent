@@ -362,7 +362,11 @@ jobs:
     severity: warn
     note: >
       systemd timer dashboard-rollup.timer, not crontab. First run must be
-      manual with --full and off a deploy window. Back this output up.
+      manual with --full and off a deploy window. Back this output up. Historical
+      dollar-only adjustments live in the append-only
+      data/corrections/dashboard_pnl_corrections.jsonl ledger and are applied
+      after the immutable archive restore point; do not fold them into archived
+      counters or settlement counts.
 
   - id: shadow_maker
     host: droplet

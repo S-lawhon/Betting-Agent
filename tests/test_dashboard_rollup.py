@@ -194,6 +194,53 @@ def test_rerun_is_idempotent(root: Path):
     assert b["skip_reasons"] == a["skip_reasons"]
 
 
+def test_pnl_correction_ledger_changes_dollars_not_counts(root: Path):
+    seed(root)
+    before, _ = run(root)
+    corrections = root / "data" / "corrections"
+    corrections.mkdir(parents=True)
+    (corrections / "dashboard_pnl_corrections.jsonl").write_text(
+        json.dumps({
+            "correction_id": "p015-fees-20260726",
+            "pod_id": "P-015",
+            "day": "2026-07-26",
+            "pnl_delta_usd": -3.48,
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    after, summary = run(root)
+
+    for key in ("rows", "placed", "settled", "wins", "losses", "voids"):
+        assert after["lifetime"][key] == before["lifetime"][key]
+    assert after["lifetime"]["realized_pnl"] \
+        == pytest.approx(before["lifetime"]["realized_pnl"] - 3.48)
+    assert after["by_pod"]["P-015"]["realized_pnl"] == -3.48
+    assert after["pnl_corrections"]["rows"] == 1
+    assert summary["pnl_correction_delta_usd"] == -3.48
+
+    rerun, _ = run(root)
+    assert rerun["lifetime"]["realized_pnl"] \
+        == pytest.approx(after["lifetime"]["realized_pnl"])
+
+
+def test_conflicting_pnl_correction_ids_fail_closed(root: Path):
+    corrections = root / "data" / "corrections"
+    corrections.mkdir(parents=True)
+    path = corrections / "dashboard_pnl_corrections.jsonl"
+    rows = [
+        {"correction_id": "same", "pod_id": "P-015",
+         "day": "2026-07-25", "pnl_delta_usd": -1.0},
+        {"correction_id": "same", "pod_id": "P-015",
+         "day": "2026-07-26", "pnl_delta_usd": -2.0},
+    ]
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows),
+                    encoding="utf-8")
+
+    with pytest.raises(ValueError, match="conflicting P&L correction id"):
+        run(root)
+
+
 def test_incremental_equals_full(root: Path):
     """Feeding the log in chunks must equal one full pass, byte for byte."""
     seed(root)

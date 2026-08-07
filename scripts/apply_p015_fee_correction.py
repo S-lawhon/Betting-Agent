@@ -40,6 +40,9 @@ DEFAULT_PATTERNS = (
     "data/trade_logs/archive/*.jsonl",
     "data/trade_logs/archive/*.jsonl.gz",
 )
+DEFAULT_ROLLUP_CORRECTIONS = Path(
+    "data/corrections/dashboard_pnl_corrections.jsonl"
+)
 
 
 class CorrectionError(ValueError):
@@ -275,6 +278,112 @@ def settlement_inventory(files: Iterable[Path]) -> dict:
     }
 
 
+def rollup_correction_rows(files: Iterable[Path]) -> List[Dict[str, Any]]:
+    """Dollar deltas by settlement day from corrected, deduplicated rows."""
+    settled: Dict[str, Dict[str, Any]] = {}
+    for path in files:
+        for raw in _read_lines(path):
+            try:
+                rec = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            outcome = str(rec.get("outcome") or rec.get("action") or "").upper()
+            if (rec.get("pod_id") != POD_ID
+                    or outcome not in ("WIN", "LOSS")
+                    or rec.get("fee_accounting_version") != VERSION):
+                continue
+            key = str(
+                rec.get("fingerprint")
+                or f"{rec.get('market_id')}|{rec.get('settled_at_utc')}"
+            )
+            settled[key] = rec
+
+    by_day: Dict[str, float] = collections.defaultdict(float)
+    for rec in settled.values():
+        day = str(rec.get("settled_at_utc") or "")[:10]
+        if len(day) != 10:
+            raise CorrectionError("corrected row has no settlement day")
+        by_day[day] -= _number(rec.get("fees_usd"), "fees_usd")
+    return [
+        {
+            "correction_id": f"p015_fee_net_v2:{day}",
+            "pod_id": POD_ID,
+            "day": day,
+            "pnl_delta_usd": round(delta, 4),
+            "note": (
+                "P-015 legacy settlements booked gross P&L; subtract stored "
+                "taker fees. See REPORT_P015_US_Open_Readiness_2026-08-07.md."
+            ),
+        }
+        for day, delta in sorted(by_day.items())
+    ]
+
+
+def write_rollup_corrections(path: Path, rows: Iterable[Dict[str, Any]],
+                             stamp: str) -> Dict[str, Any]:
+    """Append new correction IDs atomically; matching IDs are idempotent."""
+    rows = list(rows)
+    existing_lines: List[str] = []
+    existing: Dict[str, Dict[str, Any]] = {}
+    if path.exists():
+        existing_lines = path.read_text(encoding="utf-8").splitlines(True)
+        for line_no, raw in enumerate(existing_lines, 1):
+            if not raw.strip():
+                continue
+            try:
+                rec = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise CorrectionError(
+                    f"invalid rollup correction JSON at {path}:{line_no}"
+                ) from exc
+            cid = str(rec.get("correction_id") or "")
+            if cid:
+                existing[cid] = rec
+
+    additions = []
+    for row in rows:
+        cid = str(row.get("correction_id") or "")
+        prior = existing.get(cid)
+        if prior is not None:
+            comparable = ("pod_id", "day", "pnl_delta_usd")
+            if any(prior.get(k) != row.get(k) for k in comparable):
+                raise CorrectionError(f"conflicting rollup correction id {cid!r}")
+            continue
+        additions.append(row)
+
+    backup = None
+    if additions:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            backup = Path(str(path) + f".bak_{stamp}")
+            shutil.copy2(path, backup)
+        fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.writelines(existing_lines)
+                if existing_lines and not existing_lines[-1].endswith("\n"):
+                    fh.write("\n")
+                for row in additions:
+                    fh.write(json.dumps(row, sort_keys=True) + "\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp_name, path)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
+    return {
+        "path": str(path),
+        "rows_derived": len(rows),
+        "rows_added": len(additions),
+        "pnl_delta_usd": round(sum(float(r["pnl_delta_usd"])
+                                   for r in rows), 4),
+        "backup": str(backup) if backup else None,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--log", action="append", default=[],
@@ -282,6 +391,12 @@ def main() -> int:
     ap.add_argument("--apply", action="store_true",
                     help="rewrite matching rows; default is dry-run")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--write-rollup-corrections", action="store_true",
+        help="with --apply, atomically record per-day dashboard P&L deltas",
+    )
+    ap.add_argument("--rollup-corrections", type=Path,
+                    default=DEFAULT_ROLLUP_CORRECTIONS)
     args = ap.parse_args()
 
     files = discover_files(args.log or DEFAULT_PATTERNS)
@@ -304,6 +419,21 @@ def main() -> int:
         except (OSError, CorrectionError) as exc:
             print(f"APPLY FAILED: {exc}", file=sys.stderr)
             return 4
+
+    if args.write_rollup_corrections:
+        if not args.apply:
+            print("REFUSING: --write-rollup-corrections requires --apply",
+                  file=sys.stderr)
+            return 5
+        try:
+            result["rollup_corrections"] = write_rollup_corrections(
+                args.rollup_corrections,
+                rollup_correction_rows(files),
+                datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
+            )
+        except (OSError, CorrectionError) as exc:
+            print(f"ROLLUP CORRECTION FAILED: {exc}", file=sys.stderr)
+            return 6
 
     if args.json:
         print(json.dumps(result, sort_keys=True))

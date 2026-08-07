@@ -120,3 +120,36 @@ def test_inventory_deduplicates_and_classifies_without_trade_details(tmp_path):
     assert result["unique_terminal_rows"] == 2
     assert sum(group["rows"] for group in result["groups"]) == 2
     assert all("fingerprint" not in group for group in result["groups"])
+
+
+def test_rollup_corrections_group_fees_by_settlement_day(tmp_path):
+    path = tmp_path / "corrected.jsonl"
+    first, _ = correction.correct_record(_legacy())
+    first["settled_at_utc"] = "2026-07-25T12:00:00Z"
+    second, _ = correction.correct_record(
+        _legacy("LOSS", "no") | {"fingerprint": "fp-loss"}
+    )
+    second["settled_at_utc"] = "2026-07-26T12:00:00Z"
+    path.write_text(json.dumps(first) + "\n" + json.dumps(second) + "\n",
+                    encoding="utf-8")
+
+    rows = correction.rollup_correction_rows([path])
+
+    assert [row["day"] for row in rows] == ["2026-07-25", "2026-07-26"]
+    assert sum(row["pnl_delta_usd"] for row in rows) == pytest.approx(-1.26)
+
+
+def test_rollup_correction_ledger_write_is_idempotent(tmp_path):
+    path = tmp_path / "dashboard_pnl_corrections.jsonl"
+    rows = [{
+        "correction_id": "p015_fee_net_v2:2026-07-25",
+        "pod_id": "P-015", "day": "2026-07-25",
+        "pnl_delta_usd": -0.63, "note": "test",
+    }]
+
+    first = correction.write_rollup_corrections(path, rows, "ONE")
+    second = correction.write_rollup_corrections(path, rows, "TWO")
+
+    assert first["rows_added"] == 1
+    assert second["rows_added"] == 0
+    assert len(path.read_text().splitlines()) == 1

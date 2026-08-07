@@ -48,6 +48,11 @@ entire run if that proof or any fee input is missing.
 - `scripts/apply_p015_fee_correction.py` is dry-run by default, exact-signature
   scoped, idempotent, backup-first, and atomic per file. Non-target lines are
   preserved byte-for-byte.
+- The lifetime dashboard does not reread completed archives by design. The
+  correction utility therefore writes per-day dollar deltas to the append-only
+  `data/corrections/dashboard_pnl_corrections.jsonl` ledger. The rollup applies
+  that ledger after restoring its immutable archived counters, changing P&L
+  without changing settlement counts and without accumulating on reruns.
 - The historical correction changes only P&L fields. Outcome, gate n,
   breakeven, z-score, and verdict remain unchanged.
 

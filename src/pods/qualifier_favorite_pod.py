@@ -133,7 +133,18 @@ class QualifierFavoritePod(BasePod):
         self.slam_windows = self._normalize_windows(slam_windows or [])
         self.depth_haircut = depth_haircut
         self.min_lead_minutes = min_lead_minutes
-        self._open_count = 0
+        self._open_count = self._initial_open_count()
+
+    def _initial_open_count(self) -> int:
+        """Restore this pod's open-position cap across process restarts."""
+        store = self._trade_store
+        if store is None:
+            return 0
+        try:
+            return len(store.get_open_trades(self.pod_id))
+        except Exception as exc:
+            logger.warning("P-015: open-position bootstrap failed: %s", exc)
+            return 0
 
     @staticmethod
     def _normalize_windows(raw: List[Any]) -> List[tuple]:
@@ -292,7 +303,7 @@ class QualifierFavoritePod(BasePod):
             )
 
         if self.aggregate_risk is not None and not self.check_aggregate_risk(
-            "kalshi", size
+            "kalshi", size, market_id=ticker
         ):
             return self._log_skip(
                 m, tour, ask, fair_prob, "SKIPPED_RISK", "aggregate risk guard",

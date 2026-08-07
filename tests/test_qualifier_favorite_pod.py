@@ -82,6 +82,39 @@ class _FakeRiskManager:
         bankroll = 1000.0
 
 
+class _StubStore:
+    def __init__(self, open_market_ids=()):
+        self._open_market_ids = set(open_market_ids)
+
+    @property
+    def seen_fingerprints(self):
+        return set()
+
+    def get_open_market_ids(self):
+        return set(self._open_market_ids)
+
+    def get_open_trades(self, pod_id=None):
+        return [
+            {"pod_id": "P-015", "market_id": market_id}
+            for market_id in self._open_market_ids
+        ]
+
+    def is_fingerprint_seen(self, fingerprint):
+        return False
+
+    def is_position_open(self, market_id):
+        return market_id in self._open_market_ids
+
+
+class _ReservationGuard:
+    def __init__(self):
+        self.calls = []
+
+    def reserve_trade(self, **kwargs):
+        self.calls.append(kwargs)
+        return True
+
+
 def _make_pod(markets, tmpdir, **kwargs) -> QualifierFavoritePod:
     defaults = dict(
         kalshi_tennis_client=_FakeClient(markets),
@@ -175,6 +208,37 @@ class TestScan(unittest.TestCase):
             # settle one → slot released → third market can be placed
             pod.on_settlement(placed[0].market_id)
             self.assertEqual(pod._open_count, 1)
+
+    def test_cap_restores_open_positions_from_store_after_restart(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = _StubStore(["OLD-1", "OLD-2"])
+            markets = [
+                _market(ticker=f"KXATPMATCH-26JUL21M{i}-A{i}")
+                for i in range(3)
+            ]
+            pod = _make_pod(
+                markets, td, max_open_positions=3, trade_store=store,
+            )
+
+            results = pod.scan_once()
+
+            self.assertEqual(len(self._placed(results)), 1)
+            self.assertEqual(
+                len([r for r in results if r.action == "SKIPPED_RISK"]), 2,
+            )
+            self.assertEqual(pod._open_count, 3)
+
+    def test_aggregate_risk_approval_reserves_market(self):
+        with tempfile.TemporaryDirectory() as td:
+            guard = _ReservationGuard()
+            market = _market()
+            pod = _make_pod([market], td, aggregate_risk=guard)
+
+            self.assertEqual(len(self._placed(pod.scan_once())), 1)
+            self.assertEqual(len(guard.calls), 1)
+            self.assertEqual(guard.calls[0]["pod_id"], "P-015")
+            self.assertEqual(guard.calls[0]["venue"], "kalshi")
+            self.assertEqual(guard.calls[0]["market_id"], market["ticker"])
 
     def test_slam_window_raises_the_cap(self):
         """Inside a configured slam window the concurrency cap is the slam

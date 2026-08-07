@@ -340,6 +340,44 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
         if not job.get("measurable"):
             # Output path is visible from here but nothing is there to measure.
             continue
+        if jid == "p029_shadow":
+            row = job.get("last_row") or {}
+            memory_pct = row.get("shadow_memory_utilization_pct")
+            if isinstance(memory_pct, (int, float)) and memory_pct >= 90.0:
+                out.append(Finding(
+                    key="job.p029_shadow.memory_pressure",
+                    severity="warn",
+                    title="P-029 shadow memory is {:.1f}% of its 768 MiB cap".format(
+                        memory_pct),
+                    detail=("Current={} bytes, peak={} bytes, swap={} bytes, "
+                            "memory.max events={}. The Gate 0c tape cannot be "
+                            "backfilled; keep the frozen cap unchanged until "
+                            "the pressure trend is reviewed."
+                            .format(row.get("shadow_memory_current_bytes"),
+                                    row.get("shadow_memory_peak_bytes"),
+                                    row.get("shadow_memory_swap_bytes"),
+                                    row.get("shadow_memory_max_events"))),
+                    fix=("Inspect `systemctl show p029-shadow.service "
+                         "--property=MemoryCurrent,MemoryPeak,MemorySwapCurrent,"
+                         "MemoryMax,NRestarts` on the P-029 VPS."),
+                    value=memory_pct))
+            restart_delta = row.get("shadow_restart_delta")
+            oom_kills = row.get("shadow_oom_kill_events")
+            if ((isinstance(restart_delta, int) and restart_delta > 0)
+                    or (isinstance(oom_kills, int) and oom_kills > 0)):
+                out.append(Finding(
+                    key="job.p029_shadow.process_loss",
+                    severity="critical",
+                    title="P-029 shadow process restarted or was OOM-killed",
+                    detail=("restart_delta={}, oom_kill_events={}, pid={}. Any "
+                            "downtime inside Gate 0c is a non-backfillable tape gap."
+                            .format(restart_delta, oom_kills,
+                                    row.get("shadow_main_pid"))),
+                    fix=("Inspect `/var/lib/p029/shadow.log` and "
+                         "`journalctl -u p029-shadow.service` immediately; "
+                         "record the exact gap in HANDOFF_P-029.md."),
+                    value={"restart_delta": restart_delta,
+                           "oom_kill_events": oom_kills}))
         if job.get("stale"):
             # Honour the registry's declared severity. The old map only listed
             # critical/warn, so a job declared `severity: info` (e.g.
@@ -529,7 +567,7 @@ def _gate_progress(snap: Dict[str, Any], pod_id: str,
 
     key = {"p017_checkpoint": "p017", "p001_checkpoint": "p001",
            "p015_checkpoint": "p015", "p022_checkpoint": "p022",
-           "p014_checkpoint": "p014"}.get(source)
+           "p014_checkpoint": "p014", "p029_checkpoint": "p029"}.get(source)
     if not key:
         return None
     block = snap.get(key) or {}

@@ -1,6 +1,51 @@
 # P-029 Combo Market-Making — Workstream Handoff
 
-**Written:** 2026-07-29 · **Status:** Phase 0 running, Gate 0 due ~2026-08-04
+**Written:** 2026-07-29 · **Updated:** 2026-08-07
+
+## Current status — read this before the historical handoff below
+
+The original Gate 0 is **CLOSED: STOP** (2026-08-05): median margin −2.54¢,
+n=62,227. A settlement join then identified three mechanistic pricing defects,
+which were corrected without changing the closed verdict. Sam approved a new,
+frozen, forward-only **Gate 0c** before its window opened.
+
+- Collect first-seen combos **2026-08-06 through 2026-08-19**.
+- Do not read the result before **2026-08-23**.
+- The sanctioned reader is `scripts/p029_gate0c_checkpoint.py`; it enforces the
+  blind date and frozen model hash.
+- Gate 0c requires BOTH the model-margin condition and the realized-settlement
+  condition in `recalib/PREREG_P029_Gate0c_Forward.md`.
+- `p029-shadow.service` must run at `MemoryMax=768M`; the archive timer remains
+  mandatory regardless of the eventual verdict.
+- Apply and verify those host prerequisites from a Mac with P-029 SSH access:
+  `bash scripts/deploy_p029_gate0c.sh`. It transfers only the frozen reader,
+  model, copula module, and host upgrade script; it does not transfer data or
+  credentials. The host change is a systemd drop-in, not a unit rewrite.
+- The hourly `p029-health-check` heartbeat verifies the effective memory limit
+  and records current/peak/swap usage, cgroup memory events, PID/restart delta,
+  and the in-zone resolver backlog throughout the forward window.
+- **Operational deviation, 2026-08-07:** the Gate 0c deployment restart left
+  `p029-shadow.service` unable to traverse its root-owned `combo_research/`
+  working directory from 00:17:11 to 00:23:01 UTC (about six minutes). The tape
+  gap cannot be backfilled and must be disclosed with the August 23 read. The
+  deployment now suppresses rsync ownership/mode propagation, restores checkout
+  traversal explicitly, and rejects a process that is merely active between
+  crash-loop attempts. The repaired logger has remained running at the frozen
+  `MemoryMax=768M`; the first and subsequent resolver cycles reported
+  `due 0 in-zone`.
+- Phase 1 is still unauthorized. It requires a separate explicit decision and
+  a rotated, read-only Kalshi key.
+
+On the P-029 host, the eventual read is:
+
+```bash
+/opt/p029/venv/bin/python3 /opt/p029/scripts/p029_gate0c_checkpoint.py --json
+```
+
+The remainder of this document preserves the July 29 build history and original
+Gate 0 runbook. Where it conflicts with the status above, the status above and
+the Gate 0c preregistration govern.
+
 **Read this first.** It is the entry point to the whole workstream; the other documents are the
 detail behind it.
 

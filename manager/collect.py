@@ -509,6 +509,7 @@ class Collector:
 
         age_min: Optional[float] = None
         content_age_min: Optional[float] = None
+        last: Optional[Dict[str, Any]] = None
         exists = False
         target = None
 
@@ -548,6 +549,8 @@ class Collector:
             "state": "measured",
             "checked_on": self.host,
         })
+        if spec.get("inspect_last_row"):
+            base_rec["last_row"] = last
         return base_rec
 
     def can_check(self, job: Dict[str, Any]) -> bool:
@@ -844,7 +847,7 @@ class Collector:
 
     @safe("p022_gate")
     def p022_gate(self) -> Dict[str, Any]:
-        """P-022 progress against its pre-registered T=14 rule.
+        """P-022 progress against its amended 33-tournament/270-fill rule.
 
         T counts settled TOURNAMENTS from 2026-07-26 22:36 UTC, when the
         reconciled runner restarted. Before that the service had been up since
@@ -852,6 +855,11 @@ class Collector:
         far-future placeholder field — so T was genuinely 0 and nothing was lost.
         """
         return self._checkpoint("scripts/p022_checkpoint.py", "P-022")
+
+    @safe("p029_gate")
+    def p029_gate(self) -> Dict[str, Any]:
+        """P-029 Gate 0c reader; blind until its registered read date."""
+        return self._checkpoint("scripts/p029_gate0c_checkpoint.py", "P-029")
 
     @safe("p022_window")
     def p022_window(self) -> Dict[str, Any]:
@@ -1370,6 +1378,7 @@ class Collector:
             "p017": self.p017_gate() or {},
             "p001": self.p001_gate() or {},
             "p022": self.p022_gate() or {},
+            "p029": self.p029_gate() or {},
             "p022_window": self.p022_window() or {},
             "evmap": self.evmap_jobs() or {},
             "p014": self.p014_gate() or {},

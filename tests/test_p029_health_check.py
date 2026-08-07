@@ -6,9 +6,12 @@ and the registry's staleness threshold therefore measures real evidence.
 """
 import json
 
+import scripts.p029_health_check as health_check
 from scripts.p029_health_check import (
     ARCHIVE_MAX_AGE_S,
+    SHADOW_BACKLOG_WARN,
     SHADOW_MAX_DB_AGE_S,
+    SHADOW_MEMORY_MAX_BYTES,
     append_heartbeat,
     evaluate,
 )
@@ -17,11 +20,30 @@ HEALTHY = {
     "shadow_unit": "active",
     "shadow_db_age_s": 300.0,
     "shadow_db_bytes": 10_000_000,
+    "shadow_memory_current_bytes": 400 * 1024 * 1024,
+    "shadow_memory_peak_bytes": 450 * 1024 * 1024,
+    "shadow_memory_swap_bytes": 0,
+    "shadow_memory_max_bytes": SHADOW_MEMORY_MAX_BYTES,
+    "shadow_memory_events": {"max": 0, "oom": 0, "oom_kill": 0},
+    "shadow_main_pid": 1234,
+    "shadow_nrestarts": 8,
+    "shadow_result": "success",
+    "shadow_due_in_zone": 0,
     "archive_unit": "inactive",
     "archive_newest": "settled_2026-07-30.jsonl.gz",
     "archive_newest_age_s": 4 * 3600.0,
     "disk_used_pct": 41.2,
 }
+
+
+def test_remote_probe_compiles_and_measures_gate0c_prerequisites():
+    compile(health_check.REMOTE_PROBE, "<p029-remote-probe>", "exec")
+    assert '"shadow_memory_max_bytes"' in health_check.REMOTE_PROBE
+    assert '"shadow_memory_current_bytes"' in health_check.REMOTE_PROBE
+    assert '"shadow_memory_swap_bytes"' in health_check.REMOTE_PROBE
+    assert '"shadow_memory_events"' in health_check.REMOTE_PROBE
+    assert '"shadow_nrestarts"' in health_check.REMOTE_PROBE
+    assert '"shadow_due_in_zone"' in health_check.REMOTE_PROBE
 
 
 def test_healthy_box_passes_both():
@@ -42,6 +64,22 @@ def test_missing_shadow_db_fails():
 
 def test_inactive_shadow_unit_fails():
     assert not evaluate(dict(HEALTHY, shadow_unit="inactive"))["p029_shadow"]["ok"]
+
+
+def test_wrong_shadow_memory_limit_fails():
+    facts = dict(HEALTHY, shadow_memory_max_bytes=512 * 1024 * 1024)
+    assert not evaluate(facts)["p029_shadow"]["ok"]
+
+
+def test_missing_memory_telemetry_fails_attestation():
+    facts = dict(HEALTHY, shadow_memory_current_bytes=None)
+    assert not evaluate(facts)["p029_shadow"]["ok"]
+
+
+def test_sustained_in_zone_backlog_fails_but_small_transient_passes():
+    assert evaluate(dict(HEALTHY, shadow_due_in_zone=600))["p029_shadow"]["ok"]
+    facts = dict(HEALTHY, shadow_due_in_zone=SHADOW_BACKLOG_WARN + 1)
+    assert not evaluate(facts)["p029_shadow"]["ok"]
 
 
 def test_archive_activating_is_a_run_in_progress_not_a_failure():
@@ -67,11 +105,30 @@ def test_heartbeat_row_carries_timestamp_utc(tmp_path):
     row = json.loads(path.read_text().strip().splitlines()[-1])
     assert row["timestamp_utc"]  # the key manager/collect.py row_ts() reads
     assert row["ok"] is True
+    assert row["shadow_memory_max_bytes"] == SHADOW_MEMORY_MAX_BYTES
+    assert row["shadow_memory_current_bytes"] == 400 * 1024 * 1024
+    assert row["shadow_memory_utilization_pct"] == 52.1
+    assert row["shadow_memory_swap_bytes"] == 0
+    assert row["shadow_oom_kill_events"] == 0
+    assert row["shadow_main_pid"] == 1234
+    assert row["shadow_restart_delta"] == 0
+    assert row["shadow_due_in_zone"] == 0
     assert path.name == "p029_shadow.jsonl"
 
     # collect.py must parse it and derive a content age.
     from manager.collect import last_json_row, row_ts
     assert row_ts(last_json_row(path)) is not None
+
+
+def test_heartbeat_detects_pid_and_restart_changes(tmp_path):
+    verdict = evaluate(HEALTHY)["p029_shadow"]
+    append_heartbeat("p029_shadow", HEALTHY, verdict, hb_dir=tmp_path)
+    changed = dict(HEALTHY, shadow_main_pid=5678, shadow_nrestarts=9)
+    append_heartbeat("p029_shadow", changed, evaluate(changed)["p029_shadow"],
+                     hb_dir=tmp_path)
+    rows = [json.loads(line) for line in
+            (tmp_path / "p029_shadow.jsonl").read_text().splitlines()]
+    assert rows[-1]["shadow_restart_delta"] == 1
 
 
 def test_env_overrides_host_and_key(monkeypatch):
@@ -108,3 +165,4 @@ def test_droplet_unit_files_stay_wired():
     timer = (sysd / "p029-health-check.timer").read_text()
     assert "Persistent=true" in timer          # reboot must not drop a run
     assert "Unit=p029-health-check.service" in timer
+    assert "OnCalendar=*-*-* *:07:00 UTC" in timer

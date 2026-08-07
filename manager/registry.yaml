@@ -40,7 +40,7 @@
 
 meta:
   version: 1
-  updated: 2026-07-20
+  updated: 2026-08-07
   # Paths are resolved relative to project_root unless absolute.
   project_root: /opt/betting-pod-shop
   local_root: /Users/samlawhon/Desktop/Betting Fund Project
@@ -439,10 +439,11 @@ jobs:
   # nothing.
   #
   # Now they measure a HEARTBEAT instead of the job's own output.
-  # `p029-health-check.timer` ON THE DROPLET (daily 13:15 UTC, Persistent=true)
+  # `p029-health-check.timer` ON THE DROPLET (hourly, Persistent=true)
   # runs scripts/p029_health_check.py --no-push, which SSHes to the box,
   # verifies each job where it actually runs (shadow unit active + sqlite
-  # fresh <2h on-box; newest archive file <30h and unit not failed), and
+  # fresh <2h on-box + effective MemoryMax=768M + no sustained in-zone
+  # resolver backlog; newest archive file <30h and unit not failed), and
   # appends a row to data/p029_heartbeat/<id>.jsonl ONLY when the check
   # passes. `host: droplet` below describes where the measured EVIDENCE
   # lives, not where the job runs. Deploys don't clobber it (deploy.sh
@@ -467,27 +468,30 @@ jobs:
     schedule: continuous (p029-shadow.service on the P-029 VPS, Restart=always)
     description: >-
       P-029 Phase 0 public shadow logger — combo margin tape for Gate 0
-      (measured via daily SSH heartbeat, p029-health-check.timer on the droplet)
+      (measured via hourly SSH heartbeat, p029-health-check.timer on the droplet)
     output:
       file: data/p029_heartbeat/p029_shadow.jsonl
-      max_stale_hours: 30
+      max_stale_hours: 3
+      inspect_last_row: true
     severity: warn
     note: >
-      Heartbeat cadence is DAILY, so the on-box 2h-freshness rule lives in
+      Heartbeat cadence is hourly, so the on-box 2h-freshness rule lives in
       scripts/p029_health_check.py, not in max_stale_hours here. Single-instance
       guarded via a SQLite lock: a second copy refuses to start, and a stalled
       logger still reports systemd-active. Freshness of the DB is the only real
-      liveness signal. A gap in the tape CANNOT be backfilled.
+      liveness signal. The heartbeat also records the effective memory cap and
+      due in-zone backlog, current/peak/swap memory, cgroup memory events, PID,
+      and restart delta. A gap in the tape CANNOT be backfilled.
 
   - id: p029_archive
     host: droplet
     schedule: "*-*-* 09:30 UTC (p029-archive.timer on the P-029 VPS, RandomizedDelaySec=600)"
     description: >-
       P-029 settled-combo archiver — Kalshi purges these after ~3 months
-      (measured via daily SSH heartbeat, p029-health-check.timer on the droplet)
+      (measured via hourly SSH heartbeat, p029-health-check.timer on the droplet)
     output:
       file: data/p029_heartbeat/p029_archive.jsonl
-      max_stale_hours: 30
+      max_stale_hours: 3
     severity: warn
     note: >
       A missed day is PERMANENT data loss, not a delayed job — Kalshi purges
@@ -1237,15 +1241,13 @@ workstreams:
       (364 markets, T=19): pooled +3.41c vs equal-weight +3.80c, z=3.29 — the
       two AGREE and the Phase-2 GREEN-LIGHT stands on either. Widened sample
       (404 markets, T=22): pooled +2.57c vs equal-weight +1.45c, z=0.65 — NOT
-      significant. Amendment 1 cites the +2.57c pooled figure when setting
-      T=24 for "90% power", so the power basis assumes an effect larger and a
-      dispersion smaller (sd 5.04c published vs 10.44c widened) than the
-      rule's own statistic gives.
-      DECIDED 2026-08-02 by Sam: T=24 STANDS. The dispersion is accepted; no
-      amendment. Recorded here so the gate is not silently re-litigated later
-      — the finding is known, was weighed, and the threshold was left alone.
-      scripts/p022_checkpoint.py (the forward reader) is unaffected: it
-      already computes statistics.mean(xs) with MIN_T_DECISION=24.
+      significant. Amendment 1's T=24 power basis therefore used the wrong
+      point estimate and dispersion. AMENDMENT 2, approved by Sam on 2026-08-02
+      at T=2 with negative forward evidence, tightened the gate to BOTH T>=33
+      and >=270 filled markets. A single extension runs to BOTH T>=98 and >=808
+      fills. The market-level basis is valid only while adverse events per
+      affected tournament stay <=1.5; the sanctioned reader enforces that
+      clustering guard.
       CAPACITY OVERSTATED, verified 2026-08-02. The harness replays at its
       default quote_size=25 contracts/name. At the measured mean filled quote
       of $0.0763 that is 25 x $0.9237 = $23.09 of collateral per name against
@@ -1255,50 +1257,42 @@ workstreams:
       puts it near $11/month net (that number is the validator agent's and has
       NOT been independently reproduced; the 4.62x breach itself has been).
     gate:
+      locked: true
+      locked_date: 2026-08-02
+      doc: golf_quirks_research/P022_DECISION_RULE.md
+      rule_document: golf_quirks_research/P022_DECISION_RULE.md
       question: Does the +3.4c/ct dead-heat fade replicate forward, net of adverse selection?
       metric: settled_tournaments
       source: p022_checkpoint
       reader: scripts/p022_checkpoint.py
-      # AMENDMENT 1 (2026-07-28, Sam, at T=0): 14 -> 24. Same criterion (90%
-      # power against the measured effect); the 2026-07-28 widening revised the
-      # effect from +3.4c to +2.57c/ct and the rule's own solve gives 24.
-      threshold: 24           # 90% power vs the measured +3.4c effect (rule §5)
+      # AMENDMENT 2 (2026-08-02, Sam, at T=2): the earlier threshold used a
+      # pooled estimate even though the rule specifies an equal-tournament
+      # statistic. The tightened basis is 270 filled markets, with T=33 as the
+      # observed-cadence proxy. BOTH gates must clear.
+      threshold: 33
+      minimum_filled_markets: 270
+      extension_threshold: 98
+      extension_minimum_filled_markets: 808
+      max_adverse_per_tournament: 1.5
       t_start_utc: 2026-07-26T22:36:52Z
       # progress is DERIVED by the reader. Do not hand-maintain it here.
-      # TRANSCRIPTION CORRECTED 2026-08-02: this said "T<14 is NO DECISION" and
-      # "At T>=14", both superseded by Amendment 1 (2026-07-28) which raised the
-      # threshold to 24. P022_DECISION_RULE.md line 169 reads "T < 24 | NO
-      # DECISION ... (was T < 14; see Amendment 1)". The `threshold: 24` field
-      # above was already right, so the reader and this prose disagreed and the
-      # prose was the stale half. Correcting a transcription that contradicts
-      # the authoritative rule doc is NOT reinterpreting the gate — the rule doc
-      # governs, this is a pointer to it. Caught by the strategy-spec agent
-      # while writing strat_p022_fade_v1 against the primary source.
       decision: >
         LOCKED in golf_quirks_research/P022_DECISION_RULE.md — read it, do not
-        reinterpret. HARD KILL at any T if z <= -2.0. T<24 is NO DECISION
-        (underpowered; a T=8 look has 23% power against half the effect and is
-        explicitly forbidden). At T>=24: KILL if edge<=0, PASS if z>=2.0, else
-        ONE extension to T=40 at byte-identical parameters and then KILL if
-        still z<2.0. Caps are GATE CONDITIONS: a tournament with any cap
-        breached is EXCLUDED from T, and raising a cap resets T to 0 under a new
-        pod ID. PASS authorises more paper allocation and a written promotion
+        reinterpret. HARD KILL at any T if z <= -2.0. Before BOTH T>=33 and 270
+        filled markets, the verdict is NO DECISION. Once both clear: KILL if
+        edge<=0, PASS if z>=2.0, otherwise take the single byte-identical
+        extension to BOTH T>=98 and 808 fills, then KILL if z remains <2.0.
+        If adverse events cluster above 1.5 per affected tournament, the
+        market-level basis is void and no verdict may be read until the
+        tournament-level threshold is recomputed. Any cap-breached tournament
+        is EXCLUDED from T. PASS authorises more paper and a written promotion
         proposal — never live money.
     watch:
       - >
-        STILL CANNOT QUOTE — found 2026-07-27, the first time markets relisted.
-        The 2026-07-26 reconciliation fixed the wrong half of the bug. Its
-        evidence (occurrence_datetime running 13-18d past close_time on 10 of
-        10) was measured on SETTLED markets, where Kalshi has already rewritten
-        close_time to the real early-close stamp. On an OPEN market — the only
-        state the pod ever sees when deciding to quote — all five time fields
-        collapse to one ~20-day fallback, so preferring close_time over
-        occurrence_datetime changes nothing. Confirmed live: at 00:22:20 UTC the
-        runner discovered 346 markets across 3 events, every close reference
-        2026-08-16T00:00Z (~479h out), and quoted nothing. See
-        research/REPORT_P022_First_Quote_2026-07.md. T is accruing calendar but
-        cannot accrue tournaments. NOT a parameter problem — do not tune the
-        window; the round end is not a quantity Kalshi publishes in advance.
+        OPEN-market Kalshi close fields remain unusable placeholders. FIXED
+        2026-07-27 by src/golf_schedule.py, which resolves the external ESPN
+        schedule and fails closed when it cannot. The pod re-resolves listed
+        events as tee times appear; never restore a Kalshi-field fallback.
       - >
         FIXED and DEPLOYED 2026-07-27 16:00 UTC (unit restarted onto the new
         code; verified in place that from_config yields a real
@@ -1317,12 +1311,12 @@ workstreams:
         daily-loss halt is deliberately NOT wired (close_position -> record_pnl
         would halt permanently, since check_pre_cycle never runs here).
       - >
-        Books are not persisted across restarts (self.books = {} on init, and
-        nothing reads the fills log back). A restart mid-tournament re-arms all
-        three collateral caps from zero while the paper exposure persists, which
-        is a genuine cap-breach path under §7 — and p022_checkpoint.py implements
-        no cap-breach exclusion, so a breached tournament would still count
-        toward T.
+        RESTART GAP FIXED 2026-07-27. The runner calls rebuild_from_log() before
+        discovery, restoring every unsettled fill and re-arming the internal
+        caps from real exposure. CAP_BREACH rows are restored too, and
+        p022_checkpoint.py excludes the whole tournament from T. Resting paper
+        quotes do not survive a process restart and therefore carry no exposure
+        to restore.
       - >
         Aggregate risk is enforced against P-022's OWN book only — it is a
         separate process from the 5-minute engine, so the 15% cap does not span
@@ -1338,12 +1332,9 @@ workstreams:
     # correctly: it would claim a pod is trading that does not exist yet.
     tier: none
     owner_dir: combo_research
-    # `measurement`, not `time`: the accrual rate of resolved in-zone combos is
-    # NOT yet measured, so no date can be stated for when Gate 0 can be called.
-    # Claiming `time` here would report a gate that cannot resolve as one that
-    # is patiently waiting — the exact distinction this field exists to draw.
-    blocked_on: measurement
-    recheck_after: 2026-08-05
+    # Gate 0c is a fixed forward window, so this is genuinely blocked on time.
+    blocked_on: time
+    recheck_after: 2026-08-23
     # No `service:` — Phase 0 runs on its own VPS, so the reconciliation check
     # must not expect a local unit. See the p029_shadow/p029_archive jobs.
     summary: >
@@ -1352,34 +1343,52 @@ workstreams:
       target zone (2-4 legs, 10-35c): +7.20c/ct last-price basis, +3.17c/ct on
       the conservative first-print basis, ~4.0% return on posted collateral per
       turn, no measurable decay across 11 weeks.
-      CURRENT STATE: Phase 0 only — a public-data shadow logger and a settled-
-      combo archiver on a dedicated VPS (143.198.162.120), provisioned
-      2026-07-28. NO credentials, NO capital, nothing in this phase can place an
-      order. Phases are strictly serial; Phase 1 needs a read-only key, Phase 3
-      is the real gate at <=$500.
+      ORIGINAL GATE 0 CLOSED 2026-08-05: STOP at -2.54c median margin, n=62,227.
+      A settlement join then exposed three mechanistic model defects: leg
+      favorite-longshot miscalibration, unsigned YES/NO correlations, and a
+      pooled-marginal rho fit. The corrected model reads the fit tape at +2.27c,
+      but that in-sample result decides nothing. Sam approved a separate frozen
+      forward Gate 0c before its 2026-08-06 window opened.
+      CURRENT STATE: Gate 0c public-data collection on the dedicated VPS
+      (143.198.162.120), with no credentials, capital, or order path. Collect
+      first-seen combos 2026-08-06 through 2026-08-19 and read no earlier than
+      2026-08-23. Phase 1 remains a separate explicit decision and needs a
+      rotated read-only key; Phase 3 is the real execution gate at <=$500.
       WHY THE TWO 0-for-5 PRIORS DO NOT AUTOMATICALLY APPLY: the maker/fade 0-for-5
       all fought a fee and died on fills, and the fee half does not carry over
       here (it is zero). The FILL half does, which is precisely what the gate
       measures. The multi-leg 0-for-5 were arbitrage attempts taxed per leg;
       P-029 never trades the legs.
+    prior_gate:
+      status: CLOSED
+      resolved_on: 2026-08-05
+      verdict: STOP
+      rule_document: combo_research/TEST_PLAN_P-029.md
+      result: "median margin -2.54c; n=62,227; 95% CI [-2.55c, -2.52c]"
+      report: combo_research/REPORT_P029_Gate0_2026-08-05.md
     gate:
+      locked: true
+      locked_date: 2026-08-05
+      rule_document: combo_research/recalib/PREREG_P029_Gate0c_Forward.md
       question: >
-        Is there room between correlation-aware fair value and where combos
-        actually trade — enough to pay for the build?
-      metric: resolved_in_zone_combos
-      source: p029_shadow
+        Does the corrected, frozen combo model identify executable seller room
+        on a forward tape, confirmed by realized settlements?
+      metric: gate0c_forward_dual_condition
+      source: p029_checkpoint
+      reader: scripts/p029_gate0c_checkpoint.py
       threshold: 500
+      model_sha256: 01411d863de04075a38f02b40b7e0c4a7e21463a96b42d8194e8ccd8325956af
+      window_start_utc: 2026-08-06T00:00:00Z
+      window_end_utc: 2026-08-19T23:59:59Z
+      read_not_before: 2026-08-23
       decision: >
-        Pre-registered in combo_research/TEST_PLAN_P-029.md §Gate 0, decided
-        after 5-7 days of collection. CONTINUE if the in-zone median margin
-        against a CORRELATION-ADJUSTED price is >= +2.0c at n >= 500. STOP if
-        the median is < +1.0c. Extend one week if it lands between — do not
-        proceed on a marginal read.
-        The n=39 first signal (+1.06c in-zone median) is INDICATIVE ONLY and
-        must not be updated on: it spans minutes, is selected toward combos that
-        trade instantly, and part of that margin is genuine leg correlation
-        rather than profit. Trade-rate-among-resolved is biased upward until the
-        run is older than 48h.
+        BOTH conditions must pass: (1) median(first print - frozen-model fair)
+        >= +2.0c at n>=500, and (2) mean(first print - settlement) >= +1.0c
+        with a day-clustered 95% CI excluding zero. Margin <+1.0c or realized
+        point estimate <=0 is STOP. Mixed or insufficient evidence gets exactly
+        one extension through 2026-08-26, read no earlier than 2026-08-30.
+        Both-pass authorises Phase 1 only, still $0 and only after Sam's separate
+        explicit approval.
     watch:
       - >
         MUST BE PRICED WITH A COPULA, NEVER THE INDEPENDENCE PRODUCT.
@@ -1414,11 +1423,17 @@ workstreams:
         later. Same-game correlation is unmeasured (n=39, both live collections
         are cross-slate) and stays blocked until NBA/NFL season.
       - >
-        Phase 0 was provisioned but NEVER VERIFIED from this checkout — no key
-        on the Mac could authenticate to 143.198.162.120 as of 2026-07-29
-        (Permission denied (publickey)). Until that is fixed the daily health
-        check reports ACCESS BLOCKED and the registry knows nothing about the
-        actual state of the logger.
+        Gate 0c's tape cannot be backfilled. p029-shadow.service must run through
+        2026-08-19 with MemoryMax=768M, the in-zone due backlog at zero, and
+        p029-archive.timer healthy. The manager sees this third host only through
+        the hourly p029-health-check heartbeat; stale heartbeat means UNKNOWN,
+        never healthy by assumption.
+      - >
+        DATA QUALIFICATION: the 2026-08-07 Gate 0c deployment caused an
+        approximately six-minute shadow-tape gap (00:17:11-00:23:01 UTC) when
+        rsync made combo_research/ inaccessible to the p029 user. It cannot be
+        backfilled and must be disclosed in the August 23 read. The deploy path
+        is hardened and post-repair resolver cycles drain due in-zone to zero.
 
   - id: P-013
     name: Kalshi-Deribit Crypto Options
@@ -1563,42 +1578,83 @@ workstreams:
 
   - id: R-LIVE-AGENT
     name: Live In-Play Agent Research / Recursive Review
-    stage: build
+    # SHELVED 2026-08-06, NOT killed. `build` was self-contradicting: the entry's
+    # own action_required said "No build work is owed", so there was no gate and
+    # no reader to declare, and the card rendered progress `unmeasured` /
+    # projection `unprojectable` forever. `shelved` is terminal in
+    # manager/checks.py::_TERMINAL_STAGES, so it stops the build signal and the
+    # gate prompts. The RESEARCH is not dead — see `unshelve_when` below.
+    stage: shelved
+    tier: none
     owner_dir: live_agent_research
     blocked_on: nothing
-    action_required: >
-      Tier 1 (measurement + deterministic proposals) and Tier 2 (offline
-      challenger evaluator) are BUILT — Tier 2 committed 2026-07-21
-      (src/maker_challenger.py, scripts/maker_challenger_report.py, 33 tests;
-      first proposal at live_agent_research/proposals/). Tier 3 remains
-      designed-not-built and is now MOOT for the current champion: P-016 hit
-      its 500-fill gate 2026-07-21 with negative +5m markout (-1.29c, -$99.89
-      net) and the pre-registered rule resolves to KILL. Tier 2's arms and
-      the adverse-selection signature it measured (fills within 15s of a state
-      change markout -8.78c vs -0.96c) are the starting point for whatever a
-      P-016 v2 looks like, not an optimisation of a champion that is being
-      retired. No build work is owed until a v2 exists to improve.
-      NOTE: three design-doc gaps still block any future auto-apply layer —
-      no [min,max] bounds recorded per parameter, no pre-registered promotion
-      margin, and the arm-budget arithmetic contradicts its parallel-eval
-      premise. Resolve those before Tier 3.
+    action_required: null
+    shelved:
+      decided: 2026-08-06
+      decided_by: Sam
+      reason: >
+        THE CHAMPION THIS WORKSTREAM EXISTS TO IMPROVE IS RETIRED. P-016 hit its
+        500-fill gate 2026-07-21 with a negative +5m markout (-1.29c, -$99.89
+        net) and the pre-registered rule resolved to KILL; P-016 has carried
+        `stage: killed` since, with betting-live-maker inactive AND disabled.
+        Tier 1 (measurement + deterministic proposals) and Tier 2 (offline
+        challenger evaluator) are BUILT and committed 2026-07-21 (8b90413:
+        src/maker_challenger.py, scripts/maker_challenger_report.py, 33 tests;
+        first proposal at live_agent_research/proposals/). Tier 3 is
+        designed-not-built and MOOT — there is no champion to auto-apply to.
+        Nothing here is blocked and nothing is owed; the entry was simply left
+        in `build` after the thing it was building for went away.
+      cost_of_shelving: >
+        None measurable. No code is deleted and no evidence is discarded. The
+        two built tiers stay in the tree and stay tested, so a v2 restarts from
+        working measurement rather than from scratch.
+    unshelve_when: >
+      A P-016 v2 SPEC EXISTS. Tier 2's arms, and the adverse-selection signature
+      it measured — fills within 15s of a state change mark out -8.78c vs -0.96c
+      otherwise — are the starting point for what a v2 should be, not an
+      optimisation of a champion that is being retired. Build the v2 thesis
+      first; this workstream then reopens to improve it.
+    blocks_tier_3: >
+      THREE DESIGN-DOC GAPS still block any future auto-apply layer, and they
+      must be resolved BEFORE Tier 3 is built, not during: (1) no [min,max]
+      bounds are recorded per parameter, so "within pre-registered bounds" has
+      no bounds to check against; (2) no pre-registered promotion margin, so a
+      challenger beating a champion by noise would promote; (3) the arm-budget
+      arithmetic contradicts its own parallel-eval premise. A v2 that skips
+      these rebuilds the flaw. See live_agent_research/RECURSIVE_REVIEW_DESIGN.md.
     governing_rule: >
       The system may become MORE CONSERVATIVE on its own authority; MORE
       AGGRESSIVE only within pre-registered bounds. LLM review is hypothesis
       generation only — never auto-commit.
-    open_questions:
+    closed_questions:
       - id: mlb-maker-fee
-        blocked_on: external
-        text: >
-          Confirm whether the 2026-07-07 Kalshi fee schedule puts MLB series on
-          the maker-fee list. Changes P-016 economics by 0.44c/contract. Currently
-          assuming the conservative 0.0175 coefficient.
+        closed: 2026-08-06
+        answer: >
+          YES — MLB game markets DO charge maker fees, and the conservative
+          0.0175 coefficient P-016 already assumed was CORRECT. No economics
+          change; the 0.44c/contract swing this question was hedging never
+          existed. `KXMLBGAME` is `quadratic_with_maker_fees` in the generated
+          fixture src/fixtures/kalshi_series_fees.json (as are KXMLB, KXMLBAL,
+          KXMLBNL, KXMLBASGAME, KXMLBSERIES, KXMLBHRDERBY). Re-verified against
+          LIVE Kalshi on 2026-08-06 via `python3 -m scripts.check_fee_fixture`:
+          130 charging fixture / 130 live, fixture matches.
+          This stopped being an external unknown on 2026-07-27, when the fee
+          table became a generated fixture off one GET /series call with a
+          committed drift checker. It was only still open because nobody came
+          back to close it.
+    open_questions:
       - id: polymarket-us-api
         blocked_on: external
-        text: Determine Polymarket US API availability (relaunched Dec 2025, 49 states).
-      - id: inplay-basis
-        blocked_on: data
-        text: Log in-play Kalshi-vs-Polymarket basis for a few weeks.
+        text: >
+          Determine Polymarket US API availability (relaunched Dec 2025, 49
+          states). Retained here only as the standing record of the question;
+          it is NOT gating this shelved workstream. The execution-access finding
+          that shelved P-002 and P-006 is the same question — if it is ever
+          answered, those two are the entries that change.
+      # REMOVED 2026-08-06: `inplay-basis` ("log in-play Kalshi-vs-Polymarket
+      # basis for a few weeks"). Duplicated P-018, which owns the collector
+      # (scripts/collect_inplay_basis.py), the data and the backtest gate. One
+      # workstream per question; track it there.
 
   - id: R-RECURSIVE-STRATEGY
     name: Recursive Strategy Factory
@@ -1678,7 +1734,7 @@ workstreams:
     name: Tennis Research / P-015b lower tour
     stage: research
     owner_dir: tennis_research
-    blocked_on: human
+    blocked_on: nothing
     summary: >
       ANALYSIS COMPLETE. analyze_lower_tour.py finished 2026-07-20 21:07;
       results in tennis_research/lower_tour_results.txt. The P-015 tour-level

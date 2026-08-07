@@ -78,8 +78,9 @@ WorkingDirectory=$DIR/combo_research
 ExecStart=$DIR/venv/bin/python3 $DIR/combo_research/shadow_public.py --db $DATA/shadow.sqlite
 Restart=always
 RestartSec=30
-# Do not let a runaway logger take the box down again.
-MemoryMax=512M
+# Gate 0c prerequisite: the logger held ~499M RSS plus ~220M swap at 512M.
+# Keep a hard ceiling, but leave enough headroom to preserve the forward tape.
+MemoryMax=768M
 Nice=5
 StandardOutput=append:$DATA/shadow.log
 StandardError=append:$DATA/shadow.log

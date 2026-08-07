@@ -326,7 +326,7 @@ def test_the_amendment_only_moved_the_threshold():
     assert cp.HARD_KILL_Z == -2.0
 
 
-def test_extension_is_55_and_no_longer_inconsistent():
+def test_extension_is_98_and_no_longer_inconsistent():
     """Amendment 1 left the extension at 40 while flagging it as inconsistent
     with its own "80% power vs HALF the measured effect" rationale. Amendment 2
     resolves it on the market-level basis."""

@@ -101,6 +101,33 @@ def test_local_job_is_measured_when_local_root_exists(tmp_path):
     assert mac["stale"] is False, "freshly written file is not stale"
 
 
+def test_job_record_can_expose_latest_heartbeat_telemetry(tmp_path):
+    project = tmp_path / "opt" / "betting-pod-shop"
+    heartbeat = project / "data" / "p029_heartbeat" / "p029_shadow.jsonl"
+    heartbeat.parent.mkdir(parents=True)
+    heartbeat.write_text(
+        json.dumps({
+            "timestamp_utc": "2099-01-01T00:00:00Z",
+            "shadow_memory_utilization_pct": 95.8,
+        }) + "\n",
+        encoding="utf-8",
+    )
+    local = tmp_path / "local"
+    local.mkdir()
+    reg = write_registry(tmp_path, str(local), str(project))
+    col = collect.Collector(reg, root=project, local_root=local)
+    rec = col.job_record({
+        "id": "p029_shadow",
+        "host": "droplet",
+        "output": {
+            "file": "data/p029_heartbeat/p029_shadow.jsonl",
+            "max_stale_hours": 3,
+            "inspect_last_row": True,
+        },
+    })
+    assert rec["last_row"]["shadow_memory_utilization_pct"] == 95.8
+
+
 def test_stale_local_job_is_reported_stale(tmp_path):
     """An admitted gap must not swallow a genuinely late job."""
     import os
@@ -221,6 +248,42 @@ def test_uncheckable_third_host_does_not_advise_refresh():
     assert "admitted gap" in finding.detail
     assert "out-of-band" in finding.detail
     assert "p029-daily-health-check" in finding.detail
+
+
+def test_p029_memory_pressure_is_warn_but_process_loss_is_critical():
+    job = {
+        "id": "p029_shadow",
+        "measurable": True,
+        "stale": False,
+        "last_row": {
+            "shadow_memory_utilization_pct": 95.8,
+            "shadow_memory_current_bytes": 771_575_808,
+            "shadow_memory_peak_bytes": 805_810_176,
+            "shadow_memory_swap_bytes": 21_106_688,
+            "shadow_memory_max_events": 42,
+            "shadow_main_pid": 224158,
+            "shadow_restart_delta": 1,
+            "shadow_oom_kill_events": 0,
+        },
+    }
+    found = checks.check_jobs({"jobs": [job]})
+    by_key = {finding.key: finding for finding in found}
+    assert by_key["job.p029_shadow.memory_pressure"].severity == "warn"
+    assert by_key["job.p029_shadow.process_loss"].severity == "critical"
+
+
+def test_p029_healthy_memory_emits_no_pressure_findings():
+    job = {
+        "id": "p029_shadow",
+        "measurable": True,
+        "stale": False,
+        "last_row": {
+            "shadow_memory_utilization_pct": 70.0,
+            "shadow_restart_delta": 0,
+            "shadow_oom_kill_events": 0,
+        },
+    }
+    assert not checks.check_jobs({"jobs": [job]})
 
 
 def test_measurable_hosts_mirror_stays_in_sync():

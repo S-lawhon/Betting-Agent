@@ -903,6 +903,15 @@ workstreams:
     note: >
       P-015b (lower-tour Challenger/ITF) is a SEPARATE strategy version with its
       own n counter. It must be re-registered before enabling — not folded in.
+      US OPEN READINESS 2026-08-07: the sanctioned reader reports 26 settled
+      trades (22W/4L), edge -5.12pp, z=-0.72, correctly NO DECISION. The audit
+      found that the tennis settler booked gross P&L even though entry and gate
+      logic are fee-net. Future rows now carry pnl_usd net plus explicit gross
+      and fee fields; all 26 legacy rows were reproducible from their stored
+      contracts and placement fees and were corrected by the narrow,
+      idempotent scripts/apply_p015_fee_correction.py path. Total historical
+      adjustment: -$3.48. Outcomes, n, breakeven statistic, and verdict are
+      unchanged.
 
   - id: P-016
     name: Live In-Play Maker

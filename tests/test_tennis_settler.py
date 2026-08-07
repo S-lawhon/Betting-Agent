@@ -52,7 +52,8 @@ class FakeStore:
                           if e.get("fingerprint") != fp]
 
 
-def _placed(ticker, size=100.0, fill=0.40, start=None):
+def _placed(ticker, size=100.0, fill=0.40, start=None, contracts=250,
+            taker_fee=0.0168):
     return {
         "pod_id": "P-015",
         "action": "PLACED",
@@ -62,7 +63,11 @@ def _placed(ticker, size=100.0, fill=0.40, start=None):
         "fill_price": fill,
         "venue_prob": fill,
         "fingerprint": f"fp-{ticker}",
-        "extra": {"scheduled_start_utc": start or "2026-07-26T12:00:00+00:00"},
+        "extra": {
+            "scheduled_start_utc": start or "2026-07-26T12:00:00+00:00",
+            "contracts": contracts,
+            "taker_fee": taker_fee,
+        },
     }
 
 
@@ -215,3 +220,34 @@ def test_from_config_uses_shared_trade_log_not_pod_logs():
 def test_calc_outcome_labels(result, expected):
     outcome, _ = _calc_outcome_pnl("YES", result, 100.0, 0.40)
     assert outcome == expected
+
+
+def test_binary_settlement_books_fee_net_pnl():
+    placed = _placed(
+        "KXATP-XYZ-ALCARAZ", size=90.0, fill=0.90,
+        contracts=100, taker_fee=0.0063,
+    )
+    store = FakeStore([placed])
+
+    out = _settler(store, {
+        "KXATP-XYZ-ALCARAZ": {"status": "finalized", "result": "yes"},
+    }).settle_cycle()[0]
+
+    assert out["pnl_gross_usd"] == pytest.approx(10.0)
+    assert out["fees_usd"] == pytest.approx(0.63)
+    assert out["pnl_usd"] == pytest.approx(9.37)
+    assert out["fee_accounting_version"] == "p015_net_v2"
+
+
+def test_void_keeps_locked_zero_pnl_convention():
+    placed = _placed("KXATP-XYZ-VOID", size=90.0, fill=0.90)
+    store = FakeStore([placed])
+
+    out = _settler(store, {
+        "KXATP-XYZ-VOID": {"status": "finalized", "result": ""},
+    }).settle_cycle()[0]
+
+    assert out["outcome"] == "VOID"
+    assert out["pnl_gross_usd"] == 0.0
+    assert out["fees_usd"] == 0.0
+    assert out["pnl_usd"] == 0.0

@@ -135,7 +135,7 @@ paper. Kill switch for the maker unit: `touch data/KILL_MAKER`.
   `src/kalshi_tennis_settler.py`. Buy heavy favorites (ask 0.85–0.975) in ATP/WTA
   **qualifying** matches. Basis: `tennis_research/REPORT.md` — +4.1¢/ct net,
   n=238, CI [+1.4,+6.3]. Sized `fair = ask + 0.025`, depth×0.5, max 6 concurrent.
-- Gate: 120 trades (currently 0; first volume is US Open quals Aug 17–21,
+- Gate: 120 trades (currently 26 as of Aug 7; first major volume spike is US Open quals Aug 17–21,
   checkpoint ~Jan 2027). **P-015b** (extending to Challenger/ITF) was tested and
   **dropped** — edge did not replicate (Challenger −1.98¢, ITF −2.33¢).
 
@@ -410,10 +410,12 @@ reset) are covered in System Overview and the July 21–22 entry.
 3. **NCAAB fuzzy matching broken** for 2–3-letter college codes (UK, ISU, KU…)
    vs Odds API full names — scores below `min_team_score=50`. Blocks NCAAB on
    P-001; fix is an abbreviation→full-name lookup in the matcher. (Seasonal.)
-4. **Odds API tennis `/scores` unreliable** (`completed=0` even after matches
-   finish) — P-015 settlement leans on the 14-day auto-void, so tennis P&L is
-   void-not-WIN/LOSS. Consider a tennis-specific settlement source before
-   trusting P-015 realized P&L.
+4. **P-015 tennis settlement source — RESOLVED.** The pod now reads settled
+   match results from Kalshi's public production API rather than Odds API
+   `/scores`; 26/26 gate rows are binary WIN/LOSS, not stale auto-voids. The
+   Aug 7 readiness audit also corrected all 26 legacy settlements from gross to
+   fee-net P&L (-$3.48 total adjustment) without changing the locked gate
+   statistic or verdict.
 5. **Kalshi demo API never settles markets** (`status=active` always) — all
    settlement runs off Odds API scores / public-API `result`, not the Kalshi
    demo endpoint.

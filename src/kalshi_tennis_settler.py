@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from src.kalshi_fees import fee_per_contract
 from src.kalshi_tennis_client import KalshiTennisClient
 
 logger = logging.getLogger(__name__)
@@ -194,6 +195,7 @@ class KalshiTennisSettler:
         result: str,
         resolution_source: str,
     ) -> Dict[str, Any]:
+        extra = placed_entry.get("extra") or {}
         side = placed_entry.get("side", "YES")
         size_usd = float(placed_entry.get("position_size_usd") or 0)
         fill_price = float(
@@ -201,7 +203,29 @@ class KalshiTennisSettler:
             or placed_entry.get("venue_prob")
             or 0.5
         )
-        outcome, pnl_usd = _calc_outcome_pnl(side, result, size_usd, fill_price)
+        outcome, pnl_gross = _calc_outcome_pnl(
+            side, result, size_usd, fill_price
+        )
+
+        # P-015's gate and entry filter are fee-net, so its booked P&L must be
+        # fee-net too. Placements carry the exact integer paper contract count;
+        # use the stored marginal fee when present and recompute only as a
+        # defensive fallback. A true VOID remains $0 under the locked rule's
+        # "no risk taken" convention and is excluded from its statistic.
+        contracts = float(
+            extra.get("contracts")
+            or placed_entry.get("contracts")
+            or 0
+        )
+        fee_per_ct = float(
+            extra.get("taker_fee")
+            or fee_per_contract(fill_price)
+        )
+        fees_usd = (
+            round(contracts * fee_per_ct, 4)
+            if outcome in ("WIN", "LOSS") else 0.0
+        )
+        pnl_net = round(pnl_gross - fees_usd, 2)
 
         now = self._now()
         record: Dict[str, Any] = {
@@ -209,7 +233,10 @@ class KalshiTennisSettler:
             "action": outcome,
             "outcome": outcome,
             "result": result,
-            "pnl_usd": pnl_usd,
+            "pnl_usd": pnl_net,
+            "pnl_gross_usd": pnl_gross,
+            "fees_usd": fees_usd,
+            "fee_accounting_version": "p015_net_v2",
             "settled_at_utc": now.isoformat(),
             "timestamp_utc": now.isoformat(),
             "resolution_source": resolution_source,
@@ -222,8 +249,9 @@ class KalshiTennisSettler:
         else:
             self._append_log(record)
         logger.info(
-            "kalshi_tennis_settler: settled %s | result=%s outcome=%s pnl=%.2f",
-            market_id, result, outcome, pnl_usd,
+            "kalshi_tennis_settler: settled %s | result=%s outcome=%s "
+            "pnl_net=%.2f (gross=%.2f fees=%.2f)",
+            market_id, result, outcome, pnl_net, pnl_gross, fees_usd,
         )
         return record
 

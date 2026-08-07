@@ -61,6 +61,25 @@ def test_closed_tennis_research_is_not_waiting_on_sam():
     assert workstream["blocked_on"] == "nothing"
 
 
+def test_p018_registry_records_its_published_terminal_kill():
+    workstream = _workstream(_registry(), "P-018")
+    report = (ROOT / "research" / "REPORT_P018_Gate1_2026-07-28.md").read_text()
+
+    assert "## VERDICT: **KILL**" in report
+    assert workstream["stage"] == "killed"
+    assert workstream["tier"] == "none"
+    assert workstream["blocked_on"] == "retired"
+    assert workstream["action_required"] is None
+    assert workstream["retired"]["verdict"] == "KILL"
+    assert workstream["retired"]["report"] == (
+        "research/REPORT_P018_Gate1_2026-07-28.md")
+    gate = workstream["gate"]
+    assert gate["status"] == "CLOSED"
+    assert gate["verdict"] == "KILL"
+    assert gate["resolved_on"].isoformat() == "2026-07-28"
+    assert gate["rule_document"] == "research/P018_DECISION_RULE.md"
+
+
 def test_p029_provisioning_keeps_gate0c_memory_headroom():
     provisioner = (ROOT / "scripts" / "provision_p029_vps.sh").read_text()
     shadow_unit = provisioner.split(

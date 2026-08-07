@@ -333,3 +333,15 @@ def test_an_open_gate_is_still_fully_checked(tmp_path):
 
 def test_retired_is_in_the_blocked_on_vocabulary():
     assert "retired" in CGI.BLOCKED_ON_VOCAB
+
+
+def test_p018_published_kill_is_closed_and_instrumentation_exempt():
+    registry = CGI._load_registry(ROOT)
+    workstream = next(row for row in registry["workstreams"]
+                      if row.get("id") == "P-018")
+
+    results = CGI.check_pod(ROOT, workstream)
+
+    assert [row.check for row in results] == ["0_closed_gate_is_substantiated"]
+    assert results[0].ok is True
+    assert "verdict=KILL" in results[0].detail

@@ -1211,40 +1211,50 @@ workstreams:
 
   - id: P-018
     name: Surprise-Gated In-Play Fade Maker
-    stage: build
-    # NOT `validating`. `manager/throughput.py` only projects a resolution date
-    # for workstreams that are `validating` AND carry a `gate` block, and this
-    # one deliberately has neither: P-018 has no pre-registered decision rule,
-    # so a projected date would be a date for a decision nobody has defined.
-    tier: build
-    blocked_on: backtest
+    stage: killed
+    tier: none
+    blocked_on: retired
     owner_dir: inplay_research
     summary: >
-      Core landed in the tree 2026-07-29 (cherry-pick of 4ff5bea; the branch
-      itself must NOT be merged — its tip deletes Legacy/Kalshi Arb Project,
-      which src/engine.py puts on sys.path for P-001's Scanner and Matcher).
-      1,688 lines, 29 tests, INERT: `enabled: false`, absent from pods.active,
-      not in src/pods/, and carrying no @register_pod decorator, so pod
-      auto-discovery cannot pick it up. No engine, no runner, no systemd unit.
+      KILLED 2026-07-28 by its pre-registered mechanism gate. The +9.09c/ct
+      fade headline was real arithmetic but not attributable to surprise: the
+      matched non-event placebo earned +19.19c, surprise dose-response was flat
+      or negative inside every predicted-edge stratum, and realised edge was
+      below the model's own predicted disagreement. P-018 has no demonstrated
+      reason to exist over the already-retired P-016. It remains INERT:
+      `enabled: false`, absent from pods.active and src/pods/, no register_pod,
+      engine, runner, or systemd unit.
     action_required: null
-    notes: >
-      Blocked on its own backtest, not on calendar. The replay harness
-      (inplay_research/backtest_inplay_fade.py) needs >=10 game-days of
-      book_capture in-play ticks; the data is alive and AHEAD of schedule
-      (27,307 genuine ticks over 80 games in 7 days) and the gate opens
-      ~2026-07-30.
-
-      THE CAVEAT THAT MUST SURVIVE INTO THE BACKTEST: coverage measured from
-      581 DISCOVERY records is 33.9% DROPPED, lowest-volume-first, so the
-      replay sample is biased toward LIQUID markets and any result overstates
-      what is achievable across the full book. The rate cannot be raised —
-      128 cumulative 429s, 48 in the last 24h, the daemon self-throttling to
-      0.6-1.2 req/s. The limiter is the exchange, not the config.
-
-      Spec gate #1 (research/SPEC_P018_InPlay_Fade_Maker.md §8): the pod does
-      not ship unless the surprise-bucket table is NOT flat. Write the
-      decision rule BEFORE running the backtest — P-014 is the live example of
-      what it costs to reach a gate without one.
+    retired:
+      decided: 2026-07-28
+      verdict: KILL
+      rule_document: research/P018_DECISION_RULE.md
+      gate_preregistration: research/P018_GATE1_REDESIGN.md
+      report: research/REPORT_P018_Gate1_2026-07-28.md
+      rationale: >
+        Gate 1R-A killed because the identical non-event placebo earned 211%
+        of the surprise arm and the game-clustered intervals overlapped. Gate
+        1R-C independently killed because surprise dose-response was flat or
+        negative in every predicted-edge stratum. Gate 1R-B could not kill but
+        pointed the same way: realised +9.09c versus model-predicted +12.34c,
+        residual -3.25c. The locked rule says a Gate #1 KILL is final at any T
+        and z cannot rescue it. Do not re-parameterise or rerun this mechanism.
+      surviving_question: >
+        Whether src/mlb_win_prob beats the contemporaneous Kalshi mid out of
+        sample is a separate calibration hypothesis, not a P-018 revival. It
+        needs a new opportunity/spec if pursued.
+    gate:
+      status: CLOSED
+      resolved_on: 2026-07-28
+      verdict: KILL
+      question: Is positive fade P&L attributable to surprising game events?
+      metric: surprise_mechanism_gate
+      threshold: 20
+      final_progress: 91
+      rule_document: research/P018_DECISION_RULE.md
+      resolved_by: >
+        Pre-registered Gate 1R-A and 1R-C both returned KILL. See
+        research/REPORT_P018_Gate1_2026-07-28.md.
 
   # ---------------------------------------------------------------------------
   # DISABLED / KILLED

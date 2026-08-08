@@ -129,6 +129,39 @@ def _source_text(assignment: Mapping[str, Any],
     ).lower()
 
 
+def normalize_legacy_regulatory_assignment(
+    assignment: Mapping[str, Any], source_item: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Promote a filing description into a legacy assignment's display title.
+
+    Older CFTC batches used the organization code as the title even when the
+    filing table carried a mechanism-bearing ``Filing Description``. Preserve
+    the source item byte-for-byte (and therefore its original content hash),
+    but give newly generated dispatch packets the useful title emitted by the
+    fixed collector.
+    """
+    normalized = dict(assignment)
+    source_type = str(
+        assignment.get("source_type") or source_item.get("source_type") or "")
+    if source_type != "regulatory_filing":
+        return normalized
+    metadata = source_item.get("metadata") or {}
+    description = str(
+        metadata.get("Filing Description")
+        or metadata.get("Product Name")
+        or metadata.get("Description")
+        or "").strip()
+    title = str(assignment.get("title") or source_item.get("title") or "").strip()
+    organization = str(metadata.get("Organization") or "").strip()
+    opaque = bool(
+        title and (
+            (organization and title.casefold() == organization.casefold())
+            or (" " not in title and re.fullmatch(r"[A-Z0-9_-]+", title))))
+    if description and opaque and description.casefold() != title.casefold():
+        normalized["title"] = description
+    return normalized
+
+
 def _mechanism_hits(text: str) -> List[str]:
     words = set(re.findall(r"[a-z0-9]+", text))
     return sorted(term for term in MECHANISM_TERMS
@@ -564,7 +597,9 @@ def triage_assignments(
         if not assignment_id or not assignment.get("source_item_id"):
             invalid += 1
             continue
-        by_id[assignment_id] = assignment
+        source_item = source_items.get(str(assignment.get("source_item_id"))) or {}
+        by_id[assignment_id] = normalize_legacy_regulatory_assignment(
+            assignment, source_item)
     current_titles = {assignment_id: title_tokens(row.get("title"))
                       for assignment_id, row in by_id.items()}
     feedback_profiles, feedback_summary = _feedback_profiles(

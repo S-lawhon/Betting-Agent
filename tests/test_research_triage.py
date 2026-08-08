@@ -178,6 +178,30 @@ class TestResearchTriage(TestCase):
             manifest["readiness_blocked_assignment_ids"]["a1"],
             "event_listing_without_mechanism")
 
+    def test_legacy_regulatory_code_uses_filing_description_in_dispatch(self):
+        assignment = _assignment(
+            1, source="regulatory_filing", lane="market_structure",
+            score=93, title="ARST")
+        source = SourceItem.create(
+            source_type="regulatory_filing", source_name="CFTC",
+            external_id="filing-1", title="ARST", summary="ARST: ARST",
+            url="https://example.test/filing-1",
+            retrieved_at="2026-08-02T13:00:00Z",
+            metadata={
+                "Organization": "ARST",
+                "Filing Description": "Rule additions relevant to RFQ system.",
+                "Status": "Certified",
+            })
+        original_hash = source.content_hash
+        _, manifest, packets = triage_assignments(
+            [assignment], source_items_by_id={"s1": source.to_dict()}, now=NOW)
+        self.assertEqual(manifest["dispatched"], 1)
+        self.assertEqual(
+            packets[0].assignment["title"],
+            "Rule additions relevant to RFQ system.")
+        self.assertEqual(packets[0].source_item["title"], "ARST")
+        self.assertEqual(packets[0].source_item["content_hash"], original_hash)
+
     def test_triage_keeps_one_packet_per_research_family(self):
         first = _assignment(1, source="paper", lane="literature", score=80)
         second = _assignment(2, source="paper", lane="literature", score=70)

@@ -429,10 +429,15 @@ feedback loop.
 
 The queue controls were deployed on 2026-08-08. Their first live cycle saw 580
 assignments, dispatched zero while the queue was saturated, and quarantined 19
-weak legacy packets, leaving 39 pending. No model was invoked. The screened
-worker remains manual-only; a new execution window requires the passing
-calibration report, a freshly generated mechanism-bearing candidate, and an
-explicit human allocation decision.
+weak legacy packets, leaving 39 pending. A reviewed manual compaction then kept
+10 packets (strategy 4, literature 4, social 2) and moved 29 overflow packets
+to recoverable quarantine. The retained PGA round-leader packet was closed as
+duplicate work against the existing P-022 spec/integrity/validation chain,
+leaving nine pending. A next-UTC-day rehearsal selects the primary CFTC filing
+"Modifications to Equity Index Perp Style Futures Market Maker Program" after
+legacy title normalization. No model was invoked. The screened worker remains
+manual-only; its next execution requires that real scheduled packet and the
+existing explicit allocation decision.
 
 ## Current limitations
 

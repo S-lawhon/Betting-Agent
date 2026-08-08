@@ -381,6 +381,22 @@ the pilot manual-only if the output is missing, malformed, unsupported by
 public evidence, attempts a local command, exposes a secret, or advances
 strategy state.
 
+Audit that exact target after the run before pulling any result:
+
+```bash
+cd /opt/betting-pod-shop
+sudo -u bettingbot venv/bin/python -m \
+  scripts.audit_screened_research_pilot
+```
+
+The read-only audit returns `pass`, `safe_noop`, `pending`, or `fail`. `pass`
+requires a schema-valid disposition, completed claim, artifact, screening
+record, exact phase sequence, measured usage within each phase limit, no active
+target claim, no released claim, and a removed enable marker. `safe_noop` means
+the exact target was unavailable and the worker invoked no model. An `advance`
+disposition is only a warning for human review; the audit never promotes or
+changes strategy state.
+
 After any provider window, pull the schema-valid disposition JSON files from
 the VPS and commit them. `scripts/check_research_committed.sh` treats
 `research/dispositions/*.json` as protected work product; a summary report is

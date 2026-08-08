@@ -1289,6 +1289,7 @@ class Collector:
             "window_hours": window_hours,
             "repo": str(repo) if repo else None,
             "is_mirror": is_mirror,
+            "visibility": "pushed_refs_only" if is_mirror else "working_tree",
         }
         if not repo:
             result["note"] = ("no git repo available — clone the mirror to "

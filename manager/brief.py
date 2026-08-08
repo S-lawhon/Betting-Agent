@@ -285,6 +285,9 @@ def render_markdown(b: Dict[str, Any]) -> str:
                 when = (c.get("iso") or "")[:16].replace("T", " ")
                 L.append("- `{}` {} — {}".format(
                     c.get("hash"), when, c.get("subject")))
+        elif work.get("visibility") == "pushed_refs_only":
+            L.append("_No pushed commits are visible in the last {}h; "
+                     "local unpushed work is outside the mirror's view._".format(win))
         else:
             L.append("_Nothing committed in the last {}h._".format(win))
         areas = work.get("research_areas") or []
@@ -298,6 +301,9 @@ def render_markdown(b: Dict[str, Any]) -> str:
         if work.get("fetched") is False:
             L.append("")
             L.append("_(git mirror fetch failed — list may be stale)_")
+        elif work.get("visibility") == "pushed_refs_only" and commits:
+            L.append("")
+            L.append("_(git mirror view: pushed refs only)_")
     L.append("")
 
     research = b.get("research") or {}
@@ -689,6 +695,10 @@ def render_html(b: Dict[str, Any]) -> str:
                          .format(e(str(c.get("hash"))), e(when),
                                  e(str(c.get("subject")))))
             P.append("</ul>")
+        elif work.get("visibility") == "pushed_refs_only":
+            P.append("<div class='dim'>No pushed commits are visible in the last "
+                     "{}h; local unpushed work is outside the mirror's view.</div>"
+                     .format(win))
         else:
             P.append("<div class='dim'>Nothing committed in the last {}h.</div>"
                      .format(win))
@@ -702,6 +712,8 @@ def render_html(b: Dict[str, Any]) -> str:
                      .format(unc, "s" if unc != 1 else ""))
         if work.get("fetched") is False:
             P.append("<div class='dim'>(git mirror fetch failed — list may be stale)</div>")
+        elif work.get("visibility") == "pushed_refs_only" and commits:
+            P.append("<div class='dim'>(git mirror view: pushed refs only)</div>")
 
     research = b.get("research") or {}
     P.append("<h2>Research operations</h2>")

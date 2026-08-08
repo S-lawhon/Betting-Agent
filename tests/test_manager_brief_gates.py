@@ -372,3 +372,19 @@ def test_daily_brief_labels_subscription_usage_without_implying_api_spend():
         assert "configured (chatgpt_subscription)" in text
         assert "1 of 1 daily attempts" in text
         assert "$0 incremental API cost" in text
+
+
+def test_daily_brief_does_not_call_an_empty_mirror_no_work():
+    built = brief.build({"work_today": {
+        "available": True,
+        "window_hours": 24,
+        "visibility": "pushed_refs_only",
+        "fetched": True,
+        "commits": [],
+        "commit_count": 0,
+    }}, [])
+
+    for text in (brief.render_markdown(built), brief.render_html(built)):
+        assert "No pushed commits are visible" in text
+        assert "local unpushed work is outside the mirror's view" in text
+        assert "Nothing committed" not in text

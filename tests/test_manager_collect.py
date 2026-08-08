@@ -547,6 +547,7 @@ def test_work_today_fetch_failure_reports_stale_but_readable_mirror(
 
     assert result["available"] is True
     assert result["is_mirror"] is True
+    assert result["visibility"] == "pushed_refs_only"
     assert result["fetched"] is False
     assert result["fetch_error"] == "network unavailable"
     assert result["commit_count"] == 1

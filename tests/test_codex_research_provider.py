@@ -176,17 +176,22 @@ def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():
     service = Path(
         "scripts/systemd/research-agent-codex-pilot.service").read_text()
     config = Path(
-        "config/research_agent_runtime_codex_pilot.yaml").read_text()
+        "config/research_agent_runtime_screened_pilot.yaml").read_text()
     timers = list(Path("scripts/systemd").glob("research-agent-codex-pilot.timer"))
 
     assert not timers
     assert "ConditionPathExists=/var/lib/research-codex/pilot-enabled" in service
     assert "ConditionPathExists=/var/lib/research-codex/auth.json" in service
     assert "--execute" in service
+    assert "research_agent_runtime_screened_pilot.yaml" in service
     assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in service
     assert "InaccessiblePaths=-/opt/betting-pod-shop/.env" in service
     assert "InaccessiblePaths=-/opt/betting-pod-shop/kalshi_private_key.pem" in service
-    assert "max_attempts_per_day: 1" in config
+    assert "target_assignment_id: assignment_44c86b342e8ac95d8f67" in config
+    assert "max_attempts_per_day: 2" in config
+    assert "screening:\n  enabled: true" in config
+    assert "--disable-search" in config
+    assert "--reasoning-effort\n      - low" in config
     assert "billing_mode: chatgpt_subscription" in config
     assert "KALSHI" not in config
     assert "PROPHETX" not in config
@@ -217,6 +222,7 @@ def test_codex_pilot_setup_keeps_each_run_explicit_and_self_disabling():
     script = Path("scripts/setup_codex_research_pilot.sh").read_text()
 
     assert "ACTION=${1:-check}" in script
+    assert "research_agent_runtime_screened_pilot.yaml" in script
     assert '[[ -f "$STATE/auth.json" ]]' in script
     assert 'install -o bettingbot -g bettingbot -m 0600 /dev/null "$STATE/pilot-enabled"' in script
     assert script.count('rm -f "$STATE/pilot-enabled"') == 2

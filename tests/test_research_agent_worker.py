@@ -140,6 +140,38 @@ def test_dry_run_plans_without_claiming_or_invoking(tmp_path):
     assert "request_sha256" in status_text
 
 
+def test_dry_run_targets_exact_assignment_instead_of_higher_score(tmp_path):
+    provider = FakeProvider()
+    runtime = worker(tmp_path, provider)
+    dispatches = tmp_path / "data/research_triage/dispatches/strategy-scout"
+    (dispatches / "a2.json").write_text(json.dumps({
+        "id": "d2", "assignment_id": "a2", "source_item_id": "s2",
+        "assigned_agent": "strategy-scout", "priority": "high",
+        "triage_score": 99, "research_budget_minutes": 30,
+        "created_at": "2026-08-03T11:00:00Z",
+        "source_item": {"title": "higher-scored packet"},
+    }), encoding="utf-8")
+
+    result = runtime.run_once(assignment_id="a1")
+
+    assert result["status"] == "dry_run"
+    assert result["assignment_id"] == "a1"
+    assert provider.calls == 0
+
+
+def test_targeted_worker_fails_closed_when_assignment_is_missing(tmp_path):
+    provider = FakeProvider()
+    runtime = worker(tmp_path, provider, execution_enabled=True)
+
+    result = runtime.run_once(execute=True, assignment_id="missing")
+
+    assert result["status"] == "blocked"
+    assert result["error"] == "target assignment is not available: missing"
+    assert provider.calls == 0
+    assert not list((
+        tmp_path / "data/research_execution/claims").glob("*/*.json"))
+
+
 def test_execute_requires_independent_runtime_gate_before_claim(tmp_path):
     runtime = worker(tmp_path, FakeProvider(), execution_enabled=False)
 

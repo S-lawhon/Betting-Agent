@@ -19,7 +19,7 @@ fail() {
 [[ -x /usr/local/bin/codex ]] || fail "/usr/local/bin/codex is not installed"
 [[ -x "$ROOT/venv/bin/python" ]] || fail "project virtualenv is unavailable"
 [[ -f "$ROOT/scripts/systemd/$UNIT" ]] || fail "pilot unit is unavailable"
-[[ -f "$ROOT/config/research_agent_runtime_codex_pilot.yaml" ]] || fail "pilot config is unavailable"
+[[ -f "$ROOT/config/research_agent_runtime_screened_pilot.yaml" ]] || fail "screened pilot config is unavailable"
 
 install_runtime() {
   install -d -o bettingbot -g bettingbot -m 0700 "$STATE" "$STATE/workspace"

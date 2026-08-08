@@ -67,6 +67,44 @@ def test_preview_is_read_only_and_uses_claim_availability(tmp_path):
     assert not state.exists()
 
 
+def test_preview_and_claim_can_target_an_exact_lower_priority_packet(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    state = tmp_path / "execution"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    packet(dispatches / "strategy-scout/a1.json", "a1", "medium", 10)
+    packet(dispatches / "strategy-scout/a2.json", "a2", "high", 99)
+
+    preview = preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, assignment_id="a1", now=NOW)
+    claim = claim_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="targeted-worker",
+        assignment_id="a1", now=NOW)
+
+    assert preview and preview[1]["assignment_id"] == "a1"
+    assert claim and claim.assignment_id == "a1"
+    assert not (state / "claims/strategy-scout/a2.json").exists()
+
+
+def test_targeted_claim_returns_none_when_exact_packet_is_unavailable(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    state = tmp_path / "execution"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    packet(dispatches / "strategy-scout/a1.json", "a1", "high", 99)
+
+    assert preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, assignment_id="missing", now=NOW) is None
+    assert claim_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="targeted-worker",
+        assignment_id="missing", now=NOW) is None
+    assert not (state / "claims").exists()
+
+
 def test_model_invocation_is_attached_once_to_active_claim(tmp_path):
     dispatches = tmp_path / "dispatches"
     state = tmp_path / "execution"

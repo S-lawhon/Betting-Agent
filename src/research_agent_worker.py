@@ -303,13 +303,19 @@ class ResearchAgentWorker:
                 and str(packet.get("assigned_agent") or "") == "strategy-scout")
 
     def run_once(self, *, execute: bool = False,
+                 assignment_id: Optional[str] = None,
                  persist_status: bool = True) -> Dict[str, Any]:
         now = self._clock()
+        target_assignment_id = str(assignment_id or "").strip() or None
         candidate = preview_next(
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
-            dispositions_dir=self.dispositions_dir, now=now)
+            dispositions_dir=self.dispositions_dir,
+            assignment_id=target_assignment_id, now=now)
         if not candidate:
-            result = self._result("idle", now, plan=None)
+            result = self._result(
+                "blocked" if target_assignment_id else "idle", now, plan=None,
+                error=(f"target assignment is not available: "
+                       f"{target_assignment_id}" if target_assignment_id else None))
             return self._finish(result, persist_status)
         packet_path, packet = candidate
         try:
@@ -334,13 +340,17 @@ class ResearchAgentWorker:
         claim = claim_next(
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
             dispositions_dir=self.dispositions_dir, worker_id=self.worker_id,
+            assignment_id=target_assignment_id,
             now=now, lease_minutes=max(5, min(480,
                 (self.limits.timeout_seconds
                  + (self.screening_limits.timeout_seconds
                     if uses_screening else 0) + 299) // 60)))
         if not claim:
-            return self._finish(self._result("idle", now, plan=None),
-                                persist_status)
+            return self._finish(self._result(
+                "blocked" if target_assignment_id else "idle", now, plan=None,
+                error=(f"target assignment became unavailable: "
+                       f"{target_assignment_id}" if target_assignment_id else None)),
+                persist_status)
         claim_path = (self.state_dir / "claims" / claim.assigned_agent
                       / f"{claim.assignment_id}.json")
         budget = self._invocation_budget(packet)

@@ -46,6 +46,9 @@ def main(argv=None) -> int:
     parser.add_argument("--execute", action="store_true",
                         help="invoke the configured provider; requires two "
                              "additional config gates")
+    parser.add_argument(
+        "--assignment-id",
+        help="fail closed unless this exact pending assignment is available")
     parser.add_argument("--no-write-status", action="store_true",
                         help="preview without writing worker_status.json")
     args = parser.parse_args(argv)
@@ -102,8 +105,12 @@ def main(argv=None) -> int:
             screening_limits=screening_limits,
             screening_enabled=screening_enabled,
             allowed_agents=list(config.get("allowed_agents") or []))
+        target_assignment_id = (
+            str(args.assignment_id or config.get("target_assignment_id") or "").strip()
+            or None)
         result = worker.run_once(
-            execute=args.execute, persist_status=not args.no_write_status)
+            execute=args.execute, assignment_id=target_assignment_id,
+            persist_status=not args.no_write_status)
         print(json.dumps(result, indent=2, sort_keys=True))
         return 1 if result["status"] in {"blocked", "failed"} else 0
     except (OSError, TypeError, ValueError, ResearchWorkerError) as exc:

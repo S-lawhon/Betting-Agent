@@ -3,6 +3,11 @@ enabled: true
 mode: execute
 worker_id: research-codex-screened-pilot-v1
 
+# One-time fail-closed target. If intake does not dispatch this exact reviewed
+# CFTC filing after the next UTC allocation reset, the worker exits blocked and
+# invokes no provider.
+target_assignment_id: assignment_44c86b342e8ac95d8f67
+
 allowed_agents:
   - strategy-scout
 

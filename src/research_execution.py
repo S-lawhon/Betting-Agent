@@ -142,12 +142,17 @@ def _expire_stale_claims(state_dir: Path, now: datetime) -> List[str]:
     return expired
 
 
-def _ranked_packets(dispatches_dir: Path, agent: Optional[str]) -> List[Tuple[Path, Dict[str, Any]]]:
+def _ranked_packets(
+    dispatches_dir: Path, agent: Optional[str],
+    assignment_id: Optional[str] = None,
+) -> List[Tuple[Path, Dict[str, Any]]]:
     pattern = "{}/*.json".format(agent) if agent else "*/*.json"
     packets: List[Tuple[Path, Dict[str, Any]]] = []
     for path in sorted(dispatches_dir.glob(pattern)):
         payload = _read_json(path)
-        if payload.get("assignment_id") and payload.get("assigned_agent"):
+        if (payload.get("assignment_id") and payload.get("assigned_agent")
+                and (not assignment_id
+                     or str(payload.get("assignment_id")) == assignment_id)):
             packets.append((path, payload))
     packets.sort(key=lambda row: (
         PRIORITY_ORDER.get(str(row[1].get("priority") or ""), 9),
@@ -160,7 +165,8 @@ def _ranked_packets(dispatches_dir: Path, agent: Optional[str]) -> List[Tuple[Pa
 
 def preview_next(
     *, dispatches_dir: Path, state_dir: Path, dispositions_dir: Path,
-    agent: Optional[str] = None, now: Optional[datetime] = None,
+    agent: Optional[str] = None, assignment_id: Optional[str] = None,
+    now: Optional[datetime] = None,
 ) -> Optional[Tuple[Path, Dict[str, Any]]]:
     """Return the next available packet without mutating claim state.
 
@@ -178,9 +184,10 @@ def preview_next(
     for path in dispositions_dir.glob("*.json"):
         payload = _read_json(path)
         disposition_ids.add(str(payload.get("assignment_id") or path.stem))
-    for packet_path, packet in _ranked_packets(dispatches_dir, agent):
-        assignment_id = str(packet["assignment_id"])
-        if assignment_id not in active_ids and assignment_id not in disposition_ids:
+    for packet_path, packet in _ranked_packets(
+            dispatches_dir, agent, assignment_id):
+        candidate_id = str(packet["assignment_id"])
+        if candidate_id not in active_ids and candidate_id not in disposition_ids:
             return packet_path, packet
     return None
 
@@ -192,6 +199,7 @@ def claim_next(
     dispositions_dir: Path,
     worker_id: str,
     agent: Optional[str] = None,
+    assignment_id: Optional[str] = None,
     now: Optional[datetime] = None,
     lease_minutes: int = 90,
 ) -> Optional[ResearchClaim]:
@@ -210,18 +218,19 @@ def claim_next(
         for path in dispositions_dir.glob("*.json"):
             payload = _read_json(path)
             disposition_ids.add(str(payload.get("assignment_id") or path.stem))
-        for packet_path, packet in _ranked_packets(dispatches_dir, agent):
-            assignment_id = str(packet["assignment_id"])
-            if assignment_id in active_ids or assignment_id in disposition_ids:
+        for packet_path, packet in _ranked_packets(
+                dispatches_dir, agent, assignment_id):
+            candidate_id = str(packet["assignment_id"])
+            if candidate_id in active_ids or candidate_id in disposition_ids:
                 continue
             assigned_agent = str(packet["assigned_agent"])
             claimed_at = _utc_iso(now)
             digest = hashlib.sha256(
-                "{}:{}:{}".format(assignment_id, worker_id, claimed_at).encode()
+                "{}:{}:{}".format(candidate_id, worker_id, claimed_at).encode()
             ).hexdigest()[:20]
             claim = ResearchClaim(
                 claim_id="claim_{}".format(digest),
-                assignment_id=assignment_id,
+                assignment_id=candidate_id,
                 source_item_id=str(packet.get("source_item_id") or ""),
                 dispatch_id=str(packet.get("id") or ""),
                 assigned_agent=assigned_agent,
@@ -234,12 +243,12 @@ def claim_next(
                     Path(".claude/agents") / "{}.md".format(assigned_agent)),
             )
             _write_atomic(
-                _claim_path(state_dir, assigned_agent, assignment_id),
+                _claim_path(state_dir, assigned_agent, candidate_id),
                 claim.to_dict())
             _append_event(state_dir, {
                 "event": "claim_started", "at": claimed_at,
                 "claim_id": claim.claim_id,
-                "assignment_id": assignment_id,
+                "assignment_id": candidate_id,
                 "worker_id": claim.worker_id,
                 "assigned_agent": assigned_agent,
                 "model_invocation_tracked": False,

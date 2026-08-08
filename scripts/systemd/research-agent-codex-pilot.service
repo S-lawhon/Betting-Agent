@@ -1,5 +1,5 @@
 [Unit]
-Description=Betting Pod Shop — one-assignment Codex Pro research pilot
+Description=Betting Pod Shop — exact-target screened Codex Pro research pilot
 After=network-online.target research-intake.service
 Wants=network-online.target
 ConditionPathExists=/var/lib/research-codex/pilot-enabled
@@ -12,7 +12,7 @@ Group=bettingbot
 WorkingDirectory=/opt/betting-pod-shop
 Environment=HOME=/var/lib/research-codex
 Environment=CODEX_HOME=/var/lib/research-codex
-ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_agent_worker --config /opt/betting-pod-shop/config/research_agent_runtime_codex_pilot.yaml --execute
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_agent_worker --config /opt/betting-pod-shop/config/research_agent_runtime_screened_pilot.yaml --execute
 
 StandardOutput=journal
 StandardError=journal
@@ -22,7 +22,7 @@ Nice=15
 IOSchedulingClass=idle
 MemoryMax=512M
 TasksMax=64
-TimeoutStartSec=660
+TimeoutStartSec=900
 
 # The model gets public network access and an empty workspace, but no betting
 # credential environment and no read access to the credential-bearing files.

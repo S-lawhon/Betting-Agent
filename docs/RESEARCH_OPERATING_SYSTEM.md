@@ -332,18 +332,20 @@ of provider selection, model budget, filesystem permissions, and tool access.
 Phase 2 adds a separate, manual-only `research-agent-codex-pilot.service`; it
 does not change or replace the hourly dry-run timer. The pilot uses saved
 ChatGPT authentication in `/var/lib/research-codex`, an empty Codex workspace,
-an ephemeral `codex exec` session, live public web search, a read-only Codex
-sandbox, and a strict JSON output schema. It permits only `strategy-scout` and
-one model attempt per UTC day. Subscription usage is measured in tokens and
+an ephemeral `codex exec` session, a read-only Codex sandbox, and strict JSON
+output schemas. It permits only `strategy-scout`. The current screened config
+allows one screening invocation plus one full-research invocation only when the
+screen returns `deep_research`. Subscription usage is measured in tokens and
 reported as zero incremental API dollars; zero dollars must not be interpreted
 as zero ChatGPT-plan usage.
 
 The unit cannot start unless both `auth.json` and an operator-created
-`pilot-enabled` marker exist. It has no timer. The service masks the repository,
-environment backups, Kalshi private key, and legacy tree from its mount
-namespace. The adapter rejects any run in which Codex attempts a local command;
-only public web-search activity is admitted. Keep the Phase 1 service installed
-as the default until a human reviews the first durable artifact and disposition.
+`pilot-enabled` marker exist. It has no committed timer. The service masks the
+repository, environment backups, Kalshi private key, and legacy tree from its
+mount namespace. The adapter rejects any run in which Codex attempts a local
+command. Screening has web search disabled; a surviving full-research call may
+use public web search. Keep the Phase 1 service installed as the default until
+a human reviews the first durable artifact and disposition.
 
 Install and inspect the pilot from the DigitalOcean console:
 
@@ -363,18 +365,21 @@ sudo bash scripts/setup_codex_research_pilot.sh check
 ```
 
 The check reports only the auth file's owner and mode. Once authentication
-exists, run exactly one assignment:
+exists, run the configured exact-target assignment:
 
 ```bash
 sudo bash scripts/setup_codex_research_pilot.sh run-once
 ```
 
 `run-once` creates the enable marker immediately before starting the unit and
-removes it after either success or failure. A successful unit exit is not the
-acceptance gate: inspect the archived claim, the new `research/dispositions/`
-artifact, and the journal's measured token usage. Keep the pilot manual-only if
-the output is missing, malformed, unsupported by public evidence, attempts a
-local command, exposes a secret, or advances strategy state.
+removes it after either success or failure. The worker fails closed without a
+provider call if `target_assignment_id` is not available to the configured
+agent; it never substitutes the next-ranked packet. A successful unit exit is
+not the acceptance gate: inspect the archived claim, the new
+`research/dispositions/` artifact, and the journal's measured token usage. Keep
+the pilot manual-only if the output is missing, malformed, unsupported by
+public evidence, attempts a local command, exposes a secret, or advances
+strategy state.
 
 After any provider window, pull the schema-valid disposition JSON files from
 the VPS and commit them. `scripts/check_research_committed.sh` treats
@@ -384,7 +389,8 @@ not a substitute for the per-assignment completion records.
 ### Staged screening and calibration
 
 The next pilot uses `config/research_agent_runtime_screened_pilot.yaml`. It is
-still manual-only and strategy-scout-only. A schema-bound screening call is
+still manual-only, strategy-scout-only, and pinned to one reviewed assignment
+ID. A schema-bound screening call is
 limited to 25,000 input tokens, 1,000 output tokens, and three decisions:
 `reject`, `defer`, or `deep_research`. Screening has no `advance` value and its
 durable record explicitly carries `authorizes_advancement: false`.

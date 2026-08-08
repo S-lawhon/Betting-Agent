@@ -187,7 +187,9 @@ dedicated **read-only clone of the public repo**, which it `git fetch`es at the
 top of every cycle:
 
 ```bash
-git clone https://github.com/S-lawhon/Betting-Agent.git /opt/betting-agent-mirror
+install -d -o bettingbot -g bettingbot /opt/betting-agent-mirror
+runuser -u bettingbot -- git clone \
+  https://github.com/S-lawhon/Betting-Agent.git /opt/betting-agent-mirror
 ```
 
 `collect.py` auto-detects it (`MIRROR_PATH`, overridable via `MANAGER_GIT_REPO`);
@@ -195,8 +197,12 @@ on the Mac it reads the working tree in place instead. Only **pushed** commits
 appear — push your feature branches. The section spans all branches (`--all`),
 since `main` on GitHub often lags the branch work happens on. If the clone is
 missing the section renders "unavailable" rather than failing; recreate it after
-a droplet rebuild. It is separate from `/opt/betting-pod-shop` and untouched by
-deploy.
+a droplet rebuild. The clone must remain owned by `bettingbot`, the user that
+runs `manager-collect.service`; adding a root-owned clone to Git's
+`safe.directory` list is insufficient because the collector must also update
+its remote refs. `scripts/setup_manager_timers.sh` repairs this ownership when
+the manager units are reinstalled. The mirror is separate from
+`/opt/betting-pod-shop` and untouched by deploy.
 
 ## Maintaining the registry
 

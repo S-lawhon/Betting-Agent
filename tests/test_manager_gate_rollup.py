@@ -129,6 +129,7 @@ def test_rollup_unit_is_bounded_hourly_and_monitored():
     assert "Persistent=true" in timer
     assert "manager-gate-rollup.service" in installer
     assert "manager-gate-rollup.timer" in installer
+    assert "chown -R bettingbot:bettingbot '$MIRROR'" in installer
     assert installer.index("systemctl start manager-gate-rollup.service") < (
         installer.index("systemctl start manager-collect.service"))
 

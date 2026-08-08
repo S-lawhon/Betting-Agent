@@ -17,6 +17,7 @@ set -euo pipefail
 DROPLET="${DROPLET:-root@129.212.176.202}"
 KEY="${KEY:-$HOME/.ssh/betting_deploy}"
 APP="${APP:-/opt/betting-pod-shop}"
+MIRROR="${MIRROR:-/opt/betting-agent-mirror}"
 
 UNITS=(
   manager-collect.service
@@ -37,6 +38,9 @@ dssh "for u in ${UNITS[*]}; do test -f '$APP/scripts/systemd/'\"\$u\" || { echo 
 
 say "install units into /etc/systemd/system"
 dssh "for u in ${UNITS[*]}; do cp '$APP/scripts/systemd/'\"\$u\" '/etc/systemd/system/'\"\$u\"; done"
+
+say "repair manager git-mirror ownership"
+dssh "if test -d '$MIRROR/.git'; then chown -R bettingbot:bettingbot '$MIRROR'; fi"
 
 dssh "systemctl daemon-reload"
 

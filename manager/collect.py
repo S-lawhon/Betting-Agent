@@ -1319,6 +1319,10 @@ class Collector:
         log = git("log", "--all", "--no-merges", "--since", since,
                   "--date=iso-strict",
                   "--pretty=format:%h{0}%cI{0}%s{0}%an".format(sep))
+        if log.returncode != 0:
+            result["log_error"] = (log.stderr or "git log failed").strip()[-500:]
+            result["note"] = "git history is unavailable"
+            return result
         commits: List[Dict[str, Any]] = []
         seen = set()
         for line in (log.stdout or "").splitlines():
@@ -1336,6 +1340,10 @@ class Collector:
         # Research areas the committed work touched (authoritative on any host).
         names = git("log", "--all", "--no-merges", "--since", since,
                     "--name-only", "--pretty=format:")
+        if names.returncode != 0:
+            result["log_error"] = (names.stderr or "git name log failed").strip()[-500:]
+            result["note"] = "git history paths are unavailable"
+            return result
         areas = set()
         for path_line in (names.stdout or "").splitlines():
             top = path_line.strip().split("/", 1)[0]
@@ -1346,6 +1354,11 @@ class Collector:
         uncommitted = 0
         if not is_mirror:
             st = git("status", "--porcelain")
+            if st.returncode != 0:
+                result["status_error"] = (
+                    st.stderr or "git status failed").strip()[-500:]
+                result["note"] = "git working-tree status is unavailable"
+                return result
             for row in (st.stdout or "").splitlines():
                 top = row[3:].strip().split("/", 1)[0]
                 if top.endswith("_research") or top == "research":

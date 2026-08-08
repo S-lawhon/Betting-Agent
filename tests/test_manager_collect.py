@@ -499,6 +499,59 @@ def test_work_today_window_excludes_old_commits(tmp_path, monkeypatch):
     assert w["commit_count"] == 0, "a 2020 commit is not today's work"
 
 
+def test_work_today_git_log_failure_is_unavailable_not_empty(tmp_path, monkeypatch):
+    import subprocess
+    project = tmp_path / "repo"
+    _init_repo(project)
+    (project / "a.txt").write_text("1", encoding="utf-8")
+    _commit(project, "visible only if git works")
+    reg = write_registry(tmp_path, str(project), str(project))
+    real_run = subprocess.run
+
+    def fail_log(cmd, *args, **kwargs):
+        if cmd[:3] == ["git", "-C", str(project)] and "log" in cmd:
+            return subprocess.CompletedProcess(
+                cmd, 128, stdout="", stderr="fatal: dubious ownership")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(collect.subprocess, "run", fail_log)
+    result = collect.Collector(
+        reg, root=project, local_root=project).work_today()
+
+    assert result["available"] is False
+    assert result["note"] == "git history is unavailable"
+    assert "dubious ownership" in result["log_error"]
+    assert "commit_count" not in result
+
+
+def test_work_today_fetch_failure_reports_stale_but_readable_mirror(
+        tmp_path, monkeypatch):
+    import subprocess
+    project = tmp_path / "repo"
+    _init_repo(project)
+    (project / "a.txt").write_text("1", encoding="utf-8")
+    _commit(project, "locally readable mirror commit")
+    reg = write_registry(tmp_path, str(project), str(project))
+    monkeypatch.setenv("MANAGER_GIT_REPO", str(project))
+    real_run = subprocess.run
+
+    def fail_fetch(cmd, *args, **kwargs):
+        if cmd[:3] == ["git", "-C", str(project)] and "fetch" in cmd:
+            return subprocess.CompletedProcess(
+                cmd, 1, stdout="", stderr="network unavailable")
+        return real_run(cmd, *args, **kwargs)
+
+    monkeypatch.setattr(collect.subprocess, "run", fail_fetch)
+    result = collect.Collector(
+        reg, root=tmp_path / "plain", local_root=tmp_path / "plain").work_today()
+
+    assert result["available"] is True
+    assert result["is_mirror"] is True
+    assert result["fetched"] is False
+    assert result["fetch_error"] == "network unavailable"
+    assert result["commit_count"] == 1
+
+
 def test_work_today_without_git_is_unavailable_not_a_crash(tmp_path, monkeypatch):
     monkeypatch.setattr(collect, "MIRROR_PATH", tmp_path / "no-mirror")
     monkeypatch.delenv("MANAGER_GIT_REPO", raising=False)

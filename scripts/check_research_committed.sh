@@ -24,6 +24,15 @@ PATTERNS=(
   '*_research/REPORT*.md'
   '*_research/**/*_params.json'
   '*_research/*_params.json'
+  # Model/human research runs write these outside a *_research directory.
+  # They are the durable completion signal for the dispatch funnel and must
+  # not live only on the VPS.
+  'research/dispositions/*.json'
+  'research/dispositions/**/*.json'
+  # Calibration is itself a research gate. Its durable report and any compact
+  # committed result artifact must not disappear inside ignored data/ output.
+  'research/calibration/REPORT*.md'
+  'research/calibration/*.json'
 )
 
 fail=0

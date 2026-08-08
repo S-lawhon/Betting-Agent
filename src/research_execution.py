@@ -336,6 +336,64 @@ def mark_claim_invoked(
         return payload
 
 
+def mark_claim_phase_invoked(
+    *, claim_path: Path, state_dir: Path, provider: str, model: str,
+    budget: Mapping[str, Any], phase: str,
+    now: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """Record one named invocation phase on an active claim.
+
+    This is the multi-stage counterpart to :func:`mark_claim_invoked`.  Named
+    phases may each be recorded once, making screening and deep-research calls
+    independently auditable without weakening the legacy single-call guard.
+    """
+    if not provider.strip() or not model.strip() or not phase.strip():
+        raise ResearchExecutionError("provider, model, and phase are required")
+    now = now or datetime.now(timezone.utc)
+    with _state_lock(state_dir):
+        payload = _read_json(claim_path)
+        if not payload:
+            raise ResearchExecutionError("active claim does not exist")
+        expires = _parse_time(payload.get("lease_expires_at"))
+        if not expires or expires <= now:
+            raise ResearchExecutionError("claim lease has expired")
+        invocations = list(payload.get("model_invocations") or [])
+        if any(str(item.get("phase") or "") == phase.strip()
+               for item in invocations if isinstance(item, Mapping)):
+            raise ResearchExecutionError(
+                f"claim invocation phase is already recorded: {phase.strip()}")
+        invocation = {
+            "phase": phase.strip(), "invoked_at": _utc_iso(now),
+            "provider": provider.strip(), "model": model.strip(),
+            "budget": dict(budget),
+        }
+        invocations.append(invocation)
+        payload["model_invocations"] = invocations
+        payload["model_invocation_tracked"] = True
+        # Preserve the legacy first-invocation fields consumed by metrics and
+        # old operational tooling.
+        if not payload.get("invoked_at"):
+            payload.update({
+                "invoked_at": invocation["invoked_at"],
+                "provider": invocation["provider"],
+                "model": invocation["model"],
+                "invocation_budget": invocation["budget"],
+            })
+        _write_atomic(claim_path, payload)
+        _append_event(state_dir, {
+            "event": "model_invoked", "at": invocation["invoked_at"],
+            "claim_id": payload.get("claim_id"),
+            "assignment_id": payload.get("assignment_id"),
+            "worker_id": payload.get("worker_id"),
+            "assigned_agent": payload.get("assigned_agent"),
+            "phase": invocation["phase"],
+            "provider": invocation["provider"],
+            "model": invocation["model"],
+            "budget": invocation["budget"],
+        })
+        return payload
+
+
 def release_claim(
     *, claim_path: Path, state_dir: Path, reason: str,
     now: Optional[datetime] = None,

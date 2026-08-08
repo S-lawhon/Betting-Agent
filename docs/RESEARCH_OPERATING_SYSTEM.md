@@ -60,12 +60,14 @@ Kalshi census. The collector is intentionally not a low-latency trading feed.
 ### X cost and data controls
 
 X uses a two-key opt-in in `config/research_sources.yaml` and at runtime. The
-approved pilot runs once daily:
+first pilot is paused after producing 17 assignments with zero reviews and zero
+advances. A second pilot requires an explicit allocation decision and review
+capacity for the existing social-scout queue:
 
 1. Keep the X-side monthly hard limit at $50 with auto-recharge disabled.
 2. Set `X_BEARER_TOKEN` in the root `.env` for local runs, or in the VPS-only
    `/opt/betting-pod-shop/.env.x`; never commit the token.
-3. Keep `collectors.x.enabled: true` and pass `--include-x`.
+3. Set `collectors.x.enabled: true` and pass `--include-x` only for an approved window.
 4. Start with the three configured queries and inspect source yield.
 
 The application allows one run per UTC day, warns at a conservative estimated
@@ -102,6 +104,23 @@ Triage preserves at least one candidate per available lane before score-based
 filling, caps lane concentration, and limits all retries combined to 10 packets
 and 300 allocated research minutes per UTC day. It never treats its priors as edge evidence.
 It creates tasks only: no agent is invoked and no strategy state changes.
+
+The operational configuration adds queue backpressure on top of those library
+ceilings. New dispatch creation stops at 10 pending packets, at four pending
+packets for any one specialist, and at one new packet per scheduled run. The
+daily production allocation is one packet / 45 research minutes, matching the
+most recently authorized execution capacity instead of manufacturing a
+ten-to-one backlog. Raising these limits is an allocation decision, not a
+harmless cadence change.
+
+Before scoring, triage rejects raw event inventory that names no mechanism and
+organization/product listings that contain no mechanism-bearing description.
+It also keeps only the highest-ranked representative of a research family.
+Prior dispositions contribute one deliberately small, five-observation-shrunk
+score component: advances score positively, supported falsifications remain
+productive, and rejections caused by missing mechanism/data/executability count
+against the source lane. This feedback cannot turn an unknown edge or capacity
+field into evidence.
 
 ### `ResearchClaim`
 
@@ -202,6 +221,8 @@ Outputs under `data/research_execution/`:
 - `claim_released/<agent>/`: explicitly returned work;
 - `claim_expired/<agent>/`: stale attempts recovered for retry;
 - `events.jsonl`: append-only start, completion, release, and expiry events.
+- `screenings/<agent>/`: durable, non-promoting first-stage decisions;
+- `runs/<UTC date>/`: aggregate usage plus one row per named invocation phase.
 
 Partial source failures are recorded in `collector_errors`. Prior state is
 written atomically. The scheduled unit fails only when collectors report errors
@@ -259,9 +280,9 @@ Validated and paper/live outcomes should eventually be joined back to
 contract used by both the dashboard and daily email: 24-hour dispatch/review
 activity, per-agent pending, in-progress, and overdue queues, oldest task age,
 and explicit execution semantics. A dispatch is task creation only. A claim is
-the dedicated start event. Model invocation remains untracked until a provider
-adapter emits that separate fact, while a newer durable disposition is the
-completion signal.
+the dedicated start event. Each provider call is recorded on the claim as a
+named invocation phase, while a newer durable disposition is the completion
+signal.
 
 Maintain a 15–20% exploration floor even after source metrics accumulate. A
 small early sample must not permanently starve new sources or market families.
@@ -337,6 +358,61 @@ artifact, and the journal's measured token usage. Keep the pilot manual-only if
 the output is missing, malformed, unsupported by public evidence, attempts a
 local command, exposes a secret, or advances strategy state.
 
+After any provider window, pull the schema-valid disposition JSON files from
+the VPS and commit them. `scripts/check_research_committed.sh` treats
+`research/dispositions/*.json` as protected work product; a summary report is
+not a substitute for the per-assignment completion records.
+
+### Staged screening and calibration
+
+The next pilot uses `config/research_agent_runtime_screened_pilot.yaml`. It is
+still manual-only and strategy-scout-only. A schema-bound screening call is
+limited to 25,000 input tokens, 1,000 output tokens, and three decisions:
+`reject`, `defer`, or `deep_research`. Screening has no `advance` value and its
+durable record explicitly carries `authorizes_advancement: false`.
+
+A reject or defer completes the assignment after one invocation. Only
+`deep_research` may make the full research call. The claim ledger records the
+phases independently, run usage is their measured sum, and the worker reserves
+two attempts and both worst-case cost ceilings before claiming a screened
+assignment. The full stage remains responsible for any OpportunityCard and
+cannot bypass the existing disposition/artifact validation.
+
+Before another queue pilot, emit the blinded three-case suite:
+
+```bash
+python3 scripts/run_research_calibration.py > /tmp/research-calibration.json
+```
+
+The emitted cases omit expected labels. Completed results use an
+`observations` array and are graded with:
+
+```bash
+python3 scripts/run_research_calibration.py \
+  --results /path/to/calibration-observations.json
+```
+
+The cases are: a real settlement mechanism that should survive screening
+(P-022), a directly falsified defense that should be rejected cheaply (P-016),
+and a new unresolved maker-incentive filing that must either name a decisive
+test or a dated evidence dependency. Acceptance requires all three cases,
+25,000 or fewer screening input tokens per case, no deep call after reject or
+defer, the known-answer labels, schema-valid durable dispositions, and zero
+screening-stage advancement. The unresolved case is judged on evidence
+discipline, not on whether it predicts an edge.
+
+The original 12,000-token screen ceiling was rejected by calibration rather
+than silently loosened: with web search disabled and reasoning set to low, all
+three real provider calls converged at 20,589–20,638 input tokens. The 25,000
+ceiling gives roughly 21% operational headroom while remaining materially below
+the first pilot's 36,868–202,807-token full-research calls. Deferred screens
+must supply an ISO-8601 UTC `recheck_after`; a prose condition is not a dated
+feedback loop.
+
+This implementation is code-complete but not deployed and has not been pointed
+at the live research queue. A new execution window requires a passing
+calibration report and an explicit human allocation decision.
+
 ## Current limitations
 
 - The CFTC collector parses official filing tables; a site markup change will
@@ -347,8 +423,9 @@ local command, exposes a secret, or advances strategy state.
 - ProphetX remains read-only. Sandbox authentication and response shapes are
   reconciled; production credentials, production-shape validation, and tax
   Gate 0 remain blockers to a production evidence run.
-- The bounded X pilot is enabled with application and X-side budget controls;
-  the runtime credential remains VPS-only and uncommitted.
+- The bounded X pilot is paused after its first measured window; application
+  and X-side budget controls remain in place and the runtime credential remains
+  VPS-only and uncommitted.
 - No repository daemon invokes the model-driven agents automatically. The
   claim/completion lifecycle is ready, but live model execution remains
   fail-closed until a headless runtime and explicit API budget are provisioned.

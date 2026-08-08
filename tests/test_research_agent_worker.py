@@ -14,6 +14,8 @@ from src.research_agent_worker import (
     ProviderUsage,
     ResearchAgentWorker,
     ResearchWorkerError,
+    ScreeningDecision,
+    ScreeningLimits,
     WorkerLimits,
 )
 
@@ -71,14 +73,53 @@ class FakeProvider:
 
 
 def worker(root: Path, provider=None, *, execution_enabled=False,
-           limits=None) -> ResearchAgentWorker:
+           limits=None, screening_provider=None,
+           screening_enabled=False) -> ResearchAgentWorker:
     dispatches, state, dispositions = setup_packet(root)
     return ResearchAgentWorker(
         root=root, dispatches_dir=dispatches, state_dir=state,
         dispositions_dir=dispositions, worker_id="test-worker",
         limits=limits or WorkerLimits(timeout_seconds=60),
         provider=provider, execution_enabled=execution_enabled,
+        screening_provider=screening_provider,
+        screening_limits=ScreeningLimits(timeout_seconds=30),
+        screening_enabled=screening_enabled,
         clock=lambda: NOW)
+
+
+class FakeScreeningProvider:
+    name = "fake-screen"
+    model = "screen-model"
+
+    def __init__(self, decision="reject"):
+        self.calls = 0
+        self.decision = decision
+
+    def invoke(self, request, *, timeout_seconds):
+        self.calls += 1
+        assert timeout_seconds == 30
+        assert request["output_contract"]["advance_allowed"] is False
+        return ProviderResult(self.name, self.model, {
+            "decision": self.decision,
+            "reason_codes": ["screened_reason"],
+            "evidence_checked": ["dispatch_packet"],
+            "research_minutes": 2,
+            "mechanism": (
+                "maker inventory is mispriced" if self.decision == "deep_research"
+                else ""),
+            "cheapest_decisive_test": (
+                "compare fee-net markout" if self.decision == "deep_research"
+                else ""),
+            "confidence": 0.8,
+            "recheck_after": None,
+            "notes": "bounded screen",
+        }, ProviderUsage(500, 100, .02))
+
+
+class FailingProvider(FakeProvider):
+    def invoke(self, request, *, timeout_seconds):
+        self.calls += 1
+        raise ResearchWorkerError("provider crashed before usage report")
 
 
 def test_dry_run_plans_without_claiming_or_invoking(tmp_path):
@@ -137,6 +178,93 @@ def test_valid_provider_result_completes_claim_and_records_usage(tmp_path):
     assert json.loads(artifacts[0].read_text())["safety"][
         "authorizes_execution"] is False
     assert result["daily_usage"]["cost_usd"] == pytest.approx(.08)
+
+
+def test_screening_rejection_completes_without_deep_research(tmp_path):
+    deep = FakeProvider()
+    screen = FakeScreeningProvider("reject")
+    runtime = worker(
+        tmp_path, deep, execution_enabled=True,
+        screening_provider=screen, screening_enabled=True)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "completed"
+    assert screen.calls == 1
+    assert deep.calls == 0
+    assert result["run"]["terminal_stage"] == "screening"
+    assert result["run"]["usage"] == {
+        "input_tokens": 500, "output_tokens": 100, "cost_usd": .02}
+    assert result["daily_usage"]["attempts"] == 1
+    disposition = json.loads(
+        (tmp_path / "research/dispositions/a1.json").read_text())
+    assert disposition["decision"] == "reject"
+    screening = json.loads((
+        tmp_path / "data/research_execution/screenings/strategy-scout/a1.json"
+    ).read_text())
+    assert screening["safety"]["authorizes_advancement"] is False
+
+
+def test_screening_survivor_invokes_deep_research_and_aggregates_usage(tmp_path):
+    deep = FakeProvider()
+    screen = FakeScreeningProvider("deep_research")
+    runtime = worker(
+        tmp_path, deep, execution_enabled=True,
+        screening_provider=screen, screening_enabled=True)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "completed"
+    assert screen.calls == deep.calls == 1
+    assert [item["phase"] for item in result["run"]["invocations"]] == [
+        "screening", "deep_research"]
+    assert result["run"]["usage"] == {
+        "input_tokens": 1700, "output_tokens": 400, "cost_usd": .1}
+    assert result["daily_usage"]["attempts"] == 2
+    archives = list((tmp_path / "data/research_execution/claim_archive"
+                     / "strategy-scout").glob("*.json"))
+    archived = json.loads(archives[0].read_text())
+    assert [item["phase"] for item in archived["model_invocations"]] == [
+        "screening", "deep_research"]
+
+
+def test_screening_reserves_two_daily_attempts_before_claim(tmp_path):
+    runtime = worker(
+        tmp_path, FakeProvider(), execution_enabled=True,
+        screening_provider=FakeScreeningProvider(), screening_enabled=True,
+        limits=WorkerLimits(timeout_seconds=60, max_attempts_per_day=1))
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "blocked"
+    assert "model-attempt limit" in result["error"]
+    assert not list((tmp_path / "data/research_execution/claims").glob("*/*.json"))
+
+
+def test_failed_deep_call_still_counts_as_an_attempt(tmp_path):
+    runtime = worker(
+        tmp_path, FailingProvider(), execution_enabled=True,
+        screening_provider=FakeScreeningProvider("deep_research"),
+        screening_enabled=True)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "failed"
+    assert result["daily_usage"]["attempts"] == 2
+    assert result["run"]["invocations"][1]["usage_measured"] is False
+
+
+def test_deferred_screen_requires_timezone_aware_iso_recheck():
+    with pytest.raises(ValueError, match="ISO-8601"):
+        ScreeningDecision(
+            decision="defer", reason_codes=["missing_terms"],
+            evidence_checked=["filing"], research_minutes=2,
+            recheck_after="after terms are published")
+    with pytest.raises(ValueError, match="timezone"):
+        ScreeningDecision(
+            decision="defer", reason_codes=["missing_terms"],
+            evidence_checked=["filing"], research_minutes=2,
+            recheck_after="2026-08-14T15:00:00")
 
 
 def test_budget_breach_releases_claim_and_never_completes(tmp_path):

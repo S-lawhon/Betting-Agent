@@ -136,3 +136,79 @@ class TestResearchTriage(TestCase):
         self.assertEqual(retry, [])
         self.assertEqual(retry_manifest["daily_totals"]["dispatches"], 1)
         self.assertEqual(retry_manifest["daily_remaining"]["minutes"], 0)
+
+    def test_backpressure_stops_dispatch_when_pending_queue_is_full(self):
+        pending = [{
+            "assignment_id": "old", "assigned_agent": "strategy-scout",
+        }]
+        _, manifest, packets = triage_assignments(
+            [_assignment(1)], pending_packets=pending, now=NOW,
+            max_pending_total=1, max_new_dispatches_per_run=1)
+        self.assertEqual(packets, [])
+        self.assertTrue(manifest["backpressure"]["saturated"])
+        self.assertEqual(manifest["backpressure"]["pending_before"], 1)
+
+    def test_backpressure_stops_one_agent_from_owning_the_queue(self):
+        pending = [{
+            "assignment_id": "old", "assigned_agent": "social-scout",
+        }]
+        _, manifest, packets = triage_assignments(
+            [_assignment(1)], pending_packets=pending, now=NOW,
+            max_pending_total=10, max_pending_per_agent=1)
+        self.assertEqual(packets, [])
+        self.assertEqual(
+            manifest["backpressure"]["agent_capacity_blocked_assignment_ids"],
+            ["a1"])
+
+    def test_market_listing_without_mechanism_is_not_dispatched(self):
+        assignment = _assignment(
+            1, source="venue_market", lane="information_latency",
+            title="Valparaiso vs. Belmont")
+        source = SourceItem.create(
+            source_type="venue_market", source_name="Venue",
+            external_id="game-1", title="Valparaiso vs. Belmont",
+            summary="Valparaiso vs. Belmont",
+            url="https://example.test/game-1",
+            retrieved_at="2026-08-02T13:00:00Z",
+            product_family="sports")
+        _, manifest, packets = triage_assignments(
+            [assignment], source_items_by_id={"s1": source.to_dict()}, now=NOW)
+        self.assertEqual(packets, [])
+        self.assertEqual(
+            manifest["readiness_blocked_assignment_ids"]["a1"],
+            "event_listing_without_mechanism")
+
+    def test_triage_keeps_one_packet_per_research_family(self):
+        first = _assignment(1, source="paper", lane="literature", score=80)
+        second = _assignment(2, source="paper", lane="literature", score=70)
+        first["assignment"]["market_family_key"] = "family:calibration"
+        second["assignment"]["market_family_key"] = "family:calibration"
+        _, manifest, packets = triage_assignments(
+            [first, second], now=NOW, lane_concentration_cap=1.0)
+        self.assertEqual([packet.assignment_id for packet in packets], ["a1"])
+        self.assertEqual(
+            manifest["family_duplicate_representatives"], {"a2": "a1"})
+
+    def test_prior_dispositions_penalize_low_context_sources(self):
+        good_history = _assignment(10, source="paper", lane="literature")
+        good_history["attribution_key"] = "Good"
+        bad_history = _assignment(11, source="paper", lane="literature")
+        bad_history["attribution_key"] = "Bad"
+        good = _assignment(1, source="paper", lane="literature", score=60)
+        good["attribution_key"] = "Good"
+        bad = _assignment(2, source="paper", lane="literature", score=60)
+        bad["attribution_key"] = "Bad"
+        dispositions = [
+            {"assignment_id": "a10", "decision": "advance",
+             "reason_codes": []},
+            {"assignment_id": "a11", "decision": "reject",
+             "reason_codes": ["no_specific_market_mechanism"]},
+        ]
+        _, _, packets = triage_assignments(
+            [good_history, bad_history, good, bad],
+            reviewed_assignment_ids={"a10", "a11"},
+            disposition_history=dispositions, now=NOW,
+            max_dispatches=1, lane_concentration_cap=1.0)
+        self.assertEqual([packet.assignment_id for packet in packets], ["a1"])
+        self.assertGreater(
+            packets[0].score_components["historical_yield"]["score"], 50)

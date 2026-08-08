@@ -24,7 +24,7 @@
       "additionalProperties": false
     },
     "artifact_type": {
-      "enum": ["opportunity_card", "scout_rejection"]
+      "enum": ["opportunity_card", "scout_rejection", "research_disposition"]
     },
     "artifact": {
       "anyOf": [
@@ -59,10 +59,36 @@
           },
           "required": ["reason_codes", "evidence_checked"],
           "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/researchDisposition"
         }
       ]
     }
   },
   "required": ["disposition", "artifact_type", "artifact"],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "researchDisposition": {
+      "type": "object",
+      "properties": {
+        "assignment_id": {"type": "string"},
+        "source_item_id": {"type": "string"},
+        "decided_at": {"type": "string"},
+        "decision": {"enum": ["reject", "defer", "advance"]},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "evidence_checked": {"type": "array", "items": {"type": "string"}},
+        "research_minutes": {"type": "integer", "minimum": 0},
+        "opportunity_id": {"type": ["string", "null"]},
+        "recheck_after": {"type": ["string", "null"]},
+        "notes": {"type": "string"}
+      },
+      "required": [
+        "assignment_id", "source_item_id", "decided_at", "decision",
+        "reason_codes", "evidence_checked", "research_minutes",
+        "opportunity_id", "recheck_after", "notes"
+      ],
+      "additionalProperties": false
+    }
+  }
 }

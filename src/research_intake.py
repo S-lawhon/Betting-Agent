@@ -299,8 +299,18 @@ def quality_rejection_reason(
         if status in TERMINAL_REGULATORY_STATUSES:
             return "terminal_regulatory_filing"
         title = item.title.strip()
+        description = str(
+            _first(
+                item.metadata,
+                "Filing Description",
+                "Product Name",
+                "Description",
+            )
+            or ""
+        ).strip()
         if (len(title) < 40 and " " not in title
-                and re.fullmatch(r"[A-Z0-9_-]+", title)):
+                and re.fullmatch(r"[A-Z0-9_-]+", title)
+                and (not description or description == title)):
             return "opaque_product_code"
     memory = _memory_match(item, memory_rules)
     if memory and str(memory.get("status") or "").lower() in {
@@ -673,8 +683,13 @@ class CFTCCollector:
                 values = {headers[i]: cell["text"] for i, cell in enumerate(cells)
                           if i < len(headers)}
                 links = [cell["href"] for cell in cells if cell.get("href")]
-                title = (_first(values, "Product Name", "Description", "Organization")
-                         or "CFTC filing")
+                # The CFTC rules table commonly puts only the venue code in
+                # ``Organization`` while the economically meaningful text is
+                # in ``Filing Description``.  Dispatching the code ("CFE",
+                # "MIAX") asks a model to invent a mechanism from no context.
+                title = (_first(
+                    values, "Filing Description", "Product Name",
+                    "Description", "Organization") or "CFTC filing")
                 organization = str(values.get("Organization") or "CFTC")
                 venue_id = self.VENUE_IDS.get(organization.upper())
                 published = _first(values, "Date", "Official Receipt Date", "Receipt Date")
@@ -685,7 +700,10 @@ class CFTCCollector:
                     external_id=url or _hash(values), title=str(title), url=url,
                     published_at=str(published) if published else None,
                     retrieved_at=retrieved_at,
-                    summary=f"{organization}: {title}",
+                    summary=(
+                        str(title) if str(title).startswith(f"{organization}:")
+                        else f"{organization}: {title}"
+                    ),
                     topics=[kind], venue_ids=[venue_id] if venue_id else [],
                     product_family=str(values.get("Category") or "*").lower(),
                     reliability="primary", metadata=values,

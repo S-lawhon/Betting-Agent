@@ -17,7 +17,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.research_outcomes import ResearchDisposition  # noqa: E402
 from src.research_intake import quality_rejection_from_mapping  # noqa: E402
-from src.research_triage import triage_assignments  # noqa: E402
+from src.research_triage import (  # noqa: E402
+    mechanism_readiness_rejection,
+    triage_assignments,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -75,11 +78,13 @@ def _reviewed_assignments(directory: Path, *, now: datetime) -> tuple:
     reviewed: Set[str] = set()
     due_deferrals: Set[str] = set()
     errors: List[Dict[str, str]] = []
+    records: List[ResearchDisposition] = []
     for path in sorted(directory.glob("*.json")):
         payload: Any = None
         try:
             payload = json.loads(path.read_text())
             record = ResearchDisposition.from_dict(payload)
+            records.append(record)
             if record.decision == "defer" and record.recheck_after:
                 if date.fromisoformat(record.recheck_after[:10]) <= now.date():
                     due_deferrals.add(record.assignment_id)
@@ -89,7 +94,19 @@ def _reviewed_assignments(directory: Path, *, now: datetime) -> tuple:
             errors.append({"path": str(path), "error": str(exc)})
             if isinstance(payload, dict) and payload.get("assignment_id"):
                 reviewed.add(str(payload["assignment_id"]))
-    return reviewed, due_deferrals, errors
+    return reviewed, due_deferrals, errors, records
+
+
+def _pending_dispatches(output_dir: Path) -> List[Dict[str, Any]]:
+    pending: List[Dict[str, Any]] = []
+    for path in sorted((output_dir / "dispatches").glob("*/*.json")):
+        try:
+            payload = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict) and payload.get("assignment_id"):
+            pending.append(payload)
+    return pending
 
 
 def _opportunity_assignments(path: Path) -> Set[str]:
@@ -145,6 +162,9 @@ def _quarantine_invalid_dispatches(
         reason = quality_rejection_from_mapping(
             source_item, now=now,
             memory_rules=memory_rules)
+        if not reason:
+            reason = mechanism_readiness_rejection(
+                payload.get("assignment") or {}, source_item)
         if not reason:
             continue
         assignment_id = str(payload.get("assignment_id") or path.stem)
@@ -241,8 +261,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     now = _parse_now(args.now)
     assignments = _load_assignments(args.assignments_dir)
     source_items = _load_source_items(args.source_batches_dir)
-    reviewed, due_deferrals, disposition_errors = _reviewed_assignments(
-        args.dispositions_dir, now=now)
+    reviewed, due_deferrals, disposition_errors, disposition_records = (
+        _reviewed_assignments(args.dispositions_dir, now=now)
+    )
     opportunities = _opportunity_assignments(args.strategy_registry)
     archived_completed = _archive_completed_dispatches(
         args.output_dir, reviewed | opportunities)
@@ -253,6 +274,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ledger_path = args.output_dir / "ledger.json"
     previous_ledger, reclaimed = _reconcile_quarantined_allocations(
         args.output_dir, _read_json(ledger_path, {}), now=now)
+    backpressure = config.get("backpressure") or {}
     ledger, manifest, packets = triage_assignments(
         assignments,
         source_items_by_id=source_items,
@@ -260,6 +282,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         reviewed_assignment_ids=reviewed,
         opportunity_assignment_ids=opportunities,
         redispatch_assignment_ids=due_deferrals,
+        disposition_history=[record.to_dict() for record in disposition_records],
+        pending_packets=_pending_dispatches(args.output_dir),
         memory_rules=memory_rules,
         now=now,
         max_dispatches=int(portfolio.get(
@@ -270,6 +294,15 @@ def main(argv: Optional[List[str]] = None) -> int:
                           portfolio.get("max_research_minutes_per_run", 300))),
         lane_concentration_cap=float(
             portfolio.get("lane_concentration_cap", 0.40)),
+        max_pending_total=(
+            int(backpressure["max_pending_total"])
+            if backpressure.get("max_pending_total") is not None else None),
+        max_pending_per_agent=(
+            int(backpressure["max_pending_per_agent"])
+            if backpressure.get("max_pending_per_agent") is not None else None),
+        max_new_dispatches_per_run=(
+            int(backpressure["max_new_dispatches_per_run"])
+            if backpressure.get("max_new_dispatches_per_run") is not None else None),
     )
     manifest["invalid_dispositions"] = disposition_errors
     manifest["dispatches_archived_completed"] = archived_completed

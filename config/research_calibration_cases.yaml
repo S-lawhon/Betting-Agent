@@ -1,0 +1,99 @@
+schema_version: 1
+suite_id: research_funnel_calibration_v1
+purpose: >-
+  Test whether the staged research path preserves a real mechanism, rejects a
+  falsified one cheaply, and handles a novel unresolved lead without inventing
+  evidence or promoting from the screening stage.
+
+cases:
+  - case_id: cal_001
+    assignment:
+      assignment_id: calibration_assignment_001
+      source_item_id: calibration_source_001
+      assigned_agent: strategy-scout
+      research_budget_minutes: 30
+      title: Maker pricing around pro-rata golf round-leader settlements
+      evidence:
+        - >-
+          Primary contract terms specify a pro-rata $1/n YES payout when
+          multiple golfers tie for the round lead.
+        - >-
+          Historical settlement records contain matching scalar payouts; all
+          relevant leader series are maker-fee-free.
+        - >-
+          Retrospective estimates are positive but the corrected
+          equal-tournament statistic is currently underpowered, so any later
+          promotion remains governed by a forward paper gate.
+      references:
+        - golf_quirks_research/P022_DECISION_RULE.md
+        - research/validation/strat_p022_fade_v2_validation_2026-08-02.json
+      task: >-
+        Decide whether a falsifiable economic mechanism survives cheaply enough
+        to justify full scout research. Do not decide live readiness.
+    oracle:
+      screening_decisions: [deep_research]
+      final_decisions: [advance]
+      rationale: >-
+        The settlement mechanic is real and testable, so it belongs in the
+        research factory even though its later validation/promotion gate may hold.
+
+  - case_id: cal_002
+    assignment:
+      assignment_id: calibration_assignment_002
+      source_item_id: calibration_source_002
+      assigned_agent: strategy-scout
+      research_budget_minutes: 30
+      title: Revive the market-anchored live MLB maker by suppressing state changes
+      evidence:
+        - >-
+          The original paper gate observed 814 fills and fee-adjusted five-minute
+          markout of -1.29 cents per contract, negative at every horizon.
+        - >-
+          A clean 672-fill, 20-game offline grid found the loss was diffuse:
+          62% of fills occurred more than 60 seconds from a state change and
+          still marked out at about -2.2 cents.
+        - No suppression or widening arm made markout non-negative.
+      references:
+        - research/POSTMORTEM_P016_2026-07-21.md
+        - research/P016_v2_offline_grid_2026-07-21.md
+      task: >-
+        Decide whether the stated state-change defense warrants more research.
+        Treat a materially different faster-than-market signal as a new thesis,
+        not as evidence for this one.
+    oracle:
+      screening_decisions: [reject]
+      final_decisions: [reject]
+      rationale: >-
+        The named mechanism has already been directly tested and falsified.
+
+  - case_id: cal_003
+    assignment:
+      assignment_id: calibration_assignment_003
+      source_item_id: calibration_source_003
+      assigned_agent: strategy-scout
+      research_budget_minutes: 30
+      title: Temporary maker subsidy on a newly filed prediction-market program
+      evidence:
+        - >-
+          A public regulatory filing describes a venue liquidity-incentive
+          program, but the eligible contracts, rebate schedule, queue rules,
+          launch date, and participant eligibility have not been verified.
+        - >-
+          The proposed mechanism is that a time-bounded maker rebate could turn
+          otherwise marginal passive quotes positive after fees and adverse
+          selection.
+        - No order-level data or executable fee schedule is supplied.
+      references:
+        - CFTC designated-contract-market and rule-filing pages
+      task: >-
+        Identify the cheapest decisive evidence request. Preserve the lead only
+        if the mechanism is concrete; do not infer an edge from the filing alone.
+        If deferred, provide an ISO-8601 UTC recheck timestamp rather than a
+        prose condition.
+    oracle:
+      screening_decisions: [defer, deep_research]
+      final_decisions: []
+      rationale: >-
+        This is intentionally unresolved. A defensible defer names the missing
+        terms and recheck date; deep research is also defensible if it starts
+        with the filing and fee schedule rather than assuming a subsidy edge.

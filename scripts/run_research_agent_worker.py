@@ -17,6 +17,7 @@ from src.research_agent_worker import (  # noqa: E402
     CommandProvider,
     ResearchAgentWorker,
     ResearchWorkerError,
+    ScreeningLimits,
     WorkerLimits,
 )
 
@@ -53,7 +54,12 @@ def main(argv=None) -> int:
         if not config.get("enabled"):
             raise ResearchWorkerError("research runtime is disabled in config")
         limits = WorkerLimits(**dict(config.get("limits") or {}))
+        screening_config = dict(config.get("screening") or {})
+        screening_enabled = bool(screening_config.get("enabled"))
+        screening_limits = ScreeningLimits(**dict(
+            screening_config.get("limits") or {}))
         provider = None
+        screening_provider = None
         execution_enabled = False
         provider_config = dict(config.get("provider") or {})
         if args.execute:
@@ -71,12 +77,30 @@ def main(argv=None) -> int:
                 pass_env=list(provider_config.get("pass_env") or []),
                 billing_mode=str(
                     provider_config.get("billing_mode") or "metered_api"))
+            if screening_enabled:
+                screen_provider_config = dict(
+                    screening_config.get("provider") or {})
+                if screen_provider_config.get("type") != "command":
+                    raise ResearchWorkerError(
+                        "screening execution requires provider.type=command")
+                screening_provider = CommandProvider(
+                    argv=list(screen_provider_config.get("argv") or []),
+                    name=str(screen_provider_config.get("name") or ""),
+                    model=str(screen_provider_config.get("model") or ""),
+                    cwd=args.root,
+                    pass_env=list(
+                        screen_provider_config.get("pass_env") or []),
+                    billing_mode=str(screen_provider_config.get(
+                        "billing_mode") or "metered_api"))
             execution_enabled = True
         worker = ResearchAgentWorker(
             root=args.root, dispatches_dir=args.dispatches_dir,
             state_dir=args.state_dir, dispositions_dir=args.dispositions_dir,
             worker_id=str(config.get("worker_id") or ""), limits=limits,
             provider=provider, execution_enabled=execution_enabled,
+            screening_provider=screening_provider,
+            screening_limits=screening_limits,
+            screening_enabled=screening_enabled,
             allowed_agents=list(config.get("allowed_agents") or []))
         result = worker.run_once(
             execute=args.execute, persist_status=not args.no_write_status)

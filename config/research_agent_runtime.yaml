@@ -29,6 +29,23 @@ provider:
   argv: []
   pass_env: []
 
+# The two-stage path is configured separately and remains off in the default
+# dry-run timer. When enabled, it applies only to strategy-scout packets.
+screening:
+  enabled: false
+  limits:
+    timeout_seconds: 180
+    max_input_tokens: 25000
+    max_output_tokens: 1000
+    max_cost_usd: 0.25
+    max_output_bytes: 32000
+  provider:
+    type: none
+    name: null
+    model: null
+    argv: []
+    pass_env: []
+
 safety:
   trading_execution_allowed: false
   queue_mutation_in_dry_run: false

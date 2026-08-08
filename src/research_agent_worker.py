@@ -25,6 +25,7 @@ from src.research_execution import (
     claim_next,
     complete_claim,
     mark_claim_invoked,
+    mark_claim_phase_invoked,
     preview_next,
     release_claim,
 )
@@ -37,7 +38,8 @@ SCHEMA_VERSION = 1
 ALLOWED_ARTIFACTS = {
     "literature-scout": {"research_disposition", "hypothesis_brief"},
     "social-scout": {"research_disposition", "hypothesis_brief"},
-    "strategy-scout": {"opportunity_card", "scout_rejection"},
+    "strategy-scout": {
+        "opportunity_card", "scout_rejection", "research_disposition"},
 }
 HYPOTHESIS_KEYS = {
     "title", "mechanism", "null_hypothesis", "decisive_test",
@@ -94,6 +96,81 @@ class WorkerLimits:
             raise ValueError("all worker limits must be positive")
         if self.max_cost_usd_per_task > self.max_cost_usd_per_day:
             raise ValueError("per-task cost cannot exceed daily cost")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ScreeningLimits:
+    timeout_seconds: int = 180
+    max_input_tokens: int = 25_000
+    max_output_tokens: int = 1_000
+    max_cost_usd: float = 0.25
+    max_output_bytes: int = 32_000
+
+    def __post_init__(self) -> None:
+        if any(value <= 0 for value in asdict(self).values()):
+            raise ValueError("all screening limits must be positive")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ScreeningDecision:
+    decision: str
+    reason_codes: list[str]
+    evidence_checked: list[str]
+    research_minutes: int
+    mechanism: str = ""
+    cheapest_decisive_test: str = ""
+    confidence: float = 0.0
+    recheck_after: Optional[str] = None
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        if self.decision not in {"reject", "defer", "deep_research"}:
+            raise ValueError(f"invalid screening decision: {self.decision}")
+        if not self.reason_codes or not self.evidence_checked:
+            raise ValueError("screening requires reasons and evidence checked")
+        if self.research_minutes < 0:
+            raise ValueError("screening research_minutes cannot be negative")
+        if not 0 <= self.confidence <= 1:
+            raise ValueError("screening confidence must be between 0 and 1")
+        if self.decision == "defer" and not self.recheck_after:
+            raise ValueError("defer screening requires recheck_after")
+        if self.decision == "defer":
+            try:
+                parsed = datetime.fromisoformat(
+                    str(self.recheck_after).replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError(
+                    "defer screening recheck_after must be ISO-8601") from exc
+            if parsed.tzinfo is None:
+                raise ValueError(
+                    "defer screening recheck_after must include a timezone")
+        if self.decision == "deep_research" and (
+                not self.mechanism or not self.cheapest_decisive_test):
+            raise ValueError(
+                "deep_research screening requires mechanism and decisive test")
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "ScreeningDecision":
+        return cls(
+            decision=str(payload["decision"]),
+            reason_codes=[str(value) for value in
+                          payload.get("reason_codes") or []],
+            evidence_checked=[str(value) for value in
+                              payload.get("evidence_checked") or []],
+            research_minutes=int(payload.get("research_minutes") or 0),
+            mechanism=str(payload.get("mechanism") or ""),
+            cheapest_decisive_test=str(
+                payload.get("cheapest_decisive_test") or ""),
+            confidence=float(payload.get("confidence") or 0),
+            recheck_after=payload.get("recheck_after"),
+            notes=str(payload.get("notes") or ""),
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -198,6 +275,9 @@ class ResearchAgentWorker:
         self, *, root: Path, dispatches_dir: Path, state_dir: Path,
         dispositions_dir: Path, worker_id: str, limits: WorkerLimits,
         provider: Optional[ResearchProvider] = None,
+        screening_provider: Optional[ResearchProvider] = None,
+        screening_limits: Optional[ScreeningLimits] = None,
+        screening_enabled: bool = False,
         execution_enabled: bool = False,
         allowed_agents: Sequence[str] = tuple(ALLOWED_ARTIFACTS),
         clock=None,
@@ -211,9 +291,16 @@ class ResearchAgentWorker:
         self.worker_id = worker_id.strip()
         self.limits = limits
         self.provider = provider
+        self.screening_provider = screening_provider
+        self.screening_limits = screening_limits or ScreeningLimits()
+        self.screening_enabled = bool(screening_enabled)
         self.execution_enabled = bool(execution_enabled)
         self.allowed_agents = tuple(allowed_agents)
         self._clock = clock or (lambda: datetime.now(UTC))
+
+    def _uses_screening(self, packet: Mapping[str, Any]) -> bool:
+        return (self.screening_enabled
+                and str(packet.get("assigned_agent") or "") == "strategy-scout")
 
     def run_once(self, *, execute: bool = False,
                  persist_status: bool = True) -> Dict[str, Any]:
@@ -239,12 +326,18 @@ class ResearchAgentWorker:
                 "execution requires runtime execution_enabled=true")
         if self.provider is None:
             raise ResearchWorkerError("execution requires a configured provider")
+        uses_screening = self._uses_screening(packet)
+        if uses_screening and self.screening_provider is None:
+            raise ResearchWorkerError(
+                "screening execution requires a configured screening provider")
 
         claim = claim_next(
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
             dispositions_dir=self.dispositions_dir, worker_id=self.worker_id,
             now=now, lease_minutes=max(5, min(480,
-                (self.limits.timeout_seconds + 299) // 60)))
+                (self.limits.timeout_seconds
+                 + (self.screening_limits.timeout_seconds
+                    if uses_screening else 0) + 299) // 60)))
         if not claim:
             return self._finish(self._result("idle", now, plan=None),
                                 persist_status)
@@ -258,17 +351,76 @@ class ResearchAgentWorker:
                 "greater than or equal to claimed_at"
             ),
         }
+        if uses_screening:
+            plan["screening_request"]["claim_context"] = {
+                "claimed_at": claim.claimed_at,
+            }
         started = time.monotonic()
         provider_result: Optional[ProviderResult] = None
         invocation_recorded = False
+        invocations: list[Dict[str, Any]] = []
         try:
-            mark_claim_invoked(
-                claim_path=claim_path, state_dir=self.state_dir,
-                provider=self.provider.name, model=self.provider.model,
-                budget=budget, now=now)
-            invocation_recorded = True
+            if uses_screening:
+                screen_budget = self._screening_budget()
+                assert self.screening_provider is not None
+                mark_claim_phase_invoked(
+                    claim_path=claim_path, state_dir=self.state_dir,
+                    provider=self.screening_provider.name,
+                    model=self.screening_provider.model,
+                    budget=screen_budget, phase="screening", now=now)
+                invocation_recorded = True
+                invocations.append(self._invocation_attempt(
+                    "screening", self.screening_provider))
+                screening_result = self.screening_provider.invoke(
+                    plan["screening_request"],
+                    timeout_seconds=self.screening_limits.timeout_seconds)
+                invocations[-1] = self._invocation_record(
+                    "screening", screening_result)
+                screening = self._validate_screening_result(
+                    screening_result, claim, packet)
+                self._write_screening(claim, screening, screening_result, now)
+                if screening.decision != "deep_research":
+                    disposition, artifact_type, artifact = (
+                        self._screening_completion(screening, claim))
+                    artifact_record = self._write_artifact(
+                        claim, artifact_type, artifact, screening_result, now)
+                    complete_claim(
+                        claim_path=claim_path,
+                        disposition_payload=disposition.to_dict(),
+                        state_dir=self.state_dir,
+                        dispositions_dir=self.dispositions_dir,
+                        now=self._clock())
+                    elapsed = time.monotonic() - started
+                    run = self._run_record(
+                        "completed", claim, screening_result, now, elapsed,
+                        artifact_record=artifact_record,
+                        model_invocation_tracked=True,
+                        invocations=invocations,
+                        terminal_stage="screening")
+                    self._write_run(run, now)
+                    return self._finish(self._result(
+                        "completed", self._clock(), plan=plan,
+                        claim=claim.to_dict(), run=run), persist_status)
+                mark_claim_phase_invoked(
+                    claim_path=claim_path, state_dir=self.state_dir,
+                    provider=self.provider.name, model=self.provider.model,
+                    budget=budget, phase="deep_research", now=self._clock())
+                plan["request"]["screening_context"] = screening.to_dict()
+                invocations.append(self._invocation_attempt(
+                    "deep_research", self.provider))
+            else:
+                mark_claim_invoked(
+                    claim_path=claim_path, state_dir=self.state_dir,
+                    provider=self.provider.name, model=self.provider.model,
+                    budget=budget, now=now)
+                invocation_recorded = True
+                invocations.append(self._invocation_attempt(
+                    "research", self.provider))
             provider_result = self.provider.invoke(
                 plan["request"], timeout_seconds=self.limits.timeout_seconds)
+            invocations[-1] = self._invocation_record(
+                "deep_research" if uses_screening else "research",
+                provider_result)
             elapsed = time.monotonic() - started
             disposition, artifact_type, artifact = self._validate_result(
                 provider_result, claim, packet)
@@ -282,7 +434,10 @@ class ResearchAgentWorker:
             run = self._run_record(
                 "completed", claim, provider_result, now, elapsed,
                 artifact_record=artifact_record,
-                model_invocation_tracked=invocation_recorded)
+                model_invocation_tracked=invocation_recorded,
+                invocations=invocations,
+                terminal_stage=("deep_research" if uses_screening
+                                else "research"))
             self._write_run(run, now)
             return self._finish(self._result(
                 "completed", self._clock(), plan=plan,
@@ -299,7 +454,8 @@ class ResearchAgentWorker:
                     pass
             run = self._run_record(
                 "failed", claim, provider_result, now, elapsed, error=str(exc),
-                model_invocation_tracked=invocation_recorded)
+                model_invocation_tracked=invocation_recorded,
+                invocations=invocations)
             self._write_run(run, now)
             return self._finish(self._result(
                 "failed", self._clock(), plan=plan,
@@ -316,11 +472,16 @@ class ResearchAgentWorker:
                 f"packet budget {minutes}m exceeds worker limit "
                 f"{self.limits.max_minutes_per_task}m")
         daily_usage = self._daily_usage(now)
-        if daily_usage["attempts"] >= self.limits.max_attempts_per_day:
+        uses_screening = self._uses_screening(packet)
+        reserved_attempts = 2 if uses_screening else 1
+        if (daily_usage["attempts"] + reserved_attempts
+                > self.limits.max_attempts_per_day):
             raise ResearchWorkerError(
-                "daily model-attempt limit has been reached")
+                "daily model-attempt limit: reservation would exceed it")
         spent = daily_usage["cost_usd"]
-        if spent + self.limits.max_cost_usd_per_task > self.limits.max_cost_usd_per_day:
+        reserved_cost = self.limits.max_cost_usd_per_task + (
+            self.screening_limits.max_cost_usd if uses_screening else 0)
+        if spent + reserved_cost > self.limits.max_cost_usd_per_day:
             raise ResearchWorkerError(
                 "daily cost reservation would exceed the hard limit")
         prompt_path = (self.root / ".claude" / "agents" / f"{agent}.md").resolve()
@@ -348,11 +509,18 @@ class ResearchAgentWorker:
                 "secrets_allowed_in_output": False,
             },
         }
-        return {
+        plan = {
             "packet_path": str(packet_path),
             "assignment_id": request["assignment_id"],
             "assigned_agent": agent,
             "provider_configured": self.provider is not None,
+            "screening_enabled": uses_screening,
+            "screening_provider_configured": (
+                self.screening_provider is not None if uses_screening else None),
+            "stages": (["screening", "deep_research"] if uses_screening
+                       else ["research"]),
+            "reserved_attempts": reserved_attempts,
+            "reserved_cost_usd": reserved_cost,
             "billing_mode": (
                 getattr(self.provider, "billing_mode", "metered_api")
                 if self.provider else "none"),
@@ -360,6 +528,34 @@ class ResearchAgentWorker:
             "daily_usage": self._daily_usage(now),
             "request": request,
         }
+        if uses_screening:
+            plan["screening_request"] = {
+                "schema_version": SCHEMA_VERSION,
+                "mode": "research_screening_only",
+                "assignment_id": request["assignment_id"],
+                "source_item_id": request["source_item_id"],
+                "assigned_agent": agent,
+                "dispatch_packet": dict(packet),
+                "screening_rules": [
+                    "Reject only when the mechanism is absent, duplicated, "
+                    "illegal, or falsified by the supplied/public evidence.",
+                    "Defer only when a named external fact and recheck time "
+                    "can resolve the uncertainty; recheck_after must be an "
+                    "ISO-8601 UTC timestamp.",
+                    "Use only supplied evidence in screening; do not browse.",
+                    "Choose deep_research only with a concrete market "
+                    "mechanism and a cheapest decisive test.",
+                    "This phase cannot advance or create an opportunity card.",
+                ],
+                "output_contract": {
+                    "schema": "config/research_screen_output.schema.json",
+                    "decisions": ["reject", "defer", "deep_research"],
+                    "advance_allowed": False,
+                },
+                "budget": self._screening_budget(),
+                "safety": dict(request["safety"]),
+            }
+        return plan
 
     def _invocation_budget(self, packet: Mapping[str, Any]) -> Dict[str, Any]:
         return {
@@ -371,6 +567,105 @@ class ResearchAgentWorker:
             "max_output_tokens": self.limits.max_output_tokens_per_task,
             "max_cost_usd": self.limits.max_cost_usd_per_task,
         }
+
+    def _screening_budget(self) -> Dict[str, Any]:
+        return self.screening_limits.to_dict()
+
+    @staticmethod
+    def _invocation_record(phase: str, result: ProviderResult) -> Dict[str, Any]:
+        return {
+            "phase": phase, "provider": result.provider,
+            "model": result.model, "usage": result.usage.to_dict(),
+            "usage_measured": True,
+        }
+
+    @staticmethod
+    def _invocation_attempt(phase: str, provider: ResearchProvider) -> Dict[str, Any]:
+        return {
+            "phase": phase, "provider": provider.name,
+            "model": provider.model, "usage": {},
+            "usage_measured": False,
+        }
+
+    def _validate_screening_result(
+        self, result: ProviderResult, claim: ResearchClaim,
+        packet: Mapping[str, Any],
+    ) -> ScreeningDecision:
+        assert self.screening_provider is not None
+        if (result.provider != self.screening_provider.name
+                or result.model != self.screening_provider.model):
+            raise ResearchWorkerError(
+                "screening provider identity changed during invocation")
+        usage = result.usage
+        if usage.input_tokens > self.screening_limits.max_input_tokens:
+            raise ResearchWorkerError("screening exceeded input-token limit")
+        if usage.output_tokens > self.screening_limits.max_output_tokens:
+            raise ResearchWorkerError("screening exceeded output-token limit")
+        if usage.cost_usd > self.screening_limits.max_cost_usd:
+            raise ResearchWorkerError("screening exceeded cost limit")
+        serialized = json.dumps(result.output, sort_keys=True)
+        if len(serialized.encode()) > self.screening_limits.max_output_bytes:
+            raise ResearchWorkerError("screening output exceeded byte limit")
+        try:
+            screening = ScreeningDecision.from_dict(result.output)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ResearchWorkerError(f"invalid screening decision: {exc}") from exc
+        if screening.research_minutes > min(
+                int(packet.get("research_budget_minutes") or 0),
+                self.limits.max_minutes_per_task):
+            raise ResearchWorkerError(
+                "screening research minutes exceed assignment budget")
+        return screening
+
+    def _write_screening(
+        self, claim: ResearchClaim, screening: ScreeningDecision,
+        result: ProviderResult, now: datetime,
+    ) -> Dict[str, Any]:
+        payload = screening.to_dict()
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256(canonical.encode()).hexdigest()
+        path = (self.state_dir / "screenings" / claim.assigned_agent
+                / f"{claim.assignment_id}.json")
+        record = {
+            "schema_version": SCHEMA_VERSION, "created_at": _iso(now),
+            "claim_id": claim.claim_id,
+            "assignment_id": claim.assignment_id,
+            "source_item_id": claim.source_item_id,
+            "assigned_agent": claim.assigned_agent,
+            "provider": result.provider, "model": result.model,
+            "screening_sha256": digest, "screening": payload,
+            "safety": {
+                "authorizes_execution": False,
+                "authorizes_advancement": False,
+            },
+        }
+        _write_atomic(path, record)
+        return {"path": str(path), "sha256": digest}
+
+    def _screening_completion(
+        self, screening: ScreeningDecision, claim: ResearchClaim,
+    ) -> tuple[ResearchDisposition, str, Dict[str, Any]]:
+        if screening.decision == "deep_research":
+            raise ResearchWorkerError(
+                "deep_research screening cannot directly complete a claim")
+        disposition = ResearchDisposition(
+            assignment_id=claim.assignment_id,
+            source_item_id=claim.source_item_id,
+            decided_at=_iso(self._clock()),
+            decision=screening.decision,
+            reason_codes=list(screening.reason_codes),
+            evidence_checked=list(screening.evidence_checked),
+            research_minutes=screening.research_minutes,
+            recheck_after=screening.recheck_after,
+            notes=("screening_only: " + screening.notes).strip(),
+        )
+        if disposition.decision == "reject":
+            return disposition, "scout_rejection", {
+                "assignment_id": claim.assignment_id,
+                "reason_codes": list(disposition.reason_codes),
+                "evidence_checked": list(disposition.evidence_checked),
+            }
+        return disposition, "research_disposition", disposition.to_dict()
 
     def _validate_result(self, result: ProviderResult, claim: ResearchClaim,
                          packet: Mapping[str, Any]):
@@ -486,7 +781,9 @@ class ResearchAgentWorker:
                 costs += float(usage.get("cost_usd") or 0)
                 inputs += int(usage.get("input_tokens") or 0)
                 outputs += int(usage.get("output_tokens") or 0)
-                attempts += 1
+                invocations = row.get("invocations")
+                attempts += (len(invocations) if isinstance(invocations, list)
+                             else 1)
             except (OSError, ValueError, TypeError, json.JSONDecodeError):
                 continue
         return {"date": now.astimezone(UTC).date().isoformat(),
@@ -499,7 +796,21 @@ class ResearchAgentWorker:
                     result: Optional[ProviderResult], started_at: datetime,
                     elapsed_seconds: float, artifact_record=None,
                     error: Optional[str] = None,
-                    model_invocation_tracked: bool = False) -> Dict[str, Any]:
+                    model_invocation_tracked: bool = False,
+                    invocations: Optional[Sequence[Mapping[str, Any]]] = None,
+                    terminal_stage: Optional[str] = None) -> Dict[str, Any]:
+        invocation_rows = [dict(item) for item in (invocations or [])]
+        if invocation_rows:
+            aggregate_usage = {
+                "input_tokens": sum(int((item.get("usage") or {}).get(
+                    "input_tokens") or 0) for item in invocation_rows),
+                "output_tokens": sum(int((item.get("usage") or {}).get(
+                    "output_tokens") or 0) for item in invocation_rows),
+                "cost_usd": round(sum(float((item.get("usage") or {}).get(
+                    "cost_usd") or 0) for item in invocation_rows), 6),
+            }
+        else:
+            aggregate_usage = result.usage.to_dict() if result else {}
         return {
             "schema_version": SCHEMA_VERSION, "status": status,
             "started_at": _iso(started_at), "finished_at": _iso(self._clock()),
@@ -513,7 +824,9 @@ class ResearchAgentWorker:
             "billing_mode": (
                 getattr(self.provider, "billing_mode", "metered_api")
                 if self.provider else "none"),
-            "usage": result.usage.to_dict() if result else {},
+            "usage": aggregate_usage,
+            "invocations": invocation_rows,
+            "terminal_stage": terminal_stage,
             "model_invocation_tracked": model_invocation_tracked,
             "artifact": artifact_record, "error": error,
             "safety": {"authorizes_execution": False},
@@ -532,6 +845,8 @@ class ResearchAgentWorker:
             "worker_id": self.worker_id, "status": status,
             "mode": "execute" if self.execution_enabled else "dry_run",
             "provider_configured": self.provider is not None,
+            "screening_enabled": self.screening_enabled,
+            "screening_provider_configured": self.screening_provider is not None,
             "billing_mode": (
                 getattr(self.provider, "billing_mode", "metered_api")
                 if self.provider else "none"),
@@ -561,12 +876,23 @@ class ResearchAgentWorker:
         if not plan:
             return None
         request = plan.get("request") or {}
+        screening_request = plan.get("screening_request") or {}
         canonical = json.dumps(request, sort_keys=True, separators=(",", ":"))
+        screening_canonical = json.dumps(
+            screening_request, sort_keys=True, separators=(",", ":"))
         return {
-            key: value for key, value in plan.items() if key != "request"
+            key: value for key, value in plan.items()
+            if key not in {"request", "screening_request"}
         } | {
             "request_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
             "request_bytes": len(canonical.encode()),
             "budget": dict(request.get("budget") or {}),
             "safety": dict(request.get("safety") or {}),
+            "screening_request_sha256": (
+                hashlib.sha256(screening_canonical.encode()).hexdigest()
+                if screening_request else None),
+            "screening_request_bytes": (
+                len(screening_canonical.encode()) if screening_request else 0),
+            "screening_budget": dict(
+                screening_request.get("budget") or {}),
         }

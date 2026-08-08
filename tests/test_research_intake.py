@@ -235,6 +235,17 @@ class TestCollectors(TestCase):
         self.assertEqual(items[0].reliability, "primary")
         self.assertEqual(items[0].venue_ids, ["kalshi"])
 
+    def test_cftc_rule_uses_filing_description_instead_of_venue_code(self):
+        html = """<table><tr><th>Organization</th><th>Filing Description</th>
+        <th>Status</th></tr><tr><td>CFE</td>
+        <td><a href="/filings/rule.pdf">Market Maker Incentive Program</a></td>
+        <td>Certified</td></tr></table>"""
+        items = CFTCCollector().parse(
+            html, kind="rules", retrieved_at="2026-08-01T12:00:00Z")
+        self.assertEqual(items[0].title, "Market Maker Incentive Program")
+        self.assertIn("CFE", items[0].summary)
+        self.assertIsNone(quality_rejection_reason(items[0], now=NOW))
+
     def test_newer_equal_score_sources_rank_first(self):
         old = _item(
             external_id="old", title="Old", published_at="2026-07-01",

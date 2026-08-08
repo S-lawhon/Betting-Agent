@@ -1,0 +1,76 @@
+schema_version: 1
+enabled: true
+mode: execute
+worker_id: research-codex-screened-pilot-v1
+
+allowed_agents:
+  - strategy-scout
+
+# One assignment can consume two attempts: screen, then deep research only if
+# the screen survives. This config admits one assignment per UTC day.
+limits:
+  max_minutes_per_task: 30
+  timeout_seconds: 600
+  max_input_tokens_per_task: 75000
+  max_output_tokens_per_task: 5000
+  max_cost_usd_per_task: 0.01
+  max_cost_usd_per_day: 0.02
+  max_attempts_per_day: 2
+  max_output_bytes: 150000
+
+provider:
+  type: command
+  name: openai-codex-pro
+  model: gpt-5.6-luna
+  billing_mode: chatgpt_subscription
+  argv:
+    - /opt/betting-pod-shop/venv/bin/python
+    - /opt/betting-pod-shop/scripts/codex_research_provider.py
+    - --model
+    - gpt-5.6-luna
+    - --schema
+    - /opt/betting-pod-shop/config/research_agent_output.schema.json
+    - --workspace
+    - /var/lib/research-codex/workspace
+    - --timeout-seconds
+    - "540"
+  pass_env:
+    - CODEX_HOME
+    - HOME
+
+screening:
+  enabled: true
+  limits:
+    timeout_seconds: 180
+    max_input_tokens: 25000
+    max_output_tokens: 1000
+    max_cost_usd: 0.01
+    max_output_bytes: 32000
+  provider:
+    type: command
+    name: openai-codex-pro-screen
+    model: gpt-5.6-luna
+    billing_mode: chatgpt_subscription
+    argv:
+      - /opt/betting-pod-shop/venv/bin/python
+      - /opt/betting-pod-shop/scripts/codex_research_provider.py
+      - --model
+      - gpt-5.6-luna
+      - --schema
+      - /opt/betting-pod-shop/config/research_screen_output.schema.json
+      - --workspace
+      - /var/lib/research-codex/workspace
+      - --timeout-seconds
+      - "150"
+      - --disable-search
+      - --reasoning-effort
+      - low
+    pass_env:
+      - CODEX_HOME
+      - HOME
+
+safety:
+  trading_execution_allowed: false
+  queue_mutation_in_dry_run: false
+  service_mutation_allowed: false
+  secrets_allowed_in_output: false

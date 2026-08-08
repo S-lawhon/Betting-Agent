@@ -79,6 +79,34 @@ def test_codex_adapter_rejects_local_command_execution(tmp_path, monkeypatch):
             workspace=tmp_path / "workspace", timeout_seconds=30)
 
 
+def test_codex_adapter_can_disable_search_and_lower_screening_reasoning(
+        tmp_path, monkeypatch):
+    schema = tmp_path / "schema.json"
+    schema.write_text("{}")
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured["argv"] = list(argv)
+        final_path = Path(argv[argv.index("--output-last-message") + 1])
+        final_path.write_text("{}")
+        events = json.dumps({
+            "type": "turn.completed",
+            "usage": {"input_tokens": 100, "output_tokens": 20},
+        })
+        return subprocess.CompletedProcess(argv, 0, events, "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    invoke_codex(
+        {"mode": "research_calibration_screening_only"},
+        codex="codex", model="gpt-test", schema=schema,
+        workspace=tmp_path / "workspace", timeout_seconds=30,
+        allow_search=False, reasoning_effort="low")
+
+    argv = captured["argv"]
+    assert "--search" not in argv
+    assert 'model_reasoning_effort="low"' in argv
+
+
 def test_stderr_diagnostic_is_bounded_and_redacts_credentials():
     diagnostic = _safe_stderr(
         "context\nrequest failed Authorization: Bearer secret-value "

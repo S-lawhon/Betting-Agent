@@ -12,6 +12,7 @@ from src.research_execution import (
     complete_claim,
     execution_status,
     mark_claim_invoked,
+    mark_claim_phase_invoked,
     preview_next,
     release_claim,
 )
@@ -87,6 +88,33 @@ def test_model_invocation_is_attached_once_to_active_claim(tmp_path):
         mark_claim_invoked(
             claim_path=path, state_dir=state, provider="fake", model="fixture",
             budget={}, now=NOW)
+
+
+def test_named_invocation_phases_are_each_recorded_once(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    state = tmp_path / "execution"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    packet(dispatches / "strategy-scout/a1.json", "a1", "high", 70)
+    claim = claim_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="worker-1", now=NOW)
+    path = state / "claims/strategy-scout/a1.json"
+
+    first = mark_claim_phase_invoked(
+        claim_path=path, state_dir=state, provider="screen", model="small",
+        budget={"max_input_tokens": 1000}, phase="screening", now=NOW)
+    second = mark_claim_phase_invoked(
+        claim_path=path, state_dir=state, provider="deep", model="large",
+        budget={"max_input_tokens": 10000}, phase="deep_research", now=NOW)
+
+    assert claim and [item["phase"] for item in second["model_invocations"]] == [
+        "screening", "deep_research"]
+    assert first["provider"] == "screen"
+    with pytest.raises(ResearchExecutionError, match="already recorded"):
+        mark_claim_phase_invoked(
+            claim_path=path, state_dir=state, provider="screen", model="small",
+            budget={}, phase="screening", now=NOW)
 
 
 def test_expired_claim_is_recovered(tmp_path):

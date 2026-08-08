@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import re
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
@@ -56,14 +57,37 @@ COMPONENT_WEIGHTS = {
     "edge_half_life_prior": 0.15,
     "novelty": 0.15,
     "specificity_prior": 0.10,
+    "historical_yield": 0.10,
 }
 
 MECHANISM_TERMS = {
     "api", "arbitrage", "calibration", "contract", "depth", "execution",
-    "fee", "forecast", "latency", "liquidity", "market making", "mechanism",
+    "fee", "forecast", "incentive", "latency", "liquidity", "market maker",
+    "market making", "mechanism",
     "mispricing", "model", "odds", "probability", "rebate", "research",
     "rule", "settlement", "slippage", "spread", "timestamp",
 }
+
+# These rejection reasons say the packet should have been filtered before a
+# specialist spent time on it.  Other rejections can be valuable falsification
+# and therefore are not treated as zero-yield source outcomes.
+INPUT_QUALITY_REJECTION_REASONS = {
+    "dormant_designated_venue",
+    "no_executable_market",
+    "no_live_market_data",
+    "no_price_or_liquidity_data",
+    "no_specific_market_mechanism",
+    "no_testable_edge_mechanism",
+    "not_active_venue",
+    "organization_level_source_only",
+    "pending_regulatory_application",
+    "products_migrated_to_other_venue",
+    "series_without_events",
+    "venue_not_operational",
+}
+
+FEEDBACK_PRIOR_SCORE = 50.0
+FEEDBACK_PRIOR_WEIGHT = 5
 
 
 def _canonical(value: Any) -> str:
@@ -89,6 +113,161 @@ def _similarity(left: Sequence[str], right: Sequence[str]) -> float:
     if not a or not b:
         return 0.0
     return len(a & b) / len(a | b)
+
+
+def _source_text(assignment: Mapping[str, Any],
+                 source_item: Mapping[str, Any]) -> str:
+    metadata = source_item.get("metadata") or {}
+    descriptive_metadata = " ".join(str(metadata.get(key) or "") for key in (
+        "Filing Description", "Product Name", "Description", "market_family",
+        "mechanism", "rule_change", "fee_structure",
+    ))
+    return "{} {} {}".format(
+        source_item.get("title") or assignment.get("title") or "",
+        source_item.get("summary") or "",
+        descriptive_metadata,
+    ).lower()
+
+
+def _mechanism_hits(text: str) -> List[str]:
+    words = set(re.findall(r"[a-z0-9]+", text))
+    return sorted(term for term in MECHANISM_TERMS
+                  if ((" " in term and term in text)
+                      or (" " not in term and term in words)))
+
+
+def mechanism_readiness_rejection(
+    assignment: Mapping[str, Any], source_item: Mapping[str, Any],
+) -> Optional[str]:
+    """Reject source records that are universe entries, not hypotheses.
+
+    Intake intentionally keeps broad venue coverage.  Triage has a narrower
+    job: spend specialist attention only when the compact packet names some
+    market mechanism or comes from the mechanism-oriented census bridge.
+    """
+    source_type = str(assignment.get("source_type") or
+                      source_item.get("source_type") or "")
+    text = _source_text(assignment, source_item)
+    hits = _mechanism_hits(text)
+    metadata = source_item.get("metadata") or {}
+    topics = {str(value).lower() for value in source_item.get("topics") or []}
+
+    if source_type == "venue_market":
+        # A census seed is already family-level and carries a deterministic
+        # reason for being in the scout inbox.  A raw event listing such as a
+        # single matchup is inventory, not a research mechanism.
+        if metadata.get("market_family") or metadata.get("census_run_id"):
+            return None
+        if not hits:
+            return "event_listing_without_mechanism"
+
+    if source_type == "regulatory_filing":
+        if "organizations" in topics and not hits:
+            return "organization_listing_without_mechanism"
+        quality_flags = set(
+            (assignment.get("assignment") or {}).get("quality_flags") or [])
+        if "official_listing_is_not_edge_evidence" in quality_flags and not hits:
+            return "official_listing_without_mechanism"
+    return None
+
+
+def research_family_key(assignment: Mapping[str, Any],
+                        source_item: Mapping[str, Any]) -> str:
+    explicit = str(
+        (assignment.get("assignment") or {}).get("market_family_key") or ""
+    ).strip()
+    if explicit:
+        return explicit
+    metadata = source_item.get("metadata") or {}
+    census_family = str(metadata.get("market_family") or "").strip()
+    source = re.sub(
+        r"[^a-z0-9]+", "_",
+        str(assignment.get("source_name") or source_item.get("source_name")
+            or "unknown").lower(),
+    ).strip("_")
+    if census_family:
+        return f"{source}:census:{census_family.lower()}"
+    if str(assignment.get("source_type") or "") == "venue_market":
+        text = str(assignment.get("title") or source_item.get("title") or "")
+        if re.search(r"\bvs\.?\b", text.lower()):
+            product = str(assignment.get("product_family") or "unknown").lower()
+            return f"{source}:{product}:matchup"
+    return ""
+
+
+def _outcome_value(disposition: Mapping[str, Any]) -> Tuple[float, bool]:
+    decision = str(disposition.get("decision") or "")
+    reasons = {str(value) for value in disposition.get("reason_codes") or []}
+    if decision == "advance":
+        return 100.0, False
+    if decision == "defer":
+        return 45.0, False
+    if decision == "reject" and reasons & INPUT_QUALITY_REJECTION_REASONS:
+        return 10.0, True
+    if decision == "reject":
+        # A supported falsification is productive research, even though it did
+        # not create an opportunity.
+        return 65.0, False
+    return FEEDBACK_PRIOR_SCORE, False
+
+
+def _feedback_profiles(
+    assignments: Mapping[str, Mapping[str, Any]],
+    dispositions: Sequence[Mapping[str, Any]],
+) -> Tuple[Dict[str, Dict[str, Dict[str, float]]], Dict[str, int]]:
+    profiles: Dict[str, Dict[str, Dict[str, float]]] = {
+        "attribution": defaultdict(lambda: {"count": 0.0, "total": 0.0}),
+        "lane": defaultdict(lambda: {"count": 0.0, "total": 0.0}),
+    }
+    quality_rejections = 0
+    used = 0
+    for disposition in dispositions:
+        assignment = assignments.get(str(disposition.get("assignment_id") or ""))
+        if not assignment:
+            continue
+        value, input_quality_failure = _outcome_value(disposition)
+        quality_rejections += int(input_quality_failure)
+        used += 1
+        keys = {
+            "attribution": str(assignment.get("attribution_key") or
+                               assignment.get("source_name") or "unknown"),
+            "lane": str(assignment.get("lane") or "unknown"),
+        }
+        for dimension, key in keys.items():
+            profiles[dimension][key]["count"] += 1
+            profiles[dimension][key]["total"] += value
+    return {
+        dimension: {key: dict(values) for key, values in rows.items()}
+        for dimension, rows in profiles.items()
+    }, {"records": used, "input_quality_rejections": quality_rejections}
+
+
+def _historical_yield_component(
+    assignment: Mapping[str, Any],
+    profiles: Mapping[str, Mapping[str, Mapping[str, float]]],
+) -> Tuple[float, str]:
+    observations: List[Tuple[float, float, str]] = []
+    keys = {
+        "attribution": str(assignment.get("attribution_key") or
+                           assignment.get("source_name") or "unknown"),
+        "lane": str(assignment.get("lane") or "unknown"),
+    }
+    for dimension, key in keys.items():
+        row = (profiles.get(dimension) or {}).get(key) or {}
+        count = float(row.get("count") or 0)
+        if count <= 0:
+            continue
+        score = (
+            float(row.get("total") or 0)
+            + FEEDBACK_PRIOR_SCORE * FEEDBACK_PRIOR_WEIGHT
+        ) / (count + FEEDBACK_PRIOR_WEIGHT)
+        observations.append((score, min(count, 5.0), f"{dimension}:{key} n={int(count)}"))
+    if not observations:
+        return FEEDBACK_PRIOR_SCORE, "no prior dispositions; neutral shrunk prior"
+    weight = sum(item[1] for item in observations)
+    score = sum(item[0] * item[1] for item in observations) / weight
+    return round(score, 2), "disposition feedback, shrunk: {}".format(
+        "; ".join(item[2] for item in observations))
 
 
 @dataclass(frozen=True)
@@ -165,6 +344,7 @@ def _score_assignment(
     source_item: Mapping[str, Any],
     historical_titles: Mapping[str, Sequence[str]],
     current_titles: Mapping[str, Sequence[str]],
+    feedback_profiles: Mapping[str, Mapping[str, Mapping[str, float]]],
 ) -> Tuple[float, Dict[str, Dict[str, Any]], List[str], List[str], bool]:
     assignment_id = str(assignment.get("id") or "")
     tokens = current_titles.get(assignment_id) or []
@@ -200,14 +380,8 @@ def _score_assignment(
             "reason": "unknown until a falsifiable mechanism survives costs and validation",
         },
     }
-    source_text = "{} {}".format(
-        source_item.get("title") or assignment.get("title") or "",
-        source_item.get("summary") or "",
-    ).lower()
-    source_words = set(re.findall(r"[a-z0-9]+", source_text))
-    term_hits = sorted(term for term in MECHANISM_TERMS
-                       if ((" " in term and term in source_text)
-                           or (" " not in term and term in source_words)))
+    source_text = _source_text(assignment, source_item)
+    term_hits = _mechanism_hits(source_text)
     specificity = min(90, 20 + 15 * len(term_hits))
     if str(assignment.get("source_type") or "") in {
             "paper", "regulatory_filing", "official_data"}:
@@ -217,6 +391,12 @@ def _score_assignment(
         "reason": ("mechanism/test vocabulary present: {}".format(
             ", ".join(term_hits[:6])) if term_hits else
             "no mechanism/test vocabulary detected in the compact source text"),
+    }
+    yield_score, yield_reason = _historical_yield_component(
+        assignment, feedback_profiles)
+    components["historical_yield"] = {
+        "score": yield_score,
+        "reason": yield_reason,
     }
     for name in ("testability_prior", "data_availability_prior",
                  "edge_half_life_prior"):
@@ -256,11 +436,14 @@ def _budget_minutes(assignment: Mapping[str, Any]) -> int:
 def _packet(assignment: Mapping[str, Any], *, source_item: Mapping[str, Any],
             now: datetime,
             historical_titles: Mapping[str, Sequence[str]],
-            current_titles: Mapping[str, Sequence[str]]) -> Tuple[DispatchPacket, bool]:
+            current_titles: Mapping[str, Sequence[str]],
+            feedback_profiles: Mapping[str, Mapping[str, Mapping[str, float]]],
+            ) -> Tuple[DispatchPacket, bool]:
     score, components, unknowns, similar, blocked = _score_assignment(
         assignment, source_item=source_item,
         historical_titles=historical_titles,
-        current_titles=current_titles)
+        current_titles=current_titles,
+        feedback_profiles=feedback_profiles)
     assignment_id = str(assignment["id"])
     assigned_agent = _agent(assignment)
     packet = DispatchPacket(
@@ -281,8 +464,11 @@ def _packet(assignment: Mapping[str, Any], *, source_item: Mapping[str, Any],
             "required_output": "ResearchDisposition or falsifiable hypothesis brief",
             "disposition_schema": "src.research_outcomes.ResearchDisposition",
             "advance_requires": [
-                "public evidence", "cheapest decisive test",
-                "fees and execution friction", "current eligibility decision",
+                "named falsifiable mechanism", "public primary evidence",
+                "cheapest decisive test", "timestamp-correct dataset",
+                "current prices/depth or a documented availability plan",
+                "fees, fills, and execution friction",
+                "settlement rules and current eligibility decision",
                 "opportunity_id after OpportunityCard registration",
             ],
             "output_directory": "research/dispositions",
@@ -307,11 +493,16 @@ def triage_assignments(
     reviewed_assignment_ids: Optional[Set[str]] = None,
     opportunity_assignment_ids: Optional[Set[str]] = None,
     redispatch_assignment_ids: Optional[Set[str]] = None,
+    disposition_history: Sequence[Mapping[str, Any]] = (),
+    pending_packets: Sequence[Mapping[str, Any]] = (),
     memory_rules: Sequence[Mapping[str, Any]] = (),
     now: Optional[datetime] = None,
     max_dispatches: int = 10,
     max_research_minutes: int = 300,
     lane_concentration_cap: float = 0.40,
+    max_pending_total: Optional[int] = None,
+    max_pending_per_agent: Optional[int] = None,
+    max_new_dispatches_per_run: Optional[int] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], List[DispatchPacket]]:
     """Rank unreviewed assignments and allocate a diverse bounded portfolio."""
     if max_dispatches < 1:
@@ -320,6 +511,13 @@ def triage_assignments(
         raise ValueError("max_research_minutes must be positive")
     if not 0 < lane_concentration_cap <= 1:
         raise ValueError("lane_concentration_cap must be in (0, 1]")
+    for name, value in (
+        ("max_pending_total", max_pending_total),
+        ("max_pending_per_agent", max_pending_per_agent),
+        ("max_new_dispatches_per_run", max_new_dispatches_per_run),
+    ):
+        if value is not None and value < 0:
+            raise ValueError(f"{name} cannot be negative")
 
     now = now or datetime.now(timezone.utc)
     previous = dict(previous_ledger or {})
@@ -346,6 +544,19 @@ def triage_assignments(
     remaining_dispatches = max(0, max_dispatches - dispatched_today_before)
     remaining_minutes = max(0, max_research_minutes - minutes_today_before)
 
+    pending_by_agent = Counter(
+        str(packet.get("assigned_agent") or "unknown")
+        for packet in pending_packets
+        if packet.get("assignment_id"))
+    pending_total = sum(pending_by_agent.values())
+    pending_by_agent_before = dict(pending_by_agent)
+    if max_pending_total is not None:
+        remaining_dispatches = min(
+            remaining_dispatches, max(0, max_pending_total - pending_total))
+    if max_new_dispatches_per_run is not None:
+        remaining_dispatches = min(
+            remaining_dispatches, max_new_dispatches_per_run)
+
     by_id: Dict[str, Mapping[str, Any]] = {}
     invalid = 0
     for assignment in assignments:
@@ -356,10 +567,13 @@ def triage_assignments(
         by_id[assignment_id] = assignment
     current_titles = {assignment_id: title_tokens(row.get("title"))
                       for assignment_id, row in by_id.items()}
+    feedback_profiles, feedback_summary = _feedback_profiles(
+        by_id, disposition_history)
 
     packets: List[DispatchPacket] = []
     legally_blocked: List[str] = []
     quality_blocked: Dict[str, str] = {}
+    readiness_blocked: Dict[str, str] = {}
     candidates = []
     for assignment_id, assignment in by_id.items():
         if (assignment_id in dispatched_before or assignment_id in reviewed
@@ -371,11 +585,17 @@ def triage_assignments(
         if quality_reason:
             quality_blocked[assignment_id] = quality_reason
             continue
+        readiness_reason = mechanism_readiness_rejection(
+            assignment, source_item)
+        if readiness_reason:
+            readiness_blocked[assignment_id] = readiness_reason
+            continue
         packet, blocked = _packet(
             assignment,
             source_item=source_item,
             now=now, historical_titles=historical_titles,
-            current_titles=current_titles)
+            current_titles=current_titles,
+            feedback_profiles=feedback_profiles)
         if blocked:
             legally_blocked.append(assignment_id)
             continue
@@ -386,11 +606,35 @@ def triage_assignments(
         -int(packet.assignment.get("score") or 0),
         packet.assignment_id,
     ))
+    family_duplicates: Dict[str, str] = {}
+    family_representatives: Dict[str, str] = {}
+    deduplicated_candidates: List[DispatchPacket] = []
+    for packet in candidates:
+        family = research_family_key(packet.assignment, packet.source_item)
+        if family and family in family_representatives:
+            family_duplicates[packet.assignment_id] = family_representatives[family]
+            continue
+        if family:
+            family_representatives[family] = packet.assignment_id
+        deduplicated_candidates.append(packet)
+    candidates = deduplicated_candidates
     lane_cap = max(1, math.ceil(max_dispatches * lane_concentration_cap))
     lane_counts: Dict[str, int] = {
         str(key): int(value) for key, value in (today.get("by_lane") or {}).items()
     }
     minutes = 0
+    agent_capacity_blocked: Set[str] = set()
+
+    def agent_has_capacity(packet: DispatchPacket) -> bool:
+        if max_pending_per_agent is None:
+            return True
+        return pending_by_agent.get(packet.assigned_agent, 0) < max_pending_per_agent
+
+    def select(packet: DispatchPacket) -> None:
+        nonlocal minutes
+        packets.append(packet)
+        minutes += packet.research_budget_minutes
+        pending_by_agent[packet.assigned_agent] += 1
 
     # Exploration floor: take the best affordable item from every available
     # lane before filling by score. This prevents a temporarily productive lane
@@ -405,10 +649,12 @@ def triage_assignments(
             break
         if lane_counts.get(lane, 0) >= lane_cap:
             continue
+        if not agent_has_capacity(packet):
+            agent_capacity_blocked.add(packet.assignment_id)
+            continue
         if minutes + packet.research_budget_minutes > remaining_minutes:
             continue
-        packets.append(packet)
-        minutes += packet.research_budget_minutes
+        select(packet)
         lane_counts[lane] = lane_counts.get(lane, 0) + 1
 
     selected_ids = {packet.assignment_id for packet in packets}
@@ -419,11 +665,13 @@ def triage_assignments(
         lane = str(packet.assignment.get("lane") or "general_research")
         if lane_counts.get(lane, 0) >= lane_cap:
             continue
+        if not agent_has_capacity(packet):
+            agent_capacity_blocked.add(packet.assignment_id)
+            continue
         if minutes + packet.research_budget_minutes > remaining_minutes:
             continue
-        packets.append(packet)
+        select(packet)
         selected_ids.add(packet.assignment_id)
-        minutes += packet.research_budget_minutes
         lane_counts[lane] = lane_counts.get(lane, 0) + 1
 
     dispatched_after = dispatched_before | selected_ids
@@ -455,6 +703,12 @@ def triage_assignments(
         "legally_blocked_assignment_ids": sorted(legally_blocked),
         "quality_blocked": len(quality_blocked),
         "quality_blocked_assignment_ids": dict(sorted(quality_blocked.items())),
+        "readiness_blocked": len(readiness_blocked),
+        "readiness_blocked_assignment_ids": dict(
+            sorted(readiness_blocked.items())),
+        "family_duplicates": len(family_duplicates),
+        "family_duplicate_representatives": dict(
+            sorted(family_duplicates.items())),
         "eligible_candidates": len(candidates),
         "dispatched": len(packets),
         "deferred": len(candidates) - len(packets),
@@ -469,6 +723,31 @@ def triage_assignments(
             "max_dispatches": max_dispatches,
             "max_research_minutes": max_research_minutes,
             "lane_concentration_cap": lane_concentration_cap,
+        },
+        "backpressure": {
+            "pending_before": pending_total,
+            "pending_by_agent_before": dict(sorted(
+                pending_by_agent_before.items())),
+            "pending_after": pending_total + len(packets),
+            "max_pending_total": max_pending_total,
+            "max_pending_per_agent": max_pending_per_agent,
+            "max_new_dispatches_per_run": max_new_dispatches_per_run,
+            "slots_available_at_start": remaining_dispatches,
+            "agent_capacity_blocked_assignment_ids": sorted(
+                agent_capacity_blocked),
+            "saturated": bool(
+                (max_pending_total is not None
+                 and pending_total >= max_pending_total)
+                or (max_new_dispatches_per_run == 0)
+                or (bool(candidates) and not packets
+                    and len(agent_capacity_blocked) == len(candidates))),
+        },
+        "outcome_feedback": {
+            **feedback_summary,
+            "prior_score": FEEDBACK_PRIOR_SCORE,
+            "prior_weight": FEEDBACK_PRIOR_WEIGHT,
+            "input_quality_reason_codes": sorted(
+                INPUT_QUALITY_REJECTION_REASONS),
         },
         "by_agent": {
             agent: sum(packet.assigned_agent == agent for packet in packets)

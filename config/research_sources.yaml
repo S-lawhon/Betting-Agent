@@ -39,10 +39,13 @@ collectors:
       include_keywords: [forecast, prediction market, calibration, online learning, sports]
 
   x:
-    enabled: true
+    # Paused after the first measured pilot: 17 assignments, zero reviewed and
+    # zero advanced.  Re-enable only with a review allocation for the existing
+    # social-scout queue and an explicit second-pilot decision.
+    enabled: false
     note: >-
-      Approved $50 pilot. Collection still requires X_BEARER_TOKEN and the
-      explicit --include-x runtime flag.
+      Initial $50-ceiling pilot paused below budget. Collection still requires
+      X_BEARER_TOKEN, this flag, and the explicit --include-x runtime flag.
     max_results_per_query: 25
     max_queries_per_run: 3
     budget:

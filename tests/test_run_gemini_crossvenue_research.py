@@ -86,7 +86,7 @@ def test_fast_collection_reuses_analysis_without_replaying_observations(
     def fail_if_replayed(*args, **kwargs):
         raise AssertionError("the five-minute path must not replay observations")
 
-    monkeypatch.setattr(collector, "load_observations", fail_if_replayed)
+    monkeypatch.setattr(collector, "iter_observations", fail_if_replayed)
     result = collect(
         _Gemini(), _Kalshi(), tmp_path, refresh_analysis=False)
 

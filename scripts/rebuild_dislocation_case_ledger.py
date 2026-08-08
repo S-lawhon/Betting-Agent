@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.dislocation_analytics import load_observations  # noqa: E402
+from src.dislocation_analytics import iter_observations  # noqa: E402
 from src.dislocation_cases import (  # noqa: E402
     CaseLedger, build_cases, calibrate_thresholds, settlement_basis,
 )
@@ -46,10 +46,11 @@ def rebuild(*, observations_dir: Path, database: Path, output: Path,
             settlement_config: Path, settlement_manifest: Path,
             pair_id: str, policy_id: str, now: datetime,
             window_days: int, threshold_usd: float) -> Dict[str, Any]:
-    rows = load_observations(observations_dir, now=now, window_days=window_days)
     policy = load_policy_state(settlement_config, settlement_manifest, policy_id)
-    cases = build_cases(rows, pair_id=pair_id, policy=policy, now=now,
-                        threshold_usd=threshold_usd)
+    cases = build_cases(
+        iter_observations(observations_dir, now=now, window_days=window_days),
+        pair_id=pair_id, policy=policy, now=now,
+        threshold_usd=threshold_usd)
     ledger = CaseLedger(database)
     try:
         ledger.upsert(cases, updated_at=now)
@@ -58,10 +59,15 @@ def rebuild(*, observations_dir: Path, database: Path, output: Path,
         ledger.close()
     metrics.update({
         "generated_at": _iso(now), "window_days_replayed": window_days,
-        "threshold_usd": threshold_usd, "observations_replayed": len(rows),
+        "threshold_usd": threshold_usd,
+        "observations_replayed": sum(
+            1 for _ in iter_observations(
+                observations_dir, now=now, window_days=window_days)),
         "cases_replayed": len(cases), "settlement_basis": settlement_basis(policy),
         "threshold_calibration": calibrate_thresholds(
-            rows, pair_id=pair_id, policy=policy, now=now),
+            iter_observations(
+                observations_dir, now=now, window_days=window_days),
+            pair_id=pair_id, policy=policy, now=now),
         "source_tape": str(observations_dir), "ledger": str(database),
     })
     _atomic_json(output, metrics)

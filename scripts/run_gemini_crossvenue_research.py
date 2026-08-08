@@ -24,7 +24,7 @@ from src.gemini_kalshi_research import (  # noqa: E402
     evaluate_match, match_events, normalize_gemini_events,
     normalize_kalshi_events,
 )
-from src.dislocation_analytics import analyze, load_observations  # noqa: E402
+from src.dislocation_analytics import analyze, iter_observations  # noqa: E402
 from src.dislocation_cases import (  # noqa: E402
     CaseLedger, build_cases, calibrate_thresholds, settlement_basis,
 )
@@ -200,6 +200,64 @@ def _load_cached(path: Path, *, kind: str) -> Dict[str, Any]:
         }
 
 
+def refresh_historical_analysis(
+        output_dir: Path, *, captured_at: datetime,
+        terms_policy: Dict[str, Any], window_days: int = 14,
+        threshold_usd: float = 0.03) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """Stream the retained tape into analytics and durable research cases."""
+    observations_dir = output_dir / "observations"
+    pair_id = "gemini_kalshi_mlb_moneyline"
+    analytics = analyze(
+        iter_observations(
+            observations_dir, now=captured_at, window_days=window_days),
+        window_days=window_days, threshold_usd=threshold_usd)
+    analytics = {"generated_at": _iso(captured_at), **analytics}
+
+    cases = build_cases(
+        iter_observations(
+            observations_dir, now=captured_at, window_days=window_days),
+        pair_id=pair_id, policy=terms_policy, now=captured_at,
+        threshold_usd=threshold_usd)
+    ledger = CaseLedger(output_dir / "research_cases.sqlite3")
+    try:
+        ledger.upsert(cases, updated_at=captured_at)
+        case_metrics = ledger.summary(pair_id, now=captured_at)
+    finally:
+        ledger.close()
+    case_metrics.update({
+        "generated_at": _iso(captured_at),
+        "window_days_replayed": window_days,
+        "threshold_usd": threshold_usd,
+        "cases_replayed": len(cases),
+        "settlement_basis": settlement_basis(terms_policy),
+        "threshold_calibration": calibrate_thresholds(
+            iter_observations(
+                observations_dir, now=captured_at, window_days=window_days),
+            pair_id=pair_id, policy=terms_policy, now=captured_at),
+        "source_tape": "data/gemini_crossvenue/observations/*.jsonl",
+        "ledger": "data/gemini_crossvenue/research_cases.sqlite3",
+    })
+    evidence_path = output_dir / "settlement_basis_evidence.json"
+    try:
+        outcome_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        if not isinstance(outcome_evidence, dict):
+            raise ValueError("evidence payload is not an object")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        outcome_evidence = {
+            "status": "unavailable",
+            "reason": str(exc),
+            "interpretation": (
+                "No observed settlement-outcome evidence is available yet; "
+                "contract-basis risks remain unmeasured."),
+        }
+    case_metrics["outcome_evidence"] = outcome_evidence
+    _write_atomic(output_dir / "research_cases.json", case_metrics)
+    # analytics.json is the monitored completion heartbeat. Write it last so
+    # a failed case/calibration stage cannot masquerade as a successful replay.
+    _write_atomic(output_dir / "analytics.json", analytics)
+    return analytics, case_metrics
+
+
 def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
             *, now: Optional[datetime] = None,
             refresh_analysis: bool = True,
@@ -293,48 +351,8 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
     day_metrics = _history_24h(output_dir, captured_at)
     pair_id = "gemini_kalshi_mlb_moneyline"
     if refresh_analysis:
-        observation_rows = load_observations(
-            output_dir / "observations", now=captured_at, window_days=14)
-        analytics = analyze(
-            observation_rows, window_days=14, threshold_usd=0.03)
-        analytics = {"generated_at": _iso(captured_at), **analytics}
-        _write_atomic(output_dir / "analytics.json", analytics)
-        cases = build_cases(
-            observation_rows, pair_id=pair_id, policy=terms_policy,
-            now=captured_at, threshold_usd=0.03)
-        ledger = CaseLedger(output_dir / "research_cases.sqlite3")
-        try:
-            ledger.upsert(cases, updated_at=captured_at)
-            case_metrics = ledger.summary(pair_id, now=captured_at)
-        finally:
-            ledger.close()
-        case_metrics.update({
-            "generated_at": _iso(captured_at),
-            "window_days_replayed": 14,
-            "threshold_usd": 0.03,
-            "cases_replayed": len(cases),
-            "settlement_basis": settlement_basis(terms_policy),
-            "threshold_calibration": calibrate_thresholds(
-                observation_rows, pair_id=pair_id, policy=terms_policy,
-                now=captured_at),
-            "source_tape": "data/gemini_crossvenue/observations/*.jsonl",
-            "ledger": "data/gemini_crossvenue/research_cases.sqlite3",
-        })
-        evidence_path = output_dir / "settlement_basis_evidence.json"
-        try:
-            outcome_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-            if not isinstance(outcome_evidence, dict):
-                raise ValueError("evidence payload is not an object")
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            outcome_evidence = {
-                "status": "unavailable",
-                "reason": str(exc),
-                "interpretation": (
-                    "No observed settlement-outcome evidence is available yet; "
-                    "contract-basis risks remain unmeasured."),
-            }
-        case_metrics["outcome_evidence"] = outcome_evidence
-        _write_atomic(output_dir / "research_cases.json", case_metrics)
+        analytics, case_metrics = refresh_historical_analysis(
+            output_dir, captured_at=captured_at, terms_policy=terms_policy)
     else:
         analytics = _load_cached(output_dir / "analytics.json", kind="analytics")
         case_metrics = _load_cached(

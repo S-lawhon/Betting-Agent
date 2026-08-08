@@ -73,10 +73,17 @@ The five-minute path captures current quotes, updates the compact 24-hour run
 summary, and reuses the last historical analytics/case artifacts. It
 deliberately does not replay the full observation tape: by 2026-08-08 the 68 MB
 tape expanded beyond the service's 256 MiB memory limit and caused every run to
-time out under reclaim pressure. Run the heavier replay explicitly with
-`python3 -m scripts.run_gemini_crossvenue_research --refresh-analysis`; its
-timestamps are exposed under `metrics.json.analysis_refresh`, so cached
-analysis is never presented as newly recomputed.
+time out under reclaim pressure. The separate
+`gemini-crossvenue-analysis.timer` streams the 14-day tape hourly under its own
+256 MiB cgroup; it never calls either venue. Its timestamps are exposed under
+`metrics.json.analysis_refresh`, so cached analysis is never presented as
+newly recomputed. A manual refresh uses
+`python3 -m scripts.refresh_gemini_crossvenue_analysis`.
+
+Measured before deployment on the live 67 MB / 31,833-observation tape, the
+streaming replay completed in 1.81 seconds at 52.4 MB peak RSS with zero swap.
+`analytics.json` is written last and is the monitored completion heartbeat, so
+a partial replay cannot report healthy merely because an early stage ran.
 
 The analytics deliberately report depth as unavailable. Public snapshots do
 not expose comparable full order-book depth, so slippage is scenario-tested

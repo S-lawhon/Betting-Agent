@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import math
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, Iterator, List, Optional
 
 
 UTC = timezone.utc
@@ -40,34 +39,60 @@ def _quantile(values: List[float], q: float) -> Optional[float]:
     return round(value, 6)
 
 
-def load_observations(directory: Path, *, now: Optional[datetime] = None,
-                      window_days: int = 14) -> List[Dict[str, Any]]:
+def iter_observations(directory: Path, *, now: Optional[datetime] = None,
+                      window_days: int = 14) -> Iterator[Dict[str, Any]]:
+    """Yield retained observations one at a time in chronological file order."""
     now = (now or datetime.now(UTC)).astimezone(UTC)
     cutoff = now - timedelta(days=window_days)
-    rows = []
     for path in sorted(directory.glob("*.jsonl")):
         try:
-            lines = path.read_text().splitlines()
+            handle = path.open(encoding="utf-8")
         except OSError:
             continue
-        for line in lines:
-            try:
-                row = json.loads(line)
-            except (json.JSONDecodeError, TypeError):
-                continue
-            captured = _parse(row.get("captured_at"))
-            if captured and cutoff <= captured <= now:
-                rows.append(row)
-    return rows
+        with handle:
+            for line in handle:
+                try:
+                    row = json.loads(line)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                captured = _parse(row.get("captured_at"))
+                if captured and cutoff <= captured <= now:
+                    yield row
+
+
+def load_observations(directory: Path, *, now: Optional[datetime] = None,
+                      window_days: int = 14) -> List[Dict[str, Any]]:
+    """Compatibility reader for callers that explicitly need a materialized list."""
+    return list(iter_observations(directory, now=now, window_days=window_days))
 
 
 def analyze(rows: Iterable[Dict[str, Any]], *, threshold_usd: float = 0.03,
             max_episode_gap_seconds: float = 450.0,
             window_days: int = 14) -> Dict[str, Any]:
-    observations = list(rows)
-    paths = []
-    skews = []
-    for row in observations:
+    observation_count = path_count = priced_count = qualifying_count = 0
+    net: List[float] = []
+    gross: List[float] = []
+    skews: List[float] = []
+    states: Dict[tuple, Dict[str, Any]] = {}
+    episode_rows: List[Dict[str, Any]] = []
+
+    def finish_episode(key: tuple, current: Optional[Dict[str, Any]]) -> None:
+        if not current:
+            return
+        match_key, direction = key
+        duration = (current["last"] - current["first"]).total_seconds()
+        episode_rows.append({
+            "match_key": match_key, "direction": direction,
+            "observations": current["count"],
+            "duration_seconds": duration,
+            "first_seen": current["first"].isoformat().replace("+00:00", "Z"),
+            "last_seen": current["last"].isoformat().replace("+00:00", "Z"),
+            "max_net_edge_usd": current["max_edge"],
+            "persistent": current["count"] >= 2,
+        })
+
+    for row in rows:
+        observation_count += 1
         captured = _parse(row.get("captured_at"))
         if not captured:
             continue
@@ -76,53 +101,44 @@ def analyze(rows: Iterable[Dict[str, Any]], *, threshold_usd: float = 0.03,
         for path in row.get("paths") or []:
             if not isinstance(path, dict):
                 continue
-            paths.append({
-                **path, "captured": captured,
-                "collection_id": row.get("collection_id"),
-                "match_key": row.get("match_key"),
-                "direction": "gemini:{}|kalshi:{}".format(
-                    path.get("gemini_yes_team"), path.get("kalshi_yes_team")),
-            })
-    priced = [row for row in paths
-              if isinstance(row.get("net_edge_usd"), (int, float))]
-    net = [float(row["net_edge_usd"]) for row in priced]
-    gross = [float(row["gross_edge_usd"]) for row in priced
-             if isinstance(row.get("gross_edge_usd"), (int, float))]
-    qualifying = [row for row in priced
-                  if float(row["net_edge_usd"]) >= threshold_usd]
-
-    series = defaultdict(list)
-    for row in priced:
-        series[(row["match_key"], row["direction"])].append(row)
-    episodes = []
-    for key, values in series.items():
-        values.sort(key=lambda item: item["captured"])
-        current = []
-        previous = None
-        for row in values:
-            qualifies = float(row["net_edge_usd"]) >= threshold_usd
-            gap = ((row["captured"] - previous).total_seconds()
+            path_count += 1
+            value = path.get("net_edge_usd")
+            if not isinstance(value, (int, float)):
+                continue
+            priced_count += 1
+            edge = float(value)
+            net.append(edge)
+            gross_value = path.get("gross_edge_usd")
+            if isinstance(gross_value, (int, float)):
+                gross.append(float(gross_value))
+            qualifies = edge >= threshold_usd
+            qualifying_count += qualifies
+            direction = "gemini:{}|kalshi:{}".format(
+                path.get("gemini_yes_team"), path.get("kalshi_yes_team"))
+            key = (row.get("match_key"), direction)
+            state = states.setdefault(key, {"previous": None, "current": None})
+            previous = state["previous"]
+            gap = ((captured - previous).total_seconds()
                    if previous is not None else None)
-            if not qualifies or (gap is not None and gap > max_episode_gap_seconds):
-                if current:
-                    episodes.append((key, current))
-                current = []
+            if (not qualifies
+                    or (gap is not None and gap > max_episode_gap_seconds)):
+                finish_episode(key, state["current"])
+                state["current"] = None
             if qualifies:
-                current.append(row)
-            previous = row["captured"]
-        if current:
-            episodes.append((key, current))
-    episode_rows = []
-    for (match_key, direction), values in episodes:
-        duration = (values[-1]["captured"] - values[0]["captured"]).total_seconds()
-        episode_rows.append({
-            "match_key": match_key, "direction": direction,
-            "observations": len(values), "duration_seconds": duration,
-            "first_seen": values[0]["captured"].isoformat().replace("+00:00", "Z"),
-            "last_seen": values[-1]["captured"].isoformat().replace("+00:00", "Z"),
-            "max_net_edge_usd": max(float(row["net_edge_usd"]) for row in values),
-            "persistent": len(values) >= 2,
-        })
+                current = state["current"]
+                if current is None:
+                    state["current"] = {
+                        "first": captured, "last": captured,
+                        "count": 1, "max_edge": edge,
+                    }
+                else:
+                    current["last"] = captured
+                    current["count"] += 1
+                    current["max_edge"] = max(current["max_edge"], edge)
+            state["previous"] = captured
+
+    for key, state in states.items():
+        finish_episode(key, state["current"])
     durations = [row["duration_seconds"] for row in episode_rows]
     persistent = [row for row in episode_rows if row["persistent"]]
     scenarios = []
@@ -139,12 +155,13 @@ def analyze(rows: Iterable[Dict[str, Any]], *, threshold_usd: float = 0.03,
     return {
         "schema_version": 1, "window_days": window_days,
         "threshold_usd": threshold_usd,
-        "observation_rows": len(observations), "path_observations": len(paths),
-        "priced_path_observations": len(priced),
-        "quote_completeness": (round(len(priced) / len(paths), 6) if paths else None),
-        "qualifying_path_observations": len(qualifying),
-        "qualifying_share": (round(len(qualifying) / len(priced), 6)
-                             if priced else None),
+        "observation_rows": observation_count, "path_observations": path_count,
+        "priced_path_observations": priced_count,
+        "quote_completeness": (round(priced_count / path_count, 6)
+                               if path_count else None),
+        "qualifying_path_observations": qualifying_count,
+        "qualifying_share": (round(qualifying_count / priced_count, 6)
+                             if priced_count else None),
         "net_edge_usd": {
             "min": min(net) if net else None, "median": _quantile(net, .5),
             "p90": _quantile(net, .9), "p95": _quantile(net, .95),

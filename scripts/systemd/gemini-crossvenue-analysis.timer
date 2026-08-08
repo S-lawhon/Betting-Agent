@@ -1,0 +1,11 @@
+[Unit]
+Description=Betting Pod Shop — hourly Gemini/Kalshi historical analysis
+
+[Timer]
+OnCalendar=*-*-* *:02:00 UTC
+Persistent=true
+RandomizedDelaySec=20
+Unit=gemini-crossvenue-analysis.service
+
+[Install]
+WantedBy=timers.target

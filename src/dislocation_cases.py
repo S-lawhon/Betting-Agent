@@ -6,10 +6,9 @@ import hashlib
 import json
 import math
 import sqlite3
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence
 
 
 UTC = timezone.utc
@@ -45,8 +44,7 @@ def _quantile(values: Sequence[float], q: float) -> Optional[float]:
     return round(value, 6)
 
 
-def _paths(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
-    paths = []
+def _paths(rows: Iterable[Mapping[str, Any]]) -> Iterator[Dict[str, Any]]:
     for observation in rows:
         captured = _parse(observation.get("captured_at"))
         if not captured:
@@ -65,7 +63,7 @@ def _paths(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
                             "gemini:{}|kalshi:{}".format(
                                 path.get("gemini_yes_team"),
                                 path.get("kalshi_yes_team")))
-            paths.append({
+            yield {
                 **dict(path), "captured": captured,
                 "collection_id": observation.get("collection_id"),
                 "match_key": observation.get("match_key"),
@@ -75,8 +73,7 @@ def _paths(rows: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
                 "venue_start_difference_seconds": (
                     abs((gemini_start - kalshi_start).total_seconds())
                     if gemini_start and kalshi_start else None),
-            })
-    return paths
+            }
 
 
 def settlement_basis(policy: Mapping[str, Any]) -> Dict[str, Any]:
@@ -171,62 +168,98 @@ def _finish_case(pair_id: str, key: tuple, values: List[Dict[str, Any]], *,
     }
 
 
+class _CaseBuilder:
+    """Incrementally segment chronological paths without retaining the tape."""
+
+    def __init__(self, *, pair_id: str, policy: Mapping[str, Any],
+                 now: datetime, threshold_usd: float,
+                 max_episode_gap_seconds: float):
+        self.pair_id = pair_id
+        self.basis = settlement_basis(policy)
+        self.now = now
+        self.threshold_usd = threshold_usd
+        self.max_episode_gap_seconds = max_episode_gap_seconds
+        self.states: Dict[tuple, Dict[str, Any]] = {}
+        self.cases: List[Dict[str, Any]] = []
+
+    def consume(self, row: Dict[str, Any]) -> None:
+        value = row.get("net_edge_usd")
+        if not isinstance(value, (int, float)):
+            return
+        key = (row.get("match_key"), row["direction"])
+        state = self.states.setdefault(key, {"previous": None, "current": []})
+        current = state["current"]
+        previous = state["previous"]
+        gap = ((row["captured"] - previous).total_seconds()
+               if previous is not None else None)
+        if current and gap is not None and gap > self.max_episode_gap_seconds:
+            self.cases.append(_finish_case(
+                self.pair_id, key, current, policy_basis=self.basis,
+                status="closed", closure_reason="observation_gap",
+                closed_at=current[-1]["captured"], post_case_edge_usd=None))
+            current = []
+        edge = float(value)
+        if edge >= self.threshold_usd:
+            current.append(row)
+        elif current:
+            self.cases.append(_finish_case(
+                self.pair_id, key, current, policy_basis=self.basis,
+                status="closed", closure_reason="edge_below_threshold",
+                closed_at=row["captured"], post_case_edge_usd=edge))
+            current = []
+        state["current"] = current
+        state["previous"] = row["captured"]
+
+    def finish(self) -> List[Dict[str, Any]]:
+        for key, state in self.states.items():
+            current = state["current"]
+            if not current:
+                continue
+            age = (self.now - current[-1]["captured"]).total_seconds()
+            active = 0 <= age <= self.max_episode_gap_seconds
+            self.cases.append(_finish_case(
+                self.pair_id, key, current, policy_basis=self.basis,
+                status="active" if active else "closed",
+                closure_reason=None if active else "observation_gap",
+                closed_at=None if active else current[-1]["captured"],
+                post_case_edge_usd=None))
+            state["current"] = []
+        return sorted(
+            self.cases, key=lambda row: (row["first_seen"], row["case_id"]))
+
+
 def build_cases(rows: Iterable[Mapping[str, Any]], *, pair_id: str,
                 policy: Mapping[str, Any], now: Optional[datetime] = None,
                 threshold_usd: float = 0.03,
                 max_episode_gap_seconds: float = 450.0) -> List[Dict[str, Any]]:
     """Segment qualifying paths into stable cases with observed closure facts."""
     now = (now or datetime.now(UTC)).astimezone(UTC)
-    basis = settlement_basis(policy)
-    series = defaultdict(list)
+    builder = _CaseBuilder(
+        pair_id=pair_id, policy=policy, now=now,
+        threshold_usd=threshold_usd,
+        max_episode_gap_seconds=max_episode_gap_seconds)
     for row in _paths(rows):
-        if isinstance(row.get("net_edge_usd"), (int, float)):
-            series[(row.get("match_key"), row["direction"])].append(row)
-    cases = []
-    for key, values in series.items():
-        values.sort(key=lambda row: row["captured"])
-        current: List[Dict[str, Any]] = []
-        previous: Optional[datetime] = None
-        for row in values:
-            edge = float(row["net_edge_usd"])
-            gap = ((row["captured"] - previous).total_seconds()
-                   if previous is not None else None)
-            if current and gap is not None and gap > max_episode_gap_seconds:
-                cases.append(_finish_case(
-                    pair_id, key, current, policy_basis=basis, status="closed",
-                    closure_reason="observation_gap", closed_at=current[-1]["captured"],
-                    post_case_edge_usd=None))
-                current = []
-            if edge >= threshold_usd:
-                current.append(row)
-            elif current:
-                cases.append(_finish_case(
-                    pair_id, key, current, policy_basis=basis, status="closed",
-                    closure_reason="edge_below_threshold", closed_at=row["captured"],
-                    post_case_edge_usd=edge))
-                current = []
-            previous = row["captured"]
-        if current:
-            age = (now - current[-1]["captured"]).total_seconds()
-            active = 0 <= age <= max_episode_gap_seconds
-            cases.append(_finish_case(
-                pair_id, key, current, policy_basis=basis,
-                status="active" if active else "closed",
-                closure_reason=None if active else "observation_gap",
-                closed_at=None if active else current[-1]["captured"],
-                post_case_edge_usd=None))
-    return sorted(cases, key=lambda row: (row["first_seen"], row["case_id"]))
+        builder.consume(row)
+    return builder.finish()
 
 
 def calibrate_thresholds(rows: Iterable[Mapping[str, Any]], *, pair_id: str,
                          policy: Mapping[str, Any], now: Optional[datetime] = None,
                          thresholds: Sequence[float] = DEFAULT_THRESHOLDS
                          ) -> List[Dict[str, Any]]:
-    observations = list(rows)
+    now = (now or datetime.now(UTC)).astimezone(UTC)
+    builders = [
+        _CaseBuilder(
+            pair_id=pair_id, policy=policy, now=now,
+            threshold_usd=threshold, max_episode_gap_seconds=450.0)
+        for threshold in thresholds
+    ]
+    for row in _paths(rows):
+        for builder in builders:
+            builder.consume(row)
     output = []
-    for threshold in thresholds:
-        cases = build_cases(observations, pair_id=pair_id, policy=policy,
-                            now=now, threshold_usd=threshold)
+    for threshold, builder in zip(thresholds, builders):
+        cases = builder.finish()
         durations = [row["duration_seconds_lower_bound"] for row in cases]
         output.append({
             "threshold_usd": threshold, "case_count": len(cases),

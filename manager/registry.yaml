@@ -68,6 +68,8 @@ systemd_units:
   - {id: manager-alert.service, unit: manager-alert.service, source: scripts/systemd/manager-alert.service, severity: warn}
   - {id: manager-brief.timer, unit: manager-brief.timer, source: scripts/systemd/manager-brief.timer, severity: warn}
   - {id: manager-brief.service, unit: manager-brief.service, source: scripts/systemd/manager-brief.service, severity: warn}
+  - {id: gemini-crossvenue-analysis.timer, unit: gemini-crossvenue-analysis.timer, source: scripts/systemd/gemini-crossvenue-analysis.timer, severity: warn}
+  - {id: gemini-crossvenue-analysis.service, unit: gemini-crossvenue-analysis.service, source: scripts/systemd/gemini-crossvenue-analysis.service, severity: warn}
   - {id: p029-gate0c-checkpoint.timer, unit: p029-gate0c-checkpoint.timer, source: scripts/systemd/p029-gate0c-checkpoint.timer, severity: warn}
   - {id: p029-gate0c-checkpoint.service, unit: p029-gate0c-checkpoint.service, source: scripts/systemd/p029-gate0c-checkpoint.service, severity: warn}
   - {id: mlb-props-execution-checkpoint.timer, unit: mlb-props-execution-checkpoint.timer, source: scripts/mlb-props-execution-checkpoint.timer, severity: warn}
@@ -208,6 +210,19 @@ jobs:
       file proves quote collection and exact matching ran. Settlement terms are
       fail closed. Hypothetical positive paths remain non-actionable unless a
       reviewed, current equivalence policy explicitly approves them.
+
+  - id: gemini_crossvenue_analysis
+    host: droplet
+    schedule: "hourly at minute 02 (systemd timer)"
+    description: Bounded replay of Gemini/Kalshi analytics and research cases
+    output:
+      file: data/gemini_crossvenue/analytics.json
+      max_stale_hours: 2.0
+    severity: warn
+    note: >
+      Streams the 14-day public observation tape under a separate 256 MiB
+      cgroup. Failure cannot block five-minute quote collection; cached
+      analysis remains explicitly timestamped and non-actionable.
 
   - id: crossvenue_settlement_evidence
     host: droplet

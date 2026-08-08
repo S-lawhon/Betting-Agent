@@ -35,9 +35,10 @@ import signal
 import sqlite3
 import sys
 import time
+from collections import OrderedDict, deque
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, Iterable, List, Optional, Set, Tuple
 
 import requests
 
@@ -57,6 +58,9 @@ RESOLVE_INTERVAL = 300.0              # s between trade-resolution sweeps
 RESOLVE_BATCH = 600                   # rows per resolve sweep; exactly 1 call each
 RESOLVE_MIN_AGE_H = 40.0              # check a combo ONCE, after its trading life
 LEG_CACHE_TTL = 20.0                  # s; leg books move, but not every call
+LEG_CACHE_MAX = 10_000                # hard bound; stale entries are not useful
+ERROR_HISTORY_MAX = 1_000             # diagnostics, never an unbounded ledger
+SQLITE_MEMBERSHIP_BATCH = 500         # stay below conservative variable limits
 # Warn on the IN-ZONE due backlog only. Out-of-zone rows are deliberately
 # starved — they get whatever capacity is left after the gate's own sample is
 # served — so a warning on the total backlog would be permanently on, and a
@@ -147,7 +151,7 @@ class Public:
         self._s = requests.Session()
         self._s.headers.update({"Accept": "application/json", "User-Agent": UA})
         self.calls = 0
-        self.errors: List[Tuple[str, int]] = []
+        self.errors: Deque[Tuple[str, int]] = deque(maxlen=ERROR_HISTORY_MAX)
 
     def _throttle(self) -> None:
         dt = time.monotonic() - self._last
@@ -350,12 +354,25 @@ class LegPricer:
 
     def __init__(self, pub: Public):
         self.pub = pub
-        self._cache: Dict[str, Tuple[float, dict]] = {}
+        self._cache: OrderedDict[str, Tuple[float, dict]] = OrderedDict()
+
+    def prune(self, now: Optional[float] = None) -> int:
+        """Drop expired marks and enforce the hard cache bound."""
+        current = time.monotonic() if now is None else now
+        stale = [ticker for ticker, (stamp, _) in self._cache.items()
+                 if current - stamp >= LEG_CACHE_TTL]
+        for ticker in stale:
+            self._cache.pop(ticker, None)
+        while len(self._cache) > LEG_CACHE_MAX:
+            self._cache.popitem(last=False)
+        return len(stale)
 
     def mark(self, ticker: str) -> Optional[dict]:
         hit = self._cache.get(ticker)
         if hit and (time.monotonic() - hit[0]) < LEG_CACHE_TTL:
+            self._cache.move_to_end(ticker)
             return hit[1]
+        self._cache.pop(ticker, None)
         d = self.pub.get(f"/markets/{ticker}")
         if not d or "market" not in d:
             return None
@@ -375,6 +392,9 @@ class LegPricer:
             "ts": now_iso(),
         }
         self._cache[ticker] = (time.monotonic(), rec)
+        self._cache.move_to_end(ticker)
+        while len(self._cache) > LEG_CACHE_MAX:
+            self._cache.popitem(last=False)
         return rec
 
     def price_combo(self, legs: List[Tuple[str, str]]
@@ -455,11 +475,32 @@ def live_collections(pub: Public) -> List[str]:
     return out
 
 
+def _existing_tickers(
+    con: sqlite3.Connection, tickers: Iterable[str],
+) -> Set[str]:
+    """Return existing tickers using bounded primary-key probes.
+
+    The database holds millions of historical rows. Materialising every ticker
+    into a Python set consumed hundreds of MiB and forced the service against
+    its cgroup cap. Discovery only needs membership for the current API page.
+    """
+    unique = list(dict.fromkeys(str(ticker) for ticker in tickers if ticker))
+    existing: Set[str] = set()
+    for start in range(0, len(unique), SQLITE_MEMBERSHIP_BATCH):
+        batch = unique[start:start + SQLITE_MEMBERSHIP_BATCH]
+        placeholders = ",".join("?" for _ in batch)
+        existing.update(row[0] for row in con.execute(
+            f"SELECT market_ticker FROM combo WHERE market_ticker IN "
+            f"({placeholders})", batch))
+    return existing
+
+
 def discover(con: sqlite3.Connection, pub: Public, pricer: LegPricer) -> int:
     """Sweep live collections for combo markets we have not seen before."""
     series = ["KXMVESPORTSMULTIGAMEEXTENDED", "KXMVECROSSCATEGORY",
               "KXMVENBASINGLEGAME", "KXMVENFLSINGLEGAME"]
-    seen = {r[0] for r in con.execute("SELECT market_ticker FROM combo")}
+    pricer.prune()
+    seen_this_sweep: Set[str] = set()
     added = 0
     for s in series:
         cursor, pages = None, 0
@@ -477,7 +518,11 @@ def discover(con: sqlite3.Connection, pub: Public, pricer: LegPricer) -> int:
             rows = d.get("markets", [])
             if not rows:
                 break
-            fresh = [m for m in rows if m.get("ticker") not in seen]
+            existing = _existing_tickers(
+                con, (m.get("ticker") for m in rows))
+            fresh = [m for m in rows
+                     if m.get("ticker") not in existing
+                     and m.get("ticker") not in seen_this_sweep]
             for m in fresh:
                 tkr = m["ticker"]
                 legs = legs_of(m)
@@ -503,7 +548,7 @@ def discover(con: sqlite3.Connection, pub: Public, pricer: LegPricer) -> int:
                      indep, copula, model, rel,
                      fnum(m.get("yes_bid_dollars")), fnum(m.get("yes_ask_dollars")),
                      in_zone))
-                seen.add(tkr)
+                seen_this_sweep.add(tkr)
                 added += 1
             con.commit()
             cursor = d.get("cursor")

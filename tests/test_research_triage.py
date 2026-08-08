@@ -199,8 +199,62 @@ class TestResearchTriage(TestCase):
         self.assertEqual(
             packets[0].assignment["title"],
             "Rule additions relevant to RFQ system.")
-        self.assertEqual(packets[0].source_item["title"], "ARST")
+        # The packet is what a specialist reads, so its embedded source record
+        # is corrected too -- without moving the dedup identity.
+        self.assertEqual(
+            packets[0].source_item["title"],
+            "Rule additions relevant to RFQ system.")
+        self.assertEqual(
+            packets[0].source_item["summary"],
+            "ARST: Rule additions relevant to RFQ system.")
+        self.assertEqual(packets[0].source_item["original_title"], "ARST")
+        self.assertEqual(
+            packets[0].source_item["title_source"],
+            "metadata.Filing Description")
+        self.assertEqual(packets[0].source_item["id"], source.id)
         self.assertEqual(packets[0].source_item["content_hash"], original_hash)
+
+    def test_ledger_state_does_not_permanently_block_a_corrected_assignment(self):
+        assignment = _assignment(
+            1, source="regulatory_filing", lane="market_structure",
+            score=93, title="COIN")
+        source = SourceItem.create(
+            source_type="regulatory_filing", source_name="CFTC",
+            external_id="filing-coin", title="COIN", summary="COIN: COIN",
+            url="https://example.test/filing-coin",
+            retrieved_at="2026-08-02T13:00:00Z",
+            metadata={
+                "Organization": "COIN", "Status": "10 Day Review",
+                "Filing Description": (
+                    "Modifications to Equity Index Perp Style Futures "
+                    "Market Maker Program"),
+            })
+        ledger = {
+            "dispatched_assignment_ids": ["a1"],
+            "title_tokens_by_assignment": {"a1": ["coin"]},
+        }
+        sources = {"s1": source.to_dict()}
+        # Without an explicit reopen the ledger keeps it out, which is what a
+        # normal run should do.
+        _, blocked_manifest, blocked_packets = triage_assignments(
+            [assignment], source_items_by_id=sources,
+            previous_ledger=ledger, now=NOW)
+        self.assertEqual(blocked_packets, [])
+        self.assertEqual(blocked_manifest["already_dispatched"], 1)
+        # Re-admission reopens exactly that assignment and it carries the
+        # corrected title, under its original id.
+        new_ledger, manifest, packets = triage_assignments(
+            [assignment], source_items_by_id=sources,
+            previous_ledger=ledger, redispatch_assignment_ids={"a1"}, now=NOW)
+        self.assertEqual(manifest["dispatched"], 1)
+        self.assertEqual(manifest["reopened_due_deferral"], 1)
+        self.assertEqual(packets[0].assignment_id, "a1")
+        self.assertEqual(packets[0].assigned_agent, "strategy-scout")
+        self.assertEqual(
+            packets[0].assignment["title"],
+            "Modifications to Equity Index Perp Style Futures "
+            "Market Maker Program")
+        self.assertIn("a1", new_ledger["dispatched_assignment_ids"])
 
     def test_triage_keeps_one_packet_per_research_family(self):
         first = _assignment(1, source="paper", lane="literature", score=80)

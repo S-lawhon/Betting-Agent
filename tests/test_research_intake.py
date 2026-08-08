@@ -13,11 +13,44 @@ from src.research_intake import (
     XRecentSearchCollector,
     build_intake,
     market_census_items,
+    normalize_regulatory_title,
     quality_rejection_reason,
 )
 
 
 NOW = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
+
+# The live CFTC row behind src_95f6533902b2cf2e6343, verbatim.  It was ingested
+# before the collector preferred the description column, so the persisted title
+# is the filer code while the mechanism text sits in the metadata.
+COIN_FILING_METADATA = {
+    "Date": "07/30/2026",
+    "Documents": "2",
+    "Filing Description": (
+        "Modifications to Equity Index Perp Style Futures "
+        "Market Maker Program"),
+    "Organization": "COIN",
+    "Receipt Date": "07/30/2026",
+    "Remarks": "",
+    "Status": "10 Day Review",
+}
+
+
+def _legacy_cftc_item(**changes):
+    values = {
+        "source_type": "regulatory_filing", "source_name": "CFTC",
+        "external_id": ("https://www.cftc.gov/IndustryOversight/IndustryFilings"
+                        "/TradingOrganizationRules/62095"),
+        "title": "COIN", "summary": "COIN: COIN",
+        "url": ("https://www.cftc.gov/IndustryOversight/IndustryFilings"
+                "/TradingOrganizationRules/62095"),
+        "published_at": "07/30/2026",
+        "retrieved_at": "2026-08-02T13:46:48.274032Z",
+        "topics": ["rules"], "venue_ids": [], "reliability": "primary",
+        "metadata": dict(COIN_FILING_METADATA),
+    }
+    values.update(changes)
+    return SourceItem.create(**values)
 
 
 def _registry(research_allowed=True):
@@ -168,6 +201,68 @@ class TestSourceItems(TestCase):
         self.assertEqual(
             quality_rejection_reason(withdrawn_filing, now=NOW),
             "terminal_regulatory_filing")
+
+    def test_filing_description_takes_precedence_over_opaque_codes(self):
+        self.assertEqual(
+            normalize_regulatory_title("COIN", COIN_FILING_METADATA),
+            "Modifications to Equity Index Perp Style Futures "
+            "Market Maker Program")
+        self.assertEqual(
+            normalize_regulatory_title(
+                "KEX", {"Organization": "KEX",
+                        "Product Name": "Weather Contract"}),
+            "Weather Contract")
+        self.assertEqual(
+            normalize_regulatory_title(
+                "MLBEXTRAS1", {"Description": "Extra innings rulebook change"}),
+            "Extra innings rulebook change")
+        # A description-bearing column wins, but a human-readable title is
+        # never overwritten and a code with no description is left alone.
+        self.assertEqual(
+            normalize_regulatory_title(
+                "Market Maker Incentive Program",
+                {"Organization": "CFE", "Filing Description": "CFE"}),
+            "Market Maker Incentive Program")
+        self.assertEqual(
+            normalize_regulatory_title("MLBEXTRAS1", {}), "MLBEXTRAS1")
+
+    def test_active_ten_day_review_filing_is_not_an_opaque_product_code(self):
+        filing = _legacy_cftc_item()
+        self.assertIsNone(quality_rejection_reason(filing, now=NOW))
+        # The same active filing with no description column stays opaque, and
+        # a terminal status still outranks the title rule.
+        self.assertEqual(
+            quality_rejection_reason(
+                _legacy_cftc_item(metadata={
+                    "Organization": "COIN", "Status": "10 Day Review"}),
+                now=NOW),
+            "opaque_product_code")
+        self.assertEqual(
+            quality_rejection_reason(
+                _legacy_cftc_item(metadata=dict(
+                    COIN_FILING_METADATA, Status="Withdrawn")), now=NOW),
+            "terminal_regulatory_filing")
+
+    def test_legacy_filing_title_survives_assignment_generation(self):
+        filing = _legacy_cftc_item()
+        # Identity is derived from source type, name and URL, so correcting the
+        # title must not move the source item or its dedup hash.
+        self.assertEqual(filing.id, "src_95f6533902b2cf2e6343")
+        self.assertEqual(
+            filing.content_hash,
+            "c205b7e9cea96af97b6628184d9dc00dd8955565e94f6547c6cdd21ac73ce99b")
+        _, manifest, assignments = build_intake(
+            [filing], eligibility=_registry(),
+            now=datetime(2026, 8, 2, 13, 47, 26, 10201, tzinfo=timezone.utc))
+        self.assertEqual(manifest["quality_rejection_reasons"], {})
+        self.assertEqual(len(assignments), 1)
+        self.assertEqual(
+            assignments[0].title,
+            "Modifications to Equity Index Perp Style Futures "
+            "Market Maker Program")
+        self.assertEqual(assignments[0].id, "assignment_44c86b342e8ac95d8f67")
+        self.assertEqual(assignments[0].source_item_id, filing.id)
+        self.assertEqual(assignments[0].attribution_key, "CFTC:COIN")
 
     def test_active_organization_listing_is_low_priority_not_edge_evidence(self):
         organization = _item(

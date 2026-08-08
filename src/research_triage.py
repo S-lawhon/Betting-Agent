@@ -16,7 +16,11 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-from src.research_intake import quality_rejection_from_mapping
+from src.research_intake import (
+    quality_rejection_from_mapping,
+    regulatory_filing_description_field,
+    research_display_title,
+)
 
 
 SCHEMA_VERSION = 1
@@ -145,21 +149,39 @@ def normalize_legacy_regulatory_assignment(
         assignment.get("source_type") or source_item.get("source_type") or "")
     if source_type != "regulatory_filing":
         return normalized
-    metadata = source_item.get("metadata") or {}
-    description = str(
-        metadata.get("Filing Description")
-        or metadata.get("Product Name")
-        or metadata.get("Description")
-        or "").strip()
     title = str(assignment.get("title") or source_item.get("title") or "").strip()
-    organization = str(metadata.get("Organization") or "").strip()
-    opaque = bool(
-        title and (
-            (organization and title.casefold() == organization.casefold())
-            or (" " not in title and re.fullmatch(r"[A-Z0-9_-]+", title))))
-    if description and opaque and description.casefold() != title.casefold():
-        normalized["title"] = description
+    normalized["title"] = research_display_title(
+        source_type, title, source_item.get("metadata") or {})
     return normalized
+
+
+def normalize_legacy_regulatory_source_item(
+    source_item: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Give a dispatch packet's embedded source record the useful title.
+
+    The packet is what a specialist (or a screening model) reads, so a legacy
+    record whose title and summary are both the filer code ("COIN", "COIN:
+    COIN") has to be corrected here too.  ``id`` and ``content_hash`` are left
+    untouched, and the original title is retained as provenance, so the
+    correction never masquerades as a different source item.
+    """
+    payload = dict(source_item)
+    if str(payload.get("source_type") or "") != "regulatory_filing":
+        return payload
+    metadata = payload.get("metadata") or {}
+    original = str(payload.get("title") or "").strip()
+    normalized = research_display_title("regulatory_filing", original, metadata)
+    if not normalized or normalized == original:
+        return payload
+    organization = str(metadata.get("Organization") or "").strip()
+    payload["title"] = normalized
+    payload["summary"] = (f"{organization}: {normalized}" if organization
+                          else normalized)
+    payload["original_title"] = original
+    payload["title_source"] = "metadata.{}".format(
+        regulatory_filing_description_field(metadata))
+    return payload
 
 
 def _mechanism_hits(text: str) -> List[str]:
@@ -554,7 +576,10 @@ def triage_assignments(
 
     now = now or datetime.now(timezone.utc)
     previous = dict(previous_ledger or {})
-    source_items = dict(source_items_by_id or {})
+    source_items = {
+        str(key): normalize_legacy_regulatory_source_item(value)
+        for key, value in dict(source_items_by_id or {}).items()
+    }
     dispatched_before = set(previous.get("dispatched_assignment_ids") or [])
     reopened = set(redispatch_assignment_ids or set())
     dispatched_before -= reopened

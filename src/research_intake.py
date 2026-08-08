@@ -49,6 +49,11 @@ SOCIAL_MECHANISM_TERMS = {
     "rebate", "rule", "settlement", "slippage", "spread", "timestamp",
 }
 
+# A CFTC filing table puts the venue/product code in ``Organization`` and the
+# economically meaningful text in one of these columns, in this order.
+REGULATORY_DESCRIPTION_FIELDS = ("Filing Description", "Product Name",
+                                 "Description")
+
 
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
@@ -261,6 +266,70 @@ def market_family_key(item: SourceItem) -> str:
     return "{}:{}:{}".format(source, item.source_type, fallback)
 
 
+def regulatory_filing_description_field(
+        metadata: Optional[Mapping[str, Any]]) -> str:
+    """Return which metadata column carries this filing's description."""
+    for key in REGULATORY_DESCRIPTION_FIELDS:
+        if str((metadata or {}).get(key) or "").strip():
+            return key
+    return ""
+
+
+def regulatory_filing_description(
+        metadata: Optional[Mapping[str, Any]]) -> str:
+    """Return the mechanism-bearing text a regulatory filing row carries."""
+    field_name = regulatory_filing_description_field(metadata)
+    return str((metadata or {}).get(field_name) or "").strip() if field_name else ""
+
+
+def is_opaque_regulatory_title(
+    title: Any, metadata: Optional[Mapping[str, Any]] = None,
+) -> bool:
+    """True when a regulatory title is a bare venue or product code.
+
+    ``COIN``, ``CFE`` and ``MLBEXTRAS1`` name a filer or a ticker; they do not
+    name a mechanism, so dispatching one asks a specialist to invent context.
+    """
+    text = str(title or "").strip()
+    if not text:
+        return True
+    if " " in text:
+        return False
+    organization = str((metadata or {}).get("Organization") or "").strip()
+    if organization and text.casefold() == organization.casefold():
+        return True
+    return bool(len(text) < 40 and re.fullmatch(r"[A-Z0-9_-]+", text))
+
+
+def normalize_regulatory_title(
+    title: Any, metadata: Optional[Mapping[str, Any]] = None,
+) -> str:
+    """Promote a filing description over an opaque organization/product code.
+
+    This is DISPLAY-ONLY.  ``SourceItem.content_hash`` covers the title, and the
+    intake ledger deduplicates on that hash, so writing the result back into a
+    persisted source record would make an already-ingested filing look new.
+    Legacy CFTC batches (collected before the collector preferred the
+    description column) are corrected by calling this at read time instead.
+    """
+    text = str(title or "").strip()
+    if not is_opaque_regulatory_title(text, metadata):
+        return text
+    description = regulatory_filing_description(metadata)
+    if description and description.casefold() != text.casefold():
+        return description
+    return text
+
+
+def research_display_title(
+    source_type: Any, title: Any, metadata: Optional[Mapping[str, Any]] = None,
+) -> str:
+    """Return the title research tooling should show for a source record."""
+    if str(source_type or "") == "regulatory_filing":
+        return normalize_regulatory_title(title, metadata)
+    return str(title or "").strip()
+
+
 def _memory_match(item: SourceItem,
                   rules: Sequence[Mapping[str, Any]]) -> Optional[Mapping[str, Any]]:
     text = "{} {} {}".format(item.title, item.summary, item.external_id).lower()
@@ -298,19 +367,12 @@ def quality_rejection_reason(
     if item.source_type == "regulatory_filing":
         if status in TERMINAL_REGULATORY_STATUSES:
             return "terminal_regulatory_filing"
-        title = item.title.strip()
-        description = str(
-            _first(
-                item.metadata,
-                "Filing Description",
-                "Product Name",
-                "Description",
-            )
-            or ""
-        ).strip()
-        if (len(title) < 40 and " " not in title
-                and re.fullmatch(r"[A-Z0-9_-]+", title)
-                and (not description or description == title)):
+        # Judge the title research tooling will actually show.  A legacy batch
+        # titled with the filer code is not opaque when the filing description
+        # is sitting in its own metadata.
+        if is_opaque_regulatory_title(
+                normalize_regulatory_title(item.title, item.metadata),
+                item.metadata):
             return "opaque_product_code"
     memory = _memory_match(item, memory_rules)
     if memory and str(memory.get("status") or "").lower() in {
@@ -460,7 +522,8 @@ def build_intake(
             created_at=created_at,
             score=score,
             lane=_lane(item),
-            title=item.title,
+            title=research_display_title(
+                item.source_type, item.title, item.metadata),
             source_type=item.source_type,
             source_name=item.source_name,
             attribution_key=attribution_key,
@@ -687,9 +750,11 @@ class CFTCCollector:
                 # ``Organization`` while the economically meaningful text is
                 # in ``Filing Description``.  Dispatching the code ("CFE",
                 # "MIAX") asks a model to invent a mechanism from no context.
-                title = (_first(
-                    values, "Filing Description", "Product Name",
-                    "Description", "Organization") or "CFTC filing")
+                # Route through the shared rule so a freshly collected filing
+                # and a legacy one already on disk resolve to the same title.
+                title = normalize_regulatory_title(
+                    _first(values, *REGULATORY_DESCRIPTION_FIELDS,
+                           "Organization") or "CFTC filing", values)
                 organization = str(values.get("Organization") or "CFTC")
                 venue_id = self.VENUE_IDS.get(organization.upper())
                 published = _first(values, "Date", "Official Receipt Date", "Receipt Date")

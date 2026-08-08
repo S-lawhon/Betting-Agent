@@ -388,7 +388,8 @@ class ResearchAgentWorker:
                     "screening", screening_result)
                 screening = self._validate_screening_result(
                     screening_result, claim, packet)
-                self._write_screening(claim, screening, screening_result, now)
+                self._write_screening(
+                    claim, screening, screening_result, now, packet)
                 if screening.decision != "deep_research":
                     disposition, artifact_type, artifact = (
                         self._screening_completion(screening, claim))
@@ -549,10 +550,22 @@ class ResearchAgentWorker:
                 "screening_rules": [
                     "Reject only when the mechanism is absent, duplicated, "
                     "illegal, or falsified by the supplied/public evidence.",
-                    "Defer only when a named external fact and recheck time "
-                    "can resolve the uncertainty; recheck_after must be an "
-                    "ISO-8601 UTC timestamp.",
-                    "Use only supplied evidence in screening; do not browse.",
+                    "Defer ONLY when the deciding fact DOES NOT EXIST YET and "
+                    "needs time to come into being -- a market not yet listed, "
+                    "an event not yet settled, a filing whose text is not yet "
+                    "public. recheck_after must be an ISO-8601 UTC timestamp "
+                    "for when that fact will exist.",
+                    "If the missing input is public and FETCHABLE NOW -- a "
+                    "linked filing document, contract terms, current prices, "
+                    "depth, fees, a published dataset -- that is deep_research, "
+                    "NOT defer. You cannot browse in this phase; the deep "
+                    "research phase can. Deferring a fetchable fact spends the "
+                    "assignment and resolves nothing.",
+                    "Use only supplied evidence in screening; do not browse. "
+                    "Read dispatch_packet.market_evidence before claiming any "
+                    "evidence class is unavailable -- measured fees, quotes, "
+                    "contract terms and filing documents are often already "
+                    "there, with the timestamp they were measured at.",
                     "Choose deep_research only with a concrete market "
                     "mechanism and a cheapest decisive test.",
                     "This phase cannot advance or create an opportunity card.",
@@ -630,6 +643,7 @@ class ResearchAgentWorker:
     def _write_screening(
         self, claim: ResearchClaim, screening: ScreeningDecision,
         result: ProviderResult, now: datetime,
+        packet: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         payload = screening.to_dict()
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -644,6 +658,11 @@ class ResearchAgentWorker:
             "assigned_agent": claim.assigned_agent,
             "provider": result.provider, "model": result.model,
             "screening_sha256": digest, "screening": payload,
+            # What the screen was actually holding when it decided. A rule
+            # telling it not to defer a fetchable fact is unenforceable, so
+            # record the context instead: a defer taken while measured
+            # evidence was in hand is then visible rather than inferred.
+            "evidence_context": self._evidence_context(packet),
             "safety": {
                 "authorizes_execution": False,
                 "authorizes_advancement": False,
@@ -651,6 +670,22 @@ class ResearchAgentWorker:
         }
         _write_atomic(path, record)
         return {"path": str(path), "sha256": digest}
+
+    @staticmethod
+    def _evidence_context(packet: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+        evidence = (packet or {}).get("market_evidence") or {}
+        contract = (packet or {}).get("completion_contract") or {}
+        supplied = [str(value) for value in
+                    (contract.get("supplied_evidence") or [])]
+        return {
+            "evidence_status": str(evidence.get("status") or "none"),
+            "evidence_source": str(evidence.get("source") or ""),
+            "measured_at": evidence.get("measured_at"),
+            "supplied_evidence": supplied,
+            "decided_with_measured_evidence": bool(
+                supplied and str(evidence.get("status") or "") in
+                {"measured", "partial"}),
+        }
 
     def _screening_completion(
         self, screening: ScreeningDecision, claim: ResearchClaim,

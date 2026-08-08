@@ -23,20 +23,26 @@ from src.research_agent_worker import (
 NOW = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
 
 
-def setup_packet(root: Path, *, agent="strategy-scout", minutes=30) -> tuple:
+def setup_packet(root: Path, *, agent="strategy-scout", minutes=30,
+                 evidence=None) -> tuple:
     prompt = root / ".claude" / "agents" / f"{agent}.md"
     prompt.parent.mkdir(parents=True, exist_ok=True)
     prompt.write_text("research only; never trade\n", encoding="utf-8")
     dispatches = root / "data/research_triage/dispatches"
     packet = dispatches / agent / "a1.json"
     packet.parent.mkdir(parents=True)
-    packet.write_text(json.dumps({
+    body = {
         "id": "d1", "assignment_id": "a1", "source_item_id": "s1",
         "assigned_agent": agent, "priority": "high", "triage_score": 80,
         "research_budget_minutes": minutes,
         "created_at": "2026-08-03T11:00:00Z",
         "source_item": {"title": "private-looking source text marker"},
-    }), encoding="utf-8")
+    }
+    if evidence is not None:
+        body["market_evidence"] = evidence
+        body["completion_contract"] = {
+            "supplied_evidence": sorted(evidence.get("facts") or {})}
+    packet.write_text(json.dumps(body), encoding="utf-8")
     dispositions = root / "research/dispositions"
     dispositions.mkdir(parents=True)
     return dispatches, root / "data/research_execution", dispositions
@@ -74,8 +80,8 @@ class FakeProvider:
 
 def worker(root: Path, provider=None, *, execution_enabled=False,
            limits=None, screening_provider=None,
-           screening_enabled=False) -> ResearchAgentWorker:
-    dispatches, state, dispositions = setup_packet(root)
+           screening_enabled=False, evidence=None) -> ResearchAgentWorker:
+    dispatches, state, dispositions = setup_packet(root, evidence=evidence)
     return ResearchAgentWorker(
         root=root, dispatches_dir=dispatches, state_dir=state,
         dispositions_dir=dispositions, worker_id="test-worker",
@@ -93,10 +99,12 @@ class FakeScreeningProvider:
 
     def __init__(self, decision="reject"):
         self.calls = 0
+        self.last_request = None
         self.decision = decision
 
     def invoke(self, request, *, timeout_seconds):
         self.calls += 1
+        self.last_request = request
         assert timeout_seconds == 30
         assert request["output_contract"]["advance_allowed"] is False
         return ProviderResult(self.name, self.model, {
@@ -443,3 +451,64 @@ def test_phase1_service_is_network_denied_and_cannot_execute():
     assert "OnCalendar=hourly" in timer
     assert "mode: dry_run" in config
     assert "type: none" in config
+
+
+def test_screening_rules_route_fetchable_unknowns_to_deep_research(tmp_path):
+    screen = FakeScreeningProvider("reject")
+    runtime = worker(
+        tmp_path, FakeProvider(), execution_enabled=True,
+        screening_provider=screen, screening_enabled=True)
+
+    runtime.run_once(execute=True)
+
+    request = screen.last_request
+    rules = " ".join(request["screening_rules"])
+    # Defer is for a fact that does not exist yet, not one behind a fetch.
+    # Screening has no network; deep research does, so deferring something
+    # fetchable spends the assignment and resolves nothing.
+    assert "DOES NOT EXIST YET" in rules
+    assert "FETCHABLE NOW" in rules
+    assert "that is deep_research, " in rules and "NOT defer" in rules
+    # And the screen is pointed at the evidence it was actually handed.
+    assert "dispatch_packet.market_evidence" in rules
+    assert request["output_contract"]["decisions"] == [
+        "reject", "defer", "deep_research"]
+    assert request["output_contract"]["advance_allowed"] is False
+
+
+def test_screening_record_captures_what_evidence_was_in_hand(tmp_path):
+    runtime = worker(
+        tmp_path, FakeProvider(), execution_enabled=True,
+        screening_provider=FakeScreeningProvider("reject"),
+        screening_enabled=True, evidence={
+            "status": "measured", "source": "cftc_filing_documents",
+            "measured_at": "2026-08-03T11:30:00Z",
+            "facts": {"documents": [{"url": "https://cftc.test/rule.pdf"}]},
+        })
+
+    runtime.run_once(execute=True)
+
+    screening = json.loads((
+        tmp_path / "data/research_execution/screenings/strategy-scout/a1.json"
+    ).read_text())
+    context = screening["evidence_context"]
+    assert context["evidence_status"] == "measured"
+    assert context["evidence_source"] == "cftc_filing_documents"
+    assert context["supplied_evidence"] == ["documents"]
+    assert context["decided_with_measured_evidence"] is True
+
+
+def test_screening_record_marks_an_evidence_free_decision(tmp_path):
+    runtime = worker(
+        tmp_path, FakeProvider(), execution_enabled=True,
+        screening_provider=FakeScreeningProvider("reject"),
+        screening_enabled=True)
+
+    runtime.run_once(execute=True)
+
+    context = json.loads((
+        tmp_path / "data/research_execution/screenings/strategy-scout/a1.json"
+    ).read_text())["evidence_context"]
+    assert context["evidence_status"] == "none"
+    assert context["supplied_evidence"] == []
+    assert context["decided_with_measured_evidence"] is False

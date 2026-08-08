@@ -1,0 +1,21 @@
+{
+  "assignment_id": "assignment_0c7155aaa0b83b109f75",
+  "decided_at": "2026-08-02T18:31:00Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/21428",
+    "https://www.cftc.gov/PressRoom/PressReleases/9246-26",
+    "https://ir.cboe.com/news/news-details/2025/Cboe-Successfully-Completes-Migration-of-Cboe-Digital-Exchange-Futures-to-Cboe-Futures-Exchange/default.aspx"
+  ],
+  "notes": "Cboe Digital remains CFTC-designated, but Cboe migrated its Bitcoin and Ether futures to Cboe Futures Exchange on 2025-06-09. The CFTC then issued time-limited no-action relief on 2026-06-03 concerning Cboe Digital's dormancy procedures. The source identifies a regulated entity, not a currently executable product, pricing anomaly, dataset, or falsifiable edge mechanism.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "dormant_designated_venue",
+    "products_migrated_to_other_venue",
+    "no_testable_edge_mechanism",
+    "no_executable_market"
+  ],
+  "recheck_after": "2027-04-03T00:00:00Z",
+  "research_minutes": 8,
+  "source_item_id": "src_cacc0e3b17cda7b10fa3"
+}

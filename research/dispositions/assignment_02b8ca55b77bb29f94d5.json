@@ -1,0 +1,22 @@
+{
+  "assignment_id": "assignment_02b8ca55b77bb29f94d5",
+  "source_item_id": "src_4def604bc1b7732da2eb",
+  "decided_at": "2026-08-08T14:12:24Z",
+  "decision": "reject",
+  "reason_codes": [
+    "duplicate_existing_strategy",
+    "existing_forward_gate_active",
+    "no_new_mechanism"
+  ],
+  "evidence_checked": [
+    "https://assets.kalshi.com/contract_terms/PGAROUNDLEADER.pdf",
+    "research/specs/strat_p022_fade_v2_2026-08-02.json sha256:d5895644e977295c4932b39aa1bf416c72e60ac522aaded26408e911b554cfaf",
+    "research/integrity/strat_p022_fade_v2_integrity_2026-08-02.json sha256:7890e88443235c8264bea5b18cdb66c15eb8b7d51ee0bc6c3d71ff9447c012fd",
+    "research/validation/strat_p022_fade_v2_validation_2026-08-02.json sha256:25a242fb99e67912c515af34c5bed26434fdfe515d58083f4b5caa232589cb5f",
+    "golf_quirks_research/P022_DECISION_RULE.md sha256:c771d9953877fb0f2bb56e4b887f1b9449d5ee860f06ee7e197632d33310b227"
+  ],
+  "research_minutes": 5,
+  "opportunity_id": null,
+  "recheck_after": null,
+  "notes": "The census packet names the same KXPGAR1LEAD round-leader dead-heat mechanism already specified and integrity/validation reviewed as strat_p022_fade_v2, with P-022 collecting its locked forward paper gate. This rejects only the duplicate intake assignment; it does not reject, promote, alter, or read the forward P-022 gate. No new market mechanism or decisive test was supplied by the packet."
+}

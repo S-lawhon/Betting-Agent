@@ -1,0 +1,23 @@
+{
+  "assignment_id": "assignment_3711c6557a5d1732805e",
+  "decided_at": "2026-08-06T05:20:00Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "CFTC, Industry Filings: Designated Contract Markets (DCM) Filing \u2014 Bullish Markets LLC, filing 60754: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/60754",
+    "CFTC, Bullish Form DCM Cover Page: https://www.cftc.gov/filings/documents/2026/orgdcmbullformdcmcover260513.pdf",
+    "Bullish, Institutional crypto trading / derivatives: https://www.bullish.com/derivatives",
+    "Bullish Help Center, Understanding fees: https://support.exchange.bullish.com/wiki/spaces/BHC/pages/9373547/Understanding+fees"
+  ],
+  "notes": "The filing is a pending DCM application dated 2026-05-07, not evidence of an approved, live, executable event-contract market. Public materials identify a general derivatives venue and fee framework but do not provide a specific contract, settlement source, order-book history, capacity, or measurable pricing discrepancy. No economically testable net-edge hypothesis survives this packet.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "pending_regulatory_status",
+    "no_identified_contract_or_settlement_rule",
+    "no_falsifiable_edge_mechanism",
+    "execution_eligibility_unknown",
+    "fees_and_liquidity_unverified"
+  ],
+  "recheck_after": "2026-11-03T00:00:00Z",
+  "research_minutes": 10,
+  "source_item_id": "src_86a38e3a84dce7884ddd"
+}

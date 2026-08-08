@@ -1,0 +1,24 @@
+{
+  "assignment_id": "assignment_168715f3bf9e6439beaf",
+  "decided_at": "2026-08-02T18:34:00Z",
+  "decision": "advance",
+  "evidence_checked": [
+    "https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/44472",
+    "https://developer.gemini.com/prediction-markets/prediction-markets",
+    "https://www.gemini.com/fees/predictions",
+    "https://support.gemini.com/hc/en-us/articles/204072799-Which-countries-and-U-S-states-does-Gemini-support",
+    "Gemini GET /v1/prediction-markets/events?status=active&limit=100",
+    "Gemini MLB-2608021740-PIT-CIN-M and Kalshi KXMLBGAME-26AUG021340PITCIN public event payloads"
+  ],
+  "notes": "Gemini Titan is designated and operating with at least 100 active event listings, public REST/WebSocket market data, documented maker/taker fees, and broad overlap with Kalshi. A manually matched Pittsburgh-Cincinnati MLB moneyline had economically aligned terms and identical 0.05/0.06 Pittsburgh quotes on both venues, so no immediate edge was observed. The venue nevertheless supports a cheap, falsifiable read-only study of synchronized, fee-adjusted cross-venue dislocations. Opportunity op_20260802_003 was registered with a hard no-execution boundary.",
+  "opportunity_id": "op_20260802_003",
+  "reason_codes": [
+    "active_legal_venue",
+    "public_market_data_available",
+    "cross_venue_overlap_verified",
+    "falsifiable_read_only_test_available"
+  ],
+  "recheck_after": null,
+  "research_minutes": 15,
+  "source_item_id": "src_2b927ab7166faa5556e0"
+}

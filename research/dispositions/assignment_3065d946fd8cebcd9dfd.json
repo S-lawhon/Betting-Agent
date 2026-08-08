@@ -1,0 +1,23 @@
+{
+  "assignment_id": "assignment_3065d946fd8cebcd9dfd",
+  "decided_at": "2026-08-04T05:25:00Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "CFTC, Industry Filings: Designated Contract Markets (DCM) Filing \u2014 Rothera Exchange and Clearing LLC: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/40473",
+    "CFTC, Designated Contract Markets Rules Filing 60703 \u2014 Updates to the Exchange fee schedule: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizationRules/60703",
+    "Rothera, About Us: https://www.rothera.io/about-us",
+    "Rothera, Fees: https://www.rothera.io/fees",
+    "CFTC, Product Terms and Conditions Rules \u2014 Designated Contract Markets: https://www.cftc.gov/IndustryOversight/IndustryFilings/PTCDCMRules"
+  ],
+  "notes": "Observation: CFTC lists Rothera as a designated DCM, and Rothera describes DCM/DCO registrations, 24x7 trading, event-contract ambitions, and published fees. Observation: the source packet is an organization-level regulatory filing and identifies no contract, settlement rule, market history, executable depth, or candidate signal. Inference: without a specified market and measurable mechanism, no falsifiable net-edge hypothesis or cheapest decisive test can be defined; the venue-level designation does not establish executability or profitability. Recheck after a concrete product, settlement terms, historical order-book/trade data, and participant-access details are public.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "no_specific_market_or_contract",
+    "no_falsifiable_edge_mechanism",
+    "insufficient_data_for_net_edge",
+    "execution_and_fee_unknowns"
+  ],
+  "recheck_after": "2026-09-01T00:00:00Z",
+  "research_minutes": 8,
+  "source_item_id": "src_161be3455f297dc3beb5"
+}

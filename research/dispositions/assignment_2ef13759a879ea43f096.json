@@ -1,0 +1,24 @@
+{
+  "assignment_id": "assignment_2ef13759a879ea43f096",
+  "decided_at": "2026-08-03T20:20:00Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "CFTC, Industry Filings: Designated Contract Markets (DCM) Filing \u2014 QCX LLC d/b/a Polymarket US: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/49571",
+    "Polymarket US Documentation, Fee Schedule: https://docs.polymarket.us/fees",
+    "Polymarket US Documentation, Collateral and Margin: https://docs.polymarket.us/market-structure/collateral-and-margin",
+    "Polymarket US Rulebook (2026.05.19): https://polymarketexchange.com/files/legal/Polymarket%20US%20Rulebook%20%282026.05.19%29.pdf",
+    "Polymarket US Documentation, API Reference: https://docs.polymarket.us/api-reference"
+  ],
+  "notes": "Observation: the CFTC source establishes that QCX LLC d/b/a Polymarket US was designated on 2025-07-09, but it is an organization-level filing and specifies no contract, market, signal, or exploitable discrepancy. Public venue materials show variable trading fees, fully collateralized positions, and contract-specific settlement rules; these establish material costs and operational constraints, not an edge. Inference: without a named contract family, historical market data, executable depth, and a falsifiable mechanism, no cheapest decisive test can be defined and no opportunity card survives.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "no_specific_market_mechanism",
+    "organization_level_source_only",
+    "net_edge_not_falsifiable",
+    "execution_and_capacity_unverified",
+    "data_history_unverified"
+  ],
+  "recheck_after": null,
+  "research_minutes": 7,
+  "source_item_id": "src_48bb90b8a289fea41c4a"
+}

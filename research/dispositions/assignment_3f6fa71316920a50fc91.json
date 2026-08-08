@@ -1,0 +1,20 @@
+{
+  "assignment_id": "assignment_3f6fa71316920a50fc91",
+  "decided_at": "2026-08-07T05:10:03Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "CFTC Industry Filings: Designated Contract Markets (DCM) Filing \u2014 Smarkets Board of Trade Exchange LLC: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/59862",
+    "Smarkets Exchange Rulebook: https://www.cftc.gov/filings/documents/2026/orgdcmsmarketexhibitm260304.pdf",
+    "CFTC Industry Filings: Designated Contract Markets index: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations"
+  ],
+  "notes": "Observation: the CFTC filing is marked Pending, and the public documents reviewed are an application and draft rulebook. Inference: execution eligibility and live tradability are not established. The lead identifies an exchange organization rather than a specific contract, settlement rule, fee regime, executable depth, or falsifiable net-edge mechanism. No opportunity card is justified. Recheck if the CFTC status changes and public contract specifications, fees, market data, and settlement procedures become available.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "pending_eligibility",
+    "no_falsifiable_mechanism",
+    "insufficient_public_evidence"
+  ],
+  "recheck_after": "2026-09-01T00:00:00Z",
+  "research_minutes": 4,
+  "source_item_id": "src_bdd3dc4158e9c3b49054"
+}

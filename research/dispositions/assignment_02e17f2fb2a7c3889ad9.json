@@ -1,0 +1,22 @@
+{
+  "assignment_id": "assignment_02e17f2fb2a7c3889ad9",
+  "decided_at": "2026-08-02T18:37:00Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "https://api.elections.kalshi.com/trade-api/v2/series/AOH1996",
+    "https://api.elections.kalshi.com/trade-api/v2/events?series_ticker=AOH1996&limit=200",
+    "https://clinicaltrials.gov/study/NCT06763341",
+    "https://clinicaltrials.gov/study/NCT05227326"
+  ],
+  "notes": "AOH1996 is a valid Kalshi series definition but currently has zero open or historical events returned by the public API, so there is no contract, price, liquidity, or cadence to test. The newer AML Phase 1 study is currently suspended pending interim analysis and the series uses a custom frequency. This is a dormant product shell rather than a researchable market; a future census can rediscover it if an event is actually listed.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "series_without_events",
+    "no_executable_market",
+    "no_price_or_liquidity_data",
+    "clinical_trial_suspended"
+  ],
+  "recheck_after": null,
+  "research_minutes": 7,
+  "source_item_id": "src_d7341dafd5b5af34a5a7"
+}

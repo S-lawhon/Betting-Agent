@@ -1,0 +1,25 @@
+{
+  "assignment_id": "assignment_32fe511f523bf6d7279f",
+  "decided_at": "2026-08-05T05:20:00Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/58152",
+    "https://www.cftc.gov/filings/documents/2025/orgdcmrsbixm001ruleboo250917.pdf",
+    "https://www.cftc.gov/filings/documents/2025/orgdcmrsbixformdcmsignd250917.pdf",
+    "https://www.cftc.gov/filings/documents/2025/orgdcmrsbixunarrative250917.pdf",
+    "https://www.cftc.gov/IndustryOversight/IndustryFilings/ClearingOrganizations/50836"
+  ],
+  "notes": "Observation: the CFTC lists RSBIX, LLC as a pending DCM application, and its public rulebook describes generic binary contracts, a central limit order book, market-maker programs, and QC Clearing as clearinghouse. Observation: contract specifications, product list, fee schedule, market-maker terms, and operational exhibits are not publicly available in the reviewed filing; Exhibit U requests confidential treatment for most of them. Inference: no specific underlying, settlement source, price history, executable venue, or cost basis is available from which to formulate and test a net-edge hypothesis. QC Clearing is registered, but that does not establish RSBIX execution eligibility or live trading.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "no_falsifiable_edge",
+    "contract_terms_unavailable",
+    "fees_unknown",
+    "execution_friction_unknown",
+    "pending_eligibility",
+    "insufficient_public_data"
+  ],
+  "recheck_after": "2026-09-16T00:00:00Z",
+  "research_minutes": 10,
+  "source_item_id": "src_f9618ce80b671132470a"
+}

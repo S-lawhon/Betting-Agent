@@ -1,0 +1,21 @@
+{
+  "assignment_id": "assignment_03902bfa29607f823956",
+  "decided_at": "2026-08-02T18:13:06.719736Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/25784",
+    "https://www.cftc.gov/IndustryOversight/TradingOrganizations/DCMs/index.htm",
+    "CFTC filing status and remarks in source packet"
+  ],
+  "notes": "CFTC states the DCM application was stayed for material incompleteness and withdrawn on 2015-02-20. EOX is absent from the current CFTC DCM directory. No active venue, products, accessible data, fees, liquidity, or edge mechanism exists to test.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "withdrawn_regulatory_application",
+    "not_active_venue",
+    "no_testable_edge_mechanism",
+    "no_executable_market"
+  ],
+  "recheck_after": null,
+  "research_minutes": 6,
+  "source_item_id": "src_c7f732ca67e044418d6f"
+}

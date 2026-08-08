@@ -90,43 +90,17 @@ def _timed_fetch(fetch: Callable[[], List[Dict[str, Any]]]) -> Dict[str, Any]:
     }
 
 
-def _history_24h(directory: Path, now: datetime) -> Dict[str, Any]:
+def _run_history_24h(directory: Path, now: datetime) -> Dict[str, Any]:
+    """Summarize the compact run tape without replaying quote observations.
+
+    The observation tape is tens of megabytes and expands several-fold as
+    Python objects.  It belongs to the historical-analysis path, not the
+    five-minute collection heartbeat.
+    """
     cutoff = now - timedelta(hours=24)
-    runs = set()
+    snapshots = healthy = degraded = runs_with_matches = 0
     matched = hypothetical = actionable = 0
     best: Optional[float] = None
-    paths = [directory / f"{day.isoformat()}.jsonl"
-             for day in (now.date(), (now - timedelta(days=1)).date())]
-    for path in paths:
-        try:
-            lines = path.read_text().splitlines() if path.exists() else []
-        except OSError:
-            lines = []
-        for line in lines:
-            try:
-                row = json.loads(line)
-            except (json.JSONDecodeError, TypeError):
-                continue
-            captured = _parse_iso(row.get("captured_at"))
-            if not captured or captured < cutoff:
-                continue
-            runs.add(str(row.get("collection_id") or row.get("captured_at")))
-            matched += 1
-            hypothetical += int(row.get("hypothetical_positive_paths") or 0)
-            actionable += int(row.get("actionable_paths") or 0)
-            value = row.get("best_net_edge_usd")
-            if isinstance(value, (int, float)) and (best is None or value > best):
-                best = value
-    return {
-        "runs_with_matches": len(runs), "matched_events": matched,
-        "hypothetical_positive_paths": hypothetical,
-        "actionable_paths": actionable, "best_net_edge_usd": best,
-    }
-
-
-def _run_history_24h(directory: Path, now: datetime) -> Dict[str, int]:
-    cutoff = now - timedelta(hours=24)
-    snapshots = healthy = degraded = 0
     for day in (now.date(), (now - timedelta(days=1)).date()):
         path = directory / f"{day.isoformat()}.jsonl"
         try:
@@ -144,12 +118,39 @@ def _run_history_24h(directory: Path, now: datetime) -> Dict[str, int]:
             snapshots += 1
             healthy += row.get("status") == "healthy"
             degraded += row.get("status") != "healthy"
-    return {"snapshots": snapshots, "healthy_snapshots": healthy,
-            "degraded_snapshots": degraded}
+            row_matched = int(row.get("matched_events") or 0)
+            matched += row_matched
+            runs_with_matches += row_matched > 0
+            hypothetical += int(row.get("hypothetical_positive_paths") or 0)
+            actionable += int(row.get("actionable_paths") or 0)
+            value = row.get("best_net_edge_usd")
+            if isinstance(value, (int, float)) and (best is None or value > best):
+                best = value
+    return {
+        "snapshots": snapshots, "healthy_snapshots": healthy,
+        "degraded_snapshots": degraded,
+        "runs_with_matches": runs_with_matches, "matched_events": matched,
+        "hypothetical_positive_paths": hypothetical,
+        "actionable_paths": actionable, "best_net_edge_usd": best,
+    }
+
+
+def _load_cached(path: Path, *, kind: str) -> Dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("payload is not an object")
+        return payload
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return {
+            "status": "unavailable", "generated_at": None,
+            "reason": f"cached {kind} unavailable: {type(exc).__name__}: {exc}",
+        }
 
 
 def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
             *, now: Optional[datetime] = None,
+            refresh_analysis: bool = True,
             settlement_config: Path = ROOT / "config" / "settlement_equivalence.yaml",
             settlement_manifest: Path = ROOT / "data" / "settlement_registry"
             / "manifest.json",
@@ -235,52 +236,57 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
         "matched_events": len(evaluated),
         "hypothetical_positive_paths": latest_hypothetical,
         "actionable_paths": latest_actionable,
+        "best_net_edge_usd": best,
     }])
-    day_metrics = _history_24h(output_dir / "observations", captured_at)
-    day_metrics.update(_run_history_24h(output_dir / "runs", captured_at))
-    observation_rows = load_observations(
-        output_dir / "observations", now=captured_at, window_days=14)
-    analytics = analyze(
-        observation_rows, window_days=14, threshold_usd=0.03)
-    _write_atomic(output_dir / "analytics.json", {
-        "generated_at": _iso(captured_at), **analytics})
+    day_metrics = _run_history_24h(output_dir / "runs", captured_at)
     pair_id = "gemini_kalshi_mlb_moneyline"
-    cases = build_cases(
-        observation_rows, pair_id=pair_id, policy=terms_policy,
-        now=captured_at, threshold_usd=0.03)
-    ledger = CaseLedger(output_dir / "research_cases.sqlite3")
-    try:
-        ledger.upsert(cases, updated_at=captured_at)
-        case_metrics = ledger.summary(pair_id, now=captured_at)
-    finally:
-        ledger.close()
-    case_metrics.update({
-        "generated_at": _iso(captured_at),
-        "window_days_replayed": 14,
-        "threshold_usd": 0.03,
-        "cases_replayed": len(cases),
-        "settlement_basis": settlement_basis(terms_policy),
-        "threshold_calibration": calibrate_thresholds(
+    if refresh_analysis:
+        observation_rows = load_observations(
+            output_dir / "observations", now=captured_at, window_days=14)
+        analytics = analyze(
+            observation_rows, window_days=14, threshold_usd=0.03)
+        analytics = {"generated_at": _iso(captured_at), **analytics}
+        _write_atomic(output_dir / "analytics.json", analytics)
+        cases = build_cases(
             observation_rows, pair_id=pair_id, policy=terms_policy,
-            now=captured_at),
-        "source_tape": "data/gemini_crossvenue/observations/*.jsonl",
-        "ledger": "data/gemini_crossvenue/research_cases.sqlite3",
-    })
-    evidence_path = output_dir / "settlement_basis_evidence.json"
-    try:
-        outcome_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-        if not isinstance(outcome_evidence, dict):
-            raise ValueError("evidence payload is not an object")
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
-        outcome_evidence = {
-            "status": "unavailable",
-            "reason": str(exc),
-            "interpretation": (
-                "No observed settlement-outcome evidence is available yet; "
-                "contract-basis risks remain unmeasured."),
-        }
-    case_metrics["outcome_evidence"] = outcome_evidence
-    _write_atomic(output_dir / "research_cases.json", case_metrics)
+            now=captured_at, threshold_usd=0.03)
+        ledger = CaseLedger(output_dir / "research_cases.sqlite3")
+        try:
+            ledger.upsert(cases, updated_at=captured_at)
+            case_metrics = ledger.summary(pair_id, now=captured_at)
+        finally:
+            ledger.close()
+        case_metrics.update({
+            "generated_at": _iso(captured_at),
+            "window_days_replayed": 14,
+            "threshold_usd": 0.03,
+            "cases_replayed": len(cases),
+            "settlement_basis": settlement_basis(terms_policy),
+            "threshold_calibration": calibrate_thresholds(
+                observation_rows, pair_id=pair_id, policy=terms_policy,
+                now=captured_at),
+            "source_tape": "data/gemini_crossvenue/observations/*.jsonl",
+            "ledger": "data/gemini_crossvenue/research_cases.sqlite3",
+        })
+        evidence_path = output_dir / "settlement_basis_evidence.json"
+        try:
+            outcome_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            if not isinstance(outcome_evidence, dict):
+                raise ValueError("evidence payload is not an object")
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            outcome_evidence = {
+                "status": "unavailable",
+                "reason": str(exc),
+                "interpretation": (
+                    "No observed settlement-outcome evidence is available yet; "
+                    "contract-basis risks remain unmeasured."),
+            }
+        case_metrics["outcome_evidence"] = outcome_evidence
+        _write_atomic(output_dir / "research_cases.json", case_metrics)
+    else:
+        analytics = _load_cached(output_dir / "analytics.json", kind="analytics")
+        case_metrics = _load_cached(
+            output_dir / "research_cases.json", kind="research cases")
     metrics = {
         "schema_version": 1, "mode": "read_only_research",
         "scope": "mlb_moneyline", "status": current["status"],
@@ -300,6 +306,11 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
         "last_24h": day_metrics,
         "analytics": analytics,
         "research_cases": case_metrics,
+        "analysis_refresh": {
+            "mode": "refreshed" if refresh_analysis else "cached",
+            "analytics_generated_at": analytics.get("generated_at"),
+            "cases_generated_at": case_metrics.get("generated_at"),
+        },
         "venue_pipeline": load_venue_pipeline(venue_config),
         "source": "data/gemini_crossvenue/latest.json",
     }
@@ -320,6 +331,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                         / "manifest.json")
     parser.add_argument("--venue-config", type=Path,
                         default=ROOT / "config" / "research_venues.yaml")
+    parser.add_argument(
+        "--refresh-analysis", action="store_true",
+        help=("Replay the 14-day observation tape and rebuild analytics/cases. "
+              "The five-minute service intentionally omits this heavy step."))
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     lock_path = args.output_dir / ".collector.lock"
@@ -331,6 +346,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 75
         result = collect(
             GeminiPublic(), KalshiPublic(), args.output_dir,
+            refresh_analysis=args.refresh_analysis,
             settlement_config=args.settlement_config,
             settlement_manifest=args.settlement_manifest,
             venue_config=args.venue_config)

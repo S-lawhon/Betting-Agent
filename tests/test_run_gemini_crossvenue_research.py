@@ -1,5 +1,6 @@
 import json
 
+import scripts.run_gemini_crossvenue_research as collector
 from scripts.run_gemini_crossvenue_research import collect
 
 
@@ -63,3 +64,37 @@ def test_collect_persists_snapshot_observation_and_metrics(tmp_path):
     assert cases["outcome_evidence"]["status"] == "unavailable"
     assert len(cases["threshold_calibration"]) == 5
     assert metrics["research_cases"] == cases
+
+
+def test_fast_collection_reuses_analysis_without_replaying_observations(
+        tmp_path, monkeypatch):
+    cached_analytics = {
+        "generated_at": "2026-08-02T00:00:00Z",
+        "priced_path_observations": 10,
+        "quote_completeness": 1.0,
+    }
+    cached_cases = {
+        "generated_at": "2026-08-02T00:00:00Z", "lifetime_cases": 2,
+    }
+    (tmp_path / "analytics.json").write_text(json.dumps(cached_analytics))
+    (tmp_path / "research_cases.json").write_text(json.dumps(cached_cases))
+
+    def fail_if_replayed(*args, **kwargs):
+        raise AssertionError("the five-minute path must not replay observations")
+
+    monkeypatch.setattr(collector, "load_observations", fail_if_replayed)
+    result = collect(
+        _Gemini(), _Kalshi(), tmp_path, refresh_analysis=False)
+
+    assert result["status"] == "healthy"
+    metrics = json.loads((tmp_path / "metrics.json").read_text())
+    assert metrics["analytics"] == cached_analytics
+    assert metrics["research_cases"] == cached_cases
+    assert metrics["analysis_refresh"] == {
+        "mode": "cached",
+        "analytics_generated_at": "2026-08-02T00:00:00Z",
+        "cases_generated_at": "2026-08-02T00:00:00Z",
+    }
+    assert metrics["last_24h"]["matched_events"] == 1
+    assert metrics["last_24h"]["runs_with_matches"] == 1
+    assert metrics["last_24h"]["best_net_edge_usd"] == -0.03

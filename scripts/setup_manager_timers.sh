@@ -4,10 +4,10 @@
 #
 # What it does:
 #   1) Verifies the deployed tree has manager-* unit files.
-#   2) Installs manager-{collect,alert,brief}.{service,timer} into
+#   2) Installs manager-{collect,alert,brief,gate-rollup}.{service,timer} into
 #      /etc/systemd/system.
-#   3) daemon-reload + enable --now the three timers.
-#   4) Runs collect/alert once and prints timer status.
+#   3) daemon-reload + enable --now the four timers.
+#   4) Primes the gate rollup, then runs collect/alert and prints timer status.
 #
 # Prerequisite:
 #   The repo has already been synced to /opt/betting-pod-shop on the droplet.
@@ -25,6 +25,8 @@ UNITS=(
   manager-alert.timer
   manager-brief.service
   manager-brief.timer
+  manager-gate-rollup.service
+  manager-gate-rollup.timer
 )
 
 dssh() { ssh -i "$KEY" -o IdentitiesOnly=yes "$DROPLET" "$@"; }
@@ -39,16 +41,19 @@ dssh "for u in ${UNITS[*]}; do cp '$APP/scripts/systemd/'\"\$u\" '/etc/systemd/s
 dssh "systemctl daemon-reload"
 
 say "enable timers"
-dssh "systemctl enable --now manager-collect.timer manager-alert.timer manager-brief.timer"
+dssh "systemctl enable --now manager-collect.timer manager-alert.timer manager-brief.timer manager-gate-rollup.timer"
+
+say "prime gate rollup"
+dssh "systemctl start manager-gate-rollup.service"
 
 say "prime snapshot + alert state"
 dssh "systemctl start manager-collect.service manager-alert.service"
 
 say "timer status"
-dssh "systemctl list-timers --all | grep -E 'manager-(collect|alert|brief)'"
+dssh "systemctl list-timers --all | grep -E 'manager-(collect|alert|brief|gate-rollup)'"
 
 say "recent logs"
-dssh "journalctl -u manager-collect -u manager-alert -u manager-brief -n 30 --no-pager"
+dssh "journalctl -u manager-collect -u manager-alert -u manager-brief -u manager-gate-rollup -n 30 --no-pager"
 
 say "done"
 echo "Manager timers are installed and enabled on ${DROPLET}."

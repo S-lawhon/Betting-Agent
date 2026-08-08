@@ -158,11 +158,14 @@ Install the versioned systemd units from a machine with droplet SSH access:
 bash scripts/setup_manager_timers.sh
 ```
 
-Cadence: collection every 15 minutes, alert evaluation 30 seconds later, and
-the emailed brief daily at 12:30 UTC. Verify with:
+Cadence: the bounded sanctioned-gate rollup runs hourly at minute 07, collection
+runs every 15 minutes, alert evaluation follows 30 seconds later, and the
+emailed brief runs daily at 12:30 UTC. The collector consumes the rollup only
+while it is fresh, complete, and healthy; otherwise it falls back to the same
+sanctioned readers so cache failure cannot hide a gate. Verify with:
 
 ```bash
-ssh root@129.212.176.202 'systemctl list-timers --all | grep -E "manager-(collect|alert|brief)"'
+ssh root@129.212.176.202 'systemctl list-timers --all | grep -E "manager-(collect|alert|brief|gate-rollup)"'
 ```
 
 Legacy cron fallback:

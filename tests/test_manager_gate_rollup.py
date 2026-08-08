@@ -118,6 +118,7 @@ def test_rollup_degrades_when_a_reader_is_unavailable(tmp_path, monkeypatch):
 def test_rollup_unit_is_bounded_hourly_and_monitored():
     service = Path("scripts/systemd/manager-gate-rollup.service").read_text()
     timer = Path("scripts/systemd/manager-gate-rollup.timer").read_text()
+    installer = Path("scripts/setup_manager_timers.sh").read_text()
     registry = yaml.safe_load(Path("manager/registry.yaml").read_text())
 
     assert "manager.gate_rollup" in service
@@ -126,6 +127,10 @@ def test_rollup_unit_is_bounded_hourly_and_monitored():
     assert "RestrictAddressFamilies=AF_UNIX" in service
     assert "*:07:00 UTC" in timer
     assert "Persistent=true" in timer
+    assert "manager-gate-rollup.service" in installer
+    assert "manager-gate-rollup.timer" in installer
+    assert installer.index("systemctl start manager-gate-rollup.service") < (
+        installer.index("systemctl start manager-collect.service"))
 
     units = {row["id"] for row in registry["systemd_units"]}
     jobs = {row["id"]: row for row in registry["jobs"]}

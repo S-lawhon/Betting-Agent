@@ -320,3 +320,125 @@ class TestRunResearchTriage(TestCase):
             self.assertIs(manifest["evidence_enabled"], True)
             self.assertEqual(
                 manifest["evidence_status_by_assignment"], {"a1": "measured"})
+
+
+class _RecordingResolver:
+    name = "fake"
+
+    def __init__(self):
+        self.seen = []
+
+    def applies_to(self, assignment, source_item):
+        return True
+
+    def resolve(self, assignment, source_item, *, now=None):
+        self.seen.append(str(assignment.get("id") or source_item.get("id")))
+        return {"status": "measured", "source": "fake",
+                "measured_at": "2026-08-02T14:00:00Z",
+                "facts": {"representative_quote": {"spread": 0.1}}, "notes": []}
+
+
+class TestPendingEvidenceRefresh(TestCase):
+    def _queue(self, root, packets):
+        output = root / "output"
+        for name, body in packets.items():
+            path = output / "dispatches" / "strategy-scout" / f"{name}.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(body))
+        for name in ("assignments", "sources", "dispositions"):
+            (root / name).mkdir(exist_ok=True)
+        (root / "assignments" / "b.json").write_text(json.dumps({"assignments": []}))
+        (root / "sources" / "b.json").write_text(json.dumps({"items": []}))
+        (root / "triage.yaml").write_text("portfolio: {}\n")
+        return output
+
+    def _packet(self, name, evidence=None):
+        body = {
+            "id": f"d-{name}", "assignment_id": name, "source_item_id": "s1",
+            "assigned_agent": "strategy-scout", "priority": "high",
+            "triage_score": 80, "research_budget_minutes": 30,
+            "created_at": "2026-08-01T04:00:00Z",
+            "completion_contract": {"required_output": "disposition"},
+            "assignment": {"id": name, "source_type": "venue_market",
+                           "venue_ids": ["kalshi"]},
+            "source_item": {"id": "s1", "source_type": "venue_market",
+                            "metadata": {"market_family": "KXTEST"}},
+        }
+        if evidence is not None:
+            body["market_evidence"] = evidence
+        return body
+
+    def _run(self, root, output, resolver):
+        with patch("scripts.run_research_triage.build_resolvers",
+                   return_value=[resolver]):
+            return main([
+                "--config", str(root / "triage.yaml"),
+                "--assignments-dir", str(root / "assignments"),
+                "--source-batches-dir", str(root / "sources"),
+                "--dispositions-dir", str(root / "dispositions"),
+                "--strategy-registry", str(root / "missing.json"),
+                "--output-dir", str(output),
+                "--now", "2026-08-02T14:00:00Z",
+            ])
+
+    def test_queued_packets_without_evidence_are_measured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = self._queue(root, {"a1": self._packet("a1")})
+            resolver = _RecordingResolver()
+            self.assertEqual(self._run(root, output, resolver), 0)
+            self.assertEqual(resolver.seen, ["a1"])
+            packet = json.loads((
+                output / "dispatches/strategy-scout/a1.json").read_text())
+            self.assertEqual(packet["market_evidence"]["status"], "measured")
+            self.assertEqual(
+                packet["completion_contract"]["supplied_evidence"],
+                ["representative_quote"])
+            # The rest of the packet is preserved, not rebuilt.
+            self.assertEqual(packet["id"], "d-a1")
+            self.assertEqual(
+                packet["completion_contract"]["required_output"], "disposition")
+            manifest = json.loads((output / "latest_manifest.json").read_text())
+            self.assertEqual(
+                manifest["evidence_refreshed_pending"], {"a1": "measured"})
+
+    def test_stale_evidence_is_remeasured_and_fresh_evidence_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = self._queue(root, {
+                # 24h old at the 14:00 run: past the 12h default.
+                "stale": self._packet("stale", {
+                    "status": "measured", "source": "old",
+                    "measured_at": "2026-08-01T14:00:00Z", "facts": {}}),
+                # 2h old: still current.
+                "fresh": self._packet("fresh", {
+                    "status": "measured", "source": "kept",
+                    "measured_at": "2026-08-02T12:00:00Z", "facts": {}}),
+            })
+            resolver = _RecordingResolver()
+            self.assertEqual(self._run(root, output, resolver), 0)
+            self.assertEqual(resolver.seen, ["stale"])
+            kept = json.loads((
+                output / "dispatches/strategy-scout/fresh.json").read_text())
+            self.assertEqual(kept["market_evidence"]["source"], "kept")
+            redone = json.loads((
+                output / "dispatches/strategy-scout/stale.json").read_text())
+            self.assertEqual(redone["market_evidence"]["source"], "fake")
+
+    def test_refresh_is_skipped_entirely_when_evidence_is_disabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = self._queue(root, {"a1": self._packet("a1")})
+            result = main([
+                "--config", str(root / "triage.yaml"),
+                "--assignments-dir", str(root / "assignments"),
+                "--source-batches-dir", str(root / "sources"),
+                "--dispositions-dir", str(root / "dispositions"),
+                "--strategy-registry", str(root / "missing.json"),
+                "--output-dir", str(output),
+                "--now", "2026-08-02T14:00:00Z", "--no-evidence",
+            ])
+            self.assertEqual(result, 0)
+            packet = json.loads((
+                output / "dispatches/strategy-scout/a1.json").read_text())
+            self.assertNotIn("market_evidence", packet)

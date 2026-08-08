@@ -17,7 +17,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.research_outcomes import ResearchDisposition  # noqa: E402
 from src.research_intake import quality_rejection_from_mapping  # noqa: E402
-from src.research_evidence import build_resolvers, resolve_evidence  # noqa: E402
+from src.research_evidence import (  # noqa: E402
+    build_resolvers,
+    resolve_evidence,
+    supplied_evidence_keys,
+)
 from src.research_triage import (  # noqa: E402
     attach_evidence,
     mechanism_readiness_rejection,
@@ -109,6 +113,60 @@ def _pending_dispatches(output_dir: Path) -> List[Dict[str, Any]]:
         if isinstance(payload, dict) and payload.get("assignment_id"):
             pending.append(payload)
     return pending
+
+
+def _refresh_pending_evidence(
+    output_dir: Path,
+    resolvers: List[Any],
+    *,
+    now: datetime,
+    max_age_hours: float,
+) -> Dict[str, str]:
+    """Re-measure public evidence on packets already sitting in the queue.
+
+    A packet is written once and can then wait days for a specialist, so
+    enriching only at dispatch time leaves the queue full of records whose
+    quote is stale or absent.  A quote measured last Tuesday is not evidence
+    about today, so anything older than ``max_age_hours`` -- and anything that
+    predates enrichment entirely -- is measured again.
+    """
+    refreshed: Dict[str, str] = {}
+    if not resolvers:
+        return refreshed
+    for path in sorted((output_dir / "dispatches").glob("*/*.json")):
+        payload = _read_json(path, {})
+        assignment_id = str(payload.get("assignment_id") or "")
+        if not assignment_id:
+            continue
+        existing = payload.get("market_evidence") or {}
+        measured_at = _parse_iso(existing.get("measured_at"))
+        if measured_at is not None:
+            age_hours = (now - measured_at).total_seconds() / 3600.0
+            if age_hours < max_age_hours:
+                continue
+        pack = resolve_evidence(
+            payload.get("assignment") or {},
+            payload.get("source_item") or {}, resolvers, now=now)
+        contract = dict(payload.get("completion_contract") or {})
+        contract["supplied_evidence"] = supplied_evidence_keys(pack)
+        contract["supplied_evidence_status"] = str(pack.get("status") or "")
+        payload["market_evidence"] = pack
+        payload["completion_contract"] = contract
+        _write_atomic(path, payload)
+        refreshed[assignment_id] = str(pack.get("status") or "")
+    return refreshed
+
+
+def _parse_iso(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _opportunity_assignments(path: Path) -> Set[str]:
@@ -257,6 +315,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--no-evidence", action="store_true",
         help="skip public fee/quote/document lookups (offline or replay runs)")
+    parser.add_argument(
+        "--evidence-max-age-hours", type=float, default=12.0,
+        help="re-measure a queued packet's evidence once it is this old")
     args = parser.parse_args(argv)
 
     config = yaml.safe_load(args.config.read_text()) or {}
@@ -327,9 +388,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             packet.assignment, packet.source_item, resolvers, now=now)
         evidence_status[packet.assignment_id] = str(pack.get("status") or "")
         enriched.append(attach_evidence(packet, pack))
+    refreshed = _refresh_pending_evidence(
+        args.output_dir, resolvers, now=now,
+        max_age_hours=args.evidence_max_age_hours)
     manifest["evidence_enabled"] = not args.no_evidence
+    manifest["evidence_max_age_hours"] = args.evidence_max_age_hours
     manifest["evidence_status_by_assignment"] = dict(sorted(
         evidence_status.items()))
+    manifest["evidence_refreshed_pending"] = dict(sorted(refreshed.items()))
 
     _write_atomic(ledger_path, ledger)
     _write_atomic(args.output_dir / "latest_manifest.json", manifest)

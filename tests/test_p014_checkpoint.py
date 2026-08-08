@@ -212,7 +212,8 @@ def test_progress_excludes_voids_and_reports_both(tmp_path):
 
 def test_archives_and_gzip_are_read(tmp_path):
     _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_row("live")])
-    _write(tmp_path / "data/trade_logs/archive/old.jsonl", [_row("arch")])
+    _write(tmp_path / "data/trade_logs/archive/trade_log.archive_old.jsonl",
+           [_row("arch")])
     _write(tmp_path / "data/trade_logs/trade_log.1.jsonl.gz", [_row("gz")], gz=True)
     rows = cp.load_terminal(_logs(tmp_path))
     assert {r["fingerprint"] for r in rows} == {"live", "arch", "gz"}
@@ -221,7 +222,8 @@ def test_archives_and_gzip_are_read(tmp_path):
 def test_duplicates_do_not_inflate_progress(tmp_path):
     row = _row("dupe")
     _write(tmp_path / "data/trade_logs/trade_log.jsonl", [row, dict(row)])
-    _write(tmp_path / "data/trade_logs/archive/old.jsonl", [dict(row)])
+    _write(tmp_path / "data/trade_logs/archive/trade_log.archive_old.jsonl",
+           [dict(row)])
     assert cp.evaluate(cp.load_terminal(_logs(tmp_path)))["progress"] == 1
 
 

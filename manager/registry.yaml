@@ -68,6 +68,8 @@ systemd_units:
   - {id: manager-alert.service, unit: manager-alert.service, source: scripts/systemd/manager-alert.service, severity: warn}
   - {id: manager-brief.timer, unit: manager-brief.timer, source: scripts/systemd/manager-brief.timer, severity: warn}
   - {id: manager-brief.service, unit: manager-brief.service, source: scripts/systemd/manager-brief.service, severity: warn}
+  - {id: manager-gate-rollup.timer, unit: manager-gate-rollup.timer, source: scripts/systemd/manager-gate-rollup.timer, severity: warn}
+  - {id: manager-gate-rollup.service, unit: manager-gate-rollup.service, source: scripts/systemd/manager-gate-rollup.service, severity: warn}
   - {id: gemini-crossvenue-analysis.timer, unit: gemini-crossvenue-analysis.timer, source: scripts/systemd/gemini-crossvenue-analysis.timer, severity: warn}
   - {id: gemini-crossvenue-analysis.service, unit: gemini-crossvenue-analysis.service, source: scripts/systemd/gemini-crossvenue-analysis.service, severity: warn}
   - {id: p029-gate0c-checkpoint.timer, unit: p029-gate0c-checkpoint.timer, source: scripts/systemd/p029-gate0c-checkpoint.timer, severity: warn}
@@ -196,6 +198,17 @@ jobs:
     output: {file: manager/state/brief_runs.jsonl, max_stale_hours: 30}
     severity: warn
     note: brief_runs.jsonl is the timer heartbeat for the daily email path.
+
+  - id: manager_gate_rollup
+    host: droplet
+    schedule: "hourly at minute 07 (manager-gate-rollup.timer)"
+    description: Sanctioned gate readers and observation-throughput rollup
+    output: {file: manager/state/gate_rollup.json, max_stale_hours: 2}
+    severity: warn
+    note: >
+      Moves authoritative checkpoint and throughput scans out of the 15-minute
+      snapshot path. The snapshot falls back to the same sanctioned readers if
+      this artifact is missing, stale, degraded, or incomplete.
 
   - id: gemini_crossvenue_research
     host: droplet

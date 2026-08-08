@@ -17,6 +17,7 @@ comfortable number:
     reads only `trade_log.jsonl` under-reports by whatever has rotated.
 """
 import json
+import gzip
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -67,7 +68,8 @@ def test_archived_logs_are_counted(tmp_path):
     under-reports by however much has rotated — the same shape as the
     log-rotation incident that hid 177 open positions."""
     _write(tmp_path, "trade_log.jsonl", [_settle("P-017", "2026-07-26", "C")])
-    _write(tmp_path, "old.jsonl", [_settle("P-017", "2026-07-01", "A")],
+    _write(tmp_path, "trade_log.archive_old.jsonl",
+           [_settle("P-017", "2026-07-01", "A")],
            sub="data/trade_logs/archive")
     by = observations_by_day(tmp_path)
     assert by["P-017"] == {"2026-07-01": 1, "2026-07-26": 1}
@@ -79,6 +81,27 @@ def test_duplicate_rows_are_not_double_counted(tmp_path):
     _write(tmp_path, "trade_log.jsonl", [row, dict(row)])
     _write(tmp_path, "trade_log.archive.jsonl", [dict(row)])
     assert observations_by_day(tmp_path)["P-017"] == {"2026-07-25": 1}
+
+
+def test_backup_and_skip_only_archives_are_not_authoritative(tmp_path):
+    _write(tmp_path, "trade_log.jsonl", [
+        _settle("P-017", "2026-07-25", "live")])
+    _write(tmp_path, "trade_log_backup.jsonl", [
+        _settle("P-017", "2026-07-24", "backup")])
+    _write(tmp_path, "skipped_archive_20260420.jsonl", [
+        _settle("P-017", "2026-07-23", "skip")],
+        sub="data/trade_logs/archive")
+
+    assert observations_by_day(tmp_path)["P-017"] == {"2026-07-25": 1}
+
+
+def test_monthly_canonical_archive_is_authoritative(tmp_path):
+    archive = tmp_path / "data" / "trade_logs" / "archive"
+    archive.mkdir(parents=True)
+    with gzip.open(archive / "2026-03.jsonl.gz", "wt", encoding="utf-8") as fh:
+        fh.write(json.dumps(_settle("P-001", "2026-03-20", "old")) + "\n")
+
+    assert observations_by_day(tmp_path) == {"P-001": {"2026-03-20": 1}}
 
 
 def test_voids_count_as_observations_of_throughput(tmp_path):

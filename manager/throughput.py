@@ -85,17 +85,29 @@ def _rows(paths: List[str]):
 
 
 def _trade_log_paths(root: Path) -> List[str]:
-    """Every trade log, live and archived.
+    """Authoritative trade logs, live and rotated.
 
     Archives matter: rotation truncates the live file, and a counter that reads
     only `trade_log.jsonl` under-reports by however much has rotated — the same
     shape of bug as the log-rotation incident that orphaned 177 positions.
+
+    Backup and skip-only files are deliberately excluded. On 2026-08-08 the
+    old broad globs pulled in 491 MB of ``skipped_archive`` plus overlapping
+    pre-cleanup/backup copies. They contain no terminal outcomes and made the
+    15-minute manager loop parse roughly 1.5 GB per run.
     """
     pats = [
-        "data/trade_logs/trade_log*.jsonl",
-        "data/trade_logs/trade_log*.jsonl.gz",
-        "data/trade_logs/archive/*.jsonl",
-        "data/trade_logs/archive/*.jsonl.gz",
+        "data/trade_logs/trade_log.jsonl",
+        "data/trade_logs/trade_log.archive_*.jsonl",
+        "data/trade_logs/trade_log.archive_*.jsonl.gz",
+        "data/trade_logs/trade_log.[0-9]*.jsonl",
+        "data/trade_logs/trade_log.[0-9]*.jsonl.gz",
+        "data/trade_logs/archive/trade_log.archive_*.jsonl",
+        "data/trade_logs/archive/trade_log.archive_*.jsonl.gz",
+        "data/trade_logs/archive/trade_log.[0-9]*.jsonl",
+        "data/trade_logs/archive/trade_log.[0-9]*.jsonl.gz",
+        "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl",
+        "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl.gz",
     ]
     out: List[str] = []
     for pat in pats:
@@ -109,19 +121,27 @@ def _day(ts: Any) -> Optional[str]:
     return None
 
 
-def observations_by_day(root: Path) -> Dict[str, Dict[str, int]]:
-    """pod_id -> {YYYY-MM-DD: settled observations}, deduplicated.
+def activity_summary(
+        root: Path) -> tuple[Dict[str, Dict[str, int]], Dict[str, str]]:
+    """Return settled observations and first activity in one tape pass.
 
     The unit here is a settled POSITION. Gates that count something coarser
     (P-017 and P-022 count tournaments) are converted by `_gate_series`, which
     is why this is not the number reported for them.
     """
     out: Dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    first: Dict[str, str] = {}
     seen: set = set()
     for rec in _rows(_trade_log_paths(root)):
+        pod = rec.get("pod_id") or rec.get("pod")
+        if pod:
+            activity_day = _day(rec.get("timestamp_utc") or rec.get("iso")
+                                or rec.get("settled_at_utc")
+                                or rec.get("settled_at"))
+            if activity_day and (pod not in first or activity_day < first[pod]):
+                first[pod] = activity_day
         if (rec.get("outcome") or "").upper() not in ("WIN", "LOSS", "VOID"):
             continue
-        pod = rec.get("pod_id") or rec.get("pod")
         if not pod:
             continue
         ts = rec.get("settled_at_utc") or rec.get("settled_at") or rec.get("iso")
@@ -133,7 +153,12 @@ def observations_by_day(root: Path) -> Dict[str, Dict[str, int]]:
             continue
         seen.add(key)
         out[pod][day] += 1
-    return {k: dict(v) for k, v in out.items()}
+    return ({k: dict(v) for k, v in out.items()}, first)
+
+
+def observations_by_day(root: Path) -> Dict[str, Dict[str, int]]:
+    """pod_id -> {YYYY-MM-DD: settled observations}, deduplicated."""
+    return activity_summary(root)[0]
 
 
 def first_activity_by_pod(root: Path) -> Dict[str, str]:
@@ -146,18 +171,7 @@ def first_activity_by_pod(root: Path) -> Dict[str, str]:
     of nonexistence. Placement rows count as activity, not just settlements:
     a pod that places and waits is alive, and its clock starts then.
     """
-    out: Dict[str, str] = {}
-    for rec in _rows(_trade_log_paths(root)):
-        pod = rec.get("pod_id") or rec.get("pod")
-        if not pod:
-            continue
-        day = _day(rec.get("timestamp_utc") or rec.get("iso")
-                   or rec.get("settled_at_utc") or rec.get("settled_at"))
-        if not day:
-            continue
-        if pod not in out or day < out[pod]:
-            out[pod] = day
-    return out
+    return activity_summary(root)[1]
 
 
 def _window_count(by_day: Dict[str, int], now: datetime, days: int) -> int:
@@ -207,8 +221,7 @@ def gate_throughput(root: Path, snap: Dict[str, Any],
     from manager.checks import _gate_progress          # local: avoid a cycle
 
     now = now or datetime.now(UTC)
-    by_pod = observations_by_day(root)
-    first_act = first_activity_by_pod(root)
+    by_pod, first_act = activity_summary(root)
     out: List[Dict[str, Any]] = []
 
     for ws in registry.get("workstreams", []) or []:

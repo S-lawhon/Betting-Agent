@@ -81,10 +81,15 @@ RULE_DOCUMENT = "research/P014_DECISION_RULE.md"
 # live file, so a reader that opens only `trade_log.jsonl` under-reports by
 # whatever has rotated.
 DEFAULT_LOGS = [
-    "data/trade_logs/trade_log*.jsonl",
-    "data/trade_logs/trade_log*.jsonl.gz",
-    "data/trade_logs/archive/*.jsonl",
-    "data/trade_logs/archive/*.jsonl.gz",
+    "data/trade_logs/trade_log.jsonl",
+    "data/trade_logs/trade_log.archive_*.jsonl",
+    "data/trade_logs/trade_log.archive_*.jsonl.gz",
+    "data/trade_logs/trade_log.[0-9]*.jsonl",
+    "data/trade_logs/trade_log.[0-9]*.jsonl.gz",
+    "data/trade_logs/archive/trade_log.archive_*.jsonl",
+    "data/trade_logs/archive/trade_log.archive_*.jsonl.gz",
+    "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl",
+    "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl.gz",
     "data/pods/P-014.jsonl",
 ]
 
@@ -117,7 +122,7 @@ def load_terminal(patterns, pod_id: str = POD_ID) -> List[Dict[str, Any]]:
             with _open_any(path) as fh:
                 for raw in fh:
                     raw = raw.strip()
-                    if not raw:
+                    if not raw or pod_id not in raw:
                         continue
                     try:
                         rec = json.loads(raw)

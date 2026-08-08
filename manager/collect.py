@@ -70,6 +70,7 @@ MLB_PROPS_CHECKPOINT_PATH = Path(
 MLB_PROPS_RULE_SHA256 = (
     "c76296909b878b70de7eab4a82fb24ee0c7c45158ae0e1d8bb6ed7cc589c8c60"
 )
+GATE_ROLLUP_MAX_AGE_HOURS = 2.0
 
 
 # --------------------------------------------------------------------------
@@ -315,6 +316,43 @@ class Collector:
             return p
         base = self.local_root if root_kind == "local" else self.root
         return base / p
+
+    @safe("gate_rollup")
+    def gate_rollup(self) -> Dict[str, Any]:
+        """Load the compact hourly output of the sanctioned gate readers."""
+        path = self.root / "manager" / "state" / "gate_rollup.json"
+        out: Dict[str, Any] = {
+            "available": False, "path": str(path),
+            "max_age_hours": GATE_ROLLUP_MAX_AGE_HOURS,
+        }
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            out["error"] = "{}: {}".format(type(exc).__name__, exc)
+            return out
+        generated = parse_ts(payload.get("generated_at"))
+        age_hours = ((now() - generated).total_seconds() / 3600.0
+                     if generated else None)
+        out.update({
+            "generated_at": payload.get("generated_at"),
+            "age_hours": round(age_hours, 3) if age_hours is not None else None,
+            "status": payload.get("status"),
+            "faults": payload.get("faults") or [],
+        })
+        required = ("p015", "p017", "p001", "p022", "p014", "throughput")
+        missing = [key for key in required if not isinstance(payload.get(key), dict)]
+        if missing:
+            out["error"] = "rollup missing blocks: {}".format(", ".join(missing))
+            return out
+        if age_hours is None or age_hours < 0 or age_hours > GATE_ROLLUP_MAX_AGE_HOURS:
+            out["error"] = "gate rollup is stale"
+            return out
+        if payload.get("status") != "healthy":
+            out["error"] = "gate rollup is degraded"
+            return out
+        out["available"] = True
+        out["payload"] = payload
+        return out
 
     # ---- services --------------------------------------------------------
     @safe("services")
@@ -1437,6 +1475,8 @@ class Collector:
     # ---- orchestration ---------------------------------------------------
     def run(self) -> Dict[str, Any]:
         trade = self.trade_activity() or {}
+        rollup = self.gate_rollup() or {}
+        cached = rollup.get("payload") if rollup.get("available") else None
         snapshot = {
             "collected_at": iso(now()),
             "host": self.host,
@@ -1447,25 +1487,28 @@ class Collector:
             "jobs": self.jobs() or [],
             "trade": trade,
             "maker": self.maker_gate() or {},
-            "p015": self.p015_gate() or {},
-            "p017": self.p017_gate() or {},
-            "p001": self.p001_gate() or {},
-            "p022": self.p022_gate() or {},
+            "p015": (cached.get("p015") if cached else self.p015_gate()) or {},
+            "p017": (cached.get("p017") if cached else self.p017_gate()) or {},
+            "p001": (cached.get("p001") if cached else self.p001_gate()) or {},
+            "p022": (cached.get("p022") if cached else self.p022_gate()) or {},
             "p029": self.p029_gate() or {},
             "mlb_props": self.mlb_props_gate() or {},
             "p022_window": self.p022_window() or {},
             "evmap": self.evmap_jobs() or {},
-            "p014": self.p014_gate() or {},
+            "p014": (cached.get("p014") if cached else self.p014_gate()) or {},
             "invariants": self.invariants() or {},
             "errors": self.recent_errors() or {},
             "workstreams": self.workstreams(trade) or [],
             "work_today": self.work_today() or {},
             "research_operations": self.research_operations() or {},
             "faults": self.faults,
+            "gate_rollup": {key: value for key, value in rollup.items()
+                            if key != "payload"},
         }
         # Last, and fed the snapshot: throughput reads the gate readers'
         # answers rather than recomputing them.
-        snapshot["throughput"] = self.throughput(snapshot) or {}
+        snapshot["throughput"] = (
+            cached.get("throughput") if cached else self.throughput(snapshot)) or {}
         return snapshot
 
 

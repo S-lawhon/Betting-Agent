@@ -1,0 +1,27 @@
+[Unit]
+Description=Fund manager sanctioned gate and throughput rollup
+
+[Service]
+Type=oneshot
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m manager.gate_rollup --root /opt/betting-pod-shop
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=manager-gate-rollup
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=256M
+TimeoutStartSec=300
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/betting-pod-shop/manager/state
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

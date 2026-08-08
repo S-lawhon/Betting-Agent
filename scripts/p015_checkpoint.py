@@ -59,10 +59,15 @@ HARD_KILL_Z = -2.0
 # opens only `trade_log.jsonl` under-reports by however much has rotated, which
 # is the same shape as the incident that hid 177 open positions.
 DEFAULT_LOGS = [
-    "data/trade_logs/trade_log*.jsonl",
-    "data/trade_logs/trade_log*.jsonl.gz",
-    "data/trade_logs/archive/*.jsonl",
-    "data/trade_logs/archive/*.jsonl.gz",
+    "data/trade_logs/trade_log.jsonl",
+    "data/trade_logs/trade_log.archive_*.jsonl",
+    "data/trade_logs/trade_log.archive_*.jsonl.gz",
+    "data/trade_logs/trade_log.[0-9]*.jsonl",
+    "data/trade_logs/trade_log.[0-9]*.jsonl.gz",
+    "data/trade_logs/archive/trade_log.archive_*.jsonl",
+    "data/trade_logs/archive/trade_log.archive_*.jsonl.gz",
+    "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl",
+    "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl.gz",
     # Retained so that anything which ever did write here is still seen.
     # Harmless while absent; duplicates cannot survive the fingerprint dedupe.
     "data/pods/P-015.jsonl",
@@ -97,7 +102,7 @@ def load_settled(patterns, pod_id: str = POD_ID) -> List[Dict[str, Any]]:
             with _open_any(path) as fh:
                 for raw in fh:
                     raw = raw.strip()
-                    if not raw:
+                    if not raw or pod_id not in raw:
                         continue
                     try:
                         rec = json.loads(raw)

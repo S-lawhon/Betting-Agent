@@ -77,7 +77,8 @@ def test_a_missing_default_path_is_not_an_error(tmp_path):
 def test_archived_and_gzipped_logs_are_read(tmp_path):
     """Rotation truncates the live file; reading only it under-reports."""
     _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_trade("live")])
-    _write(tmp_path / "data/trade_logs/archive/old.jsonl", [_trade("arch")])
+    _write(tmp_path / "data/trade_logs/archive/trade_log.archive_old.jsonl",
+           [_trade("arch")])
     _write(tmp_path / "data/trade_logs/trade_log.1.jsonl.gz", [_trade("gz")], gz=True)
     trades = cp.load_settled([str(tmp_path / p) for p in cp.DEFAULT_LOGS])
     assert {t["fingerprint"] for t in trades} == {"live", "arch", "gz"}
@@ -88,8 +89,18 @@ def test_duplicates_across_logs_do_not_inflate_n(tmp_path):
     double-counting is not cosmetic — it moves the gate."""
     row = _trade("dupe")
     _write(tmp_path / "data/trade_logs/trade_log.jsonl", [row, dict(row)])
-    _write(tmp_path / "data/trade_logs/archive/old.jsonl", [dict(row)])
+    _write(tmp_path / "data/trade_logs/archive/trade_log.archive_old.jsonl",
+           [dict(row)])
     assert len(cp.load_settled([str(tmp_path / p) for p in cp.DEFAULT_LOGS])) == 1
+
+
+def test_default_sources_exclude_backup_and_skip_only_files(tmp_path):
+    _write(tmp_path / "data/trade_logs/trade_log.jsonl", [_trade("live")])
+    _write(tmp_path / "data/trade_logs/trade_log_backup.jsonl", [_trade("backup")])
+    _write(tmp_path / "data/trade_logs/archive/skipped_archive_20260420.jsonl",
+           [_trade("skipped")])
+    trades = cp.load_settled([str(tmp_path / p) for p in cp.DEFAULT_LOGS])
+    assert [row["fingerprint"] for row in trades] == ["live"]
 
 
 def test_other_pods_are_ignored(tmp_path):

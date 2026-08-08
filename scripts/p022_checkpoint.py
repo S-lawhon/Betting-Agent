@@ -79,6 +79,7 @@ See research/REPORT_P022_First_Quote_2026-07.md §3.
 
 import argparse
 import glob
+import gzip
 import json
 import math
 import statistics
@@ -135,13 +136,26 @@ DEFAULT_LOGS = [
     "data/trade_logs/archive/round_leader_fade_fills*.jsonl",
     # Kept: a settler-written P-022 row would land in the shared trade log.
     "data/trade_logs/trade_log.jsonl",
-    "data/trade_logs/archive/*.jsonl",
+    "data/trade_logs/trade_log.archive_*.jsonl",
+    "data/trade_logs/trade_log.archive_*.jsonl.gz",
+    "data/trade_logs/trade_log.[0-9]*.jsonl",
+    "data/trade_logs/trade_log.[0-9]*.jsonl.gz",
+    "data/trade_logs/archive/trade_log.archive_*.jsonl",
+    "data/trade_logs/archive/trade_log.archive_*.jsonl.gz",
+    "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl",
+    "data/trade_logs/archive/[0-9][0-9][0-9][0-9]-[0-9][0-9].jsonl.gz",
     # Kept for completeness; nothing writes these today.
     "data/pods/P-022.jsonl",
     "data/round_leader_fade/*.jsonl",
 ]
 
 SETTLED = ("WIN", "LOSS")    # VOIDs excluded — no risk taken
+
+
+def _open_any(path: str):
+    return (gzip.open(path, "rt", encoding="utf-8", errors="replace")
+            if path.endswith(".gz")
+            else open(path, "r", encoding="utf-8", errors="replace"))
 
 
 # ── loading ──────────────────────────────────────────────────────────
@@ -217,10 +231,10 @@ def load_settled(patterns: List[str], pod_id: str = POD_ID) -> List[Dict[str, An
         files.extend(sorted(glob.glob(pat)))
     for path in files:
         try:
-            with open(path, "r", encoding="utf-8") as fh:
+            with _open_any(path) as fh:
                 for raw in fh:
                     raw = raw.strip()
-                    if not raw:
+                    if not raw or pod_id not in raw:
                         continue
                     try:
                         rec = json.loads(raw)
@@ -262,10 +276,10 @@ def load_breached_events(patterns: List[str],
         files.extend(sorted(glob.glob(pat)))
     for path in files:
         try:
-            with open(path, "r", encoding="utf-8") as fh:
+            with _open_any(path) as fh:
                 for raw in fh:
                     raw = raw.strip()
-                    if not raw:
+                    if not raw or pod_id not in raw:
                         continue
                     try:
                         rec = json.loads(raw)

@@ -1,0 +1,11 @@
+[Unit]
+Description=Fund manager hourly sanctioned gate and throughput rollup
+
+[Timer]
+OnCalendar=*-*-* *:07:00 UTC
+Persistent=true
+RandomizedDelaySec=20
+Unit=manager-gate-rollup.service
+
+[Install]
+WantedBy=timers.target

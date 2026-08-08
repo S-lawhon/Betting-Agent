@@ -43,6 +43,32 @@ frozen, forward-only **Gate 0c** before its window opened.
   crash-loop attempts. The repaired logger has remained running at the frozen
   `MemoryMax=768M`; the first and subsequent resolver cycles reported
   `due 0 in-zone`.
+- **Bounded-memory repair, 2026-08-08:** the logger had reached 772 MB cgroup
+  memory, 46 MB swap and 4.9 million `memory.max` reclaims. This was not an
+  opaque leak: every discovery sweep materialised all 2,324,268 historical
+  tickers into a Python set (~288 MiB by measured object size), while the
+  expired leg cache was never pruned. The 5.07 GB SQLite tape contributed
+  another ~358 MiB of reclaimable page cache. Commit `e40f3f7` replaced the
+  global set with 500-ticker indexed membership probes, TTL-pruned and hard
+  capped the leg cache at 10,000, and capped error history at 1,000. The frozen
+  `MemoryMax=768M` did not change.
+  - Controlled restart chronology (UTC): SIGTERM `16:46:40`; the old process
+    completed its last discovery at `16:47:52.352`; its 90-second stop timeout
+    fired and systemd used SIGKILL at `16:48:10`; replacement PID 243750 started
+    in the same logged second; its first discovery completed at `16:51:50.530`.
+    Thus there was no observed multi-second processless interval, while the
+    conservative interval between completed discovery sweeps was 3m58.178s.
+    Disclose the SIGKILL and this interval with the August 23 read.
+  - SQLite reopened through WAL recovery and resumed writes. New-process RSS
+    held at ~72–75 MB (anonymous ~49–52 MB), swap stayed zero, and automatic
+    restarts stayed zero. Aggregate cgroup memory still approaches 768 MB
+    because Linux uses the remainder for reclaimable SQLite page cache; commit
+    `64804a2` teaches the heartbeat and manager to report heap and cache
+    separately rather than treating cache occupancy as a heap leak. Resolver
+    backlog stepped from 128 in-zone at `16:53:18`, to 62 at `17:01:19`, to
+    **zero** at `17:09:20`; the strict post-restart drain check passed.
+  - Rollback copy on the P-029 host:
+    `/var/lib/p029/deploy_backups/shadow_public.py.before-e40f3f7.20260808T164622Z`.
 - Sam confirmed the exposed account RSA key was rotated on 2026-08-07. Phase 1
   is still unauthorized and, if Gate 0c passes, requires a separate explicit
   decision plus confirmation or creation of a distinct read-only Kalshi key.

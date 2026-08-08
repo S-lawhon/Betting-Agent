@@ -10,7 +10,9 @@ Group=bettingbot
 WorkingDirectory=/opt/betting-pod-shop
 EnvironmentFile=-/opt/betting-pod-shop/.env
 EnvironmentFile=-/opt/betting-pod-shop/.env.x
-ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_intake --include-x
+# X is paused by default.  Re-enabling it requires both the source-config flag
+# and an explicit unit override/manual invocation with --include-x.
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_intake
 ExecStartPost=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_triage
 ExecStartPost=/opt/betting-pod-shop/venv/bin/python -m scripts.build_research_metrics
 

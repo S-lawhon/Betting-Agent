@@ -243,10 +243,12 @@ systemctl list-timers market-census.timer research-intake.timer
 ```
 
 `research-intake.service` imports `/opt/betting-pod-shop/.env`, then the
-optional X-only `/opt/betting-pod-shop/.env.x`, and supplies the explicit
-`--include-x` flag. The X-only file is preferred for this pilot so deploying the
-Bearer Token does not copy unrelated credentials. Lock it to mode `0600` and
-owner `bettingbot:bettingbot`. The normal code deploy excludes secret files.
+optional X-only `/opt/betting-pod-shop/.env.x`, but does not supply
+`--include-x` while the source is paused. A later X window requires an explicit
+unit override or manual invocation in addition to `collectors.x.enabled: true`.
+The X-only file is preferred so deploying the Bearer Token does not copy
+unrelated credentials. Lock it to mode `0600` and owner
+`bettingbot:bettingbot`. The normal code deploy excludes secret files.
 
 The manager registry monitors census, intake, and triage manifests for
 freshness. A fresh triage manifest proves tasks were allocated; only a durable

@@ -122,6 +122,22 @@ productive, and rejections caused by missing mechanism/data/executability count
 against the source lane. This feedback cannot turn an unknown edge or capacity
 field into evidence.
 
+Backpressure stops new work but does not silently delete an inherited oversized
+queue. Use the manual, dry-run-first compactor when legacy pending work must be
+brought under the configured caps:
+
+```bash
+python3 scripts/compact_research_queue.py
+python3 scripts/compact_research_queue.py --apply
+```
+
+It keeps live claims unconditionally, then retains the highest recorded triage
+scores within the total and per-agent limits. Overflow moves to
+`dispatch_quarantine/` and remains recoverable; an immutable audit under
+`queue_compactions/` records every retained and quarantined packet. The ranking
+allocates review attention only and is not evidence of edge. If active claims
+alone violate a cap, or a claim has no matching packet, compaction fails closed.
+
 ### `ResearchClaim`
 
 Defined in `src/research_execution.py`. A human session or explicitly

@@ -411,9 +411,12 @@ the first pilot's 36,868–202,807-token full-research calls. Deferred screens
 must supply an ISO-8601 UTC `recheck_after`; a prose condition is not a dated
 feedback loop.
 
-This implementation is code-complete but not deployed and has not been pointed
-at the live research queue. A new execution window requires a passing
-calibration report and an explicit human allocation decision.
+The queue controls were deployed on 2026-08-08. Their first live cycle saw 580
+assignments, dispatched zero while the queue was saturated, and quarantined 19
+weak legacy packets, leaving 39 pending. No model was invoked. The screened
+worker remains manual-only; a new execution window requires the passing
+calibration report, a freshly generated mechanism-bearing candidate, and an
+explicit human allocation decision.
 
 ## Current limitations
 

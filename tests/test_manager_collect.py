@@ -260,6 +260,9 @@ def test_p029_memory_pressure_is_warn_but_process_loss_is_critical():
         "last_row": {
             "shadow_memory_utilization_pct": 95.8,
             "shadow_memory_current_bytes": 771_575_808,
+            "shadow_memory_anon_bytes": 400_000_000,
+            "shadow_memory_file_bytes": 371_575_808,
+            "shadow_memory_anon_utilization_pct": 49.7,
             "shadow_memory_peak_bytes": 805_810_176,
             "shadow_memory_swap_bytes": 21_106_688,
             "shadow_memory_max_events": 42,
@@ -281,6 +284,7 @@ def test_p029_memory_warning_includes_bounded_pressure_trend():
             "shadow_main_pid": 224158,
             "shadow_memory_utilization_pct": utilization,
             "shadow_memory_swap_bytes": swap,
+            "shadow_memory_anon_utilization_pct": 49.7,
             "shadow_memory_max_events": events,
             "shadow_due_in_zone": backlog,
             "shadow_restart_delta": 0,
@@ -296,6 +300,9 @@ def test_p029_memory_warning_includes_bounded_pressure_trend():
         "id": "p029_shadow", "measurable": True, "stale": False,
         "last_row": recent[-1] | {
             "shadow_memory_current_bytes": 771_575_808,
+            "shadow_memory_anon_bytes": 400_000_000,
+            "shadow_memory_file_bytes": 371_575_808,
+            "shadow_memory_anon_utilization_pct": 49.7,
             "shadow_memory_peak_bytes": 805_810_176,
         },
         "recent_rows": recent,
@@ -341,6 +348,23 @@ def test_p029_healthy_memory_emits_no_pressure_findings():
         "stale": False,
         "last_row": {
             "shadow_memory_utilization_pct": 70.0,
+            "shadow_restart_delta": 0,
+            "shadow_oom_kill_events": 0,
+        },
+    }
+    assert not checks.check_jobs({"jobs": [job]})
+
+
+def test_p029_reclaimable_file_cache_at_cap_emits_no_pressure_finding():
+    job = {
+        "id": "p029_shadow", "measurable": True, "stale": False,
+        "last_row": {
+            "shadow_memory_utilization_pct": 99.9,
+            "shadow_memory_current_bytes": 804_000_000,
+            "shadow_memory_anon_bytes": 50_000_000,
+            "shadow_memory_file_bytes": 754_000_000,
+            "shadow_memory_anon_utilization_pct": 6.2,
+            "shadow_memory_swap_bytes": 0,
             "shadow_restart_delta": 0,
             "shadow_oom_kill_events": 0,
         },

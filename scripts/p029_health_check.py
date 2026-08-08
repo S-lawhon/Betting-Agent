@@ -113,6 +113,14 @@ def memory_events(u):
             return {k: int(v) for k, v in (line.split() for line in fh)}
     except Exception:
         return None
+def memory_stat(u):
+    try:
+        group = unit_property(u, "ControlGroup")
+        path = "/sys/fs/cgroup" + group + "/memory.stat"
+        with open(path, encoding="utf-8") as fh:
+            return {k: int(v) for k, v in (line.split() for line in fh)}
+    except Exception:
+        return None
 def due_in_zone():
     try:
         before = (datetime.now(timezone.utc) - timedelta(hours=40)).isoformat()
@@ -137,6 +145,7 @@ try:
 except OSError:
     pass
 disk = os.statvfs("/")
+shadow_memory_stat = memory_stat("p029-shadow.service")
 print(json.dumps({
     "shadow_unit": unit_state("p029-shadow.service"),
     "shadow_db_age_s": age_s("/var/lib/p029/shadow.sqlite"),
@@ -147,6 +156,8 @@ print(json.dumps({
     "shadow_memory_swap_bytes": unit_int("p029-shadow.service", "MemorySwapCurrent"),
     "shadow_memory_max_bytes": unit_int("p029-shadow.service", "MemoryMax"),
     "shadow_memory_events": memory_events("p029-shadow.service"),
+    "shadow_memory_anon_bytes": (shadow_memory_stat or {}).get("anon"),
+    "shadow_memory_file_bytes": (shadow_memory_stat or {}).get("file"),
     "shadow_main_pid": unit_int("p029-shadow.service", "MainPID"),
     "shadow_nrestarts": unit_int("p029-shadow.service", "NRestarts"),
     "shadow_result": unit_property("p029-shadow.service", "Result"),
@@ -184,6 +195,8 @@ def evaluate(facts: dict) -> dict:
     memory_current_bytes = facts.get("shadow_memory_current_bytes")
     memory_max_bytes = facts.get("shadow_memory_max_bytes")
     memory_swap_bytes = facts.get("shadow_memory_swap_bytes")
+    memory_anon_bytes = facts.get("shadow_memory_anon_bytes")
+    memory_file_bytes = facts.get("shadow_memory_file_bytes")
     main_pid = facts.get("shadow_main_pid")
     nrestarts = facts.get("shadow_nrestarts")
     memory_events_data = facts.get("shadow_memory_events")
@@ -193,6 +206,8 @@ def evaluate(facts: dict) -> dict:
                  and memory_current_bytes is not None
                  and memory_max_bytes == SHADOW_MEMORY_MAX_BYTES
                  and memory_swap_bytes is not None
+                 and memory_anon_bytes is not None
+                 and memory_file_bytes is not None
                  and main_pid not in (None, 0)
                  and nrestarts is not None
                  and isinstance(memory_events_data, dict)
@@ -201,7 +216,8 @@ def evaluate(facts: dict) -> dict:
                   if memory_current_bytes is not None and memory_max_bytes else None)
     out["p029_shadow"] = {
         "ok": shadow_ok,
-        "why": ("unit={} db_age={} memory={}/{}MiB ({}) swap={}MiB "
+        "why": ("unit={} db_age={} memory={}/{}MiB ({}) anon={}MiB "
+                "file_cache={}MiB swap={}MiB "
                 "pid={} restarts={} oom_kill={} due_in_zone={}".format(
             facts.get("shadow_unit"),
             "{:.0f}m".format(db_age / 60) if db_age is not None else "missing",
@@ -210,6 +226,10 @@ def evaluate(facts: dict) -> dict:
             (round(memory_max_bytes / 1024 / 1024)
              if memory_max_bytes is not None else "missing"),
             ("{:.1f}%".format(memory_pct) if memory_pct is not None else "missing"),
+            (round(memory_anon_bytes / 1024 / 1024)
+             if memory_anon_bytes is not None else "missing"),
+            (round(memory_file_bytes / 1024 / 1024)
+             if memory_file_bytes is not None else "missing"),
             (round(memory_swap_bytes / 1024 / 1024)
              if memory_swap_bytes is not None else "missing"),
             main_pid if main_pid is not None else "missing",
@@ -274,9 +294,15 @@ def append_heartbeat(job_id: str, facts: dict, verdict: dict,
             "shadow_memory_peak_bytes": facts.get("shadow_memory_peak_bytes"),
             "shadow_memory_swap_bytes": facts.get("shadow_memory_swap_bytes"),
             "shadow_memory_max_bytes": memory_max,
+            "shadow_memory_anon_bytes": facts.get("shadow_memory_anon_bytes"),
+            "shadow_memory_file_bytes": facts.get("shadow_memory_file_bytes"),
             "shadow_memory_utilization_pct": (
                 round(100.0 * memory_current / memory_max, 1)
                 if isinstance(memory_current, int) and memory_max else None),
+            "shadow_memory_anon_utilization_pct": (
+                round(100.0 * facts["shadow_memory_anon_bytes"] / memory_max, 1)
+                if isinstance(facts.get("shadow_memory_anon_bytes"), int)
+                and memory_max else None),
             "shadow_memory_max_events": events.get("max"),
             "shadow_oom_events": events.get("oom"),
             "shadow_oom_kill_events": events.get("oom_kill"),

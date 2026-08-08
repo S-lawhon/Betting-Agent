@@ -23,6 +23,8 @@ HEALTHY = {
     "shadow_memory_current_bytes": 400 * 1024 * 1024,
     "shadow_memory_peak_bytes": 450 * 1024 * 1024,
     "shadow_memory_swap_bytes": 0,
+    "shadow_memory_anon_bytes": 100 * 1024 * 1024,
+    "shadow_memory_file_bytes": 300 * 1024 * 1024,
     "shadow_memory_max_bytes": SHADOW_MEMORY_MAX_BYTES,
     "shadow_memory_events": {"max": 0, "oom": 0, "oom_kill": 0},
     "shadow_main_pid": 1234,
@@ -42,6 +44,8 @@ def test_remote_probe_compiles_and_measures_gate0c_prerequisites():
     assert '"shadow_memory_current_bytes"' in health_check.REMOTE_PROBE
     assert '"shadow_memory_swap_bytes"' in health_check.REMOTE_PROBE
     assert '"shadow_memory_events"' in health_check.REMOTE_PROBE
+    assert '"shadow_memory_anon_bytes"' in health_check.REMOTE_PROBE
+    assert '"shadow_memory_file_bytes"' in health_check.REMOTE_PROBE
     assert '"shadow_nrestarts"' in health_check.REMOTE_PROBE
     assert '"shadow_due_in_zone"' in health_check.REMOTE_PROBE
 
@@ -108,6 +112,9 @@ def test_heartbeat_row_carries_timestamp_utc(tmp_path):
     assert row["shadow_memory_max_bytes"] == SHADOW_MEMORY_MAX_BYTES
     assert row["shadow_memory_current_bytes"] == 400 * 1024 * 1024
     assert row["shadow_memory_utilization_pct"] == 52.1
+    assert row["shadow_memory_anon_bytes"] == 100 * 1024 * 1024
+    assert row["shadow_memory_file_bytes"] == 300 * 1024 * 1024
+    assert row["shadow_memory_anon_utilization_pct"] == 13.0
     assert row["shadow_memory_swap_bytes"] == 0
     assert row["shadow_oom_kill_events"] == 0
     assert row["shadow_main_pid"] == 1234

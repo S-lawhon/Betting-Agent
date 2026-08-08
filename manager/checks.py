@@ -422,7 +422,20 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
             row = job.get("last_row") or {}
             trend = _p029_pressure_trend(job.get("recent_rows") or [])
             memory_pct = row.get("shadow_memory_utilization_pct")
-            if isinstance(memory_pct, (int, float)) and memory_pct >= 90.0:
+            anon_pct = row.get("shadow_memory_anon_utilization_pct")
+            swap_bytes = row.get("shadow_memory_swap_bytes")
+            # MemoryCurrent includes reclaimable SQLite page cache. A large
+            # cache is expected for the 5 GiB tape and is not itself an OOM
+            # threat. Warn when a near-cap cgroup is also carrying substantial
+            # anonymous heap, any swap, or legacy telemetry that cannot split
+            # the two. This caught the 2026-08-08 all-history ticker set while
+            # allowing the post-fix 6% heap / 94% reclaimable-cache state.
+            heap_or_swap_pressure = (
+                anon_pct is None
+                or (isinstance(anon_pct, (int, float)) and anon_pct >= 40.0)
+                or (isinstance(swap_bytes, int) and swap_bytes > 0))
+            if (isinstance(memory_pct, (int, float)) and memory_pct >= 90.0
+                    and heap_or_swap_pressure):
                 trend_text = "24h trend unavailable (fewer than two timed samples)."
                 if trend and trend.get("samples", 0) >= 2:
                     trend_text = (
@@ -438,15 +451,18 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
                 out.append(Finding(
                     key="job.p029_shadow.memory_pressure",
                     severity="warn",
-                    title="P-029 shadow memory is {:.1f}% of its 768 MiB cap".format(
-                        memory_pct),
-                    detail=("Current={} bytes, peak={} bytes, swap={} bytes, "
-                            "memory.max events={}. {} The Gate 0c tape cannot be "
+                    title=("P-029 shadow heap/cache pressure at {:.1f}% of its "
+                           "768 MiB cap".format(memory_pct)),
+                    detail=("Current={} bytes, anon={} bytes ({}%), file cache={} "
+                            "bytes, peak={} bytes, swap={} bytes, memory.max "
+                            "events={}. {} The Gate 0c tape cannot be "
                             "backfilled; keep the frozen cap unchanged until "
                             "the pressure trend is reviewed."
                             .format(row.get("shadow_memory_current_bytes"),
+                                    row.get("shadow_memory_anon_bytes"), anon_pct,
+                                    row.get("shadow_memory_file_bytes"),
                                     row.get("shadow_memory_peak_bytes"),
-                                    row.get("shadow_memory_swap_bytes"),
+                                    swap_bytes,
                                     row.get("shadow_memory_max_events"),
                                     trend_text)),
                     fix=("Inspect systemctl show p029-shadow.service "

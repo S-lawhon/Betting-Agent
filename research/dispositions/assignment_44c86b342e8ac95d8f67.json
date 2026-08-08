@@ -1,0 +1,19 @@
+{
+  "assignment_id": "assignment_44c86b342e8ac95d8f67",
+  "decided_at": "2026-08-08T19:37:53.818136Z",
+  "decision": "defer",
+  "evidence_checked": [
+    "CFTC, \u201cModifications to Equity Index Perp Style Futures Market Maker Program,\u201d filing 62095: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizationRules/62095"
+  ],
+  "notes": "screening_only: The supplied evidence is a primary regulatory-filing metadata record marked \u201c10 Day Review,\u201d but it omits the actual modifications, effective date, affected instruments, eligibility rules, and market-data availability. No opportunity_id is created and no strategy-registry advancement is authorized.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "insufficient_filing_detail",
+    "current_eligibility_unknown",
+    "no_timestamp_correct_dataset",
+    "execution_friction_unmeasured"
+  ],
+  "recheck_after": "2026-08-18T00:00:00Z",
+  "research_minutes": 3,
+  "source_item_id": "src_95f6533902b2cf2e6343"
+}

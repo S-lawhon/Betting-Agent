@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from unittest import TestCase
 
 from src.research_intake import SourceItem
-from src.research_triage import title_tokens, triage_assignments
+from src.research_triage import attach_evidence, title_tokens, triage_assignments
 
 
 NOW = datetime(2026, 8, 2, 14, 0, tzinfo=timezone.utc)
@@ -255,6 +255,51 @@ class TestResearchTriage(TestCase):
             "Modifications to Equity Index Perp Style Futures "
             "Market Maker Program")
         self.assertIn("a1", new_ledger["dispatched_assignment_ids"])
+
+    def test_triage_itself_ships_no_evidence_and_no_network(self):
+        # triage_assignments must stay pure and offline; enrichment is the
+        # runner's job, so an un-enriched packet declares nothing measured.
+        _, _, packets = triage_assignments(
+            [_assignment(1, source="paper", lane="literature")], now=NOW)
+        self.assertEqual(packets[0].market_evidence, {})
+        self.assertNotIn("supplied_evidence", packets[0].completion_contract)
+
+    def test_attached_evidence_reaches_the_contract_without_moving_the_score(self):
+        _, _, packets = triage_assignments(
+            [_assignment(1, source="paper", lane="literature")], now=NOW)
+        packet = packets[0]
+        pack = {
+            "status": "measured", "source": "kalshi_public+kalshi_fees",
+            "measured_at": "2026-08-08T20:00:00Z",
+            "facts": {"series_ticker": "KXTEST", "fees": {"maker_charges_fee": False},
+                      "representative_quote": {"spread": 0.05}, "empty": {}},
+            "notes": [],
+        }
+        enriched = attach_evidence(packet, pack)
+        self.assertEqual(enriched.market_evidence["status"], "measured")
+        self.assertEqual(
+            enriched.completion_contract["supplied_evidence"],
+            ["fees", "representative_quote", "series_ticker"])
+        self.assertEqual(
+            enriched.completion_contract["supplied_evidence_status"], "measured")
+        self.assertIn("market_evidence",
+                      enriched.completion_contract["supplied_evidence_note"])
+        # Ranking, capacity and net edge are untouched: a quote is friction,
+        # not capacity, and never an edge.
+        self.assertEqual(enriched.triage_score, packet.triage_score)
+        self.assertEqual(enriched.evidence_unknowns, ["capacity", "net_edge"])
+        self.assertIsNone(enriched.score_components["capacity"]["score"])
+        self.assertIsNone(enriched.score_components["net_edge"]["score"])
+        self.assertEqual(packet.market_evidence, {})
+
+    def test_unavailable_evidence_tells_the_agent_to_say_so(self):
+        _, _, packets = triage_assignments(
+            [_assignment(1, source="paper", lane="literature")], now=NOW)
+        enriched = attach_evidence(packets[0], {
+            "status": "unavailable", "source": "none", "facts": {}, "notes": []})
+        self.assertEqual(enriched.completion_contract["supplied_evidence"], [])
+        self.assertIn("rather than assuming",
+                      enriched.completion_contract["supplied_evidence_note"])
 
     def test_triage_keeps_one_packet_per_research_family(self):
         first = _assignment(1, source="paper", lane="literature", score=80)

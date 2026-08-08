@@ -12,7 +12,7 @@ import json
 import math
 import re
 from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
@@ -344,6 +344,10 @@ class DispatchPacket:
     source_item: Dict[str, Any]
     status: str = "pending"
     safety: Dict[str, Any] = field(default_factory=dict)
+    # Measured public facts (fees, quote, contract terms, filing documents).
+    # Populated by the runner, which has network; triage itself stays offline
+    # and deterministic. See src/research_evidence.py.
+    market_evidence: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -538,6 +542,33 @@ def _packet(assignment: Mapping[str, Any], *, source_item: Mapping[str, Any],
         },
     )
     return packet, blocked
+
+
+def attach_evidence(packet: DispatchPacket,
+                    pack: Mapping[str, Any]) -> DispatchPacket:
+    """Return a copy of ``packet`` carrying a resolved evidence pack.
+
+    The completion contract is told what it was actually handed, so the
+    specialist spends its budget testing the mechanism instead of rediscovering
+    that fees and quotes were withheld.  ``capacity`` and ``net_edge`` stay
+    unknown and the triage score is not touched: an observed quote is friction,
+    not capacity, and never an edge.
+    """
+    from src.research_evidence import supplied_evidence_keys
+
+    supplied = supplied_evidence_keys(pack)
+    contract = dict(packet.completion_contract)
+    contract["supplied_evidence"] = supplied
+    contract["supplied_evidence_status"] = str(pack.get("status") or "unknown")
+    contract["supplied_evidence_note"] = (
+        "Measured public facts are in dispatch_packet.market_evidence. Treat "
+        "them as observations at market_evidence.measured_at, not as edge. "
+        "Do not report an evidence class as unavailable without checking it."
+        if supplied else
+        "No measured evidence could be attached for this source; say so "
+        "explicitly rather than assuming the market data does not exist.")
+    return replace(packet, market_evidence=dict(pack),
+                   completion_contract=contract)
 
 
 def triage_assignments(

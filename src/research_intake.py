@@ -760,6 +760,16 @@ class CFTCCollector:
                 published = _first(values, "Date", "Official Receipt Date", "Receipt Date")
                 url = urljoin(self.BASE, links[0]) if links else urljoin(
                     self.BASE, self.PATHS[kind])
+                # Keep EVERY document link, not just the first. A rules row
+                # routinely carries two, and dropping the rest left a
+                # specialist told a rule change exists with no way to read it.
+                documents = []
+                for href in links:
+                    absolute = urljoin(self.BASE, href)
+                    if absolute not in documents:
+                        documents.append(absolute)
+                if documents:
+                    values = dict(values, documents=documents)
                 output.append(SourceItem.create(
                     source_type="regulatory_filing", source_name="CFTC",
                     external_id=url or _hash(values), title=str(title), url=url,

@@ -17,7 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.research_outcomes import ResearchDisposition  # noqa: E402
 from src.research_intake import quality_rejection_from_mapping  # noqa: E402
+from src.research_evidence import build_resolvers, resolve_evidence  # noqa: E402
 from src.research_triage import (  # noqa: E402
+    attach_evidence,
     mechanism_readiness_rejection,
     triage_assignments,
 )
@@ -252,6 +254,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--output-dir", type=Path,
                         default=ROOT / "data" / "research_triage")
     parser.add_argument("--now", help="ISO timestamp (test/replay only)")
+    parser.add_argument(
+        "--no-evidence", action="store_true",
+        help="skip public fee/quote/document lookups (offline or replay runs)")
     args = parser.parse_args(argv)
 
     config = yaml.safe_load(args.config.read_text()) or {}
@@ -312,11 +317,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     ledger["reclaimed_quarantined_assignment_ids"] = previous_ledger.get(
         "reclaimed_quarantined_assignment_ids") or []
 
+    # Resolve public evidence only for the packets actually being dispatched,
+    # so a broad candidate pool never turns into a broad API sweep.
+    resolvers = build_resolvers(not args.no_evidence)
+    evidence_status: Dict[str, str] = {}
+    enriched = []
+    for packet in packets:
+        pack = resolve_evidence(
+            packet.assignment, packet.source_item, resolvers, now=now)
+        evidence_status[packet.assignment_id] = str(pack.get("status") or "")
+        enriched.append(attach_evidence(packet, pack))
+    manifest["evidence_enabled"] = not args.no_evidence
+    manifest["evidence_status_by_assignment"] = dict(sorted(
+        evidence_status.items()))
+
     _write_atomic(ledger_path, ledger)
     _write_atomic(args.output_dir / "latest_manifest.json", manifest)
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
     _write_atomic(args.output_dir / "manifests" / f"{stamp}.json", manifest)
-    for packet in packets:
+    for packet in enriched:
         _write_atomic(
             args.output_dir / "dispatches" / packet.assigned_agent
             / f"{packet.assignment_id}.json",

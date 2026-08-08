@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from scripts.readmit_research_assignment import ReadmissionError, main
 
@@ -102,7 +103,9 @@ class TestReadmitResearchAssignment(TestCase):
         (self.sources_dir / "batch.json").write_text(json.dumps(
             {"items": [payload]}))
 
-    def run_tool(self, *extra, assignment_id=ASSIGNMENT_ID):
+    def run_tool(self, *extra, assignment_id=ASSIGNMENT_ID, evidence=False):
+        # Evidence resolution reaches the public internet, so it is off by
+        # default here; the enrichment path has its own covered test below.
         return main([
             "--assignment-id", assignment_id,
             "--reason", "reviewed CFTC filing; title corrected",
@@ -111,7 +114,7 @@ class TestReadmitResearchAssignment(TestCase):
             "--source-batches-dir", str(self.sources_dir),
             "--dispositions-dir", str(self.dispositions_dir),
             "--output-dir", str(self.output_dir),
-            "--now", NOW, *extra,
+            "--now", NOW, *(() if evidence else ("--no-evidence",)), *extra,
         ])
 
     def packet_path(self):
@@ -158,6 +161,33 @@ class TestReadmitResearchAssignment(TestCase):
                          "reviewed CFTC filing; title corrected")
         self.assertIs(record["safety"]["invokes_model"], False)
         self.assertIs(record["safety"]["regenerates_queue"], False)
+
+    def test_readmitted_packet_carries_measured_evidence(self):
+        class FakeResolver:
+            name = "fake"
+
+            def applies_to(self, assignment, source_item):
+                return True
+
+            def resolve(self, assignment, source_item, *, now=None):
+                return {"status": "measured", "source": "fake",
+                        "measured_at": "2026-08-08T19:45:00Z",
+                        "facts": {"documents": ["https://cftc.test/rule.pdf"]},
+                        "notes": []}
+
+        with patch("scripts.readmit_research_assignment.build_resolvers",
+                   return_value=[FakeResolver()]) as built:
+            self.assertEqual(self.run_tool("--apply", evidence=True), 0)
+        built.assert_called_once_with(True)
+        packet = json.loads(self.packet_path().read_text())
+        self.assertEqual(packet["market_evidence"]["status"], "measured")
+        self.assertEqual(packet["market_evidence"]["facts"]["documents"],
+                         ["https://cftc.test/rule.pdf"])
+        self.assertEqual(
+            packet["completion_contract"]["supplied_evidence"], ["documents"])
+        record = json.loads(
+            sorted((self.output_dir / "readmissions").glob("*.json"))[0].read_text())
+        self.assertEqual(record["evidence_status"], "measured")
 
     def test_second_apply_is_refused_rather_than_duplicating_work(self):
         self.assertEqual(self.run_tool("--apply"), 0)

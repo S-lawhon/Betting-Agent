@@ -37,7 +37,9 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.research_intake import quality_rejection_from_mapping  # noqa: E402
+from src.research_evidence import build_resolvers, resolve_evidence  # noqa: E402
 from src.research_triage import (  # noqa: E402
+    attach_evidence,
     mechanism_readiness_rejection,
     normalize_legacy_regulatory_assignment,
     normalize_legacy_regulatory_source_item,
@@ -78,6 +80,7 @@ def readmit(
     triage_config: Dict[str, Any],
     now,
     pinned_assignment_id: Optional[str] = None,
+    resolve_public_evidence: bool = True,
 ) -> Dict[str, Any]:
     """Build the re-admission plan for one reviewed assignment."""
     assignment_id = assignment_id.strip()
@@ -173,7 +176,10 @@ def readmit(
             f"quality={manifest.get('quality_blocked_assignment_ids')} "
             f"readiness={manifest.get('readiness_blocked_assignment_ids')} "
             f"backpressure={manifest.get('backpressure')}")
-    packet = packets[0]
+    pack = resolve_evidence(
+        packets[0].assignment, packets[0].source_item,
+        build_resolvers(resolve_public_evidence), now=now)
+    packet = attach_evidence(packets[0], pack)
     # Carry forward the fields run_research_triage owns but this narrow run
     # does not recompute, so a partial ledger cannot erase queue history.
     ledger["reclaimed_quarantined_assignment_ids"] = previous_ledger.get(
@@ -199,6 +205,8 @@ def readmit(
             packet.source_item.get("content_hash") or ""),
         "assignment_sha256": _canonical_sha256(assignment),
         "packet_sha256": _canonical_sha256(packet.to_dict()),
+        "evidence_status": str(pack.get("status") or ""),
+        "evidence_source": str(pack.get("source") or ""),
         "slot_grant": grant,
         "daily_allocation_before": today,
         "daily_allocation_after": dict(
@@ -236,6 +244,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--output-dir", type=Path,
                         default=ROOT / "data" / "research_triage")
     parser.add_argument("--now", help="ISO timestamp (test/replay only)")
+    parser.add_argument(
+        "--no-evidence", action="store_true",
+        help="skip public fee/quote/document lookups (offline or replay runs)")
     parser.add_argument("--apply", action="store_true",
                         help="write the packet, ledger, and admission record")
     args = parser.parse_args(argv)
@@ -257,6 +268,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 args.config.read_text(encoding="utf-8")) or {},
             now=_parse_now(args.now),
             pinned_assignment_id=pinned,
+            resolve_public_evidence=not args.no_evidence,
         )
     except ReadmissionError as exc:
         print(f"readmission refused: {exc}", file=sys.stderr)

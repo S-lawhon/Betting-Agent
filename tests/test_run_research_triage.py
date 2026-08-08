@@ -4,6 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 from scripts.run_research_triage import main
 
@@ -181,7 +182,7 @@ class TestRunResearchTriage(TestCase):
                 "--dispositions-dir", str(dispositions),
                 "--strategy-registry", str(root / "missing-registry.json"),
                 "--output-dir", str(output),
-                "--now", "2026-08-02T14:00:00Z",
+                "--now", "2026-08-02T14:00:00Z", "--no-evidence",
             ])
             self.assertEqual(result, 2)
             manifest = json.loads((output / "latest_manifest.json").read_text())
@@ -228,7 +229,7 @@ class TestRunResearchTriage(TestCase):
                 "--dispositions-dir", str(dispositions),
                 "--strategy-registry", str(root / "missing-registry.json"),
                 "--output-dir", str(output),
-                "--now", "2026-08-02T14:00:00Z",
+                "--now", "2026-08-02T14:00:00Z", "--no-evidence",
             ])
             self.assertEqual(result, 0)
             self.assertFalse(pending.exists())
@@ -240,3 +241,82 @@ class TestRunResearchTriage(TestCase):
             self.assertEqual(
                 manifest["quarantined_assignment_ids"]["a1"],
                 "terminal_market")
+
+    def test_dispatched_packets_carry_resolved_public_evidence(self):
+        class FakeResolver:
+            name = "fake"
+            seen = []
+
+            def applies_to(self, assignment, source_item):
+                return True
+
+            def resolve(self, assignment, source_item, *, now=None):
+                FakeResolver.seen.append(str(assignment.get("id")))
+                return {"status": "measured", "source": "fake",
+                        "measured_at": "2026-08-02T14:00:00Z",
+                        "facts": {"series_ticker": "KXTEST",
+                                  "fees": {"maker_charges_fee": False}},
+                        "notes": []}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = root / "triage.yaml"
+            config.write_text("portfolio:\n  max_dispatches_per_utc_day: 1\n")
+            assignments = root / "assignments"
+            sources = root / "sources"
+            dispositions = root / "dispositions"
+            for path in (assignments, sources, dispositions):
+                path.mkdir()
+            (assignments / "batch.json").write_text(json.dumps({"assignments": [
+                {"id": "a1", "source_item_id": "s1", "score": 80,
+                 "lane": "information_latency",
+                 "title": "Spread mispricing on a listed series",
+                 "source_type": "venue_market", "source_name": "Kalshi",
+                 "venue_ids": ["kalshi"], "legal_decisions": [],
+                 "assignment": {"agent": "strategy-scout"}},
+                # A second, lower-ranked candidate proves enrichment runs only
+                # for packets actually dispatched, not the whole pool.
+                {"id": "a2", "source_item_id": "s2", "score": 10,
+                 "lane": "information_latency", "title": "Another listed series",
+                 "source_type": "venue_market", "source_name": "Kalshi",
+                 "venue_ids": ["kalshi"], "legal_decisions": [],
+                 "assignment": {"agent": "strategy-scout"}},
+            ]}))
+            base = {
+                "source_type": "venue_market", "source_name": "Kalshi",
+                "title": "Spread", "summary": "census seed", "url": "",
+                "published_at": None, "retrieved_at": "2026-08-02T12:00:00Z",
+                "topics": [], "venue_ids": ["kalshi"],
+                "product_family": "sports", "reliability": "primary",
+                "rights": "metadata_and_link",
+                "metadata": {"market_family": "KXTEST", "census_run_id": "c1"},
+            }
+            (sources / "batch.json").write_text(json.dumps({"items": [
+                dict(base, id="s1", external_id="m1", content_hash="h1"),
+                dict(base, id="s2", external_id="m2", content_hash="h2"),
+            ]}))
+            output = root / "output"
+            with patch("scripts.run_research_triage.build_resolvers",
+                       return_value=[FakeResolver()]) as built:
+                result = main([
+                    "--config", str(config),
+                    "--assignments-dir", str(assignments),
+                    "--source-batches-dir", str(sources),
+                    "--dispositions-dir", str(dispositions),
+                    "--strategy-registry", str(root / "missing-registry.json"),
+                    "--output-dir", str(output),
+                    "--now", "2026-08-02T14:00:00Z",
+                ])
+            self.assertEqual(result, 0)
+            built.assert_called_once_with(True)
+            self.assertEqual(FakeResolver.seen, ["a1"])
+            packet = json.loads((
+                output / "dispatches" / "strategy-scout" / "a1.json").read_text())
+            self.assertEqual(packet["market_evidence"]["status"], "measured")
+            self.assertEqual(
+                packet["completion_contract"]["supplied_evidence"],
+                ["fees", "series_ticker"])
+            manifest = json.loads((output / "latest_manifest.json").read_text())
+            self.assertIs(manifest["evidence_enabled"], True)
+            self.assertEqual(
+                manifest["evidence_status_by_assignment"], {"a1": "measured"})

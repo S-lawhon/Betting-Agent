@@ -101,6 +101,7 @@ def _run_history_24h(directory: Path, now: datetime) -> Dict[str, Any]:
     snapshots = healthy = degraded = runs_with_matches = 0
     matched = hypothetical = actionable = 0
     best: Optional[float] = None
+    edge_history_complete = True
     for day in (now.date(), (now - timedelta(days=1)).date()):
         path = directory / f"{day.isoformat()}.jsonl"
         try:
@@ -123,6 +124,8 @@ def _run_history_24h(directory: Path, now: datetime) -> Dict[str, Any]:
             runs_with_matches += row_matched > 0
             hypothetical += int(row.get("hypothetical_positive_paths") or 0)
             actionable += int(row.get("actionable_paths") or 0)
+            if "best_net_edge_usd" not in row:
+                edge_history_complete = False
             value = row.get("best_net_edge_usd")
             if isinstance(value, (int, float)) and (best is None or value > best):
                 best = value
@@ -132,7 +135,56 @@ def _run_history_24h(directory: Path, now: datetime) -> Dict[str, Any]:
         "runs_with_matches": runs_with_matches, "matched_events": matched,
         "hypothetical_positive_paths": hypothetical,
         "actionable_paths": actionable, "best_net_edge_usd": best,
+        "edge_history_complete": edge_history_complete,
     }
+
+
+def _observation_history_24h(directory: Path, now: datetime) -> Dict[str, Any]:
+    """Exact migration fallback for legacy run rows without best-edge data.
+
+    Lines are parsed and discarded one at a time.  Unlike the historical
+    replay, this never materializes the observation tape in memory.
+    """
+    cutoff = now - timedelta(hours=24)
+    runs = set()
+    matched = hypothetical = actionable = 0
+    best: Optional[float] = None
+    for day in (now.date(), (now - timedelta(days=1)).date()):
+        path = directory / f"{day.isoformat()}.jsonl"
+        try:
+            handle = path.open(encoding="utf-8")
+        except OSError:
+            continue
+        with handle:
+            for line in handle:
+                try:
+                    row = json.loads(line)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                captured = _parse_iso(row.get("captured_at"))
+                if not captured or captured < cutoff:
+                    continue
+                runs.add(str(row.get("collection_id") or row.get("captured_at")))
+                matched += 1
+                hypothetical += int(row.get("hypothetical_positive_paths") or 0)
+                actionable += int(row.get("actionable_paths") or 0)
+                value = row.get("best_net_edge_usd")
+                if (isinstance(value, (int, float))
+                        and (best is None or value > best)):
+                    best = value
+    return {
+        "runs_with_matches": len(runs), "matched_events": matched,
+        "hypothetical_positive_paths": hypothetical,
+        "actionable_paths": actionable, "best_net_edge_usd": best,
+    }
+
+
+def _history_24h(output_dir: Path, now: datetime) -> Dict[str, Any]:
+    metrics = _run_history_24h(output_dir / "runs", now)
+    if not metrics.pop("edge_history_complete"):
+        metrics.update(_observation_history_24h(
+            output_dir / "observations", now))
+    return metrics
 
 
 def _load_cached(path: Path, *, kind: str) -> Dict[str, Any]:
@@ -238,7 +290,7 @@ def collect(gemini: GeminiPublic, kalshi: KalshiPublic, output_dir: Path,
         "actionable_paths": latest_actionable,
         "best_net_edge_usd": best,
     }])
-    day_metrics = _run_history_24h(output_dir / "runs", captured_at)
+    day_metrics = _history_24h(output_dir, captured_at)
     pair_id = "gemini_kalshi_mlb_moneyline"
     if refresh_analysis:
         observation_rows = load_observations(

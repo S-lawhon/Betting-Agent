@@ -1,7 +1,11 @@
 import json
+from datetime import datetime, timezone
 
 import scripts.run_gemini_crossvenue_research as collector
 from scripts.run_gemini_crossvenue_research import collect
+
+
+UTC = timezone.utc
 
 
 class _Gemini:
@@ -98,3 +102,29 @@ def test_fast_collection_reuses_analysis_without_replaying_observations(
     assert metrics["last_24h"]["matched_events"] == 1
     assert metrics["last_24h"]["runs_with_matches"] == 1
     assert metrics["last_24h"]["best_net_edge_usd"] == -0.03
+
+
+def test_legacy_run_rows_use_bounded_observation_history_fallback(tmp_path):
+    captured = "2026-08-08T12:00:00Z"
+    runs = tmp_path / "runs"
+    observations = tmp_path / "observations"
+    runs.mkdir()
+    observations.mkdir()
+    (runs / "2026-08-08.jsonl").write_text(json.dumps({
+        "captured_at": captured, "status": "healthy", "matched_events": 1,
+        "hypothetical_positive_paths": 1, "actionable_paths": 0,
+    }) + "\n")
+    (observations / "2026-08-08.jsonl").write_text(json.dumps({
+        "captured_at": captured, "collection_id": "legacy",
+        "hypothetical_positive_paths": 1, "actionable_paths": 0,
+        "best_net_edge_usd": .22,
+    }) + "\n")
+
+    metrics = collector._history_24h(
+        tmp_path, datetime(2026, 8, 8, 12, 5, tzinfo=UTC))
+
+    assert metrics["snapshots"] == 1
+    assert metrics["matched_events"] == 1
+    assert metrics["runs_with_matches"] == 1
+    assert metrics["best_net_edge_usd"] == .22
+    assert "edge_history_complete" not in metrics

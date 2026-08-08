@@ -147,51 +147,79 @@ class TestKalshiEvidence(TestCase):
             _kalshi_assignment(), _kalshi_source(metadata={})))
 
 
+def _page(html):
+    class FakeResponse:
+        text = html
+
+        def raise_for_status(self):
+            return None
+
+    class FakeSession:
+        def get(self, url, timeout=None, headers=None):
+            return FakeResponse()
+
+    return FakeSession()
+
+
+# Trimmed from the live page for filing 62095: two real documents wrapped in
+# the site's standard .htm navigation chrome.
+CFTC_PAGE = """
+<a href="/Transparency/index.htm">Transparency</a>
+<a href="/About/Commissioners/index.htm">Commissioners</a>
+<a href="/sites/default/files/css/style.css?delta=0">css</a>
+<a href="https://www.cftc.gov/filings/orgrules/rules07302612485.pdf">
+  <span>2026-45 Modifications to Equity Index Perp Style Futures
+  MMP_Redacted</span></a>
+<a href="https://www.cftc.gov/filings/orgrules/rules07302612485.pdf">dup</a>
+<a href="https://www.cftc.gov/filings/orgrules/rules07302612486.pdf">
+  2026-45_FOIA Request</a>
+<a href="/Contact/index.htm">Contact</a>
+"""
+
+
 class TestCFTCEvidence(TestCase):
-    def test_recorded_document_links_are_used_without_a_fetch(self):
-        class Boom:
-            def get(self, *a, **k):
-                raise AssertionError("must not fetch when links are recorded")
-
-        source = {
-            "id": "src_2", "source_type": "regulatory_filing",
-            "url": "https://www.cftc.gov/filing/62095",
-            "metadata": {
-                "Organization": "COIN", "Status": "10 Day Review",
-                "Filing Description": "Market Maker Program",
-                "Documents": "2",
-                "documents": ["https://www.cftc.gov/a.pdf",
-                              "https://www.cftc.gov/b.pdf"],
-            },
-        }
-        pack = CFTCFilingEvidenceResolver(Boom()).resolve(
-            {"source_type": "regulatory_filing"}, source, now=NOW)
-        self.assertEqual(pack["status"], "measured")
-        self.assertEqual(len(pack["facts"]["documents"]), 2)
-        self.assertEqual(pack["facts"]["status"], "10 Day Review")
-
-    def test_document_links_are_extracted_from_the_filing_page(self):
-        class FakeResponse:
-            text = ('<a href="/files/rule.pdf">Rule</a>'
-                    '<a href="/files/rule.pdf">dup</a>'
-                    '<a href="https://x.test/exhibit.PDF">Exhibit</a>'
-                    '<a href="/about">Not a document</a>')
-
-            def raise_for_status(self):
-                return None
-
-        class FakeSession:
-            def get(self, url, timeout=None, headers=None):
-                return FakeResponse()
-
-        pack = CFTCFilingEvidenceResolver(FakeSession()).resolve(
+    def test_navigation_chrome_is_not_mistaken_for_filing_documents(self):
+        # Accepting .htm returned twelve cftc.gov nav links and zero filings.
+        pack = CFTCFilingEvidenceResolver(_page(CFTC_PAGE)).resolve(
             {"source_type": "regulatory_filing"},
-            {"url": "https://www.cftc.gov/filing/62095", "metadata": {}},
-            now=NOW)
-        self.assertEqual(pack["facts"]["documents"], [
-            "https://www.cftc.gov/files/rule.pdf",
-            "https://x.test/exhibit.PDF",
+            {"url": "https://www.cftc.gov/filing/62095",
+             "metadata": {"Documents": "2"}}, now=NOW)
+        urls = [row["url"] for row in pack["facts"]["documents"]]
+        self.assertEqual(urls, [
+            "https://www.cftc.gov/filings/orgrules/rules07302612485.pdf",
+            "https://www.cftc.gov/filings/orgrules/rules07302612486.pdf",
         ])
+        self.assertNotIn(
+            "https://www.cftc.gov/About/Commissioners/index.htm", urls)
+        self.assertFalse([u for u in urls if u.endswith((".htm", ".css"))])
+
+    def test_document_titles_separate_rule_text_from_attachments(self):
+        pack = CFTCFilingEvidenceResolver(_page(CFTC_PAGE)).resolve(
+            {"source_type": "regulatory_filing"},
+            {"url": "https://www.cftc.gov/filing/62095",
+             "metadata": {"Documents": "2"}}, now=NOW)
+        titles = [row["title"] for row in pack["facts"]["documents"]]
+        self.assertEqual(titles, [
+            "2026-45 Modifications to Equity Index Perp Style Futures "
+            "MMP_Redacted",
+            "2026-45_FOIA Request",
+        ])
+        self.assertEqual(pack["status"], "measured")
+
+    def test_count_disagreement_is_reported_not_hidden(self):
+        pack = CFTCFilingEvidenceResolver(_page(CFTC_PAGE)).resolve(
+            {"source_type": "regulatory_filing"},
+            {"url": "https://www.cftc.gov/filing/62095",
+             "metadata": {"Documents": "5"}}, now=NOW)
+        self.assertIn("reports 5 documents but 2 were extracted",
+                      " ".join(pack["notes"]))
+
+    def test_a_page_with_no_documents_says_so(self):
+        pack = CFTCFilingEvidenceResolver(_page("<a href='/x.htm'>x</a>")).resolve(
+            {"source_type": "regulatory_filing"},
+            {"url": "https://www.cftc.gov/filing/1", "metadata": {}}, now=NOW)
+        self.assertEqual(pack["facts"]["documents"], [])
+        self.assertIn("no document files", " ".join(pack["notes"]))
 
     def test_unreachable_filing_page_degrades_to_partial(self):
         class DeadSession:

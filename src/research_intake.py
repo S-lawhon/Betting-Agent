@@ -758,18 +758,12 @@ class CFTCCollector:
                 organization = str(values.get("Organization") or "CFTC")
                 venue_id = self.VENUE_IDS.get(organization.upper())
                 published = _first(values, "Date", "Official Receipt Date", "Receipt Date")
+                # The only href on a row is the filing DETAIL page (the
+                # ``Documents`` cell links there and reports a count); the
+                # filing PDFs live on that page, not in this table. Resolving
+                # them is src.research_evidence's job, not the collector's.
                 url = urljoin(self.BASE, links[0]) if links else urljoin(
                     self.BASE, self.PATHS[kind])
-                # Keep EVERY document link, not just the first. A rules row
-                # routinely carries two, and dropping the rest left a
-                # specialist told a rule change exists with no way to read it.
-                documents = []
-                for href in links:
-                    absolute = urljoin(self.BASE, href)
-                    if absolute not in documents:
-                        documents.append(absolute)
-                if documents:
-                    values = dict(values, documents=documents)
                 output.append(SourceItem.create(
                     source_type="regulatory_filing", source_name="CFTC",
                     external_id=url or _hash(values), title=str(title), url=url,

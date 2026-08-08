@@ -341,22 +341,6 @@ class TestCollectors(TestCase):
         self.assertIn("CFE", items[0].summary)
         self.assertIsNone(quality_rejection_reason(items[0], now=NOW))
 
-    def test_cftc_rows_keep_every_document_link(self):
-        html = """<table><tr><th>Organization</th><th>Filing Description</th>
-        <th>Documents</th></tr><tr><td>COIN</td>
-        <td><a href="/filings/rule.pdf">Market Maker Program</a></td>
-        <td><a href="/filings/rule.pdf">1</a><a href="/filings/ex.pdf">2</a></td>
-        </tr></table>"""
-        items = CFTCCollector().parse(
-            html, kind="rules", retrieved_at="2026-08-01T12:00:00Z")
-        self.assertEqual(items[0].metadata["documents"], [
-            "https://www.cftc.gov/filings/rule.pdf",
-            "https://www.cftc.gov/filings/ex.pdf",
-        ])
-        # The primary link still drives identity, so keeping the rest does not
-        # move the source item id.
-        self.assertEqual(items[0].url, "https://www.cftc.gov/filings/rule.pdf")
-
     def test_newer_equal_score_sources_rank_first(self):
         old = _item(
             external_id="old", title="Old", published_at="2026-07-01",

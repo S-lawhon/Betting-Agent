@@ -259,15 +259,25 @@ class KalshiEvidenceResolver:
 
 
 class CFTCFilingEvidenceResolver:
-    """Document links for a CFTC filing row.
+    """Filing documents for a CFTC rule/product row.
 
-    The collector records how many documents a filing has but kept only the
-    first link, so a specialist was told a rule change exists and given no way
-    to read it -- which is verbatim what the 2026-08-08 screen deferred on.
+    A rules row carries a document COUNT and a single link, and that link is
+    the filing detail page, not the filing. The text lives in PDFs on that
+    page. Without them a specialist is told a rule change exists and given no
+    way to read it -- verbatim what the 2026-08-08 screen deferred on.
+
+    Extensions are matched narrowly on purpose. Accepting ``.htm``/``.html``
+    matched cftc.gov's own navigation chrome (``/About/index.htm``,
+    ``/Contact/index.htm``) and returned twelve nav links and zero filings,
+    which is worse than returning nothing: it would have filled the model's
+    context with noise while still answering none of its questions.
     """
 
     name = "cftc_filing_documents"
-    DOCUMENT_SUFFIXES = (".pdf", ".doc", ".docx", ".htm", ".html")
+    DOCUMENT_PATTERN = re.compile(r"\.(pdf|docx?|xlsx?)(?:\?|#|$)", re.I)
+    ANCHOR_PATTERN = re.compile(
+        r"<a[^>]+href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", re.I | re.S)
+    TAG_PATTERN = re.compile(r"<[^>]+>")
 
     def __init__(self, session: Optional[Any] = None,
                  base: str = "https://www.cftc.gov") -> None:
@@ -293,28 +303,37 @@ class CFTCFilingEvidenceResolver:
                                 or metadata.get("Date") or ""),
             "document_count_reported": metadata.get("Documents"),
         }
-        recorded = [str(value) for value in (metadata.get("documents") or [])
-                    if str(value).strip()]
-        if recorded:
-            facts["documents"] = recorded
-            return _pack("measured", self.name, facts=facts, now=now,
-                         notes=["document links recorded at collection time"])
         if not filing_url:
             return _pack("unavailable", self.name, facts=facts, now=now,
                          notes=["no filing URL on the source record"])
-        links = self._fetch_documents(filing_url)
-        if links is None:
+        documents = self._fetch_documents(filing_url)
+        if documents is None:
             return _pack("partial", self.name, facts=facts, now=now,
                          notes=["filing metadata measured; the filing page "
                                 "could not be read this run"])
-        facts["documents"] = links
-        notes = ["document links resolved from the filing page"]
-        if not links:
-            notes = ["the filing page exposed no document links; the text may "
-                     "not be public yet"]
+        facts["documents"] = documents
+        if not documents:
+            return _pack("measured", self.name, facts=facts, now=now, notes=[
+                "the filing page exposed no document files; the text may not "
+                "be public yet"])
+        notes = ["document files resolved from the filing page; titles are the "
+                 "filer's own and distinguish the rule text from procedural "
+                 "attachments such as a FOIA request"]
+        # The row states how many documents the filing has. A disagreement
+        # means the page changed shape and the extraction is incomplete --
+        # say so rather than letting a partial read look authoritative.
+        try:
+            reported = int(str(facts.get("document_count_reported") or "").strip())
+        except (TypeError, ValueError):
+            reported = None
+        if reported is not None and reported != len(documents):
+            notes.append(
+                f"the filing row reports {reported} documents but "
+                f"{len(documents)} were extracted; treat this list as partial")
         return _pack("measured", self.name, facts=facts, now=now, notes=notes)
 
-    def _fetch_documents(self, filing_url: str) -> Optional[List[str]]:
+    def _fetch_documents(
+            self, filing_url: str) -> Optional[List[Dict[str, str]]]:
         try:
             if self._session is None:
                 import requests
@@ -328,14 +347,20 @@ class CFTCFilingEvidenceResolver:
         except Exception as exc:
             logger.warning("cftc evidence: %s failed: %s", filing_url, exc)
             return None
-        seen: List[str] = []
-        for href in re.findall(r'href=["\']([^"\']+)["\']', html):
-            if not href.lower().endswith(self.DOCUMENT_SUFFIXES):
+        documents: List[Dict[str, str]] = []
+        seen: set = set()
+        for href, inner in self.ANCHOR_PATTERN.findall(html):
+            if not self.DOCUMENT_PATTERN.search(href):
                 continue
             absolute = urljoin(self.base, href)
-            if absolute not in seen:
-                seen.append(absolute)
-        return seen[:12]
+            if absolute in seen:
+                continue
+            seen.add(absolute)
+            title = " ".join(self.TAG_PATTERN.sub(" ", inner).split())
+            documents.append({"url": absolute, "title": title[:200]})
+            if len(documents) >= 12:
+                break
+        return documents
 
 
 DEFAULT_RESOLVERS: tuple = (KalshiEvidenceResolver, CFTCFilingEvidenceResolver)

@@ -230,6 +230,21 @@ def test_codex_pilot_setup_keeps_each_run_explicit_and_self_disabling():
     assert "systemctl start \"$UNIT\"" in script
 
 
+def test_codex_daily_setup_retires_week_timer_and_keeps_run_now_bounded():
+    script = Path("scripts/setup_codex_research_daily.sh").read_text()
+
+    assert "research-agent-screened-daily.service" in script
+    assert "research-agent-screened-daily.timer" in script
+    assert "research-agent-codex-week.timer" in script
+    assert 'systemctl disable --now "$LEGACY_TIMER"' in script
+    assert 'systemctl enable --now "$TIMER"' in script
+    assert 'systemctl start "$SERVICE"' in script
+    assert "research_agent_runtime_screened_daily.yaml" in script
+    assert "max_attempts_per_day: 2" in script
+    assert "max_input_tokens_per_task: 250000" in script
+    assert "max_attempts_per_day: 4" not in script
+
+
 def test_temporary_codex_week_has_fixed_dates_and_saturday_check():
     from datetime import date
 

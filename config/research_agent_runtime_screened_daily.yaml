@@ -28,7 +28,25 @@ allowed_agents:
 limits:
   max_minutes_per_task: 30
   timeout_seconds: 600
-  max_input_tokens_per_task: 75000
+  # 250k, authorised by Sam 2026-08-09, and it is NOT a spend limit.
+  #
+  # Codex reports input tokens cumulatively across its internal turns, so a
+  # deep-research pass costs far more than the packet it was handed. Measured
+  # across every deep call to date: 36,868 / 69,197 / 74,134 / 78,700 / 88,948
+  # / 111,426 / 202,807. The previous 75,000 sat near the 30th percentile and
+  # rejected four of seven.
+  #
+  # The rejection happens AFTER the provider returns, so a breach cannot
+  # prevent the spend -- it only discards work already paid for, releases the
+  # claim, and leaves the same packet to be retried and fail identically the
+  # next day. That happened on 2026-08-03 (78,700) and again on 2026-08-09
+  # (111,426). Metered cost is $0.00 on every run (chatgpt_subscription).
+  #
+  # The real runaway guards are max_attempts_per_day and timeout_seconds; both
+  # are unchanged. Do not "tighten" this back without re-reading the measured
+  # distribution above -- a cap below the tail is not a safety property, it is
+  # a daily failure.
+  max_input_tokens_per_task: 250000
   max_output_tokens_per_task: 5000
   max_cost_usd_per_task: 0.01
   max_cost_usd_per_day: 0.02

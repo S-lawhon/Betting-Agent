@@ -15,7 +15,9 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Mapping, Optional, Tuple
+from typing import (
+    Any, Dict, Iterator, List, Mapping, Optional, Set, Tuple,
+)
 
 from src.research_outcomes import ResearchDisposition
 
@@ -145,11 +147,23 @@ def _expire_stale_claims(state_dir: Path, now: datetime) -> List[str]:
 def _ranked_packets(
     dispatches_dir: Path, agent: Optional[str],
     assignment_id: Optional[str] = None,
+    agents: Optional[Set[str]] = None,
 ) -> List[Tuple[Path, Dict[str, Any]]]:
+    """Rank claimable packets, skipping any the caller cannot work.
+
+    ``agents`` is the caller's allow-list.  A packet for an agent outside it is
+    SKIPPED, not selected-then-rejected: a worker restricted to one agent would
+    otherwise stall the moment another agent's packet outranked its own, and an
+    idle day looks identical to an empty queue.
+    """
     pattern = "{}/*.json".format(agent) if agent else "*/*.json"
+    allowed = {str(value) for value in agents} if agents else None
     packets: List[Tuple[Path, Dict[str, Any]]] = []
     for path in sorted(dispatches_dir.glob(pattern)):
         payload = _read_json(path)
+        if allowed is not None and str(
+                payload.get("assigned_agent") or "") not in allowed:
+            continue
         if (payload.get("assignment_id") and payload.get("assigned_agent")
                 and (not assignment_id
                      or str(payload.get("assignment_id")) == assignment_id)):
@@ -166,6 +180,7 @@ def _ranked_packets(
 def preview_next(
     *, dispatches_dir: Path, state_dir: Path, dispositions_dir: Path,
     agent: Optional[str] = None, assignment_id: Optional[str] = None,
+    agents: Optional[Set[str]] = None,
     now: Optional[datetime] = None,
 ) -> Optional[Tuple[Path, Dict[str, Any]]]:
     """Return the next available packet without mutating claim state.
@@ -185,7 +200,7 @@ def preview_next(
         payload = _read_json(path)
         disposition_ids.add(str(payload.get("assignment_id") or path.stem))
     for packet_path, packet in _ranked_packets(
-            dispatches_dir, agent, assignment_id):
+            dispatches_dir, agent, assignment_id, agents):
         candidate_id = str(packet["assignment_id"])
         if candidate_id not in active_ids and candidate_id not in disposition_ids:
             return packet_path, packet
@@ -200,6 +215,7 @@ def claim_next(
     worker_id: str,
     agent: Optional[str] = None,
     assignment_id: Optional[str] = None,
+    agents: Optional[Set[str]] = None,
     now: Optional[datetime] = None,
     lease_minutes: int = 90,
 ) -> Optional[ResearchClaim]:
@@ -219,7 +235,7 @@ def claim_next(
             payload = _read_json(path)
             disposition_ids.add(str(payload.get("assignment_id") or path.stem))
         for packet_path, packet in _ranked_packets(
-                dispatches_dir, agent, assignment_id):
+                dispatches_dir, agent, assignment_id, agents):
             candidate_id = str(packet["assignment_id"])
             if candidate_id in active_ids or candidate_id in disposition_ids:
                 continue

@@ -226,3 +226,59 @@ def test_release_returns_packet_to_available_queue(tmp_path):
         dispatches_dir=dispatches, state_dir=state,
         dispositions_dir=dispositions, worker_id="worker-2", now=NOW)
     assert reclaimed and reclaimed.assignment_id == "a1"
+
+
+def test_ranked_packets_skip_agents_the_worker_cannot_work(tmp_path):
+    """A scout-only worker must skip, not stall on, another agent's packet."""
+    dispatches = tmp_path / "dispatches"
+    for agent, name, score in (
+        ("literature-scout", "a_lit", 99),   # outranks everything
+        ("strategy-scout", "a_scout", 50),
+    ):
+        path = dispatches / agent / f"{name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "id": f"d-{name}", "assignment_id": name, "source_item_id": "s1",
+            "assigned_agent": agent, "priority": "high", "triage_score": score,
+            "created_at": "2026-08-08T00:00:00Z",
+        }))
+    state = tmp_path / "state"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+
+    # Unrestricted, the literature packet wins on score.
+    unrestricted = preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions)
+    assert unrestricted[1]["assignment_id"] == "a_lit"
+
+    # Restricted to strategy-scout, the worker gets its own packet rather
+    # than blocking on one it is not allowed to run.
+    restricted = preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, agents={"strategy-scout"})
+    assert restricted[1]["assignment_id"] == "a_scout"
+
+    claim = claim_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="w1",
+        agents={"strategy-scout"})
+    assert claim.assignment_id == "a_scout"
+    assert claim.assigned_agent == "strategy-scout"
+
+
+def test_an_empty_allow_list_is_treated_as_unrestricted(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    path = dispatches / "strategy-scout" / "a1.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({
+        "id": "d1", "assignment_id": "a1", "source_item_id": "s1",
+        "assigned_agent": "strategy-scout", "priority": "high",
+        "triage_score": 10, "created_at": "2026-08-08T00:00:00Z",
+    }))
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    found = preview_next(
+        dispatches_dir=dispatches, state_dir=tmp_path / "state",
+        dispositions_dir=dispositions, agents=set())
+    assert found[1]["assignment_id"] == "a1"

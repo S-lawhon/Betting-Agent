@@ -316,6 +316,31 @@ jobs:
       research was completed. Only a tracked invocation plus a durable,
       schema-valid disposition can do that.
 
+  - id: research_screened_daily
+    host: droplet
+    schedule: "10 5 * * *"
+    description: Daily screened research pass (screen, then deep research only if it survives)
+    output:
+      file: data/research_execution/worker_status.json
+      max_stale_hours: 30
+    severity: warn
+    note: >
+      ARMED 2026-08-08 as research-agent-screened-daily.timer, replacing
+      manual-only invocation. Runs at 05:10 UTC, after the 04:05 intake and
+      triage pass, so the queue and every packet's measured evidence are fresh.
+      Fuses are mechanical, not marker-based: one packet per invocation, two
+      model attempts per UTC day checked before any claim, strategy-scout only
+      (screening applies to no other agent, so admitting one would route it
+      straight to the unscreened deep call), and trading execution disabled.
+      scripts.audit_screened_research_pilot runs as ExecStartPost and fails the
+      unit on a bad outcome. A quiet day exits 1 and is NOT a fault: it means
+      the queue held nothing claimable, which the backpressure caps make
+      routine. This entry shares worker_status.json with research_agent_worker,
+      whose hourly dry run refreshes it far more often, so a stale status here
+      means the hourly planner has ALSO stopped -- do not read it as proof this
+      unit ran. Its own evidence is the run record under
+      data/research_execution/runs/<date>/.
+
   - id: clv_settlement
     host: droplet
     schedule: "30 7 * * *"

@@ -143,3 +143,35 @@ def test_audit_rejects_screening_over_token_limit(tmp_path):
 
     assert report["status"] == "fail"
     assert any("screening_input_limit" in item for item in report["failures"])
+
+
+def test_unpinned_config_audits_the_most_recent_run(tmp_path):
+    config = tmp_path / "daily.yaml"
+    config.write_text(
+        "worker_id: daily\nallowed_agents: [strategy-scout]\n"
+        "screening: {enabled: true, limits: {max_input_tokens: 25000, "
+        "max_output_tokens: 1000, max_cost_usd: 0.01},"
+        " provider: {name: screen, model: m}}\n"
+        "limits: {max_input_tokens_per_task: 75000}\n"
+        "provider: {name: deep, model: m}\n"
+        "safety: {trading_execution_allowed: false}\n", encoding="utf-8")
+    report = audit_pilot(root=tmp_path, config_path=config,
+                         marker_path=tmp_path / "absent")
+    # Nothing has run yet: that is a quiet day, not a fault.
+    assert report["status"] == "safe_noop"
+    assert report["assignment_id"] == ""
+
+    runs = tmp_path / "data/research_execution/runs/2026-08-09"
+    runs.mkdir(parents=True)
+    (runs / "claim_x.json").write_text(json.dumps({
+        "assignment_id": "a_newer", "started_at": "2026-08-09T05:10:00Z",
+        "status": "completed"}), encoding="utf-8")
+    older = tmp_path / "data/research_execution/runs/2026-08-08"
+    older.mkdir(parents=True)
+    (older / "claim_w.json").write_text(json.dumps({
+        "assignment_id": "a_older", "started_at": "2026-08-08T19:37:41Z",
+        "status": "completed"}), encoding="utf-8")
+
+    report = audit_pilot(root=tmp_path, config_path=config,
+                         marker_path=tmp_path / "absent")
+    assert report["assignment_id"] == "a_newer"

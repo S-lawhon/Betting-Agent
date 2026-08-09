@@ -1,0 +1,72 @@
+[Unit]
+Description=Betting Pod Shop — daily screened Codex research pass
+After=network-online.target research-intake.service
+Wants=network-online.target
+# No pilot-enabled marker. For a recurring unit a marker is not a safety
+# property: nobody is present to place it, so it would either be created by the
+# unit itself or left permanently on disk. Both are theatre. The real fuses are
+# mechanical and live in the runtime config: one packet per invocation, two
+# model attempts per UTC day checked before any claim, screening before deep
+# research, trading execution disabled.
+ConditionPathExists=/var/lib/research-codex/auth.json
+
+[Service]
+Type=oneshot
+# An empty queue exits 1 and is a normal quiet day, not a fault. A genuine
+# failure exits 2 (config/runtime error) or fails in the audit below.
+SuccessExitStatus=0 1
+User=bettingbot
+Group=bettingbot
+WorkingDirectory=/opt/betting-pod-shop
+Environment=HOME=/var/lib/research-codex
+Environment=CODEX_HOME=/var/lib/research-codex
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_agent_worker --config /opt/betting-pod-shop/config/research_agent_runtime_screened_daily.yaml --execute
+# Audit every pass. A bad outcome fails the unit, so it surfaces in systemd and
+# the fund manager instead of sitting unread in a JSON file.
+ExecStartPost=/opt/betting-pod-shop/venv/bin/python -m scripts.audit_screened_research_pilot --config /opt/betting-pod-shop/config/research_agent_runtime_screened_daily.yaml
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=research-agent-screened-daily
+UMask=0077
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=512M
+TasksMax=64
+TimeoutStartSec=900
+
+# The model gets public network access and an empty workspace, but no betting
+# credential environment and no read access to the credential-bearing files.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+ReadWritePaths=/opt/betting-pod-shop/data/research_execution
+ReadWritePaths=/opt/betting-pod-shop/research/dispositions
+ReadWritePaths=/var/lib/research-codex
+InaccessiblePaths=-/opt/betting-pod-shop/.git
+InaccessiblePaths=-/opt/betting-pod-shop/.env
+InaccessiblePaths=-/opt/betting-pod-shop/.env.bak-portable
+InaccessiblePaths=-/opt/betting-pod-shop/.env.prev-20260729154347
+InaccessiblePaths=-/opt/betting-pod-shop/.env.x
+InaccessiblePaths=-/opt/betting-pod-shop/kalshi_private_key.pem
+InaccessiblePaths=-/opt/betting-pod-shop/Legacy
+
+[Install]
+WantedBy=multi-user.target

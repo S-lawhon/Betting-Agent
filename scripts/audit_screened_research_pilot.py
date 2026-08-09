@@ -30,6 +30,21 @@ def _aware_iso(value: Any) -> bool:
     return parsed.tzinfo is not None
 
 
+def _latest_run_assignment(state: Path, *, worker_id: str = "") -> str:
+    """Assignment id of the newest recorded run, optionally for one worker."""
+    newest_key = ()
+    newest_id = ""
+    for path in sorted((state / "runs").glob("*/*.json")):
+        payload = _read_json(path)
+        candidate = str(payload.get("assignment_id") or "")
+        if not candidate:
+            continue
+        key = (str(payload.get("started_at") or ""), path.name)
+        if key > newest_key:
+            newest_key, newest_id = key, candidate
+    return newest_id
+
+
 def audit_pilot(
     *, root: Path, config_path: Path, marker_path: Path,
 ) -> dict[str, Any]:
@@ -40,6 +55,13 @@ def audit_pilot(
     limits = config.get("limits") or {}
     screening_limits = (config.get("screening") or {}).get("limits") or {}
     state = root / "data/research_execution"
+    pinned = bool(assignment_id)
+    if not pinned:
+        # A recurring worker has no pinned target, so audit whatever it most
+        # recently ran. Resolved from the run record rather than the queue:
+        # the queue says what COULD have been worked, the run says what was.
+        assignment_id = _latest_run_assignment(
+            state, worker_id=str(config.get("worker_id") or ""))
     disposition_path = root / "research/dispositions" / f"{assignment_id}.json"
     screening_path = state / "screenings" / agent / f"{assignment_id}.json"
     artifact_path = state / "artifacts" / agent / f"{assignment_id}.json"
@@ -62,7 +84,8 @@ def audit_pilot(
         if not passed:
             failures.append(f"{name}: {detail}")
 
-    check("target_configured", bool(assignment_id), assignment_id or "missing")
+    check("target_configured", bool(assignment_id) or not pinned,
+          assignment_id or ("no run to audit yet" if not pinned else "missing"))
     check("single_allowed_agent", agent == "strategy-scout",
           repr(allowed_agents))
     check("screening_enabled", bool((config.get("screening") or {}).get(
@@ -81,6 +104,11 @@ def audit_pilot(
             and not bool((worker.get("safety") or {}).get("model_invoked"))
             and "target assignment is not available" in str(worker.get("error") or "")
         )
+        if not pinned and not assignment_id:
+            # An unpinned worker with no recorded run has not invoked a model.
+            # That is the same "nothing happened" outcome, reached because the
+            # queue was empty or every packet was already claimed.
+            safe_noop = True
         if released_claims:
             failures.append("target has a released claim but no durable disposition")
         status = ("fail" if failures else

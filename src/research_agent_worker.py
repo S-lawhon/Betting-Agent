@@ -310,7 +310,8 @@ class ResearchAgentWorker:
         candidate = preview_next(
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
             dispositions_dir=self.dispositions_dir,
-            assignment_id=target_assignment_id, now=now)
+            assignment_id=target_assignment_id,
+            agents=set(self.allowed_agents), now=now)
         if not candidate:
             result = self._result(
                 "blocked" if target_assignment_id else "idle", now, plan=None,
@@ -341,6 +342,7 @@ class ResearchAgentWorker:
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
             dispositions_dir=self.dispositions_dir, worker_id=self.worker_id,
             assignment_id=target_assignment_id,
+            agents=set(self.allowed_agents),
             now=now, lease_minutes=max(5, min(480,
                 (self.limits.timeout_seconds
                  + (self.screening_limits.timeout_seconds

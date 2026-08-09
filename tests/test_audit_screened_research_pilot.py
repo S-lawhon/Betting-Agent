@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import scripts.audit_screened_research_pilot as audit_script
 from scripts.audit_screened_research_pilot import audit_pilot
 
 
@@ -81,6 +82,24 @@ def test_cleanup_failure_dominates_safe_noop(tmp_path):
 
     assert report["status"] == "fail"
     assert any("marker_removed" in item for item in report["failures"])
+
+
+def test_cli_failure_uses_exit_two_so_systemd_cannot_accept_it(
+        monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        audit_script, "audit_pilot",
+        lambda **kwargs: {"status": "fail", "failures": ["bad run"]})
+
+    result = audit_script.main([
+        "--root", str(tmp_path), "--config", "daily.yaml",
+        "--marker", str(tmp_path / "marker"),
+    ])
+
+    assert result == 2
+    service = Path(
+        "scripts/systemd/research-agent-screened-daily.service").read_text()
+    assert "SuccessExitStatus=0 1" in service
+    assert "SuccessExitStatus=0 1 2" not in service
 
 
 def completed_fixture(root: Path, *, screen_input: int = 20000) -> None:

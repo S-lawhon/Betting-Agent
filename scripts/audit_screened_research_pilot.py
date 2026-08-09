@@ -253,7 +253,10 @@ def main(argv: list[str] | None = None) -> int:
     report = audit_pilot(
         root=args.root, config_path=config_path, marker_path=args.marker)
     print(json.dumps(report, indent=2, sort_keys=True))
-    return 0 if report["status"] in {"pass", "safe_noop"} else 1
+    # The daily worker uses exit 1 for a normal quiet/blocked pass and its
+    # systemd unit therefore declares SuccessExitStatus=0 1. Audit failures
+    # must use a different code or systemd will silently mark them successful.
+    return 0 if report["status"] in {"pass", "safe_noop"} else 2
 
 
 if __name__ == "__main__":

@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 from unittest import TestCase
 
 from src.research_evidence import (
+    ArxivEvidenceResolver,
     CFTCFilingEvidenceResolver,
     KalshiEvidenceResolver,
+    SocialEvidenceResolver,
     build_resolvers,
     resolve_evidence,
     supplied_evidence_keys,
@@ -155,7 +157,7 @@ def _page(html):
             return None
 
     class FakeSession:
-        def get(self, url, timeout=None, headers=None):
+        def get(self, url, timeout=None, headers=None, params=None):
             return FakeResponse()
 
     return FakeSession()
@@ -235,12 +237,16 @@ class TestCFTCEvidence(TestCase):
 
 
 class TestResolveEvidence(TestCase):
-    def test_unknown_source_types_get_an_explicit_not_applicable_pack(self):
-        pack = resolve_evidence(
-            {"source_type": "social"}, {"source_type": "social"},
-            build_resolvers(True), now=NOW)
-        self.assertEqual(pack["status"], "not_applicable")
-        self.assertEqual(supplied_evidence_keys(pack), [])
+    def test_uncovered_source_types_get_an_explicit_not_applicable_pack(self):
+        # practitioner and official_data have no resolver yet; the pack says
+        # so rather than silently looking like a measurement that found
+        # nothing.
+        for source_type in ("practitioner", "official_data"):
+            pack = resolve_evidence(
+                {"source_type": source_type}, {"source_type": source_type},
+                build_resolvers(True), now=NOW)
+            self.assertEqual(pack["status"], "not_applicable", source_type)
+            self.assertEqual(supplied_evidence_keys(pack), [])
 
     def test_disabling_resolvers_yields_a_pack_not_an_exception(self):
         pack = resolve_evidence(
@@ -268,3 +274,223 @@ class TestResolveEvidence(TestCase):
             _kalshi_assignment(), _kalshi_source(), now=NOW)
         self.assertEqual(supplied_evidence_keys(pack), ["fees", "markets",
                                                         "series_ticker"])
+
+
+# Shaped after the live response for 2608.00647: the author comment is where
+# arXiv puts "no live venue data" and any code link.
+ARXIV_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"
+      xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <entry>
+    <id>http://arxiv.org/abs/2608.00647v3</id>
+    <updated>2026-08-06T00:00:00Z</updated>
+    <published>2026-08-04T00:00:00Z</published>
+    <title>Axient: On-Chain Credit for Leveraged Event Markets</title>
+    <summary>  A physically backed leveraged event position requires
+      real credit. Code: https://github.com/example/axient  </summary>
+    <arxiv:comment>90 pages. Fixed-seed synthetic validation; no live venue
+      data</arxiv:comment>
+    <arxiv:journal_ref>J. Fin. Mkts 12 (2026) 1</arxiv:journal_ref>
+    <arxiv:doi>10.1000/example</arxiv:doi>
+    <category term="q-fin.TR"/>
+    <category term="q-fin.RM"/>
+  </entry>
+</feed>"""
+
+
+class TestArxivEvidence(TestCase):
+    def _resolver(self, body=ARXIV_ATOM):
+        return ArxivEvidenceResolver(_page(body), sleep=lambda _s: None)
+
+    def _paper(self, **changes):
+        payload = {
+            "source_type": "paper", "source_name": "arXiv q-fin.TR",
+            "external_id": "oai:arXiv.org:2608.00647v1",
+            "url": "https://arxiv.org/abs/2608.00647",
+        }
+        payload.update(changes)
+        return payload
+
+    def test_identifier_is_read_from_either_field(self):
+        self.assertEqual(
+            ArxivEvidenceResolver.arxiv_id(
+                {"external_id": "oai:arXiv.org:2512.22476v2"}),
+            ("2512.22476", 2))
+        self.assertEqual(
+            ArxivEvidenceResolver.arxiv_id(
+                {"url": "https://arxiv.org/abs/2608.00647"}),
+            ("2608.00647", 0))
+        self.assertEqual(ArxivEvidenceResolver.arxiv_id({"url": "x"}), ("", 0))
+
+    def test_measures_version_artifact_and_full_text(self):
+        pack = self._resolver().resolve(
+            {"source_type": "paper"}, self._paper(), now=NOW)
+        facts = pack["facts"]
+        self.assertEqual(pack["status"], "measured")
+        self.assertEqual(facts["arxiv_id"], "2608.00647")
+        self.assertEqual(facts["pdf_url"], "https://arxiv.org/pdf/2608.00647")
+        self.assertEqual(facts["categories"], ["q-fin.RM", "q-fin.TR"])
+        self.assertEqual(facts["journal_ref"], "J. Fin. Mkts 12 (2026) 1")
+        self.assertEqual(facts["doi"], "10.1000/example")
+        self.assertIn("no live venue data", facts["author_comment"])
+        self.assertEqual(facts["code_links"],
+                         ["https://github.com/example/axient"])
+        self.assertIn("replication artifact is linked", " ".join(pack["notes"]))
+
+    def test_a_superseded_version_is_called_out(self):
+        pack = self._resolver().resolve(
+            {"source_type": "paper"}, self._paper(), now=NOW)
+        # Ingested at v1, arXiv is now at v3.
+        self.assertEqual(pack["facts"]["ingested_version"], 1)
+        self.assertEqual(pack["facts"]["latest_version"], 3)
+        self.assertIn("now at v3", " ".join(pack["notes"]))
+
+    def test_a_paper_without_code_says_the_test_must_be_rebuilt(self):
+        body = ARXIV_ATOM.replace(
+            "Code: https://github.com/example/axient", "No code.")
+        pack = self._resolver(body).resolve(
+            {"source_type": "paper"}, self._paper(), now=NOW)
+        self.assertEqual(pack["facts"]["code_links"], [])
+        self.assertIn("must be rebuilt", " ".join(pack["notes"]))
+
+    def test_an_unreachable_api_still_yields_the_full_text_location(self):
+        class Dead:
+            def get(self, *a, **k):
+                raise OSError("read timed out")
+
+        pack = ArxivEvidenceResolver(Dead(), sleep=lambda _s: None).resolve(
+            {"source_type": "paper"}, self._paper(), now=NOW)
+        self.assertEqual(pack["status"], "partial")
+        self.assertEqual(pack["facts"]["pdf_url"],
+                         "https://arxiv.org/pdf/2608.00647")
+        self.assertNotIn("abstract", pack["facts"])
+
+    def test_applies_only_to_papers_carrying_an_arxiv_identifier(self):
+        resolver = self._resolver()
+        self.assertTrue(resolver.applies_to({"source_type": "paper"},
+                                            self._paper()))
+        self.assertFalse(resolver.applies_to(
+            {"source_type": "paper"},
+            self._paper(external_id="ssrn-1", url="https://ssrn.test/1")))
+        self.assertFalse(resolver.applies_to({"source_type": "social"},
+                                             self._paper()))
+
+    def test_requests_are_spaced_as_arxiv_asks(self):
+        slept = []
+        resolver = ArxivEvidenceResolver(_page(ARXIV_ATOM),
+                                         sleep=slept.append)
+        resolver.resolve({"source_type": "paper"}, self._paper(), now=NOW)
+        self.assertEqual(slept, [])          # nothing to wait for on the first
+        resolver.resolve({"source_type": "paper"}, self._paper(), now=NOW)
+        self.assertEqual(len(slept), 1)
+        self.assertGreater(slept[0], 0)
+
+
+class _Registry:
+    def __init__(self, rows=None, raises=False):
+        self.rows = rows or {}
+        self.raises = raises
+
+    def decision(self, venue_id, product_family, as_of=None):
+        if self.raises:
+            raise RuntimeError("registry unreadable")
+        from types import SimpleNamespace
+
+        row = self.rows.get(venue_id) or {}
+        return SimpleNamespace(
+            status=row.get("status", "pending_review"),
+            research_allowed=row.get("research_allowed", True),
+            execution_allowed=row.get("execution_allowed", False),
+            stale=row.get("stale", False))
+
+
+def _post(text, **changes):
+    payload = {
+        "source_type": "social", "source_name": "X", "title": text[:180],
+        "summary": text, "url": "https://x.com/u/status/1",
+        "metadata": {"username": "u", "metrics": {"impression_count": 2}},
+    }
+    payload.update(changes)
+    return payload
+
+
+class TestSocialEvidence(TestCase):
+    def test_named_registered_venue_carries_its_eligibility_decision(self):
+        resolver = SocialEvidenceResolver(_Registry({
+            "kalshi": {"status": "reference_only", "research_allowed": True,
+                       "execution_allowed": False}}))
+        pack = resolver.resolve({"source_type": "social"}, _post(
+            "Kalshi settlement fees look mispriced on this series"), now=NOW)
+        facts = pack["facts"]
+        self.assertEqual(facts["registered_venues_named"], ["kalshi"])
+        self.assertEqual(facts["venue_decisions"], [{
+            "venue_id": "kalshi", "status": "reference_only",
+            "research_allowed": True, "execution_allowed": False,
+            "stale": False}])
+
+    def test_a_post_naming_no_registered_venue_says_so(self):
+        pack = SocialEvidenceResolver(_Registry()).resolve(
+            {"source_type": "social"},
+            _post("YeNo is a Solana prediction market. Check it @YeNoMarkets "
+                  "https://t.co/abc"), now=NOW)
+        facts = pack["facts"]
+        self.assertEqual(facts["registered_venues_named"], [])
+        self.assertIn("names no venue in the research registry",
+                      " ".join(pack["notes"]))
+        # Promotional markers are listed, never scored into a verdict.
+        self.assertEqual(facts["promotional_markers"], [
+            "contains_outbound_link", "mentions_other_account",
+            "call_to_action"])
+        self.assertEqual(facts["mentioned_accounts"], ["YeNoMarkets"])
+        self.assertIn("t.co is a shortener", " ".join(pack["notes"]))
+
+    def test_unqualified_polymarket_is_flagged_never_guessed(self):
+        # polymarket_us is research-allowed; polymarket_international is
+        # prohibited. Resolving the bare word to either would be a guess.
+        pack = SocialEvidenceResolver(_Registry()).resolve(
+            {"source_type": "social"},
+            _post("Polymarket odds moved before the news broke"), now=NOW)
+        self.assertEqual(pack["facts"]["registered_venues_named"], [])
+        self.assertEqual(pack["facts"]["ambiguous_venue_terms"], ["polymarket"])
+        self.assertIn("US/international qualifier", " ".join(pack["notes"]))
+
+    def test_a_qualified_polymarket_mention_resolves(self):
+        pack = SocialEvidenceResolver(_Registry()).resolve(
+            {"source_type": "social"},
+            _post("Polymarket US listed a new weather series"), now=NOW)
+        self.assertEqual(pack["facts"]["registered_venues_named"],
+                         ["polymarket_us"])
+        self.assertEqual(pack["facts"]["ambiguous_venue_terms"], [])
+
+    def test_metrics_ship_with_an_explicit_not_edge_evidence_warning(self):
+        pack = SocialEvidenceResolver(_Registry()).resolve(
+            {"source_type": "social"}, _post("Kalshi spread"), now=NOW)
+        self.assertEqual(pack["facts"]["public_metrics"],
+                         {"impression_count": 2})
+        self.assertIn("never whether", pack["facts"]["metrics_note"])
+        self.assertIs(pack["semantics"]["is_edge_evidence"], False)
+
+    def test_the_author_is_not_reported_as_a_mentioned_account(self):
+        pack = SocialEvidenceResolver(_Registry()).resolve(
+            {"source_type": "social"},
+            _post("@u thinks @other is wrong about Kalshi",
+                  metadata={"username": "u", "metrics": {}}), now=NOW)
+        self.assertEqual(pack["facts"]["mentioned_accounts"], ["other"])
+
+    def test_an_unreadable_registry_does_not_break_the_pack(self):
+        pack = SocialEvidenceResolver(_Registry(raises=True)).resolve(
+            {"source_type": "social"}, _post("Kalshi fees"), now=NOW)
+        self.assertEqual(pack["status"], "measured")
+        self.assertEqual(pack["facts"]["registered_venues_named"], ["kalshi"])
+        self.assertEqual(pack["facts"]["venue_decisions"], [])
+
+    def test_social_makes_no_network_call(self):
+        class Boom:
+            def get(self, *a, **k):
+                raise AssertionError("social evidence must not fetch")
+
+        resolver = SocialEvidenceResolver(_Registry())
+        resolver._session = Boom()
+        pack = resolver.resolve({"source_type": "social"},
+                                _post("Kalshi fees"), now=NOW)
+        self.assertEqual(pack["status"], "measured")

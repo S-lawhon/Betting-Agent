@@ -28,8 +28,11 @@ from __future__ import annotations
 
 import logging
 import re
+import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Mapping, Optional, Protocol
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence
 from urllib.parse import urljoin
 
 from src.kalshi_fees import (
@@ -363,11 +366,296 @@ class CFTCFilingEvidenceResolver:
         return documents
 
 
-DEFAULT_RESOLVERS: tuple = (KalshiEvidenceResolver, CFTCFilingEvidenceResolver)
+class ArxivEvidenceResolver:
+    """Version, replication artifact and full text for an arXiv paper.
+
+    The RSS collector stores an abstract and nothing else, so a scout is asked
+    whether a mechanism is testable without being told whether the authors
+    published code, whether the paper has since been replaced, or where the
+    full text is.  All three come free from arXiv's public API.
+    """
+
+    name = "arxiv_api"
+    # HTTPS directly: the http:// form 301s, and the redirect hop was enough
+    # to push a cold request past a 30s budget.
+    API = "https://export.arxiv.org/api/query"
+    # Measured 28s on a cold request, then sub-second. arXiv also asks callers
+    # to leave ~3s between requests, which a handful of papers a day makes
+    # free to honour.
+    TIMEOUT_SECONDS = 60.0
+    MIN_INTERVAL_SECONDS = 3.0
+    ATOM = "{http://www.w3.org/2005/Atom}"
+    ARXIV = "{http://arxiv.org/schemas/atom}"
+    ID_PATTERN = re.compile(r"(\d{4}\.\d{4,5})(?:v(\d+))?")
+    CODE_PATTERN = re.compile(
+        r"https?://(?:www\.)?(?:github\.com|gitlab\.com|zenodo\.org|"
+        r"osf\.io|codeocean\.com|huggingface\.co)/[^\s,;)\]]+", re.I)
+
+    def __init__(self, session: Optional[Any] = None, sleep=None) -> None:
+        self._session = session
+        self._sleep = sleep if sleep is not None else time.sleep
+        self._last_call = 0.0
+
+    @classmethod
+    def arxiv_id(cls, source_item: Mapping[str, Any]) -> tuple:
+        """Return ``(bare_id, ingested_version)`` for an arXiv record."""
+        for field in ("external_id", "url"):
+            match = cls.ID_PATTERN.search(str(source_item.get(field) or ""))
+            if match:
+                return match.group(1), int(match.group(2) or 0)
+        return "", 0
+
+    def applies_to(self, assignment: Mapping[str, Any],
+                   source_item: Mapping[str, Any]) -> bool:
+        source_type = str(assignment.get("source_type")
+                          or source_item.get("source_type") or "")
+        if source_type != "paper":
+            return False
+        return bool(self.arxiv_id(source_item)[0])
+
+    def resolve(self, assignment: Mapping[str, Any],
+                source_item: Mapping[str, Any],
+                *, now: Optional[datetime] = None) -> Dict[str, Any]:
+        paper_id, ingested_version = self.arxiv_id(source_item)
+        if not paper_id:
+            return _pack("not_applicable", self.name, now=now,
+                         notes=["no arXiv identifier on the source record"])
+        facts: Dict[str, Any] = {
+            "arxiv_id": paper_id,
+            "abstract_url": f"https://arxiv.org/abs/{paper_id}",
+            "pdf_url": f"https://arxiv.org/pdf/{paper_id}",
+            "ingested_version": ingested_version or None,
+        }
+        entry = self._fetch(paper_id)
+        if entry is None:
+            return _pack("partial", self.name, facts=facts, now=now, notes=[
+                "identifier and full-text location resolved; arXiv metadata "
+                "was unavailable this run"])
+        facts.update(entry)
+        notes: List[str] = []
+        latest = int(facts.get("latest_version") or 0)
+        if ingested_version and latest and latest > ingested_version:
+            notes.append(
+                f"this record was ingested at v{ingested_version} but arXiv is "
+                f"now at v{latest}; read the current version, its conclusions "
+                f"may have moved")
+        if facts.get("code_links"):
+            notes.append("a replication artifact is linked; reproducing the "
+                         "result is a test, not a research project")
+        else:
+            notes.append("no replication artifact found in the abstract or "
+                         "author comment; any decisive test must be rebuilt "
+                         "from the paper")
+        return _pack("measured", self.name, facts=facts, now=now, notes=notes)
+
+    def _fetch(self, paper_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            if self._session is None:
+                import requests
+
+                self._session = requests.Session()
+            elapsed = time.monotonic() - self._last_call
+            if self._last_call and elapsed < self.MIN_INTERVAL_SECONDS:
+                self._sleep(self.MIN_INTERVAL_SECONDS - elapsed)
+            self._last_call = time.monotonic()
+            response = self._session.get(
+                self.API, params={"id_list": paper_id, "max_results": 1},
+                timeout=self.TIMEOUT_SECONDS,
+                headers={"User-Agent": "betting-pod-shop/research-intake"})
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+        except Exception as exc:
+            logger.warning("arxiv evidence: %s failed: %s", paper_id, exc)
+            return None
+        entry = root.find(f"{self.ATOM}entry")
+        if entry is None:
+            return None
+
+        def text(tag: str) -> str:
+            node = entry.find(tag)
+            return " ".join((node.text or "").split()) if node is not None else ""
+
+        abstract = text(f"{self.ATOM}summary")
+        comment = text(f"{self.ARXIV}comment")
+        latest_version = 0
+        canonical = text(f"{self.ATOM}id")
+        match = self.ID_PATTERN.search(canonical)
+        if match and match.group(2):
+            latest_version = int(match.group(2))
+        code_links: List[str] = []
+        for candidate in self.CODE_PATTERN.findall(f"{abstract} {comment}"):
+            if candidate not in code_links:
+                code_links.append(candidate)
+        return {
+            "title": text(f"{self.ATOM}title"),
+            "abstract": abstract,
+            "author_comment": comment,
+            "journal_ref": text(f"{self.ARXIV}journal_ref"),
+            "doi": text(f"{self.ARXIV}doi"),
+            "published": text(f"{self.ATOM}published"),
+            "updated": text(f"{self.ATOM}updated"),
+            "latest_version": latest_version or None,
+            "categories": sorted({
+                node.get("term") for node in entry.findall(f"{self.ATOM}category")
+                if node.get("term")}),
+            "code_links": code_links,
+        }
+
+
+class SocialEvidenceResolver:
+    """Resolve a social lead against the venues we are allowed to research.
+
+    Deliberately makes NO network call.  These records carry
+    ``rights="post_id_link_and_short_excerpt"``, and the X budget is capped, so
+    re-fetching a post to enrich it would spend a scarce, rights-limited
+    resource to learn nothing new.  Everything below is derived from the text
+    already in hand plus the venue registry.
+
+    The decisive fact is usually venue coverage: a post promoting a Solana
+    prediction market names no venue this fund can research, which a specialist
+    can act on in seconds instead of writing up a mechanism for a venue that
+    was never reachable.
+    """
+
+    name = "social_venue_registry"
+    # Written-form aliases for the ids in config/research_venues.yaml.
+    VENUE_ALIASES = {
+        "kalshi": ("kalshi",),
+        "polymarket_us": ("polymarket us", "polymarket.us"),
+        "polymarket_international": ("polymarket international",),
+        "forecastex": ("forecastex", "forecast ex"),
+        "cme_event_contracts": ("cme", "comex", "cbot", "nymex"),
+        "prophetx": ("prophetx", "prophet x"),
+        "novig": ("novig",),
+        "underdog_predict": ("underdog",),
+        "texas_parimutuel": ("texas parimutuel",),
+    }
+    # "Polymarket" unqualified spans a research-allowed venue and a prohibited
+    # one, so it is never silently resolved to either.
+    AMBIGUOUS = {"polymarket": ("polymarket_us", "polymarket_international")}
+    CALL_TO_ACTION = re.compile(
+        r"\b(check it|check out|sign up|join|try it|trade now|download|"
+        r"get started|link in bio)\b", re.I)
+    MENTION_PATTERN = re.compile(r"@([A-Za-z0-9_]{2,30})")
+    URL_PATTERN = re.compile(r"https?://([^\s/]+)")
+
+    def __init__(self, registry: Optional[Any] = None) -> None:
+        self.registry = registry
+
+    def applies_to(self, assignment: Mapping[str, Any],
+                   source_item: Mapping[str, Any]) -> bool:
+        return str(assignment.get("source_type")
+                   or source_item.get("source_type") or "") == "social"
+
+    def resolve(self, assignment: Mapping[str, Any],
+                source_item: Mapping[str, Any],
+                *, now: Optional[datetime] = None) -> Dict[str, Any]:
+        metadata = source_item.get("metadata") or {}
+        text = "{} {}".format(
+            source_item.get("title") or "", source_item.get("summary") or "")
+        lowered = text.lower()
+
+        matched: List[str] = []
+        ambiguous: List[str] = []
+        for venue_id, aliases in self.VENUE_ALIASES.items():
+            if any(alias in lowered for alias in aliases):
+                matched.append(venue_id)
+        for term, candidates in self.AMBIGUOUS.items():
+            if term in lowered and not any(c in matched for c in candidates):
+                ambiguous.append(term)
+
+        author = str(metadata.get("username") or "")
+        mentions = [name for name in self.MENTION_PATTERN.findall(text)
+                    if name.lower() != author.lower()]
+        hosts = sorted({host.lower()
+                        for host in self.URL_PATTERN.findall(text)})
+        markers: List[str] = []
+        if hosts:
+            markers.append("contains_outbound_link")
+        if mentions:
+            markers.append("mentions_other_account")
+        if self.CALL_TO_ACTION.search(text):
+            markers.append("call_to_action")
+
+        facts: Dict[str, Any] = {
+            "post_url": str(source_item.get("url") or ""),
+            "author": author,
+            "registered_venues_named": sorted(matched),
+            "venue_decisions": self._decisions(matched, now=now),
+            "ambiguous_venue_terms": sorted(ambiguous),
+            "mentioned_accounts": sorted(set(mentions)),
+            "linked_hosts": hosts,
+            "promotional_markers": markers,
+            "public_metrics": dict(metadata.get("metrics") or {}),
+            "metrics_note": (
+                "Audience size, not truth. Engagement is explicitly not edge "
+                "evidence; it says how many people saw a claim, never whether "
+                "the claim holds."),
+        }
+        notes: List[str] = []
+        if not matched and not ambiguous:
+            notes.append("this post names no venue in the research registry; "
+                         "any mechanism in it may not be reachable from any "
+                         "venue this fund can trade or study")
+        if ambiguous:
+            notes.append("'polymarket' is named without a US/international "
+                         "qualifier and those differ in eligibility; resolve "
+                         "which before relying on it")
+        if "t.co" in hosts:
+            notes.append("t.co is a shortener; the destination was NOT "
+                         "resolved and could be any venue")
+        if len(markers) >= 2:
+            notes.append("this reads as promotional rather than analytical; "
+                         "markers are listed, not scored -- judge the claim")
+        return _pack("measured", self.name, facts=facts, now=now, notes=notes)
+
+    def _decisions(self, venue_ids: Sequence[str], *,
+                   now: Optional[datetime]) -> List[Dict[str, Any]]:
+        if self.registry is None or not venue_ids:
+            return []
+        as_of = (now or datetime.now(timezone.utc)).date()
+        out: List[Dict[str, Any]] = []
+        for venue_id in sorted(venue_ids):
+            try:
+                decision = self.registry.decision(venue_id, "*", as_of=as_of)
+            except Exception as exc:
+                logger.warning("social evidence: %s decision failed: %s",
+                               venue_id, exc)
+                continue
+            out.append({
+                "venue_id": venue_id,
+                "status": decision.status,
+                "research_allowed": decision.research_allowed,
+                "execution_allowed": decision.execution_allowed,
+                "stale": decision.stale,
+            })
+        return out
+
+
+def _load_venue_registry() -> Optional[Any]:
+    """Load the venue registry, or None if it is unreadable."""
+    try:
+        from src.research_eligibility import EligibilityRegistry
+
+        return EligibilityRegistry.load(
+            Path(__file__).resolve().parent.parent
+            / "config" / "research_venues.yaml")
+    except Exception as exc:                          # never break triage
+        logger.warning("evidence: venue registry unavailable: %s", exc)
+        return None
+
+
+DEFAULT_RESOLVERS: tuple = (
+    KalshiEvidenceResolver, CFTCFilingEvidenceResolver, ArxivEvidenceResolver)
 
 
 def build_resolvers(enabled: bool = True) -> List[EvidenceResolver]:
-    return [factory() for factory in DEFAULT_RESOLVERS] if enabled else []
+    if not enabled:
+        return []
+    resolvers: List[EvidenceResolver] = [
+        factory() for factory in DEFAULT_RESOLVERS]
+    resolvers.append(SocialEvidenceResolver(_load_venue_registry()))
+    return resolvers
 
 
 def resolve_evidence(

@@ -32,6 +32,14 @@ SEVERITY_ORDER = {"critical": 0, "warn": 1, "action": 2, "info": 3}
 # load_registry). A sync test asserts the two tuples stay identical.
 MEASURABLE_HOSTS = ("droplet", "mac", "local", "laptop")
 
+# How much the P-029 shadow cgroup's swap may grow across the recent half of a
+# trailing 24h window before it stops looking like the kernel settling and
+# starts looking like anonymous memory it cannot reclaim. Measured steady state
+# under the 768 MiB cap: ~1 MiB of recent-half drift, against a one-time fill
+# of 31 MiB when the process starts. 32 MiB sits far above the former and is
+# reached quickly by anything genuinely climbing.
+P029_SWAP_GROWTH_WARN_BYTES = 32 * 1024 * 1024
+
 
 class Finding:
     def __init__(self, key: str, severity: str, title: str,
@@ -352,6 +360,26 @@ def _p029_pressure_trend(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]
         if hours > 0:
             event_rate = event_delta / hours
 
+    # Swap GROWTH, not swap presence. A cgroup deliberately pinned at
+    # memory.max will always push some cold anonymous memory to swap -- that is
+    # the kernel doing its job, not an anomaly. Swap that rose once and
+    # plateaued is the workload settling; swap that keeps climbing against a
+    # flat heap is the thing worth waking someone for.
+    #
+    # Growth is measured over the RECENT half of the window, not end-to-end.
+    # A window that happens to contain the process start begins at swap=0, so
+    # end-to-end growth reports the whole one-time fill to steady state as if
+    # it were a leak -- measured 2026-08-09: 0 -> 31 MiB across 22h, entirely a
+    # single step that then went flat. The recent half answers the question
+    # actually being asked: is it STILL climbing?
+    swap_growth_bytes = None
+    swap_recent_growth_bytes = None
+    if len(swaps) >= 2:
+        swap_growth_bytes = swaps[-1] - swaps[0]
+        recent = swaps[len(swaps) // 2:]
+        if len(recent) >= 2:
+            swap_recent_growth_bytes = recent[-1] - recent[0]
+
     return {
         "samples": len(same_process),
         "window_hours": round(hours, 2),
@@ -364,6 +392,10 @@ def _p029_pressure_trend(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]
                                  if utilization else None),
         "utilization_max_pct": round(max(utilization), 1) if utilization else None,
         "swap_peak_bytes": max(swaps) if swaps else None,
+        "swap_first_bytes": swaps[0] if swaps else None,
+        "swap_latest_bytes": swaps[-1] if swaps else None,
+        "swap_growth_bytes": swap_growth_bytes,
+        "swap_recent_growth_bytes": swap_recent_growth_bytes,
         "memory_max_event_delta": event_delta,
         "memory_max_events_per_hour": (round(event_rate, 1)
                                        if event_rate is not None else None),
@@ -427,13 +459,25 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
             # MemoryCurrent includes reclaimable SQLite page cache. A large
             # cache is expected for the 5 GiB tape and is not itself an OOM
             # threat. Warn when a near-cap cgroup is also carrying substantial
-            # anonymous heap, any swap, or legacy telemetry that cannot split
-            # the two. This caught the 2026-08-08 all-history ticker set while
-            # allowing the post-fix 6% heap / 94% reclaimable-cache state.
+            # anonymous heap, GROWING swap, or legacy telemetry that cannot
+            # split the two. This caught the 2026-08-08 all-history ticker set
+            # while allowing the post-fix 6% heap / 94% reclaimable-cache state.
+            #
+            # Swap is tested on growth, not presence. Pinning a cgroup at
+            # memory.max is precisely what makes the kernel page out cold
+            # anonymous memory, so `swap > 0` is a permanent consequence of the
+            # 768 MiB cap, not a symptom. Measured 2026-08-09: heap flat at
+            # 4.4-7.2%, zero OOM kills, zero restarts, swap risen once from 19
+            # to 31 MiB and plateaued -- yet this warning fired every single
+            # day and could never clear. A daily alert that cannot clear is not
+            # a safety net; it teaches you to ignore the channel that would
+            # carry a real one.
+            swap_growth = (trend or {}).get("swap_recent_growth_bytes")
             heap_or_swap_pressure = (
                 anon_pct is None
                 or (isinstance(anon_pct, (int, float)) and anon_pct >= 40.0)
-                or (isinstance(swap_bytes, int) and swap_bytes > 0))
+                or (isinstance(swap_growth, int)
+                    and swap_growth >= P029_SWAP_GROWTH_WARN_BYTES))
             if (isinstance(memory_pct, (int, float)) and memory_pct >= 90.0
                     and heap_or_swap_pressure):
                 trend_text = "24h trend unavailable (fewer than two timed samples)."
@@ -443,7 +487,9 @@ def check_jobs(snap: Dict[str, Any]) -> List[Finding]:
                         "utilization {utilization_min_pct}-"
                         "{utilization_max_pct}% (avg "
                         "{utilization_avg_pct}%), swap peak "
-                        "{swap_peak_bytes} bytes, memory.max +"
+                        "{swap_peak_bytes} bytes (window growth "
+                        "{swap_growth_bytes}, recent-half "
+                        "{swap_recent_growth_bytes}), memory.max +"
                         "{memory_max_event_delta} ({memory_max_events_per_hour}/h), "
                         "in-zone backlog peak/latest {backlog_peak}/"
                         "{backlog_latest}, PID stable={pid_stable}."

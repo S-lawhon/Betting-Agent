@@ -648,3 +648,102 @@ def test_snapshot_is_json_serialisable(tmp_path):
     text = json.dumps({"jobs": col.jobs()}, default=collect.jsonable)
     assert '"state": "uncheckable"' in text
     assert '"exists": null' in text
+
+
+def _p029_rows(swaps, *, anon_pct=5.7, pid=243750):
+    """Trailing heartbeat rows, one per hour, with a given swap series."""
+    return [
+        {
+            "timestamp_utc": "2026-08-09T{:02d}:00:00Z".format(hour),
+            "shadow_main_pid": pid,
+            "shadow_memory_utilization_pct": 100.0,
+            "shadow_memory_anon_utilization_pct": anon_pct,
+            "shadow_memory_swap_bytes": swap,
+            "shadow_memory_max_events": 1_000_000 + hour * 130_000,
+            "shadow_due_in_zone": 300,
+            "shadow_restart_delta": 0,
+        }
+        for hour, swap in enumerate(swaps)
+    ]
+
+
+def _p029_job(rows):
+    return {
+        "id": "p029_shadow", "measurable": True, "stale": False,
+        "last_row": dict(rows[-1], **{
+            "shadow_memory_current_bytes": 805_273_600,
+            "shadow_memory_anon_bytes": 46_264_320,
+            "shadow_memory_file_bytes": 748_830_720,
+            "shadow_memory_peak_bytes": 805_306_368,
+            "shadow_oom_kill_events": 0,
+        }),
+        "recent_rows": rows,
+    }
+
+
+def test_p029_plateaued_swap_at_the_cap_does_not_warn():
+    """The exact live state on 2026-08-09, which warned every day.
+
+    A cgroup pinned at memory.max makes the kernel page out cold anonymous
+    memory, so `swap > 0` is a permanent consequence of the 768 MiB cap. Heap
+    flat at 5.7%, zero OOM kills, swap risen once and plateaued: nothing to
+    wake anyone for.
+    """
+    rows = _p029_rows([30_244_864, 31_281_152, 31_338_496,
+                       31_330_304, 31_334_400])
+    found = checks.check_jobs({"jobs": [_p029_job(rows)]})
+    assert [f.key for f in found] == []
+
+
+def test_p029_growing_swap_against_a_flat_heap_still_warns():
+    """Swap that keeps climbing is a leak the page-cache story would hide."""
+    rows = _p029_rows([10_000_000, 30_000_000, 60_000_000,
+                       90_000_000, 120_000_000])
+    found = {f.key: f for f in checks.check_jobs({"jobs": [_p029_job(rows)]})}
+    finding = found["job.p029_shadow.memory_pressure"]
+    assert finding.severity == "warn"
+    assert "growth 110000000" in finding.detail
+
+
+def test_p029_high_anon_still_warns_even_with_flat_swap():
+    """Heap pressure is judged on its own; it never needed the swap clause."""
+    rows = _p029_rows([31_000_000] * 5, anon_pct=52.0)
+    found = {f.key: f for f in checks.check_jobs({"jobs": [_p029_job(rows)]})}
+    assert found["job.p029_shadow.memory_pressure"].severity == "warn"
+
+
+def test_p029_legacy_rows_without_anon_telemetry_still_warn():
+    """Telemetry that cannot split heap from cache must not read as healthy."""
+    rows = _p029_rows([31_000_000] * 5)
+    for row in rows:
+        row.pop("shadow_memory_anon_utilization_pct")
+    job = _p029_job(rows)
+    job["last_row"].pop("shadow_memory_anon_utilization_pct", None)
+    found = {f.key: f for f in checks.check_jobs({"jobs": [job]})}
+    assert found["job.p029_shadow.memory_pressure"].severity == "warn"
+
+
+def test_p029_swap_growth_is_measured_over_the_window():
+    trend = checks._p029_pressure_trend(
+        _p029_rows([19_271_680, 25_000_000, 31_334_400]))
+    assert trend["swap_first_bytes"] == 19_271_680
+    assert trend["swap_latest_bytes"] == 31_334_400
+    assert trend["swap_growth_bytes"] == 12_062_720
+    # A single sample cannot establish a trend and must not fabricate one.
+    single = checks._p029_pressure_trend(_p029_rows([31_334_400]))
+    assert single["swap_growth_bytes"] is None
+
+
+def test_p029_process_start_fill_is_not_read_as_a_leak():
+    """A window containing the process start begins at swap=0.
+
+    End-to-end growth would report the whole one-time fill to steady state as
+    a leak. Measured live on 2026-08-09: 0 -> 31 MiB across 22h, a single step
+    that then went flat.
+    """
+    rows = _p029_rows([0, 19_271_680, 19_400_000, 30_244_864,
+                       31_281_152, 31_330_304, 31_334_400])
+    trend = checks._p029_pressure_trend(rows)
+    assert trend["swap_growth_bytes"] == 31_334_400        # end to end
+    assert trend["swap_recent_growth_bytes"] < 2 * 1024 * 1024
+    assert not checks.check_jobs({"jobs": [_p029_job(rows)]})

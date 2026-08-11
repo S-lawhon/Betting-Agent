@@ -1815,10 +1815,13 @@ workstreams:
       The daemon is a RECORDER: nothing invokes the six subagents, so a running
       service does not mean the loop is advancing. Read `registry_size` and
       `state_counts` in the heartbeat, not just the unit state.
-      Still unexercised: strategy-spec, strategy-validator, strategy-monitor.
-      The cheapest way to test them is to run the factory over a strategy whose
-      answer is already known (P-022, live with a Phase-2 GREEN-LIGHT on the
-      record) and see whether the validator independently agrees.
+      Exercised 2026-08-02 by running the factory over a strategy whose answer
+      was already known (P-022): op_20260802_002 went scout -> spec ->
+      integrity PASS -> validation "hold" -> retired, and the validator
+      earned its keep — recomputing the backtest, it independently caught
+      that the harness reported the pooled statistic instead of the rule's
+      per-tournament one (fixed next day in a8eabde). Still unexercised:
+      strategy-monitor only, because nothing has ever reached paper_live.
 
   - id: R-FANTASY-DEADHEAT
     name: NFL fantasy dead-heat (op_20260801_002)

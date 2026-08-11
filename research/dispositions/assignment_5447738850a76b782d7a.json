@@ -1,0 +1,24 @@
+{
+  "assignment_id": "assignment_5447738850a76b782d7a",
+  "decided_at": "2026-08-10T05:20:00Z",
+  "decision": "reject",
+  "evidence_checked": [
+    "CFTC filing page: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizationRules/61775",
+    "CFTC Rulebook Update RFQ, rules07152610413.pdf: https://www.cftc.gov/filings/orgrules/rules07152610413.pdf",
+    "CFTC Designated Contract Markets listing: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations",
+    "Aristotle Exchange Rulebook v1.1 certification: https://www.aristotle.com/emailimages/Aristotle_Rulebook_v1.1_Certification__Sep_17_2025.pdf",
+    "CFTC Letter 25-47, Aristotle Exchange: https://www.cftc.gov/csl/25-47/request_letter/0/download"
+  ],
+  "notes": "Observation: the certified rule text establishes a public RFQ process, best-price selection, quoter confirmation windows of 10 seconds or 3 seconds in designated high-volatility markets, and a subsequent 5-second or 1-second central-limit-order-book resting period. Observation: the rules state that fees are amounts posted on the exchange website, but no fee schedule, current executable prices, RFQ/order-event data, depth, fill statistics, or timestamp-correct dataset was verified. Inference: the supplied hypothesis does not establish stale liquidity or predictable quote dispersion; the process is expressly impartial and broadly visible, and any possible latency effect remains unmeasured and non-exclusive. No current net edge or executable strategy survives the screening contract.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "no_falsifiable_net_edge_survives_public_evidence",
+    "current_prices_depth_and_fills_unverified",
+    "fees_not_publicly_quantified",
+    "mechanism_is_not_exclusive",
+    "execution_eligibility_not_established"
+  ],
+  "recheck_after": null,
+  "research_minutes": 8,
+  "source_item_id": "src_c0ab7163b22602fcd134"
+}

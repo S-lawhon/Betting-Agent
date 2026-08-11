@@ -77,11 +77,12 @@ policies:
       - prophetx_rulebook_v1
       - kalshi_mlbgame
     decision: not_equivalent
-    reviewed_at: 2026-08-02
+    reviewed_at: 2026-08-10
     rationale: >-
       ProphetX voids games not starting on the scheduled local calendar day and
       uses a 36-hour suspended-game rule, while Kalshi can remain open or settle
-      at fair value under different windows. Measure as basis, never as a lock.
+      at fair value under different windows. Tie outcomes also diverge (void
+      versus $1/n split). Measure as basis, never as a lock.
     dimensions:
       underlying_event: equivalent
       binary_payout: equivalent
@@ -91,4 +92,27 @@ policies:
       cancellation: different
       suspended_game: different
       error_trade_review: different
+      tie_handling: different
+    dimension_notes:
+      tie_handling: >-
+        Added 2026-08-10, follow-up to the gemini_kalshi_mlb_moneyline tie
+        amendment; both ProphetX documents re-fetched with hashes verified
+        byte-identical to expected_sha256, clauses read verbatim. ProphetX
+        40.6(a) filing Appendix A-3 (MLB Baseball Mainline Contracts, Moneyline
+        sub-class), General Settlement Criteria Rule H: "if the event is called
+        early while tied or during an inning in which the visiting team has
+        taken the lead, it shall be treated as a suspended event and handled in
+        accordance with Rule D above," and Rule D voids suspended events "not
+        resumed within thirty-six (36) hours of the official scheduled start
+        time" with collateral returned. No ProphetX provision addresses a
+        completed game officially recorded as a tie, and the exchange rulebook
+        (prophetx_rulebook_v1) contains no tie or dead-heat rule for these
+        contracts. Kalshi BASEBALLGAMEWIN (MLBGAME.pdf) resolves an unlisted
+        tie to "$1/(the number of tied teams), rounded down" ($0.50/$0.50 for
+        two teams), and a game not resumed within 48 hours to the last fair
+        market price. On the closest comparable path — called while tied,
+        never resumed — ProphetX voids at collateral returned while Kalshi
+        settles at last fair price or the $1/n split, so the payoffs diverge.
+        No effect on the current not_equivalent decision; recorded for
+        completeness of the comparison table.
     approval: null

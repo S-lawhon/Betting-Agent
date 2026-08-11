@@ -364,6 +364,7 @@ class Collector:
                 "id": sid,
                 "description": svc.get("description", ""),
                 "severity": svc.get("severity", "warn"),
+                "oneshot": bool(svc.get("oneshot")),
                 "load": None,
                 "active": None,
                 "since": None,

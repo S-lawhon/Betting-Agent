@@ -150,6 +150,19 @@ services:
       inspect_last_row: true
     severity: warn
 
+  # Timer-driven oneshot (05:10 UTC): the research_screened_daily JOB below
+  # watches its output file, but that file is also touched by the hourly
+  # dry-run worker, so the job stays "fresh" while the daily unit sits failed
+  # — which is exactly what happened 2026-08-10 (audit rejected a legitimate
+  # cross-day retry; manager said all-nominal for 13+ hours). oneshot: true
+  # tells check_services that "inactive" is its resting state and only the
+  # latched "failed" ActiveState pages.
+  - id: research-agent-screened-daily
+    kind: systemd
+    description: Daily screened Codex research pass + acceptance audit (ExecStartPost)
+    oneshot: true
+    severity: warn
+
   # RETIRED 2026-07-22. P-016 (v1 and v2) both failed their pre-registered
   # gates (v1 adverse selection; v2 founding premise refuted). Kill switch
   # data/KILL_MAKER was hit 2026-07-22 01:22:40 UTC; the maker pulled all

@@ -152,6 +152,26 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
                 value="not-found"))
             continue
 
+        # A timer-driven oneshot rests at "inactive" between runs, so the
+        # long-running down-check below would page it every quiet hour. Its
+        # one bad state is "failed", which systemd latches until reset-failed
+        # — so a bad 05:10 run stays visible all day. Learned 2026-08-10: the
+        # screened-research audit failed its unit at 05:12 and the manager
+        # said all-nominal for 13+ hours, because the job entry watched a
+        # shared output file's freshness instead of the unit itself.
+        if svc.get("oneshot"):
+            if active == "failed":
+                out.append(Finding(
+                    key="service.{}.failed".format(sid),
+                    severity=svc.get("severity", "warn"),
+                    title="{} last run failed".format(sid),
+                    detail=svc.get("description", ""),
+                    fix=("ssh root@129.212.176.202 'journalctl -u {0} -n 100 "
+                         "--no-pager', then 'systemctl reset-failed {0}' once "
+                         "understood".format(sid)),
+                    value=active))
+            continue
+
         if active not in ("active", None):
             out.append(Finding(
                 key="service.{}.down".format(sid),

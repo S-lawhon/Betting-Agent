@@ -22,6 +22,13 @@ RESTART="${2:-}"
 REMOTE_DIR="/opt/betting-pod-shop"
 REMOTE_USER="root"
 SERVICE_NAME="betting-pod-shop"
+# The dashboard must restart with every code deploy: it imports checks.py /
+# dashboard_api.py at startup and computes alarms from the modules in memory,
+# so a long-lived process serves stale check logic no matter what is on disk.
+# Measured 2026-08-11: a process from 08-03 kept paging two alarms whose
+# checks had been fixed on disk for days (evmap UTC-day false positive,
+# research-audit oneshot handling).
+DASHBOARD_SERVICE="betting-dashboard"
 # Phase 3 cutover (2026-08-05): the gate targets the standalone dashboard on
 # :8081, not the engine — the engine no longer serves HTTP. /healthz returns
 # JSON with HTTP 200 (the curl -sf below asserts only on status). This line
@@ -177,8 +184,11 @@ if [[ "$RESTART" == "restart" ]]; then
     cp -a '${REMOTE_DIR}' '${REMOTE_DIR}${BACKUP_SUFFIX}'
   "
 
-  echo "==> Restarting service on server ..."
-  ssh "${REMOTE_USER}@${SERVER_IP}" "systemctl restart ${SERVICE_NAME}"
+  echo "==> Restarting services on server ..."
+  # Dashboard first: the health gate below reads ${HEALTH_URL}, which the
+  # dashboard serves, so the gate then validates BOTH the new engine and the
+  # new dashboard code.
+  ssh "${REMOTE_USER}@${SERVER_IP}" "systemctl restart ${DASHBOARD_SERVICE} ${SERVICE_NAME}"
 
   echo "==> Waiting for health check (${HEALTH_TIMEOUT}s timeout) ..."
   elapsed=0
@@ -188,6 +198,7 @@ if [[ "$RESTART" == "restart" ]]; then
     # Check if service is active AND web dashboard responds
     if ssh "${REMOTE_USER}@${SERVER_IP}" "
       systemctl is-active ${SERVICE_NAME} >/dev/null 2>&1 && \
+      systemctl is-active ${DASHBOARD_SERVICE} >/dev/null 2>&1 && \
       curl -sf --max-time 5 ${HEALTH_URL} >/dev/null 2>&1
     "; then
       healthy=true
@@ -210,12 +221,17 @@ if [[ "$RESTART" == "restart" ]]; then
     echo "==> HEALTH CHECK FAILED — initiating rollback ..."
     ssh "${REMOTE_USER}@${SERVER_IP}" "
       systemctl stop ${SERVICE_NAME} 2>/dev/null || true
+      systemctl stop ${DASHBOARD_SERVICE} 2>/dev/null || true
       if [ -d '${REMOTE_DIR}${BACKUP_SUFFIX}' ]; then
         rm -rf '${REMOTE_DIR}'
         mv '${REMOTE_DIR}${BACKUP_SUFFIX}' '${REMOTE_DIR}'
         echo 'Restored from backup.'
+        # Both services must reload the RESTORED code — leaving the dashboard
+        # down (or running rolled-back-from code) recreates the stale-process
+        # drift this restart step exists to prevent.
+        systemctl start ${DASHBOARD_SERVICE}
         systemctl start ${SERVICE_NAME}
-        echo 'Service restarted with previous version.'
+        echo 'Services restarted with previous version.'
         systemctl status ${SERVICE_NAME} --no-pager
       else
         echo 'ERROR: No backup found! Manual intervention required.'

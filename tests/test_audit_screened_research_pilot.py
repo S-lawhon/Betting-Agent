@@ -127,6 +127,7 @@ def completed_fixture(root: Path, *, screen_input: int = 20000) -> None:
     })
     write(root / "data/research_execution/runs/2026-08-09/claim1.json", {
         "assignment_id": TARGET, "claim_id": "claim1", "status": "completed",
+        "started_at": "2026-08-09T05:10:00Z",
         "terminal_stage": "screening",
         "safety": {"authorizes_execution": False},
         "usage": {"input_tokens": screen_input, "output_tokens": 500,
@@ -151,6 +152,76 @@ def test_audit_accepts_completed_screen_only_defer(tmp_path):
     assert report["decision"] == "defer"
     assert report["invocation_phases"] == ["screening"]
     assert not report["failures"]
+
+
+def failed_attempt_fixture(root: Path, *, day: str = "2026-08-08") -> None:
+    write(root / f"data/research_execution/runs/{day}/claim0.json", {
+        "assignment_id": TARGET, "claim_id": "claim0", "status": "failed",
+        "started_at": f"{day}T05:10:00Z",
+        "error": "provider exceeded input-token limit",
+    })
+    write(root / "data/research_execution/claim_released/strategy-scout/"
+          f"{TARGET}--claim0.json", {
+              "assignment_id": TARGET, "claim_id": "claim0",
+              "status": "released",
+          })
+
+
+def test_audit_accepts_retry_after_released_failure(tmp_path):
+    completed_fixture(tmp_path)
+    failed_attempt_fixture(tmp_path)
+
+    report = audit_pilot(
+        root=tmp_path, config_path=config(tmp_path),
+        marker_path=tmp_path / "marker")
+
+    assert report["status"] == "pass"
+    assert not report["failures"]
+
+
+def test_audit_rejects_released_claim_with_no_failed_run(tmp_path):
+    completed_fixture(tmp_path)
+    write(tmp_path / "data/research_execution/claim_released/strategy-scout/"
+          f"{TARGET}--claim9.json", {
+              "assignment_id": TARGET, "claim_id": "claim9",
+              "status": "released",
+          })
+
+    report = audit_pilot(
+        root=tmp_path, config_path=config(tmp_path),
+        marker_path=tmp_path / "marker")
+
+    assert report["status"] == "fail"
+    assert any("released_claims_match_failed_runs" in item
+               for item in report["failures"])
+
+
+def test_audit_rejects_second_completed_run(tmp_path):
+    completed_fixture(tmp_path)
+    write(tmp_path / "data/research_execution/runs/2026-08-10/claim2.json", {
+        "assignment_id": TARGET, "claim_id": "claim2", "status": "completed",
+        "started_at": "2026-08-10T05:10:00Z",
+    })
+
+    report = audit_pilot(
+        root=tmp_path, config_path=config(tmp_path),
+        marker_path=tmp_path / "marker")
+
+    assert report["status"] == "fail"
+    assert any("single_completed_run" in item for item in report["failures"])
+
+
+def test_audit_rejects_failed_attempt_after_completion(tmp_path):
+    completed_fixture(tmp_path)
+    failed_attempt_fixture(tmp_path, day="2026-08-10")
+
+    report = audit_pilot(
+        root=tmp_path, config_path=config(tmp_path),
+        marker_path=tmp_path / "marker")
+
+    assert report["status"] == "fail"
+    assert any("no_attempt_after_completion" in item
+               for item in report["failures"])
 
 
 def test_audit_rejects_screening_over_token_limit(tmp_path):

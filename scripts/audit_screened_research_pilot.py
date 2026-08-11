@@ -70,10 +70,10 @@ def audit_pilot(
         (state / "claim_archive").glob(f"*/{assignment_id}--*.json"))
     released_claims = list(
         (state / "claim_released").glob(f"*/{assignment_id}--*.json"))
-    runs = [
-        payload for path in sorted((state / "runs").glob("*/*.json"))
-        if (payload := _read_json(path)).get("assignment_id") == assignment_id
-    ]
+    runs = sorted(
+        (payload for path in sorted((state / "runs").glob("*/*.json"))
+         if (payload := _read_json(path)).get("assignment_id") == assignment_id),
+        key=lambda row: str(row.get("started_at") or ""))
     worker = _read_json(state / "worker_status.json")
     checks: list[dict[str, Any]] = []
     failures: list[str] = []
@@ -120,8 +120,17 @@ def audit_pilot(
             "checks": checks, "failures": failures, "warnings": warnings,
         }
 
-    check("single_run", len(runs) == 1, f"runs={len(runs)}")
-    run = runs[-1] if runs else {}
+    # A failed attempt releases its claim and the assignment is retried on a
+    # later day, so a retried target legitimately carries failed runs and
+    # released claims alongside the one success. The invariants: exactly one
+    # completed run, every released claim explained by a failed run (and vice
+    # versa — an unpaired release is dropped work, an unpaired failure is a
+    # leaked claim), and no attempt after the success.
+    completed_runs = [row for row in runs if row.get("status") == "completed"]
+    failed_runs = [row for row in runs if row.get("status") != "completed"]
+    check("single_completed_run", len(completed_runs) == 1,
+          f"runs={len(runs)} completed={len(completed_runs)}")
+    run = completed_runs[-1] if completed_runs else (runs[-1] if runs else {})
     check("run_completed", run.get("status") == "completed",
           str(run.get("status") or "missing"))
     check("run_cannot_execute",
@@ -129,8 +138,12 @@ def audit_pilot(
           repr((run.get("safety") or {}).get("authorizes_execution")))
     check("single_completed_claim", len(archived_claims) == 1,
           f"completed_claims={len(archived_claims)}")
-    check("no_released_claim", not released_claims,
-          f"released_claims={len(released_claims)}")
+    check("released_claims_match_failed_runs",
+          len(released_claims) == len(failed_runs),
+          f"released_claims={len(released_claims)} failed_runs={len(failed_runs)}")
+    check("no_attempt_after_completion",
+          not completed_runs or runs[-1] is completed_runs[-1],
+          str(runs[-1].get("started_at") or "missing") if runs else "no runs")
 
     disposition_payload = _read_json(disposition_path)
     try:

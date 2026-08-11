@@ -1,0 +1,157 @@
+{
+  "alternative_hypothesis": "Among pre_scheduled_start observations, qualifying executable dislocations (same $0.03-net / 1c-slippage / >=2-snapshot-persistence definition as the null) occur at a rate whose continued-forward monthly gross edge estimate (same formula as the null, same capacity ceiling) is >= $20/month, i.e. the forward continuation of the tape produces at least one pre-start qualifying, persistent case roughly every few weeks at a size consistent with the measured (non-zero) max net edge, rather than the observed zero-in-14-days.",
+  "entry_logic": {
+    "market_family": "MLB moneyline, matched Gemini prediction contract <-> Kalshi KXMLBGAME",
+    "match_rule_reference": "research/GEMINI_KALSHI_READ_ONLY_RESEARCH.md matching section, applied conservatively and unmodified: Gemini event identified as baseball moneyline; Kalshi event identified as KXMLBGAME; both venues resolve to exactly two recognized MLB teams; normalized team set and Eastern calendar date identical; scheduled starts agree within 15 minutes (wider difference = rejected schedule mismatch, not a match); event key unique on both venues. Ambiguous matches are REJECTED, never fuzzy-matched.",
+    "not_executable_reason": "settlement_equivalence policy for this pair is state='not_equivalent' (config/settlement_equivalence.yaml, classification='contract_non_equivalence'). Precondition #4 below is a HARD gate and is currently failing. This entry_logic describes what would be required to trade, not a currently live rule. Do not relax this by inferring equivalence from schedule coverage alone.",
+    "not_executable_today": true,
+    "preconditions_all_required": [
+      "1. market_phase == 'pre_scheduled_start' for the matched case, per the collector's earlier-of-two-venue-start-times classification (research/GEMINI_KALSHI_READ_ONLY_RESEARCH.md). 'after_scheduled_start' and 'unknown' cases are EXCLUDED from entry \u2014 53 of 55 lifetime cases were post-start and are presumed stale-quote/live-state artifacts, not tradeable dislocation, per the opportunity card's next_step='data_collection' framing.",
+      "2. net_edge_usd >= 0.03 per $1.00 notional path, computed AFTER both venues' actual taker fees (see fee_model) AND an independent 1c/leg slippage allowance applied against the executable quote on each leg (i.e. worst-case fill 1c worse than the displayed top-of-book on each side).",
+      "3. persistence: the qualifying edge (>= $0.03 net, as in #2) must be observed on >= 2 consecutive collector snapshots at the deployed 5-minute cadence (max gap 450s between the two observations, per the case-closing rule in the research doc), not a single-snapshot flicker. single_snapshot_share was measured at 0.745 lifetime \u2014 a majority of raw qualifying observations do NOT persist and must not be treated as executable on sight.",
+      "4. settlement_equivalence.state == 'verified' for the Gemini<->Kalshi MLB moneyline pair in config/settlement_equivalence.yaml, with every comparison dimension equivalent and an approver + approval date recorded (src logic in IntegrityReport.passes()-style all-dimensions check). CURRENT STATE: 'not_equivalent' (classification='contract_non_equivalence', actionable_allowed=false). This precondition is FALSE as of the evidence cited in extra.generated_at, so no entry is currently authorized regardless of #1-#3.",
+      "5. quote timestamps for both legs of the path are within the collector's measured skew envelope (median 0.249s, p95 0.817s, max 5.8s) at time of evaluation \u2014 a path built from quotes further apart than the p95 skew is rejected as non-synchronized rather than treated as a wider allowance.",
+      "6. both legs must be simultaneously executable at the recorded top-of-book size; no displayed-size assumption beyond what the snapshot itself reports (research/GEMINI_KALSHI_READ_ONLY_RESEARCH.md: 'depth is deliberately reported as unavailable... slippage is scenario-tested rather than represented as an estimate'). This spec does not assume any depth beyond top-of-book."
+    ],
+    "sizing_input": "the qualifying net_edge_usd and matched top-of-book size at the moment both preconditions 1-6 clear; no forward-looking size inference",
+    "type": "cross_venue_taker_taker_arb"
+  },
+  "exit_logic": {
+    "active_exit": false,
+    "basis_risk_disclosure": "The 'arb' label is conditional on the two contracts settling on the SAME outcome under the SAME rules. If Gemini and Kalshi diverge on postponement/rescheduling handling for the underlying game (Gemini holds a postponed MLB market open until played or season end; Kalshi uses a shorter rescheduling window and may resolve at a fair price per config/settlement_equivalence.yaml), the two legs can settle on different bases and the position is NOT a true arbitrage \u2014 it carries basis risk equal to the probability-weighted payoff difference between the two venues' rules. This is exactly why entry_logic precondition #4 (settlement_equivalence.state == 'verified') is a hard precondition rather than a documentation note: without it, this exit_logic's premise (both legs settle equivalently) is unverified.",
+    "quote_pull_triggers": [
+      "settlement_equivalence.state transitions away from 'verified' (e.g. to 'unverified' on missing document, or 'invalidated_document_change' on hash mismatch) after entry but before settlement of either leg -> no new entries; existing positions are a live basis-risk exposure to be handled per risk_limits, not silently held",
+      "a kill file / manual halt, consistent with other pods' fail-closed convention (see e.g. data/KILL_ROUND_LEADER_FADE precedent) -> no new entries"
+    ],
+    "rule": "This is a true two-leg arbitrage construction (buy the cheap side on one venue, buy the complementary/offsetting side on the other, or equivalent taker-taker structure) held to settlement on BOTH venues. There is no discretionary exit and no partial unwind rule, because closing one leg early converts a hedged position into a naked directional one.",
+    "type": "hold_to_settlement_both_legs"
+  },
+  "extra": {
+    "created_at": "2026-08-11T01:15:00Z",
+    "evidence_snapshot": {
+      "case_ledger": {
+        "episode_duration_seconds": {
+          "max_observed": 3000,
+          "median": 0,
+          "p90": 1213
+        },
+        "lifetime_cases_14d": 55,
+        "market_phase": {
+          "after_scheduled_start": 53,
+          "pre_scheduled_start": 0,
+          "unknown": 2
+        },
+        "persistent_cases_ge_2_snapshots": 14,
+        "single_snapshot_share": 0.745,
+        "source": "data/gemini_crossvenue/research_cases.json, threshold $0.03 net"
+      },
+      "depth": "not exposed by public snapshots on either venue; slippage is scenario-tested, not estimated from measured depth",
+      "generated_at": "2026-08-11T01:02Z",
+      "net_edge_per_dollar_path_after_fees": {
+        "max": 0.51,
+        "median": -0.05,
+        "p90": -0.04,
+        "p95": -0.04
+      },
+      "observation_rows": 40719,
+      "p95_net_edge_negative_in_every_scenario": true,
+      "path_observations": 81438,
+      "priced": 81331,
+      "qualifying_paths": {
+        "count": 107,
+        "of": 81331,
+        "rate": 0.0013,
+        "slippage_allowance_usd_per_leg": 0.01,
+        "threshold_usd": 0.03
+      },
+      "quote_completeness": 0.9987,
+      "quote_skew_seconds": {
+        "max": 5.8,
+        "median": 0.249,
+        "p95": 0.817
+      },
+      "replay_window_days": 14,
+      "settlement_basis": {
+        "classification": "contract_non_equivalence",
+        "detail": "Gemini holds postponed MLB markets open until played or season end; Kalshi uses a shorter rescheduling window and may resolve at a fair price.",
+        "fails_closed_on_document_drift": true,
+        "policy_actionable_allowed": false,
+        "policy_source": "config/settlement_equivalence.yaml",
+        "policy_terms_equivalence": "not_equivalent",
+        "schedule_evidence_coverage": 1.0
+      },
+      "slippage_scenarios_positive_path_share": {
+        "0.00": 0.0021,
+        "0.005": 0.0016,
+        "0.01": 0.0013,
+        "0.02": "lower still"
+      },
+      "source": "data/gemini_crossvenue/analytics.json (droplet, not directly accessible to this session \u2014 figures taken as given per task instructions)"
+    },
+    "read_only_hard_boundary": "Carried forward unmodified from the opportunity card: 'Read-only market-data collection only. This card authorizes neither account creation nor authenticated trading, deposits, or order placement.' This spec being written does not change that boundary. Any future integrity/validation/promotion step must independently confirm Gemini account-level product eligibility for the fund's Texas residency before any authenticated work, per the card's legal_readiness note and external_data_needed item #4.",
+    "related_pods": "none \u2014 no pod exists or should be built for this opportunity while precondition #4 is unmet; there is no venue for authenticated Gemini or Kalshi cross-venue execution in this repo (src/kalshi_private.py covers Kalshi only, closed by default; no Gemini authenticated client exists).",
+    "spec_status": "NOT EXECUTABLE TODAY. This StrategySpec documents a rule that requires settlement_equivalence.state == 'verified' for the Gemini<->Kalshi MLB moneyline pair, which is currently 'not_equivalent' (classification='contract_non_equivalence', actionable_allowed=false). Writing this spec does not and must not be read as clearing that gate; only a reviewed, versioned, approved change to config/settlement_equivalence.yaml can do that, per research/GEMINI_KALSHI_READ_ONLY_RESEARCH.md's promotion requirements.",
+    "supersedes": null,
+    "validation_guidance": {
+      "explicit_forbidden_shortcut": "Do not report a pooled per-snapshot or per-path rate as if each were an independent observation; do not substitute the after_scheduled_start rate (53/55) as a proxy for the pre-start rate under test \u2014 that conflates the two market_phase populations this spec explicitly separates.",
+      "gate_this_feeds": "This spec proposes no independent live forward gate (T, sample-size threshold, kill/pass rule) of the kind P-022 has, because entry_logic precondition #4 already blocks any live execution. The validator's output should be treated as informing whether it is worth pursuing settlement-equivalence review at all, not as a pass/fail trading gate.",
+      "instruction": "strategy-validator should replay the raw observation tape at data/gemini_crossvenue/observations/*.jsonl directly (NOT re-derive from analytics.json, which is itself a replay artifact) applying entry_logic preconditions 1, 2, 3, 5 and 6 verbatim (precondition 4, settlement equivalence, is evaluated separately against config/settlement_equivalence.yaml's current state and should be reported as PASS/FAIL on its own, not folded into the rate calculation).",
+      "statistic_to_report": "count and rate of pre_scheduled_start qualifying, persistent paths per total pre_scheduled_start matched paths, with a binomial (or Poisson, if treating count/time as the estimand) confidence interval, CLUSTERED BY GAME (event_id) \u2014 not by raw path/snapshot count \u2014 since multiple paths and snapshots within one game are correlated observations, analogous to the project convention of clustering backtest CIs by event/tournament (CLAUDE.md, Conventions section)."
+    },
+    "why_53_of_55_post_start_is_evidence_against_not_for": "The opportunity card's edge_source requires OBSERVED executable, synchronized divergence, not inference from venue novelty. 53/55 cases occurring after scheduled start, concentrated in a regime the collector itself flags as more likely stale-quote/live-state divergence than pregame basis opportunity (research/GEMINI_KALSHI_READ_ONLY_RESEARCH.md: 'after-start divergence remains valuable research evidence but is more likely to reflect live-state or stale quote differences than a pregame basis opportunity'), is treated in this spec as evidence FOR the null (measurement artifact), not as 53 near-misses on a real edge. Pre-start count of exactly 0 in 14 days is the headline number this spec's null_hypothesis is built to test honestly."
+  },
+  "fair_value_model": {
+    "description": "Fair value for each leg is the OTHER venue's currently executable (top-of-book) quote, not an independent probability model. The strategy has no edge_source beyond the parity relationship itself: if both venues price the same economic outcome, the sum of the two executable prices (buy side A at venue 1 + buy side B at venue 2, where A and B are complementary) should equal $1.00 before costs. A price is not a probability disagreement being harvested; it is a synchronization/latency/participant-composition dislocation being harvested.",
+    "edge_definition": "edge_usd_per_$1_notional = (1.00 - (executable_price_leg1 + executable_price_leg2)) - fee_leg1 - fee_leg2 - slippage_allowance_usd, where slippage_allowance_usd = 0.01 per leg (2 legs = $0.02 total) per entry_logic precondition #2",
+    "measured_distribution_reference": "Per analytics.json (14-day replay, generated_at 2026-08-11T01:02Z): net edge per $1 path after actual per-venue taker fees, rounded up per contract: median -$0.05, p90 -$0.04, p95 -$0.04, max +$0.51. Qualifying paths (>= $0.03 net after fees AND 1c/leg slippage): 107 of 81331 = 0.13%. The parity relationship is measured to hold (median near/below zero net) almost all of the time; the tail that exceeds the $0.03 bar is rare and concentrated post-start.",
+    "not_a_probability_model": true,
+    "type": "cross_venue_parity"
+  },
+  "fee_model": {
+    "computation_note": "Fees are computed and rounded per-contract PER VENUE, not summed-then-rounded once. C = contract count, P = execution price on that venue's leg. This mirrors src/kalshi_fees.py's per-contract rounding convention and the collector's own stated practice ('Actual one-contract taker fees are rounded up to the cent independently at each venue', research/GEMINI_KALSHI_READ_ONLY_RESEARCH.md).",
+    "fee_type": "taker_taker_both_venues",
+    "maker_path_not_used": "Both legs are TAKER by construction \u2014 this strategy crosses the spread on both venues to guarantee simultaneous execution; it does not rest a maker order on either leg.",
+    "per_venue": {
+      "gemini": {
+        "formula": "0.07 * C * P * (1 - P)",
+        "role": "taker",
+        "rounding": "rounded UP to the nearest cent, per contract, independently at this venue"
+      },
+      "kalshi": {
+        "formula": "0.07 * C * P * (1 - P)",
+        "role": "taker",
+        "rounding": "rounded UP to the nearest cent, per contract, independently at this venue"
+      }
+    },
+    "total_fee_usd": "fee_gemini_leg + fee_kalshi_leg",
+    "venue": "gemini+kalshi"
+  },
+  "id": "strat_crossvenue_mlb_v1",
+  "name": "Gemini/Kalshi Cross-Venue MLB Moneyline Taker-Taker Dislocation (pre-scheduled-start only)",
+  "null_hypothesis": "Among Gemini/Kalshi MLB-moneyline observations classified pre_scheduled_start under the collector's matching and phase rules, the rate of qualifying executable dislocations \u2014 net edge >= $0.03 after both venues' actual taker fees AND a $0.01/leg slippage allowance, persistent across >= 2 consecutive 5-minute-cadence snapshots (max 450s gap) \u2014 is zero, or occurs at a rate too low to clear a stated minimum economic bar: expected monthly gross edge < $20/month, computed as (observed pre-start qualifying-episode rate per 14-day tape, continued forward) x (observed max net-edge-per-path proxy, capped at the measured $0.51 maximum) x (max_concurrent_open_paths=5 x per-event cap $10 notional as a capacity ceiling). This hypothesis is measured, not projected: of 55 lifetime research cases in the 14-day tape at the $0.03 threshold, 53 were after_scheduled_start, 0 were pre_scheduled_start, and 2 were unknown-phase. The pre-start qualifying count is currently ZERO in the entire evidence window \u2014 the null sits exactly at the observed data, and this spec exists to state that plainly rather than to assert an edge the tape does not show.",
+  "opportunity_id": "op_20260802_003",
+  "provenance": {
+    "artifact_path": "research/specs/strat_crossvenue_mlb_v1_2026-08-10.json",
+    "code_commit": "372599c",
+    "created_by": "human (Claude, strategy-orchestration spec pass on approved OpportunityCard op_20260802_003)",
+    "dataset_hash": null,
+    "gate_hash": "3389c8a50ffeabc2919d7d2ebcff3816f80a4fbadcac02e9c22127bf72649476",
+    "gate_path": "config/settlement_equivalence.yaml",
+    "session_id": null
+  },
+  "risk_limits": {
+    "aggregate_cap_usd": 50.0,
+    "bankroll_usd": 1000.0,
+    "cap_enforcement_rule": "identical structure to other pods' tightest-remaining-cap sizing: a qualifying path is sized to the minimum of {per-event cap remaining, aggregate cap remaining, max_usd_at_risk remaining}; a path that would breach any cap is not entered at all (no partial fill down-sizing across two independent venues, since partial execution on only one leg converts the position into a naked directional bet)",
+    "max_concurrent_open_paths": 5,
+    "max_usd_at_risk": 0.0,
+    "max_usd_at_risk_if_verified": 50.0,
+    "max_usd_at_risk_if_verified_note": "If and only if settlement_equivalence transitions to 'verified' for this pair, a paper/small-scale validation cap of $50.00 total notional at risk applies, consistent with this being validation-stage capital per the recursive strategy factory's spec->validated->paper_live progression, not a scaled deployment.",
+    "max_usd_at_risk_note": "HARD ZERO while entry_logic precondition #4 (settlement_equivalence.state == 'verified') is false. This is not a placeholder to be tuned up independently of that gate \u2014 capital authorization is coupled to the equivalence verification, not to a separate risk decision.",
+    "one_sided_fill_risk": "Both legs must be believed simultaneously executable per entry_logic precondition #6. There is no depth guarantee (analytics.json depth field is explicitly 'unavailable'), so this risk is NOT eliminated by this spec \u2014 it is a known, named failure mode from the opportunity card ('Displayed top-of-book size may disappear before both legs execute; one-sided fill risk can dominate a small spread') and is not mitigated beyond precondition #6's synchronization check.",
+    "per_event_cap_note": "no more than $10.00 notional at risk in any single matched MLB game/event, to avoid one mispriced or misclassified match dominating the tiny validated sample",
+    "per_event_cap_usd": 10.0
+  },
+  "state": "spec",
+  "version": "1.0.0"
+}

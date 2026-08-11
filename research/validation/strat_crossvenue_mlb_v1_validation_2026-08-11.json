@@ -1,0 +1,307 @@
+{
+  "capacity": {
+    "caps": {
+      "aggregate_cap_usd": 50.0,
+      "max_concurrent_open_paths": 5,
+      "per_event_cap_usd": 10.0
+    },
+    "economic_bar_usd_per_month": 20.0,
+    "interpretation": "The POINT ESTIMATE (continuing forward exactly what this tape showed: zero qualifying pre-start episodes in 8.27 days across 79 candidate games) is $0/month, far below the $20 bar. The statistical UPPER BOUND scenario -- which asks how large the true rate could plausibly be and still be consistent with observing zero in a sample this size -- is NOT ruled out from clearing the bar. Both are reported because a single point estimate of zero, on a short window, understates the genuine uncertainty about the forward rate; neither one is the 'answer' on its own.",
+    "per_path_notional_arithmetic": "min(per-event cap $10.00, aggregate $50.00 / 5 concurrent = $10.00) = $10.00",
+    "per_path_notional_usd": 10.0,
+    "point_estimate_clears_economic_bar": false,
+    "point_estimate_scenario": {
+      "arithmetic": "0.0000 episodes/month (continued forward from the observed 0 episodes / 8.27 tape-days) x any per-path edge x $10.00 notional/path = $0.0000/month (zero episodes makes the edge multiplier moot)",
+      "episodes_per_day_observed": 0.0,
+      "episodes_per_month_continued_forward": 0.0,
+      "implied_monthly_gross_edge_usd": 0.0,
+      "observed_pre_start_qualifying_persistent_episodes": 0
+    },
+    "tape_days": 8.269,
+    "upper_bound_scenario_clears_economic_bar": true,
+    "upper_bound_statistical_scenario": {
+      "arithmetic": "290.7787 games/month x 0.037211 (95% one-sided upper bound qualifying rate) = 10.8202 qualifying games/month x $0.5100/$1-path edge x $10.00 notional/path = $55.1828/month",
+      "description": "NOT a point estimate. Uses the primary statistic's own one-sided 95% Clopper-Pearson upper bound on the game-level qualifying rate (honest answer to 'how high could the true rate plausibly be given 0/79 observed'), applied to this tape's own observed games/month cadence, at the single most generous per-path net edge measured ANYWHERE on the tape (post-start max, since pre-start itself never measured a positive fee-net edge at all).",
+      "games_per_month_estimate": 290.7787,
+      "games_with_pre_start_observation_this_tape": 79,
+      "implied_monthly_gross_edge_usd": 55.1828,
+      "one_sided_95_upper_bound_game_qualifying_rate": 0.037211,
+      "scenario_edge_per_dollar_path_usd": 0.51,
+      "scenario_edge_source": "max net_edge_usd (fee-net only) observed on ANY after_scheduled_start priced path in this tape -- reused here only because pre-start priced paths never printed a positive value to draw a scenario edge from.",
+      "upper_bound_qualifying_games_per_month": 10.8202
+    }
+  },
+  "checked_at": "2026-08-11T01:58:05Z",
+  "extra": {
+    "analytics_cross_check_verdict": "The tape independently reproduces the SHAPE of the spec's cited evidence_snapshot (market_phase heavily skewed to after_scheduled_start; pre_scheduled_start exactly 0; single_snapshot_share ~0.73-0.75; persistent_cases_ge_2_snapshots in the low teens) even though this session's window (8.27 days, ending later) is neither the same window nor the cited 14 days -- 56 lifetime cases vs 55 cited, 0 vs 0 pre-start, 55 vs 53 post-start, 1 vs 2 unknown, 15 vs 14 persistent, 0.732 vs 0.745 single-snapshot share. Close enough on every dimension to say the two datasets describe the same underlying process on overlapping-but-not-identical windows; NOT close enough (nor intended) to be read as re-deriving the exact cited figures, and the spec's '14-day' label does not match this tape's actual ~8.3-day span -- reported plainly rather than parroted.",
+    "analytics_json_cross_check": {
+      "lifetime_cases": 56,
+      "market_phase": {
+        "after_scheduled_start": 55,
+        "pre_scheduled_start": 0,
+        "unknown": 1
+      },
+      "note": "This tape's actual coverage (see tape_coverage) is NOT 14 days -- do not read agreement/disagreement here as validating or invalidating the cited figures' window, only their PHASE SPLIT SHAPE (pre vs post) on a shorter, later window.",
+      "persistent_cases_ge_2_snapshots": 15,
+      "single_snapshot_share": 0.732143,
+      "spec_cited_evidence_snapshot": {
+        "after_scheduled_start": 53,
+        "lifetime_cases_14d": 55,
+        "persistent_cases_ge_2_snapshots": 14,
+        "pre_scheduled_start": 0,
+        "replay_window_days_cited": 14,
+        "single_snapshot_share": 0.745,
+        "unknown": 2
+      }
+    },
+    "boundary_respected": "Read-only research and replay only. No production config, rule file, spec, integrity report, or settlement_equivalence.yaml were modified. The only artifact written was the requested replay script (research/validation/strat_crossvenue_mlb_v1_replay_2026-08-11.py) plus this JSON report, both research artifacts. No account, order, or authenticated-trading path was touched or invoked.",
+    "hand_check_row_proof": {
+      "arithmetic": "match 2026-08-02|astros|rangers, path gemini_yes=astros(ask 0.89)/kalshi_yes=rangers(ask 0.11): gross = 1.00 - 0.89 - 0.11 = $0.00. gemini_fee = ceil(100*0.07*0.89*0.11)/100 = ceil(0.6853)/100 = $0.01. kalshi_fee = ceil(100*0.07*0.11*0.89)/100 = ceil(0.6853)/100 = $0.01. net (fee-net only) = 0.00 - 0.02 = -$0.02. Matches the tape's own gross_edge_usd=-0.0, fees_usd=0.02, net_edge_usd=-0.02 exactly. A wider 598-path sample (every 137th priced path across the whole tape) found ZERO mismatches between the tape's own fields and a fresh evaluate_match() call.",
+      "description": "One row hand-computed independently of any repo code, to prove the parser and fee arithmetic are correct before trusting the bulk replay."
+    },
+    "net_edge_distribution_pre_vs_post": {
+      "after_scheduled_start_fee_net_only_usd": {
+        "max": 0.51,
+        "median": -0.05,
+        "min": -0.53,
+        "n": 4688,
+        "p05": -0.08,
+        "p90": -0.03,
+        "p95": -0.01
+      },
+      "pre_scheduled_start_fee_net_only_usd": {
+        "max": -0.01,
+        "median": -0.05,
+        "min": -0.61,
+        "n": 72875,
+        "p05": -0.08,
+        "p90": -0.05,
+        "p95": -0.04
+      }
+    },
+    "observation_level_phase_tally": {
+      "n_games_post_start": 75,
+      "n_games_pre_start": 79,
+      "n_games_unknown_only": 2,
+      "n_observations_post_start": 2475,
+      "n_observations_pre_start": 38363,
+      "n_observations_unknown": 25
+    },
+    "precondition_4_settlement_equivalence": {
+      "approval": null,
+      "decision_state": "not_equivalent",
+      "dimensions": {
+        "binary_payout": "equivalent",
+        "cancellation": "different",
+        "discretionary_review": "different",
+        "extra_innings": "equivalent",
+        "postponement": "different",
+        "settlement_sources": "compatible",
+        "shortened_game": "different",
+        "underlying_event": "equivalent"
+      },
+      "gate_path": "config/settlement_equivalence.yaml",
+      "policy_id": "gemini_kalshi_mlb_moneyline",
+      "reason": "settlement_equivalence.state must equal 'verified' with a recorded approval for this pair; current decision is 'not_equivalent' with approval=None.",
+      "result": "FAIL"
+    },
+    "preconditions_1_2_3_5_6_result": {
+      "1_market_phase_pre_scheduled_start": "APPLIED -- min(gemini_start, kalshi_start) per game, resolved from any tape row carrying scheduled_start_at for that match_key (the field is logged intermittently, not every row -- verified zero drift across 168 (match_key, venue) pairs with a recorded schedule, i.e. the fill-forward is safe).",
+      "2_net_edge_after_fees_and_slippage": "APPLIED -- tape's own fee-net edge minus $0.02 total (2 x $0.01/leg) per the spec's locked fee_model.edge_definition, threshold >= $0.03.",
+      "3_persistence_ge_2_consecutive_snapshots_le_450s": "APPLIED via build_cases()'s native gap and threshold-break logic, unmodified.",
+      "5_quote_skew_synchronization": "APPLIED at this session's own measured p95 (0.817s, which happens to match the spec's cited figure exactly on independent re-derivation) as the cutoff, not the collector's own looser 10s 'actionable' flag baked into the raw tape.",
+      "6_no_depth_assumption_beyond_top_of_book": "TRIVIALLY SATISFIED / NOT A FILTER -- the raw snapshots carry no size field at all on either venue, so no depth-beyond-top-of-book assumption is made anywhere in this replay; every qualifying computation is implicitly 1-contract notional, consistent with the spec's own 'depth is not exposed' disclosure. This does not reject any row; it is a documented limitation, not a pass."
+    },
+    "primary_statistic_detail": {
+      "confidence_interval": {
+        "ci_lower": 0.0,
+        "ci_upper": 0.045621,
+        "k": 0,
+        "method": "Clopper-Pearson exact binomial, clustered by game (k=games with qualifying persistent pre-start episode, n=games with any pre-start matched observation)",
+        "n": 79,
+        "one_sided_95_upper_bound": 0.037211,
+        "point_estimate": 0.0,
+        "rule_of_three_approx_upper_bound": 0.037975
+      },
+      "definition": "distinct GAMES with >=1 pre_scheduled_start qualifying (net edge >= $0.03 after both venues' actual taker fees AND $0.01/leg slippage) PERSISTENT (>=2 consecutive snapshots, <=450s apart) episode, over distinct GAMES with >=1 pre_scheduled_start MATCHED observation (any phase-pre observation at all, qualifying or not)",
+      "episode_count_pre_start_qualifying_persistent": 0,
+      "games_with_qualifying_persistent_pre_start_episode": [],
+      "k_games_with_qualifying_persistent_pre_start_episode": 0,
+      "n_games_with_any_pre_start_matched_observation": 79
+    },
+    "recommendation": "Not worth pursuing settlement-equivalence review on the strength of this evidence. The primary, pre-registered statistic is a clean, robust zero (0/79 games, 95% CI upper bound 4.56%, stable across every slippage/threshold/persistence stress cell), and the raw pre-start price data shows the two venues tracking each other almost exactly (fee-net edge never once positive across 72,875 priced pre-start paths) -- this is evidence of an efficient pregame relationship, not an under-sampled rare event. Independently, entry_logic precondition #4 (settlement_equivalence.state=='verified') is a hard, deterministic FAIL today (config/settlement_equivalence.yaml: decision='not_equivalent', approval=null) and nothing in this tape replay can move it -- that is a governance/documentation decision, not a data question, so more tape collection would not change this precondition's status. The one caveat: the statistical upper-bound scenario (games/month x 95% upper-bound qualifying rate x the single largest edge measured anywhere on the tape, borrowed from post-start since pre-start never had a positive value to draw from) reaches ~$55/month, above the $20 bar -- so a true rate this low CANNOT be fully excluded by 79 games of data alone. That caveat is reported honestly but should not be read as grounds for continued investment: it requires assuming both the loosest statistically-consistent rate AND a post-start-magnitude edge that has literally never been observed pre-start, simultaneously. On the evidence in hand, this is a no-go, and settlement-equivalence review would be spending real review effort on a strategy that -- even if the review cleared it -- has not shown an executable pre-start edge to trade.",
+    "replay_reused_repo_functions": [
+      "src/dislocation_cases.py: build_cases() (episode segmentation, persistence, market_phase pre/after/unknown classification) -- called directly, not reimplemented",
+      "src/gemini_kalshi_research.py: evaluate_match() / gemini_fee_total() -- used to independently re-derive a sample of the tape's own precomputed path fields and confirm byte-for-byte agreement (see sample_agreement_check) rather than trusting them blind",
+      "src/kalshi_fees.py: fee_total() (imported transitively by gemini_kalshi_research.py) for the Kalshi taker leg, 0.07*C*P*(1-P) rounded up to the cent"
+    ],
+    "replay_script_invocation": "python3 research/validation/strat_crossvenue_mlb_v1_replay_2026-08-11.py <tape_dir>",
+    "replay_script_path": "research/validation/strat_crossvenue_mlb_v1_replay_2026-08-11.py",
+    "sample_agreement_check": {
+      "agreement": true,
+      "hand_check_row": {
+        "captured_at": "2026-08-02T19:17:07.774808Z",
+        "gemini_ask": 0.89,
+        "gemini_yes_team": "astros",
+        "hand_fees_total": 0.02,
+        "hand_gemini_fee": 0.01,
+        "hand_gross": -0.0,
+        "hand_kalshi_fee": 0.01,
+        "hand_matches_tape": true,
+        "hand_net_edge_usd": -0.02,
+        "kalshi_ask": 0.11,
+        "kalshi_yes_team": "rangers",
+        "match_key": "2026-08-02|astros|rangers",
+        "tape_fees_usd": 0.02,
+        "tape_gross_edge_usd": -0.0,
+        "tape_net_edge_usd": -0.02
+      },
+      "mismatch_sample": [],
+      "mismatches_found": 0,
+      "paths_checked": 598
+    },
+    "tape_coverage": {
+      "files": [
+        "2026-08-02.jsonl",
+        "2026-08-03.jsonl",
+        "2026-08-04.jsonl",
+        "2026-08-05.jsonl",
+        "2026-08-06.jsonl",
+        "2026-08-07.jsonl",
+        "2026-08-08.jsonl",
+        "2026-08-09.jsonl",
+        "2026-08-10.jsonl",
+        "2026-08-11.jsonl"
+      ],
+      "max_captured_at": "2026-08-11T01:45:03.175522Z",
+      "min_captured_at": "2026-08-02T19:17:07.774808Z",
+      "note": "Actual tape coverage is ~8.3 days (2026-08-02T19:17Z to 2026-08-11T01:45Z), not the 14-day window the spec's evidence_snapshot cites.",
+      "spec_cited_replay_window_days": 14,
+      "tape_days": 8.269
+    }
+  },
+  "go_no_go": "no_go",
+  "performance": {
+    "clv": null,
+    "clv_note": "No CLV concept applies to this strategy family. This is a cross-venue PARITY harvest (fair_value_model.type='cross_venue_parity'), not a probability-model edge measured against a sharp external closing line; the spec's own fair_value_model states the fair value for each leg IS the other venue's quote, so there is no independent close to mark CLV against. The key is present (schema-required) and honestly null, mirroring the same rationale strat_p022_fade_v2's validation used for a different reason (settlement mechanic, not price-disagreement).",
+    "net_edge": -0.05,
+    "net_edge_units": "USD per $1 notional path, fee-net only (no slippage), MEDIAN across the 72,875 priced pre_scheduled_start paths in this tape. Reported as a descriptive/diagnostic figure, NOT a per-trade P&L -- there were zero qualifying pre-start trades to average. p95 = -$0.04/path, max = -$0.01/path: the parity relationship held almost exactly pre-start and NEVER once printed a positive fee-net edge across the whole pre-start sample, before slippage or the $0.03 threshold are even applied."
+  },
+  "provenance": {
+    "artifact_path": "research/validation/strat_crossvenue_mlb_v1_validation_2026-08-11.json",
+    "code_commit": "7c549f0",
+    "created_by": "strategy-validator agent (Claude)",
+    "dataset_hash": "f8e2746e8abbd5bf51ac299a5cdb35c2d53a80067a58cb77311ffd354a4ff5f0",
+    "gate_hash": "3389c8a50ffeabc2919d7d2ebcff3816f80a4fbadcac02e9c22127bf72649476",
+    "gate_path": "config/settlement_equivalence.yaml",
+    "session_id": null
+  },
+  "run_id": "val_crossvenue_mlb_v1_2026-08-11",
+  "sample_size": {
+    "date_range": "2026-08-02T19:17:07Z to 2026-08-11T01:45:03Z (8.27 days) -- the RAW TAPE's actual coverage, not the spec's cited 14-day analytics window (see extra.tape_coverage).",
+    "events": 79,
+    "events_unit": "distinct GAMES (match_key) with >=1 pre_scheduled_start matched observation -- the denominator of the primary statistic. 86 distinct games total appear anywhere in the tape (75 with a post-start observation, 2 with schedule-unknown-only observations).",
+    "priced_path_observations": 81619,
+    "raw_observations": 40863,
+    "raw_path_observations": 81726,
+    "trades": 0,
+    "trades_unit": "qualifying persistent pre-start episodes executed/executable -- zero, because (a) none qualified under the locked entry_logic and (b) precondition #4 blocks all execution regardless (see extra.precondition_4).",
+    "unpriced_missing_ask_path_observations": 107
+  },
+  "status": "pass",
+  "strategy_id": "strat_crossvenue_mlb_v1",
+  "stress_tests": {
+    "persistence_grid": {
+      "persistence_1_any_qualifying_snapshot": {
+        "distinct_games": 0,
+        "episodes": 0
+      },
+      "persistence_2_consecutive_snapshots_le_450s": {
+        "distinct_games": 0,
+        "episodes": 0
+      }
+    },
+    "quote_skew_measured_vs_spec_cited": {
+      "agreement": "close (measured p50=0.25 vs cited 0.249; measured p95=0.817 vs cited 0.817 exactly; measured max=5.834 vs cited 5.8) -- this session independently reproduces the spec's quote-skew figures on the raw tape, so those specific numbers are now verified-by-this-report, not merely unverified-as-cited.",
+      "measured_this_tape": {
+        "max": 5.834,
+        "n": 40863,
+        "p50": 0.25,
+        "p90": 0.516,
+        "p95": 0.817
+      },
+      "spec_cited_unverified": {
+        "max": 5.8,
+        "median": 0.249,
+        "p95": 0.817
+      }
+    },
+    "quote_skew_precondition_5_cutoff_used": 0.817,
+    "slippage_grid_per_leg_usd": {
+      "0.000": {
+        "any_pre_start_qualifying_episodes": 0,
+        "any_pre_start_qualifying_games": 0,
+        "persistent_pre_start_episodes": 0,
+        "persistent_pre_start_games": 0
+      },
+      "0.005": {
+        "any_pre_start_qualifying_episodes": 0,
+        "any_pre_start_qualifying_games": 0,
+        "persistent_pre_start_episodes": 0,
+        "persistent_pre_start_games": 0
+      },
+      "0.010": {
+        "any_pre_start_qualifying_episodes": 0,
+        "any_pre_start_qualifying_games": 0,
+        "persistent_pre_start_episodes": 0,
+        "persistent_pre_start_games": 0
+      },
+      "0.020": {
+        "any_pre_start_qualifying_episodes": 0,
+        "any_pre_start_qualifying_games": 0,
+        "persistent_pre_start_episodes": 0,
+        "persistent_pre_start_games": 0
+      }
+    },
+    "summary": "The pre-start qualifying count is ZERO at every single stress-test cell tried: all 4 slippage levels (0c/0.5c/1c/2c per leg), all 3 thresholds (2c/3c/5c), and both persistence requirements (>=1 snapshot / >=2 consecutive snapshots). This is not a fragile result sitting near a boundary -- it holds even at the loosest combination tested (threshold $0.02, zero slippage). The underlying raw fee-net edge distribution pre-start (max -$0.01 across 72,875 priced paths) confirms the zero is a property of the price data itself, not an artifact of any one filter choice in this replay.",
+    "threshold_grid_usd": {
+      "0.02": {
+        "any_pre_start_qualifying_episodes": 0,
+        "any_pre_start_qualifying_games": 0,
+        "persistent_pre_start_episodes": 0,
+        "persistent_pre_start_games": 0
+      },
+      "0.03": {
+        "any_pre_start_qualifying_episodes": 0,
+        "any_pre_start_qualifying_games": 0,
+        "persistent_pre_start_episodes": 0,
+        "persistent_pre_start_games": 0
+      },
+      "0.05": {
+        "any_pre_start_qualifying_episodes": 0,
+        "any_pre_start_qualifying_games": 0,
+        "persistent_pre_start_episodes": 0,
+        "persistent_pre_start_games": 0
+      }
+    }
+  },
+  "uncertainty": {
+    "ci_lower": 0.0,
+    "ci_upper": 0.045621,
+    "k_games": 0,
+    "method": "Clopper-Pearson EXACT binomial CI on the GAME-level proportion (k games with >=1 pre-start qualifying persistent episode / n games with >=1 pre-start matched observation), i.e. clustered by game, not pooled by raw path/snapshot count (forbidden shortcut explicitly avoided per spec extra.validation_guidance). k=0, n=79. Point estimate 0.0%, 95% CI [0.0%, 4.56%], one-sided 95% upper bound 3.72% (rule-of-three approx 3/79=3.80%, consistent).",
+    "n_games": 79,
+    "one_sided_95_upper_bound_game_rate": 0.037211,
+    "point_estimate": 0.0,
+    "post_start_comparison_diagnostic": {
+      "ci": [
+        0.056366,
+        0.215613
+      ],
+      "k_games": 9,
+      "n_games": 75,
+      "note": "SECONDARY/diagnostic only, per instructions -- never substituted for the pre-start rate under test. Shown to demonstrate the collector and replay pipeline DO detect qualifying persistent episodes when they occur (post-start); the pre-start zero is not an artifact of a broken detector.",
+      "point_estimate": 0.12
+    }
+  }
+}

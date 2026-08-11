@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: 2026-08-02
+updated_at: 2026-08-10
 defaults:
   fail_closed_status: unverified
 
@@ -31,11 +31,11 @@ policies:
     market_family: mlb_moneyline
     document_ids: [gemini_baseball1, kalshi_mlbgame]
     decision: not_equivalent
-    reviewed_at: 2026-08-02
+    reviewed_at: 2026-08-10
     rationale: >-
       The ordinary winner and extra-innings payoff align, but postponement,
-      cancellation, shortened-game, and discretionary review outcomes do not.
-      A complementary position therefore retains basis risk and is not an
+      cancellation, shortened-game, discretionary review, and tie outcomes do
+      not. A complementary position therefore retains basis risk and is not an
       arbitrage.
     dimensions:
       underlying_event: equivalent
@@ -46,6 +46,28 @@ policies:
       cancellation: different
       shortened_game: different
       discretionary_review: different
+      tie_handling: different
+    dimension_notes:
+      tie_handling: >-
+        Added 2026-08-10 from the strat_crossvenue_mlb_v1 integrity review
+        (research/integrity/strat_crossvenue_mlb_v1_integrity_2026-08-10.json,
+        extra.non_blocking_dimension_gap); both clauses read verbatim from the
+        pinned documents, hashes re-verified byte-identical to expected_sha256.
+        Gemini BASEBALL1 Rule 13.166(e)(1)(iv): "If {baseball game} results in
+        a tie as officially recorded by the governing body (including any
+        suspended game called as a tie), all Contracts shall resolve 'No'
+        (i.e., {team did not win})." Kalshi BASEBALLGAMEWIN (MLBGAME.pdf): "If
+        a 'Tie' strike is not listed for a given <time period> and <time
+        period> of <baseball game> ends in a tie after all regulation and
+        extra innings (unless specifically excluded), the market will resolve
+        to $1/(the number of tied teams), rounded down. For example, if two
+        teams tie, then each team strike will resolve to $0.50." Opposite
+        payoffs on the same recorded-tie event: both team contracts pay No at
+        Gemini versus a $0.50/$0.50 split at Kalshi. Low materiality (MLB
+        essentially never records official ties) and no effect on the current
+        not_equivalent decision — 'verified' requires every dimension
+        equivalent regardless — recorded so the comparison table is complete
+        before any future approval review.
     approval: null
   - id: prophetx_kalshi_mlb_moneyline
     venues: [prophetx, kalshi]

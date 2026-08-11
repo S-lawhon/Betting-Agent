@@ -236,6 +236,12 @@ jobs:
       file proves quote collection and exact matching ran. Settlement terms are
       fail closed. Hypothetical positive paths remain non-actionable unless a
       reviewed, current equivalence policy explicitly approves them.
+      STRATEGY VERDICT 2026-08-11: strat_crossvenue_mlb_v1 validated NO-GO on
+      this collector's own tape (0/79 games pre-start qualifying; fee-net edge
+      never positive pregame) and was retired via the strategy factory. The
+      collector itself continues unchanged — its tape is the evidence base a
+      successor card would need (see
+      research/decisions/strat_crossvenue_mlb_v1_promotion_2026-08-11.json).
 
   - id: gemini_crossvenue_analysis
     host: droplet
@@ -1804,9 +1810,22 @@ workstreams:
       ideas can be promoted, demoted, or retired without inventing a new
       contract each time.
       LIVE since 2026-08-01 as systemd `betting-strategy-agents` (queue worker,
-      60s poll). First strategy carried end to end the same day:
-      op_20260801_001 (KXRANKLISTFF* dead-heat) registered -> integrity FAIL ->
-      retired, all three artifacts committed under research/.
+      60s poll).
+      FIRST FULL AGENT-AUTHORED CHAIN COMPLETED 2026-08-11 on an unknown
+      answer: op_20260802_003 (Gemini/Kalshi cross-venue MLB arb) went
+      scout -> spec -> integrity PASS -> validation NO-GO -> promotion
+      RETIRE, every artifact written by the factory's own subagents and
+      committed under research/{specs,integrity,validation,decisions}/.
+      The verdict: 0/79 games with a pre-start qualifying dislocation on the
+      raw 8.27-day tape (95% CI [0%, 4.56%], zero at every stress cell);
+      pre-start fee-net edge never once positive in 72,875 priced paths; and
+      settlement equivalence is a deterministic governance FAIL no tape can
+      move. The pipeline's first real product was a disciplined,
+      reproducible kill — which is the job. The read-only Gemini collector
+      continues regardless; successor conditions are pinned in the
+      promotion decision (equivalence verified WITH approver AND directly
+      observed pre-start edge clearing $20/month — filed as a NEW card,
+      never a re-spec).
     note: >
       This is infrastructure, not a trading pod. Its job is to keep the
       opportunity factory itself auditable and recursive so the research ->
@@ -1815,13 +1834,16 @@ workstreams:
       The daemon is a RECORDER: nothing invokes the six subagents, so a running
       service does not mean the loop is advancing. Read `registry_size` and
       `state_counts` in the heartbeat, not just the unit state.
-      Exercised 2026-08-02 by running the factory over a strategy whose answer
-      was already known (P-022): op_20260802_002 went scout -> spec ->
-      integrity PASS -> validation "hold" -> retired, and the validator
-      earned its keep — recomputing the backtest, it independently caught
-      that the harness reported the pooled statistic instead of the rule's
-      per-tournament one (fixed next day in a8eabde). Still unexercised:
-      strategy-monitor only, because nothing has ever reached paper_live.
+      Registry as of 2026-08-11: 5 records — 4 retired (op_20260801_001
+      integrity-fail; op_20260802_001 integrity-fail; op_20260802_002 P-022
+      calibration housekeeping; op_20260802_003 first full-chain no-go) and
+      1 idea (op_20260801_002 NFL fantasy, parked on measurement until
+      2026-09-10). Calibration history: exercised 2026-08-02 over P-022
+      (known answer) — the validator independently caught the
+      pooled-vs-gate-statistic harness defect (fixed in a8eabde). Still
+      unexercised: strategy-monitor only, because nothing has ever reached
+      paper_live; the next candidate most likely arrives via the daily
+      screened research pass.
 
   - id: R-FANTASY-DEADHEAT
     name: NFL fantasy dead-heat (op_20260801_002)

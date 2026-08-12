@@ -766,7 +766,10 @@ class ResearchAgentWorker:
             raise ResearchWorkerError(
                 f"artifact type {artifact_type!r} is invalid for {claim.assigned_agent}")
         self._validate_artifact(artifact_type, artifact, claim, disposition)
-        return disposition, artifact_type, dict(artifact)
+        artifact = dict(artifact)
+        if artifact_type == "research_disposition":
+            artifact["notes"] = disposition.notes
+        return disposition, artifact_type, artifact
 
     @staticmethod
     def _validate_artifact(artifact_type: str, artifact: Mapping[str, Any],
@@ -774,7 +777,15 @@ class ResearchAgentWorker:
                            disposition: ResearchDisposition) -> None:
         if artifact_type == "research_disposition":
             parsed = ResearchDisposition.from_dict(artifact)
-            if parsed.to_dict() != disposition.to_dict():
+            expected = disposition.to_dict()
+            duplicate = parsed.to_dict()
+            # `notes` is free text and models paraphrase it between the two
+            # copies instead of duplicating it byte-for-byte (observed twice on
+            # assignment_5510c261, 2026-08-11/12); the completion's notes are
+            # canonical. Every structured field must still match exactly.
+            expected.pop("notes")
+            duplicate.pop("notes")
+            if duplicate != expected:
                 raise ResearchWorkerError("artifact disposition differs from completion")
         elif artifact_type == "hypothesis_brief":
             missing = sorted(HYPOTHESIS_KEYS - set(artifact))

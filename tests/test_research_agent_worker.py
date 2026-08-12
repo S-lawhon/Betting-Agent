@@ -389,9 +389,10 @@ def test_rejected_provider_output_is_preserved_for_diagnosis(tmp_path):
     base = FakeProvider().output
     output = base | {
         "artifact_type": "research_disposition",
-        # Valid disposition, but not byte-identical to the completion one —
-        # the exact failure the rejected-artifact record exists to diagnose.
-        "artifact": base["disposition"] | {"notes": "drifted copy"},
+        # Valid disposition, but a structured field differs from the completion
+        # one — the exact failure the rejected-artifact record exists to
+        # diagnose. (`notes` drift alone no longer rejects.)
+        "artifact": base["disposition"] | {"reason_codes": ["drifted_code"]},
     }
     runtime = worker(tmp_path, FakeProvider(output=output),
                      execution_enabled=True)
@@ -415,6 +416,34 @@ def test_rejected_provider_output_is_preserved_for_diagnosis(tmp_path):
     artifact = (tmp_path
                 / "data/research_execution/artifacts/strategy-scout/a1.json")
     assert not artifact.exists()
+
+
+def test_paraphrased_notes_do_not_reject_the_disposition_artifact(tmp_path):
+    base = FakeProvider().output
+    disposition = base["disposition"] | {
+        "notes": "Observation: the long-form findings live here.",
+    }
+    output = base | {
+        "disposition": disposition,
+        "artifact_type": "research_disposition",
+        # Models paraphrase free text between their two copies; only the
+        # structured fields are held to byte-identity.
+        "artifact": disposition | {"notes": "One-line summary."},
+    }
+    runtime = worker(tmp_path, FakeProvider(output=output),
+                     execution_enabled=True)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "completed"
+    artifact = (tmp_path
+                / "data/research_execution/artifacts/strategy-scout/a1.json")
+    record = json.loads(artifact.read_text(encoding="utf-8"))
+    # The completion's notes are canonical in the stored artifact.
+    assert record["artifact"]["notes"] == disposition["notes"]
+    rejected_dir = (tmp_path
+                    / "data/research_execution/rejected_artifacts/strategy-scout")
+    assert not list(rejected_dir.glob("*.json"))
 
 
 def test_oversized_rejected_output_is_truncated_to_byte_limit(tmp_path):

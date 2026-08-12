@@ -435,8 +435,13 @@ class ResearchAgentWorker:
                 "deep_research" if uses_screening else "research",
                 provider_result)
             elapsed = time.monotonic() - started
-            disposition, artifact_type, artifact = self._validate_result(
-                provider_result, claim, packet)
+            try:
+                disposition, artifact_type, artifact = self._validate_result(
+                    provider_result, claim, packet)
+            except ResearchWorkerError as exc:
+                self._write_rejected_output(
+                    claim, provider_result, now, str(exc))
+                raise
             artifact_record = self._write_artifact(
                 claim, artifact_type, artifact, provider_result, now)
             complete_claim(
@@ -817,6 +822,44 @@ class ResearchAgentWorker:
         _write_atomic(path, record)
         return {"path": str(path), "sha256": digest,
                 "artifact_type": artifact_type}
+
+    def _write_rejected_output(self, claim: ResearchClaim,
+                               result: ProviderResult, now: datetime,
+                               error: str) -> None:
+        """Preserve the raw provider output when validation rejects it.
+
+        Without this the only trace of a rejected run is the error string in
+        the run record — "artifact disposition differs from completion" is
+        undiagnosable once the output is gone. Best-effort: a failure to
+        write must never mask the validation error that got us here.
+        """
+        raw = json.dumps(result.output, sort_keys=True).encode("utf-8")
+        record = {
+            "schema_version": SCHEMA_VERSION, "created_at": _iso(now),
+            "claim_id": claim.claim_id,
+            "assignment_id": claim.assignment_id,
+            "source_item_id": claim.source_item_id,
+            "assigned_agent": claim.assigned_agent,
+            "provider": result.provider, "model": result.model,
+            "usage": result.usage.to_dict(),
+            "error": error[:500],
+            "output_sha256": hashlib.sha256(raw).hexdigest(),
+            "output_bytes": len(raw),
+            "output_truncated": len(raw) > self.limits.max_output_bytes,
+            "safety": {"authorizes_execution": False,
+                       "authorizes_advancement": False},
+        }
+        if record["output_truncated"]:
+            record["output_preview"] = raw[:self.limits.max_output_bytes] \
+                .decode("utf-8", "replace")
+        else:
+            record["output"] = dict(result.output)
+        path = (self.state_dir / "rejected_artifacts" / claim.assigned_agent
+                / f"{claim.assignment_id}--{claim.claim_id}.json")
+        try:
+            _write_atomic(path, record)
+        except OSError:
+            pass
 
     def _daily_usage(self, now: datetime) -> Dict[str, Any]:
         directory = self.state_dir / "runs" / now.astimezone(UTC).date().isoformat()

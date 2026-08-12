@@ -385,6 +385,58 @@ def test_predated_disposition_is_rejected_before_artifact_write(tmp_path):
     assert not artifact.exists()
 
 
+def test_rejected_provider_output_is_preserved_for_diagnosis(tmp_path):
+    base = FakeProvider().output
+    output = base | {
+        "artifact_type": "research_disposition",
+        # Valid disposition, but not byte-identical to the completion one —
+        # the exact failure the rejected-artifact record exists to diagnose.
+        "artifact": base["disposition"] | {"notes": "drifted copy"},
+    }
+    runtime = worker(tmp_path, FakeProvider(output=output),
+                     execution_enabled=True)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "failed"
+    assert "differs from completion" in result["error"]
+    rejected_dir = (tmp_path
+                    / "data/research_execution/rejected_artifacts/strategy-scout")
+    files = list(rejected_dir.glob("*.json"))
+    assert len(files) == 1
+    assert files[0].name == f"a1--{result['run']['claim_id']}.json"
+    record = json.loads(files[0].read_text(encoding="utf-8"))
+    assert record["output"] == output
+    assert record["output_truncated"] is False
+    assert "differs from completion" in record["error"]
+    assert record["safety"] == {"authorizes_execution": False,
+                                "authorizes_advancement": False}
+    # The rejected copy must not double as a delivered artifact.
+    artifact = (tmp_path
+                / "data/research_execution/artifacts/strategy-scout/a1.json")
+    assert not artifact.exists()
+
+
+def test_oversized_rejected_output_is_truncated_to_byte_limit(tmp_path):
+    limits = WorkerLimits(timeout_seconds=60, max_output_bytes=64)
+    runtime = worker(tmp_path, FakeProvider(), execution_enabled=True,
+                     limits=limits)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "failed"
+    assert "exceeded byte limit" in result["error"]
+    rejected_dir = (tmp_path
+                    / "data/research_execution/rejected_artifacts/strategy-scout")
+    files = list(rejected_dir.glob("*.json"))
+    assert len(files) == 1
+    record = json.loads(files[0].read_text(encoding="utf-8"))
+    assert record["output_truncated"] is True
+    assert "output" not in record
+    assert len(record["output_preview"].encode("utf-8")) <= 64 + 3
+    assert record["output_bytes"] > 64
+
+
 def test_command_provider_passes_only_allowlisted_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("MODEL_API_KEY", "allowed")
     monkeypatch.setenv("KALSHI_API_KEY", "must-not-leak")

@@ -43,13 +43,18 @@ are now:
     NO_WINDOW                        listed, none within [12h, 24h] of close
     WINDOW_OPEN_NO_CANDIDATE         window open, nothing clears band/caps
     WINDOW_OPEN_CANDIDATE_NO_QUOTE   window open, a name clears EVERY screen,
-                                     and the pod has written no quote  -> ALARM
+                                     and the pod has written no quote
+                                     in TWO consecutive runs           -> ALARM
+    WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE
+                                     same condition seen in ONE run only —
+                                     recorded, not paged; escalates if the
+                                     same name is still unquoted next run
     QUOTED                           >=1 quote written since the window opened
     CLOSE_REF_PLACEHOLDER            close reference is a fallback     -> ALARM
     SCHEDULE_UNRESOLVED              pod is failing closed             -> ALARM
     CHECK_FAILED                     this checker could not measure    -> ALARM
 
-Two rules that keep the alarm honest rather than noisy:
+Three rules that keep the alarm honest rather than noisy:
 
 * **"Has it quoted?" is measured PER TICKER SINCE THAT EVENT'S WINDOW
   OPENED**, not "in the last hour".  P-022 writes a QUOTE row when it places
@@ -60,6 +65,17 @@ Two rules that keep the alarm honest rather than noisy:
   a market whose window has just opened may legitimately not be in the pod's
   book yet.  A candidate only counts as missing a quote once its window has
   been open longer than `--grace-min` (default 20).
+* **Two consecutive runs to page.** The grace above is anchored to the
+  WINDOW opening, so a name whose price drifts into the band mid-window is
+  alert-eligible the instant it crosses — with zero effective grace.  On
+  2026-08-12 the */15 cron sampled the ~2-minute gap between CAME's mid
+  ticking onto the band's lower edge and the pod's next cycle quoting it
+  (80 s after the sample), and a CRITICAL email went out about a quote that
+  already existed.  One run cannot tell that race from the five-day failure;
+  the next run can, because the pod cycles and rediscovers well inside the
+  15-minute cron cadence.  The first observation is recorded as
+  `WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE` (no page) and escalates only if the
+  SAME name is still unquoted when the next run looks.
 
 A CHECKER FAILURE IS A FAILURE, NEVER A SKIP.  If listing raises for any
 series the state is `CHECK_FAILED` and the run alarms; the previous version
@@ -158,8 +174,20 @@ MAX_BOOK_PULLS = 200
 # detection inside the ~30 min the alert path can deliver.
 DEFAULT_GRACE_S = 600.0
 
+# How old the PREVIOUS status row must be for this run to count as its
+# consecutive confirmation. The floor stops a manual run seconds after a
+# cron row from "confirming" a price still flapping on the band edge — the
+# two samples must be far enough apart that the pod's 20 s cycles saw the
+# name in band and still declined. The ceiling is three cron slots
+# (8,23,38,53 * * * *), so one missed run still confirms; older than that
+# and "the condition persisted" is really "the condition recurred", which
+# starts the count over.
+CONFIRM_MIN_PREV_AGE_S = 600.0
+CONFIRM_MAX_PREV_AGE_S = 45 * 60.0
+
 OK_STATES = ("NO_MARKETS", "NO_WINDOW", "WINDOW_OPEN_NO_CANDIDATE",
-             "WINDOW_OPEN_GRACE", "QUOTED")
+             "WINDOW_OPEN_GRACE", "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE",
+             "QUOTED")
 ALARM_STATES = ("CLOSE_REF_PLACEHOLDER", "WINDOW_OPEN_CANDIDATE_NO_QUOTE",
                 "SCHEDULE_UNRESOLVED", "CHECK_FAILED")
 
@@ -739,6 +767,74 @@ def assess(engine: RoundLeaderFadeMakerEngine,
     }
 
 
+def _previous_status_row(path: Path,
+                         tail_bytes: int = 1 << 18) -> Optional[Dict[str, Any]]:
+    """Last parseable row of the status log, reading only the file's tail."""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            fh.seek(max(0, fh.tell() - tail_bytes))
+            lines = fh.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            return json.loads(line)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def apply_two_run_confirmation(result: Dict[str, Any],
+                               status_path: Path = STATUS_FILE,
+                               now: Optional[float] = None) -> Dict[str, Any]:
+    """Downgrade a first-run WINDOW_OPEN_CANDIDATE_NO_QUOTE to ONCE.
+
+    Called on the assess() result BEFORE it is appended to the status log, so
+    the log's last row is the previous run. The condition confirms — and
+    pages — only when the previous row's age sits inside
+    [``CONFIRM_MIN_PREV_AGE_S``, ``CONFIRM_MAX_PREV_AGE_S``] — one genuine
+    cron interval, give or take — and shares at least one missing name with
+    this run: a DIFFERENT name missing in each of two runs is two transients,
+    not one persistent failure. A confirmed row keeps escalating on every
+    subsequent run it persists (``confirmed_runs`` counts them), so a real
+    outage pages on run 2 and keeps paging.
+
+    The previous row's own state does not matter, only its missing names:
+    a ONCE row confirms its successor exactly like a full alarm row does,
+    and rows written before this mechanism existed (no ``confirmed_runs``
+    key) count as one prior observation.
+    """
+    if result.get("state") != "WINDOW_OPEN_CANDIDATE_NO_QUOTE":
+        return result
+    now = time.time() if now is None else now
+    prev = _previous_status_row(status_path) or {}
+    prev_ts = prev.get("ts")
+    consecutive = (isinstance(prev_ts, (int, float))
+                   and CONFIRM_MIN_PREV_AGE_S
+                   <= now - prev_ts <= CONFIRM_MAX_PREV_AGE_S)
+    overlap = (set(result.get("candidates_without_quote") or [])
+               & set(prev.get("candidates_without_quote") or []))
+    if consecutive and overlap:
+        result["confirmed_runs"] = int(prev.get("confirmed_runs") or 1) + 1
+        return result
+    result["state"] = "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE"
+    result["legacy_state"] = LEGACY_STATE.get(result["state"], result["state"])
+    result["alarm"] = False
+    result["confirmed_runs"] = 1
+    result["detail"] = (
+        "FIRST run to see this — recorded, not paged. " + result["detail"]
+        + " The window-open grace gives ZERO cover to a name whose price "
+          "drifts into the band mid-window, and one run cannot tell that "
+          "race from a mute pod (2026-08-12: the pod quoted 80 s after the "
+          "detector sampled). Escalates to WINDOW_OPEN_CANDIDATE_NO_QUOTE "
+          "if any of these names is still unquoted next run.")
+    return result
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="P-022 quotable-window detector — makes silence loud")
@@ -765,6 +861,7 @@ def main() -> int:
         result = assess(engine, args.placeholder_days,
                         args.quote_lookback_min * 60.0, args.max_book_pulls,
                         args.grace_min * 60.0)
+        result = apply_two_run_confirmation(result)
     except Exception as exc:                           # noqa: BLE001
         # The checker dying must LOOK like a failure. Exiting on a traceback
         # with no status row would leave the last healthy row as the most

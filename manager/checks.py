@@ -1198,6 +1198,25 @@ def check_p022_window(snap: Dict[str, Any]) -> List[Finding]:
             fix="ssh root@129.212.176.202 'journalctl -u "
                 "betting-round-leader-fade -n 100 --no-pager'",
             value=state))
+    elif state == "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE":
+        # One detector sample of an unquoted candidate. The 2026-08-12 page
+        # was a name whose mid drifted onto the band edge between pod cycles
+        # — quoted 80 s after the sample, CRITICAL email sent anyway. The
+        # detector now pages only when the same name is still unquoted at
+        # the NEXT */15 run; this warn keeps the first sighting visible
+        # without waking anyone for a race the pod wins on its own.
+        out.append(Finding(
+            key="p022.window.no_quote_once",
+            severity="warn",
+            title="P-022 unquoted candidate seen once — confirming next run",
+            detail="\n".join(x for x in [
+                win.get("detail") or "",
+                funnel_line,
+                ("names: " + ", ".join(win.get("candidates_without_quote") or []))
+                if win.get("candidates_without_quote") else "",
+            ] if x),
+            workstream="P-022",
+            value=state))
     elif state == "CHECK_FAILED":
         out.append(Finding(
             key="p022.window.check_failed",

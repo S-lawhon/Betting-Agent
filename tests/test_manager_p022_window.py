@@ -14,8 +14,10 @@ These tests pin the two halves of that path:
   collector — the last status row is surfaced, and a MISSING or STALE file is
               reported as unmeasured rather than defaulted to healthy;
   checks    — WINDOW_OPEN_CANDIDATE_NO_QUOTE is `critical` (alert.py pages
-              criticals immediately, with no confirmation window), a checker
-              failure is a `warn`, and the healthy states stay `info`.
+              criticals immediately; the two-consecutive-runs confirmation
+              lives upstream in the detector, which emits ..._ONCE for a
+              single sighting), a checker failure is a `warn`, and the
+              healthy states stay `info`.
 """
 import json
 import sys
@@ -103,9 +105,10 @@ def _findings(win):
 
 
 def test_candidate_without_quote_is_critical():
-    """alert.py pages criticals immediately; warns need two consecutive runs.
-    This condition has already cost five days — it does not get a confirmation
-    window."""
+    """alert.py pages criticals immediately. Since 2026-08-12 the detector
+    only emits this state after the same name is missing in two consecutive
+    runs (a single sighting is ..._ONCE, tested below), so by the time this
+    row exists the confirmation has already happened — it pages."""
     f = _findings({"available": True, "state": "WINDOW_OPEN_CANDIDATE_NO_QUOTE",
                    "detail": "13 names clear every screen",
                    "funnel": _row("x")["funnel"],
@@ -115,6 +118,22 @@ def test_candidate_without_quote_is_critical():
     assert f[0].workstream == "P-022"
     assert "KXLPGAR1LEAD-AIGWO26-CHLWIL" in f[0].detail
     assert "passes every screen 13" in f[0].detail
+
+
+def test_single_sighting_is_a_warn_not_a_page():
+    """The 2026-08-12 false page: a name drifted onto the band edge between
+    pod cycles, one detector sample caught it, and a CRITICAL email went out
+    about a quote that existed 80 s later. One sighting stays visible as a
+    warn; the page needs the detector's two-run confirmation."""
+    f = _findings({"available": True,
+                   "state": "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE",
+                   "detail": "FIRST run to see this",
+                   "funnel": _row("x")["funnel"],
+                   "candidates_without_quote": ["KXPGAR1LEAD-FESJC26-CAME"]})
+    assert len(f) == 1
+    assert f[0].severity == "warn"
+    assert f[0].key == "p022.window.no_quote_once"
+    assert "KXPGAR1LEAD-FESJC26-CAME" in f[0].detail
 
 
 def test_placeholder_and_unresolved_are_also_critical():

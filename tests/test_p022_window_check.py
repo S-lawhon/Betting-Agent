@@ -19,6 +19,7 @@ shout exactly when it is not**:
   * nothing listed, or listed but not yet in window -> silent.
 """
 import importlib.util
+import json
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -425,3 +426,126 @@ def test_a_quoted_name_is_not_rescreened_against_its_own_resting_collateral():
     assert r["alarm"] is False
     assert r["funnel"]["quoted_since_window_open"] == 3
     assert r["funnel"]["passes_every_screen"] == 3
+
+
+# ── two-run confirmation (added 2026-08-12) ──────────────────────────
+#
+# The 2026-08-12 false page: CAME's mid drifted onto the band's lower edge
+# 87 minutes after its window opened, the */15 cron sampled the ~2-minute
+# gap before the pod's next cycle quoted it, and a CRITICAL email went out
+# about a quote that already existed. The window-open grace gives zero
+# cover to a name entering the band mid-window, so the page now needs the
+# SAME name missing in two consecutive runs.
+
+def _alarm_result(names=("KXPGAR1LEAD-ROC26-N0",), **kw):
+    r = {"ts": NOW,
+         "state": "WINDOW_OPEN_CANDIDATE_NO_QUOTE",
+         "legacy_state": "WINDOW_OPEN_NO_QUOTES",
+         "alarm": True,
+         "detail": "1 name(s) clear EVERY screen",
+         "candidates_without_quote": list(names)}
+    r.update(kw)
+    return r
+
+
+def _status_file(tmp_path, rows):
+    p = tmp_path / "status.jsonl"
+    p.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return p
+
+
+def test_first_observation_is_recorded_not_paged(tmp_path):
+    r = wc.apply_two_run_confirmation(
+        _alarm_result(), tmp_path / "never_written.jsonl", now=NOW)
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE"
+    assert r["alarm"] is False
+    assert r["confirmed_runs"] == 1
+    # The names must survive the downgrade — they are what the next run
+    # matches against to escalate.
+    assert r["candidates_without_quote"] == ["KXPGAR1LEAD-ROC26-N0"]
+    assert "not paged" in r["detail"]
+
+
+def test_same_name_one_cron_slot_later_escalates_and_pages(tmp_path):
+    path = _status_file(tmp_path, [
+        _alarm_result(state="WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE",
+                      alarm=False, confirmed_runs=1, ts=NOW - 900.0)])
+    r = wc.apply_two_run_confirmation(_alarm_result(), path, now=NOW)
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
+    assert r["alarm"] is True
+    assert r["confirmed_runs"] == 2
+
+
+def test_confirmation_requires_the_same_name(tmp_path):
+    """A different name missing in each of two runs is two transients, not
+    one persistent failure — each starts its own count."""
+    path = _status_file(tmp_path, [
+        _alarm_result(names=("KXPGAR1LEAD-ROC26-N1",),
+                      state="WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE",
+                      alarm=False, confirmed_runs=1, ts=NOW - 900.0)])
+    r = wc.apply_two_run_confirmation(_alarm_result(), path, now=NOW)
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE"
+    assert r["confirmed_runs"] == 1
+
+
+def test_a_stale_previous_row_starts_the_count_over(tmp_path):
+    path = _status_file(tmp_path, [_alarm_result(ts=NOW - 3600.0)])
+    r = wc.apply_two_run_confirmation(_alarm_result(), path, now=NOW)
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE"
+    assert r["alarm"] is False
+
+
+def test_a_manual_rerun_seconds_later_cannot_confirm(tmp_path):
+    """Sam runs this checker by hand mid-incident. Two samples a minute
+    apart prove nothing about a price flapping on the band edge — the
+    confirming row must be at least a real interval old."""
+    path = _status_file(tmp_path, [
+        _alarm_result(state="WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE",
+                      alarm=False, confirmed_runs=1, ts=NOW - 60.0)])
+    r = wc.apply_two_run_confirmation(_alarm_result(), path, now=NOW)
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE"
+    assert r["alarm"] is False
+
+
+def test_rows_from_before_this_mechanism_still_confirm(tmp_path):
+    """A pre-mechanism alarm row has no confirmed_runs key; it must count
+    as one prior observation, not reset the sequence across a deploy."""
+    path = _status_file(tmp_path, [_alarm_result(ts=NOW - 900.0)])
+    r = wc.apply_two_run_confirmation(_alarm_result(), path, now=NOW)
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
+    assert r["alarm"] is True
+    assert r["confirmed_runs"] == 2
+
+
+def test_a_confirmed_alarm_keeps_paging_while_it_persists(tmp_path):
+    path = _status_file(tmp_path, [
+        _alarm_result(confirmed_runs=2, ts=NOW - 900.0)])
+    r = wc.apply_two_run_confirmation(_alarm_result(), path, now=NOW)
+    assert r["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
+    assert r["alarm"] is True
+    assert r["confirmed_runs"] == 3
+
+
+def test_other_states_pass_through_untouched(tmp_path):
+    path = _status_file(tmp_path, [_alarm_result(ts=NOW - 900.0)])
+    r = {"ts": NOW, "state": "QUOTED", "alarm": False, "detail": "d"}
+    assert wc.apply_two_run_confirmation(dict(r), path, now=NOW) == r
+
+
+def test_assess_output_feeds_the_confirmation_end_to_end(tmp_path):
+    """Pin the field names apply_two_run_confirmation reads to the ones
+    assess() actually writes — a rename in either breaks the page path."""
+    close = NOW + 18 * 3600
+    listed = NOW - 2 * 86400
+    first = _assess(_engine(_market(close, listed, n=3), mid=0.06))
+    assert first["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
+    first = wc.apply_two_run_confirmation(
+        first, tmp_path / "status.jsonl", now=NOW)
+    assert first["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE_ONCE"
+    assert first["alarm"] is False
+    path = _status_file(tmp_path, [dict(first, ts=NOW - 900.0)])
+    second = _assess(_engine(_market(close, listed, n=3), mid=0.06))
+    second = wc.apply_two_run_confirmation(second, path, now=NOW)
+    assert second["state"] == "WINDOW_OPEN_CANDIDATE_NO_QUOTE"
+    assert second["alarm"] is True
+    assert second["confirmed_runs"] == 2

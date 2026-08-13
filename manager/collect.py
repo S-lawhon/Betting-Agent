@@ -1008,6 +1008,7 @@ class Collector:
             "n_candidates": row.get("n_candidates"),
             "candidates_without_quote": (row.get("candidates_without_quote")
                                          or [])[:10],
+            "confirmed_runs": row.get("confirmed_runs"),
             "events": [
                 {k: e.get(k) for k in
                  ("event", "close_ref_iso", "close_source",

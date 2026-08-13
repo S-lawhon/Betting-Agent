@@ -14,6 +14,7 @@ and that would silently corrupt the paper validation if wrong:
   * Collateral caps: per-strike and per-tournament limits actually bind.
 """
 import json
+import logging
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -348,6 +349,34 @@ def test_close_is_re_resolved_as_better_timing_arrives(tmp_path):
     eng.discover()
     assert abs(eng.books[TICKER].close_epoch - CLOSE) < 1.0
     assert eng.books[TICKER].close_source == "tee_times"
+
+
+def test_a_full_field_re_resolve_logs_once_per_event(tmp_path, caplog):
+    """The close is EVENT-level but discover() walks per market, and on
+    2026-08-12 one tour_day_offset -> tee_times upgrade for BOC26 emitted the
+    identical INFO line ~80 times in a single pass — most of the unit's
+    journal volume. One upgrade, one line; every book still upgraded."""
+
+    class FullFieldKalshi(FakeKalshi):
+        def open_markets(self, series):
+            if series != "KXPGAR1LEAD":
+                return []
+            return [{"ticker": f"{EVENT}-N{i:02d}", "event_ticker": EVENT,
+                     "close_time": CLOSE_ISO} for i in range(80)]
+
+    sched = FakeSchedule(close_epoch=CLOSE + 5 * 3600,
+                         source="tour_day_offset")
+    eng = make_engine(tmp_path, FullFieldKalshi(), Clock(CLOSE - 18 * 3600),
+                      schedule=sched)
+    eng.discover()
+    sched.close_epoch, sched.source = CLOSE, "tee_times"
+    with caplog.at_level(logging.INFO, logger="src.round_leader_fade_maker"):
+        eng.discover()
+    lines = [r for r in caplog.records if "re-resolved" in r.getMessage()]
+    assert len(lines) == 1
+    assert len(eng.books) == 80
+    assert all(b.close_source == "tee_times" for b in eng.books.values())
+    assert all(abs(b.close_epoch - CLOSE) < 1.0 for b in eng.books.values())
 
 
 # ── §7 caps are GATE CONDITIONS, expressed as % of bankroll ──────────

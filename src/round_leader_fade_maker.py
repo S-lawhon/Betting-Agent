@@ -568,6 +568,7 @@ class RoundLeaderFadeMakerEngine:
             if rc is not None:
                 event_close[ev] = rc
 
+        logged_reresolve: set = set()
         for m in all_markets:
             tk = m.get("ticker", "")
             ev = m.get("event_ticker") or ""
@@ -579,11 +580,16 @@ class RoundLeaderFadeMakerEngine:
                 if rc is not None and (
                         abs(book.close_epoch - rc.close_epoch) > 1.0
                         or book.close_source != rc.source):
-                    logger.info(
-                        "P-022: %s close re-resolved %s -> %s (%s -> %s)",
-                        ev, datetime.fromtimestamp(book.close_epoch,
-                                                   timezone.utc).isoformat(),
-                        rc.close_iso, book.close_source, rc.source)
+                    # The close is event-level but this loop is per market, so
+                    # without the dedupe one upgrade emits the identical line
+                    # once per name — ~80 times for a full field.
+                    if ev not in logged_reresolve:
+                        logged_reresolve.add(ev)
+                        logger.info(
+                            "P-022: %s close re-resolved %s -> %s (%s -> %s)",
+                            ev, datetime.fromtimestamp(book.close_epoch,
+                                                       timezone.utc).isoformat(),
+                            rc.close_iso, book.close_source, rc.source)
                     book.close_epoch = rc.close_epoch
                     book.close_source = rc.source
                 continue

@@ -74,3 +74,33 @@ def test_cli_no_write_status_is_a_pure_preview(tmp_path, capsys):
     capsys.readouterr()
 
     assert not (tmp_path / "execution").exists()
+
+
+def test_cli_wires_screening_agents_from_config(tmp_path, capsys):
+    common, config = setup_runtime(tmp_path)
+    config.write_text(config.read_text().replace(
+        "allowed_agents: [strategy-scout]",
+        "allowed_agents: [strategy-scout, literature-scout]\n"
+        "screening:\n"
+        "  enabled: true\n"
+        "  agents: [strategy-scout, literature-scout]"))
+
+    assert main(common) == 0
+    result = json.loads(capsys.readouterr().out)
+
+    assert result["status"] == "dry_run"
+
+
+def test_cli_fails_closed_when_allowed_agent_is_unscreened(tmp_path, capsys):
+    # screening.agents omitted defaults to strategy-scout only, so admitting
+    # another lane must refuse to start rather than route it past the screen
+    common, config = setup_runtime(tmp_path)
+    config.write_text(config.read_text().replace(
+        "allowed_agents: [strategy-scout]",
+        "allowed_agents: [strategy-scout, literature-scout]\n"
+        "screening:\n"
+        "  enabled: true"))
+
+    assert main(common) == 2
+
+    assert "bypass the screen" in capsys.readouterr().err

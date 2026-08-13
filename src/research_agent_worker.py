@@ -278,6 +278,7 @@ class ResearchAgentWorker:
         screening_provider: Optional[ResearchProvider] = None,
         screening_limits: Optional[ScreeningLimits] = None,
         screening_enabled: bool = False,
+        screening_agents: Sequence[str] = ("strategy-scout",),
         execution_enabled: bool = False,
         allowed_agents: Sequence[str] = tuple(ALLOWED_ARTIFACTS),
         clock=None,
@@ -294,13 +295,27 @@ class ResearchAgentWorker:
         self.screening_provider = screening_provider
         self.screening_limits = screening_limits or ScreeningLimits()
         self.screening_enabled = bool(screening_enabled)
+        self.screening_agents = tuple(
+            str(agent).strip() for agent in screening_agents
+            if str(agent).strip())
         self.execution_enabled = bool(execution_enabled)
         self.allowed_agents = tuple(allowed_agents)
+        # An allowed agent outside the screened set would have its packets
+        # routed straight to the deep-research call with no screen in front.
+        if self.screening_enabled:
+            unscreened = [agent for agent in self.allowed_agents
+                          if agent not in self.screening_agents]
+            if unscreened:
+                raise ValueError(
+                    "screening is enabled but allowed agents "
+                    f"{sorted(unscreened)} are not in screening_agents; "
+                    "their packets would bypass the screen")
         self._clock = clock or (lambda: datetime.now(UTC))
 
     def _uses_screening(self, packet: Mapping[str, Any]) -> bool:
         return (self.screening_enabled
-                and str(packet.get("assigned_agent") or "") == "strategy-scout")
+                and str(packet.get("assigned_agent") or "")
+                in self.screening_agents)
 
     def run_once(self, *, execute: bool = False,
                  assignment_id: Optional[str] = None,
@@ -711,7 +726,13 @@ class ResearchAgentWorker:
             recheck_after=screening.recheck_after,
             notes=("screening_only: " + screening.notes).strip(),
         )
-        if disposition.decision == "reject":
+        # This path writes the artifact directly, without the per-agent
+        # ALLOWED_ARTIFACTS check the deep-research path goes through, so it
+        # must pick a type valid for the claim's own lane: scout_rejection
+        # exists only for strategy-scout.
+        if (disposition.decision == "reject"
+                and "scout_rejection" in ALLOWED_ARTIFACTS.get(
+                    claim.assigned_agent, set())):
             return disposition, "scout_rejection", {
                 "assignment_id": claim.assignment_id,
                 "reason_codes": list(disposition.reason_codes),

@@ -18,12 +18,16 @@ worker_id: research-codex-screened-daily-v1
 #   - trading execution disabled, queue mutation disabled
 #   - the audit runs immediately after and fails the unit on a bad outcome
 
-# Only strategy-scout. Screening applies solely to that agent, so admitting
-# literature-scout or social-scout here would route their packets straight to
-# the expensive deep-research call with no screen in front of it. Packets for
-# other agents are SKIPPED, not blocked on -- see research_execution.
+# All three scout lanes, each behind the screen (screening.agents below must
+# cover every agent here -- the worker refuses to start otherwise, because an
+# allowed-but-unscreened agent would route straight to the expensive
+# deep-research call). Queue order across lanes is priority, then triage
+# score, then age; packets for agents outside this list are SKIPPED, not
+# blocked on -- see research_execution.
 allowed_agents:
   - strategy-scout
+  - literature-scout
+  - social-scout
 
 limits:
   max_minutes_per_task: 30
@@ -75,6 +79,12 @@ provider:
 
 screening:
   enabled: true
+  # Must be a superset of allowed_agents above. Omitting this key defaults to
+  # strategy-scout only (the pinned pilot config relies on that default).
+  agents:
+    - strategy-scout
+    - literature-scout
+    - social-scout
   limits:
     timeout_seconds: 180
     max_input_tokens: 25000

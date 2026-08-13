@@ -80,8 +80,15 @@ class FakeProvider:
 
 def worker(root: Path, provider=None, *, execution_enabled=False,
            limits=None, screening_provider=None,
-           screening_enabled=False, evidence=None) -> ResearchAgentWorker:
-    dispatches, state, dispositions = setup_packet(root, evidence=evidence)
+           screening_enabled=False, evidence=None,
+           agent="strategy-scout") -> ResearchAgentWorker:
+    dispatches, state, dispositions = setup_packet(
+        root, agent=agent, evidence=evidence)
+    kwargs = {}
+    if screening_enabled:
+        # The constructor refuses an allowed agent outside the screened set.
+        kwargs["allowed_agents"] = (agent,)
+        kwargs["screening_agents"] = (agent,)
     return ResearchAgentWorker(
         root=root, dispatches_dir=dispatches, state_dir=state,
         dispositions_dir=dispositions, worker_id="test-worker",
@@ -90,7 +97,7 @@ def worker(root: Path, provider=None, *, execution_enabled=False,
         screening_provider=screening_provider,
         screening_limits=ScreeningLimits(timeout_seconds=30),
         screening_enabled=screening_enabled,
-        clock=lambda: NOW)
+        clock=lambda: NOW, **kwargs)
 
 
 class FakeScreeningProvider:
@@ -266,6 +273,58 @@ def test_screening_survivor_invokes_deep_research_and_aggregates_usage(tmp_path)
     archived = json.loads(archives[0].read_text())
     assert [item["phase"] for item in archived["model_invocations"]] == [
         "screening", "deep_research"]
+
+
+def test_screening_guard_refuses_unscreened_allowed_agent(tmp_path):
+    dispatches, state, dispositions = setup_packet(tmp_path)
+    with pytest.raises(ValueError, match="bypass the screen"):
+        ResearchAgentWorker(
+            root=tmp_path, dispatches_dir=dispatches, state_dir=state,
+            dispositions_dir=dispositions, worker_id="test-worker",
+            limits=WorkerLimits(timeout_seconds=60),
+            screening_enabled=True,
+            allowed_agents=("strategy-scout", "literature-scout"),
+            clock=lambda: NOW)
+
+
+def test_screening_agents_default_matches_pinned_pilot(tmp_path):
+    dispatches, state, dispositions = setup_packet(tmp_path)
+    runtime = ResearchAgentWorker(
+        root=tmp_path, dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="test-worker",
+        limits=WorkerLimits(timeout_seconds=60),
+        screening_enabled=True, allowed_agents=("strategy-scout",),
+        clock=lambda: NOW)
+    assert runtime.screening_agents == ("strategy-scout",)
+
+
+def test_screening_covers_other_scout_lanes_when_configured(tmp_path):
+    deep = FakeProvider()
+    screen = FakeScreeningProvider("reject")
+    runtime = worker(
+        tmp_path, deep, execution_enabled=True,
+        screening_provider=screen, screening_enabled=True,
+        agent="literature-scout")
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "completed"
+    assert screen.calls == 1
+    assert deep.calls == 0
+    assert result["run"]["terminal_stage"] == "screening"
+    # scout_rejection exists only for strategy-scout; every other lane's
+    # screen-reject must carry the disposition itself.
+    artifact = json.loads((
+        tmp_path / "data/research_execution/artifacts/literature-scout/a1.json"
+    ).read_text())
+    assert artifact["artifact_type"] == "research_disposition"
+    disposition = json.loads(
+        (tmp_path / "research/dispositions/a1.json").read_text())
+    assert disposition["decision"] == "reject"
+    screening = json.loads((
+        tmp_path / "data/research_execution/screenings/literature-scout/a1.json"
+    ).read_text())
+    assert screening["safety"]["authorizes_advancement"] is False
 
 
 def test_screening_reserves_two_daily_attempts_before_claim(tmp_path):

@@ -104,6 +104,8 @@ def main(argv=None) -> int:
             screening_provider=screening_provider,
             screening_limits=screening_limits,
             screening_enabled=screening_enabled,
+            screening_agents=list(
+                screening_config.get("agents") or ["strategy-scout"]),
             allowed_agents=list(config.get("allowed_agents") or []))
         target_assignment_id = (
             str(args.assignment_id or config.get("target_assignment_id") or "").strip()

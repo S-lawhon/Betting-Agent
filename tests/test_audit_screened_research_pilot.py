@@ -102,7 +102,8 @@ def test_cli_failure_uses_exit_two_so_systemd_cannot_accept_it(
     assert "SuccessExitStatus=0 1 2" not in service
 
 
-def completed_fixture(root: Path, *, screen_input: int = 20000) -> None:
+def completed_fixture(root: Path, *, screen_input: int = 20000,
+                      agent: str = "strategy-scout") -> None:
     disposition = {
         "assignment_id": TARGET, "source_item_id": "source-1",
         "decided_at": "2026-08-09T04:21:00Z", "decision": "defer",
@@ -112,21 +113,22 @@ def completed_fixture(root: Path, *, screen_input: int = 20000) -> None:
         "notes": "screening_only",
     }
     write(root / f"research/dispositions/{TARGET}.json", disposition)
-    write(root / f"data/research_execution/screenings/strategy-scout/{TARGET}.json", {
+    write(root / f"data/research_execution/screenings/{agent}/{TARGET}.json", {
         "assignment_id": TARGET, "source_item_id": "source-1",
         "screening": {"decision": "defer"},
         "safety": {"authorizes_execution": False,
                    "authorizes_advancement": False},
     })
-    write(root / f"data/research_execution/artifacts/strategy-scout/{TARGET}.json", {
+    write(root / f"data/research_execution/artifacts/{agent}/{TARGET}.json", {
         "assignment_id": TARGET, "artifact_type": "research_disposition",
         "safety": {"authorizes_execution": False},
     })
-    write(root / f"data/research_execution/claim_archive/strategy-scout/{TARGET}--claim1.json", {
+    write(root / f"data/research_execution/claim_archive/{agent}/{TARGET}--claim1.json", {
         "assignment_id": TARGET, "claim_id": "claim1", "status": "completed",
     })
     write(root / "data/research_execution/runs/2026-08-09/claim1.json", {
         "assignment_id": TARGET, "claim_id": "claim1", "status": "completed",
+        "assigned_agent": agent,
         "started_at": "2026-08-09T05:10:00Z",
         "terminal_stage": "screening",
         "safety": {"authorizes_execution": False},
@@ -265,3 +267,58 @@ def test_unpinned_config_audits_the_most_recent_run(tmp_path):
     report = audit_pilot(root=tmp_path, config_path=config,
                          marker_path=tmp_path / "absent")
     assert report["assignment_id"] == "a_newer"
+
+
+def multi_lane_config(root: Path, *, screened) -> Path:
+    path = root / "multi.yaml"
+    path.write_text(f"""target_assignment_id: {TARGET}
+worker_id: pilot-worker
+allowed_agents: [strategy-scout, literature-scout, social-scout]
+limits:
+  max_input_tokens_per_task: 75000
+  max_output_tokens_per_task: 5000
+  max_cost_usd_per_task: 0.01
+provider:
+  name: deep-provider
+  model: model-1
+screening:
+  enabled: true
+  agents: [{", ".join(screened)}]
+  limits:
+    max_input_tokens: 25000
+    max_output_tokens: 1000
+    max_cost_usd: 0.01
+  provider:
+    name: screen-provider
+    model: model-1
+safety:
+  trading_execution_allowed: false
+""", encoding="utf-8")
+    return path
+
+
+def test_audit_resolves_lane_from_run_record_with_multiple_agents(tmp_path):
+    completed_fixture(tmp_path, agent="literature-scout")
+
+    report = audit_pilot(
+        root=tmp_path,
+        config_path=multi_lane_config(tmp_path, screened=(
+            "strategy-scout", "literature-scout", "social-scout")),
+        marker_path=tmp_path / "marker")
+
+    assert report["status"] == "pass"
+    assert not report["failures"]
+
+
+def test_audit_rejects_unscreened_allowed_agent(tmp_path):
+    completed_fixture(tmp_path)
+
+    report = audit_pilot(
+        root=tmp_path,
+        config_path=multi_lane_config(
+            tmp_path, screened=("strategy-scout",)),
+        marker_path=tmp_path / "marker")
+
+    assert report["status"] == "fail"
+    assert any("allowed_agents_screened" in item
+               for item in report["failures"])

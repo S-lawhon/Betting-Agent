@@ -51,7 +51,8 @@ def audit_pilot(
     config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     assignment_id = str(config.get("target_assignment_id") or "").strip()
     allowed_agents = [str(value) for value in config.get("allowed_agents") or []]
-    agent = allowed_agents[0] if len(allowed_agents) == 1 else ""
+    screening_agents = [str(value) for value in (
+        (config.get("screening") or {}).get("agents") or ["strategy-scout"])]
     limits = config.get("limits") or {}
     screening_limits = (config.get("screening") or {}).get("limits") or {}
     state = root / "data/research_execution"
@@ -62,6 +63,17 @@ def audit_pilot(
         # the queue says what COULD have been worked, the run says what was.
         assignment_id = _latest_run_assignment(
             state, worker_id=str(config.get("worker_id") or ""))
+    runs = sorted(
+        (payload for path in sorted((state / "runs").glob("*/*.json"))
+         if (payload := _read_json(path)).get("assignment_id") == assignment_id),
+        key=lambda row: str(row.get("started_at") or ""))
+    # The audited lane comes from the run record: with several lanes admitted,
+    # the config no longer names which agent this assignment belongs to.
+    agent = ""
+    for row in runs:
+        agent = str(row.get("assigned_agent") or "") or agent
+    if not agent and len(allowed_agents) == 1:
+        agent = allowed_agents[0]
     disposition_path = root / "research/dispositions" / f"{assignment_id}.json"
     screening_path = state / "screenings" / agent / f"{assignment_id}.json"
     artifact_path = state / "artifacts" / agent / f"{assignment_id}.json"
@@ -70,10 +82,6 @@ def audit_pilot(
         (state / "claim_archive").glob(f"*/{assignment_id}--*.json"))
     released_claims = list(
         (state / "claim_released").glob(f"*/{assignment_id}--*.json"))
-    runs = sorted(
-        (payload for path in sorted((state / "runs").glob("*/*.json"))
-         if (payload := _read_json(path)).get("assignment_id") == assignment_id),
-        key=lambda row: str(row.get("started_at") or ""))
     worker = _read_json(state / "worker_status.json")
     checks: list[dict[str, Any]] = []
     failures: list[str] = []
@@ -86,8 +94,10 @@ def audit_pilot(
 
     check("target_configured", bool(assignment_id) or not pinned,
           assignment_id or ("no run to audit yet" if not pinned else "missing"))
-    check("single_allowed_agent", agent == "strategy-scout",
-          repr(allowed_agents))
+    check("allowed_agents_screened",
+          bool(allowed_agents)
+          and all(value in screening_agents for value in allowed_agents),
+          f"allowed={allowed_agents!r} screened={screening_agents!r}")
     check("screening_enabled", bool((config.get("screening") or {}).get(
         "enabled")), "screening must be enabled")
     check("trading_disabled", not bool((config.get("safety") or {}).get(

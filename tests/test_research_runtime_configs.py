@@ -58,9 +58,16 @@ def test_execute_configs_declare_a_command_provider(path):
     assert provider.get("argv"), "an execute config needs a provider argv"
     screening = dict(config.get("screening") or {})
     if screening.get("enabled"):
-        # Screening only applies to strategy-scout, so admitting another agent
-        # would route its packet straight to the unscreened deep call.
-        assert list(config.get("allowed_agents") or []) == ["strategy-scout"]
+        # Every allowed agent must be behind the screen: an allowed agent
+        # outside screening.agents would route its packet straight to the
+        # unscreened deep call. The worker refuses to start on this, but the
+        # unit fails at 05:10 UTC with nobody watching, so catch it here.
+        screened = list(screening.get("agents") or ["strategy-scout"])
+        allowed = list(config.get("allowed_agents") or [])
+        assert allowed, "a screening config must name its allowed agents"
+        assert all(agent in screened for agent in allowed), (
+            f"allowed agents {allowed} must all be in screening.agents "
+            f"{screened}")
         assert dict(screening.get("provider") or {}).get("type") == "command"
 
 

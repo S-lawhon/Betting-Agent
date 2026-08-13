@@ -215,6 +215,14 @@ exposure — the guard rejected nothing, and only the pod's own
 
 ## Conventions
 
+- **Push after committing (standing practice, Sam 2026-08-13).** The daily
+  brief's "work completed" section reads the droplet's mirror of the PUBLIC
+  GitHub repo, so unpushed commits are invisible to it (5 days of work went
+  unreported in Aug 2026). Finish work with: commit → verify no ignored files
+  or secret-looking strings in `git diff origin/main..main` (the repo leaked a
+  `.env` backup on 2026-07-29) → `git push origin main` (or the feature
+  branch; the brief logs `--all` refs). If the check flags anything, stop and
+  surface it instead of pushing.
 - Paper-first, CLV-gated. New pods are validated in a `*_research/` folder
   (backtest → REPORT + params JSON) BEFORE writing the pod, then the pod bakes in
   the validated params. See `tennis_research/`, `golf_research/`, `mlb_props_research/`.

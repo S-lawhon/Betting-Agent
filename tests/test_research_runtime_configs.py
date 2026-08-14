@@ -87,11 +87,18 @@ def test_daily_config_covers_the_measured_deep_research_distribution():
 
 
 def test_pilot_config_stays_exact_target_and_manual():
-    """The supervised one-off keeps its pin; only the daily config is open."""
+    """The supervised one-off keeps its pin; only the daily config is open.
+
+    The pilot's attempt limit is 4, not 2: the attempt ledger is global per
+    state_dir per UTC day, so a supervised same-day retry after a failed
+    daily run must reserve 2 on top of the 2 the failure consumed. That
+    headroom belongs ONLY in the human-triggered pinned config — the daily
+    config's 2 is pinned above.
+    """
     config = _config(
         ROOT / "config" / "research_agent_runtime_screened_pilot.yaml")
     assert str(config.get("target_assignment_id") or "").startswith("assignment_")
-    assert config["limits"]["max_attempts_per_day"] == 2
+    assert config["limits"]["max_attempts_per_day"] == 4
     daily = _config(
         ROOT / "config" / "research_agent_runtime_screened_daily.yaml")
     assert not daily.get("target_assignment_id")

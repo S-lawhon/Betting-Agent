@@ -3,24 +3,38 @@ enabled: true
 mode: execute
 worker_id: research-codex-screened-pilot-v1
 
-# One-time fail-closed target. If intake does not dispatch this exact reviewed
-# CFTC filing after the next UTC allocation reset, the worker exits blocked and
-# invokes no provider.
-target_assignment_id: assignment_44c86b342e8ac95d8f67
+# One-time fail-closed target. If this exact reviewed assignment is not
+# pending, the worker exits blocked and invokes no provider. Re-pinned
+# 2026-08-14 to the defer-with-null-recheck failure for a supervised same-day
+# retry under the c8a03f3 contract fix.
+target_assignment_id: assignment_0c5bb6106a1add3dfcba
 
 allowed_agents:
   - strategy-scout
 
 # One assignment can consume two attempts: screen, then deep research only if
 # the screen survives. This config admits one assignment per UTC day.
+#
+# max_attempts_per_day is 4, not 2, because the attempt ledger is GLOBAL per
+# state_dir per UTC day (_daily_usage reads every run record for the date,
+# not just this worker's): a supervised same-day retry after a failed daily
+# run must reserve 2 on top of the 2 the failure already consumed. This is
+# safe ONLY because this config is human-triggered with a pinned target and
+# one packet per invocation — never copy the 4 into the unattended daily
+# config, whose 2 is the real runaway guard.
+#
+# max_input_tokens_per_task matches the daily config's 250k: the old 75k sat
+# near the 30th percentile of measured deep passes and rejected 4 of 7 — and
+# the check fires only after the spend, so a low cap is not a guard, it is a
+# way to discard paid work.
 limits:
   max_minutes_per_task: 30
   timeout_seconds: 600
-  max_input_tokens_per_task: 75000
+  max_input_tokens_per_task: 250000
   max_output_tokens_per_task: 5000
   max_cost_usd_per_task: 0.01
-  max_cost_usd_per_day: 0.02
-  max_attempts_per_day: 2
+  max_cost_usd_per_day: 0.04
+  max_attempts_per_day: 4
   max_output_bytes: 150000
 
 provider:

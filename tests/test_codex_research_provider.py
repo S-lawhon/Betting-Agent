@@ -187,8 +187,11 @@ def test_codex_pilot_unit_is_manual_only_and_masks_betting_secrets():
     assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in service
     assert "InaccessiblePaths=-/opt/betting-pod-shop/.env" in service
     assert "InaccessiblePaths=-/opt/betting-pod-shop/kalshi_private_key.pem" in service
-    assert "target_assignment_id: assignment_44c86b342e8ac95d8f67" in config
-    assert "max_attempts_per_day: 2" in config
+    assert "target_assignment_id: assignment_0c5bb6106a1add3dfcba" in config
+    # 4, not 2: the attempt ledger is global per UTC day, and the pilot's job
+    # now includes supervised same-day retries after a failed daily run (2
+    # burned + screen + deep). The unattended daily config keeps 2.
+    assert "max_attempts_per_day: 4" in config
     assert "screening:\n  enabled: true" in config
     assert "--disable-search" in config
     assert "--reasoning-effort\n      - low" in config

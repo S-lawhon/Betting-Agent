@@ -155,6 +155,32 @@ def test_dry_run_plans_without_claiming_or_invoking(tmp_path):
     assert "request_sha256" in status_text
 
 
+def test_deep_request_states_the_defer_contract(tmp_path):
+    # The worker rejects a defer with null recheck_after AFTER the model call
+    # returns, with the spend already made (2026-08-14: 47.9k tokens burned).
+    # The contract must therefore be stated in the request the model reads.
+    provider = FakeProvider()
+    runtime = worker(tmp_path, provider, execution_enabled=True)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "completed"
+    contract = provider.last_request["output_contract"]
+    rules = " ".join(contract["disposition_rules"])
+    assert "defer" in rules and "recheck_after" in rules
+    assert "ISO-8601" in rules
+
+
+def test_output_schema_documents_defer_recheck_requirement():
+    import yaml  # noqa: F401  (parity with sibling config tests)
+    schema = json.loads(Path("config/research_agent_output.schema.json")
+                        .read_text(encoding="utf-8"))
+    spec = schema["properties"]["disposition"]["properties"]["recheck_after"]
+    assert "defer" in spec.get("description", ""), (
+        "recheck_after must document that defer requires it; the codex "
+        "structured-output layer reads field descriptions")
+
+
 def test_dry_run_targets_exact_assignment_instead_of_higher_score(tmp_path):
     provider = FakeProvider()
     runtime = worker(tmp_path, provider)

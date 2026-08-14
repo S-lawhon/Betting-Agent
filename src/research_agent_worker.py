@@ -533,6 +533,20 @@ class ResearchAgentWorker:
                 "required": ["disposition", "artifact_type", "artifact"],
                 "allowed_artifact_types": sorted(ALLOWED_ARTIFACTS[agent]),
                 "disposition_schema": "src.research_outcomes.ResearchDisposition",
+                # Validation invariants the worker enforces AFTER the call
+                # returns; a violation rejects the output and fails the run
+                # with the spend already made, so they are stated here where
+                # the model reads them. (2026-08-14: a defer with null
+                # recheck_after burned a 47.9k-token deep pass.)
+                "disposition_rules": [
+                    "decision='defer' REQUIRES recheck_after: a "
+                    "timezone-aware ISO-8601 UTC timestamp for when the "
+                    "missing fact will exist. A defer with null "
+                    "recheck_after is rejected and the run fails.",
+                    "reason_codes and evidence_checked must be non-empty.",
+                    "research_minutes must not exceed "
+                    "budget.research_minutes.",
+                ],
             },
             "budget": self._invocation_budget(packet),
             "safety": {

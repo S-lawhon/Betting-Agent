@@ -190,6 +190,7 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
             failures = int(agent.get("failed") or 0)
             consecutive = int(agent.get("consecutive_failed_passes") or 0)
             queue_age = agent.get("oldest_queue_age_minutes")
+            task_age = agent.get("oldest_task_age_minutes")
             if failures:
                 out.append(Finding(
                     key="service.{}.request_failures".format(sid),
@@ -208,6 +209,15 @@ def check_services(snap: Dict[str, Any]) -> List[Finding]:
                         sid, queue_age),
                     detail="A fresh process heartbeat does not prove the queue is draining.",
                     value=queue_age))
+            if isinstance(task_age, (int, float)) and task_age > 60:
+                out.append(Finding(
+                    key="service.{}.task_stale".format(sid),
+                    severity="warn",
+                    title="{} has a downstream agent task {:.0f} min old".format(
+                        sid, task_age),
+                    detail=("The recorder is healthy, but the next strategy role "
+                            "has not consumed its deterministic handoff."),
+                    value=task_age))
         age = hb.get("age_minutes")
         limit = hb.get("max_stale_minutes")
         if age is not None and limit and age > limit:

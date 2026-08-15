@@ -31,6 +31,7 @@ def main() -> int:
     ap.add_argument("--queue-dir", default="data/strategy_agents/queue")
     ap.add_argument("--processed-dir", default=None)
     ap.add_argument("--heartbeat", default="data/strategy_agents/heartbeat.jsonl")
+    ap.add_argument("--task-dir", default="data/strategy_agents/tasks")
     ap.add_argument("--lock-file", default="data/strategy_agents/worker.lock")
     ap.add_argument("--poll-interval", type=float, default=60.0)
     ap.add_argument("--once", action="store_true", help="run one pass and exit")
@@ -56,6 +57,7 @@ def main() -> int:
         queue_dir=Path(args.queue_dir),
         processed_dir=Path(args.processed_dir) if args.processed_dir else None,
         heartbeat_path=Path(args.heartbeat),
+        task_dir=Path(args.task_dir),
         poll_interval_s=args.poll_interval,
     )
 

@@ -29,6 +29,17 @@ def test_stale_queue_is_visible_even_with_fresh_heartbeat():
     }
 
 
+def test_stale_downstream_task_is_visible_even_with_fresh_recorder():
+    findings = check_services(_snapshot({
+        "failed": 0, "consecutive_failed_passes": 0,
+        "oldest_queue_age_minutes": None,
+        "oldest_task_age_minutes": 90,
+    }))
+    assert "service.betting-strategy-agents.task_stale" in {
+        finding.key for finding in findings
+    }
+
+
 # --- not-installed vs down -------------------------------------------------
 # systemctl reports ActiveState=inactive for a unit that was never installed
 # AND for one that crashed. Paging CRITICAL for the first is crying wolf: the

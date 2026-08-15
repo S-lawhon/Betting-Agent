@@ -18,6 +18,11 @@ limits:
   max_attempts_per_day: 24
   max_output_bytes: 250000
 
+retry:
+  base_cooldown_minutes: 180
+  max_cooldown_minutes: 1440
+  max_failures: 3
+
 # Provider execution is intentionally not configured in Phase 1. Moving to an
 # actual model requires all three changes: mode=execute, provider.type=command,
 # and an explicit --execute CLI flag. The command is passed JSON over stdin and

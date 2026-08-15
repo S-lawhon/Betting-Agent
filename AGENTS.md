@@ -387,9 +387,13 @@ is unrelated to this chain — it reports on the fund from `manager/`.
 - **Authority comes from WHICH INBOX the file lands in** — `actor = role`, never
   from caller-controlled JSON, and a `type` that doesn't match its inbox is
   rejected. Do not add a field that lets a payload name its own actor.
-- **The daemon is a RECORDER, not an invoker.** Nothing spawns the subagents;
-  a human pipes their JSON into the queue. "The service is running" does not
-  mean the loop is advancing — check `registry_size` in the heartbeat.
+- **`betting-strategy-agents` remains a RECORDER, not an invoker.** It now emits
+  an idempotent next-role task after each accepted artifact. The separate,
+  bounded `betting-strategy-chain` oneshot may invoke one task every 15 minutes
+  and can only queue typed JSON back to the recorder. It rejects unattended
+  promotion into `live_small`/`live_scaled`; human approval remains mandatory.
+  Check `registry_size`, `task_depth`, and `oldest_task_age_minutes` in the
+  heartbeat — a running recorder alone still does not prove advancement.
 - The registry is **empty** as of 2026-08-01. `OpportunityCard` is proven
   end-to-end; `IntegrityReport`/`ValidationReport` (mandatory mappings, dataset
   + gate hashes, provenance) have never been filled by an agent — that is the

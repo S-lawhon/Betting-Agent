@@ -58,6 +58,7 @@ CapabilityBoundingSet=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
 ReadWritePaths=/opt/betting-pod-shop/data/research_execution
+ReadWritePaths=/opt/betting-pod-shop/data/strategy_agents
 ReadWritePaths=/opt/betting-pod-shop/research/dispositions
 ReadWritePaths=/var/lib/research-codex
 InaccessiblePaths=-/opt/betting-pod-shop/.git

@@ -1,0 +1,27 @@
+schema_version: 1
+enabled: true
+mode: execute
+worker_id: strategy-chain-codex-v1
+max_attempts_per_utc_day: 4
+timeout_seconds: 900
+provider:
+  type: command
+  name: openai-codex-pro
+  model: gpt-5.6-luna
+  billing_mode: chatgpt_subscription
+  argv:
+    - /opt/betting-pod-shop/venv/bin/python
+    - /opt/betting-pod-shop/scripts/codex_research_provider.py
+    - --model
+    - gpt-5.6-luna
+    - --schema
+    - /opt/betting-pod-shop/config/strategy_chain_output.schema.json
+    - --workspace
+    - /opt/betting-pod-shop
+    - --timeout-seconds
+    - "840"
+  pass_env: [CODEX_HOME, HOME]
+safety:
+  trading_execution_allowed: false
+  deployment_allowed: false
+  unattended_live_promotion_allowed: false

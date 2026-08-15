@@ -36,6 +36,9 @@ def _latest_run_assignment(state: Path, *, worker_id: str = "") -> str:
     newest_id = ""
     for path in sorted((state / "runs").glob("*/*.json")):
         payload = _read_json(path)
+        if (worker_id and payload.get("worker_id")
+                and payload.get("worker_id") != worker_id):
+            continue
         candidate = str(payload.get("assignment_id") or "")
         if not candidate:
             continue
@@ -82,7 +85,9 @@ def audit_pilot(
         (state / "claim_archive").glob(f"*/{assignment_id}--*.json"))
     released_claims = list(
         (state / "claim_released").glob(f"*/{assignment_id}--*.json"))
-    worker = _read_json(state / "worker_status.json")
+    deep_packet = state / "deep_queue" / agent / f"{assignment_id}.json"
+    worker = _read_json(
+        state / str(config.get("status_filename") or "worker_status.json"))
     checks: list[dict[str, Any]] = []
     failures: list[str] = []
     warnings: list[str] = []
@@ -129,6 +134,33 @@ def audit_pilot(
             "invocation_phases": [], "usage": {},
             "checks": checks, "failures": failures, "warnings": warnings,
         }
+
+    if config.get("stage_mode") == "screen_only" and runs:
+        run = runs[-1]
+        screening = _read_json(screening_path)
+        decision = str((screening.get("screening") or {}).get("decision") or "")
+        if run.get("status") == "screened":
+            check("screening_survived", decision == "deep_research", decision)
+            check("deep_packet_present", deep_packet.exists(), str(deep_packet))
+            check("no_premature_disposition", not disposition_path.exists(),
+                  str(disposition_path))
+            check("screen_claim_released", bool(released_claims),
+                  f"released_claims={len(released_claims)}")
+            phases = [str(row.get("phase") or "")
+                      for row in run.get("invocations") or []]
+            check("screen_only_phase", phases == ["screening"], repr(phases))
+            return {
+                "schema_version": 1,
+                "status": "pass" if not failures else "fail",
+                "assignment_id": assignment_id,
+                "decision": None,
+                "screening_decision": decision or None,
+                "invocation_phases": phases,
+                "usage": run.get("usage") or {},
+                "checks": checks,
+                "failures": failures,
+                "warnings": warnings,
+            }
 
     # A failed attempt releases its claim and the assignment is retried on a
     # later day, so a retried target legitimately carries failed runs and

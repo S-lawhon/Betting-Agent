@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -226,6 +226,69 @@ def test_release_returns_packet_to_available_queue(tmp_path):
         dispatches_dir=dispatches, state_dir=state,
         dispositions_dir=dispositions, worker_id="worker-2", now=NOW)
     assert reclaimed and reclaimed.assignment_id == "a1"
+
+
+def test_failed_release_cools_down_without_blocking_next_packet(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    state = tmp_path / "execution"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    packet(dispatches / "strategy-scout/a1.json", "a1", "high", 90)
+    packet(dispatches / "strategy-scout/a2.json", "a2", "high", 80)
+    claim = claim_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="worker-1", now=NOW)
+    assert claim and claim.assignment_id == "a1"
+
+    released = release_claim(
+        claim_path=state / "claims/strategy-scout/a1.json",
+        state_dir=state, reason="invalid provider output", now=NOW,
+        retry_cooldown_minutes=60, retry_max_cooldown_minutes=240,
+        max_failures=3)
+
+    assert released["retry"]["failure_count"] == 1
+    assert released["retry"]["dead_lettered"] is False
+    next_claim = claim_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="worker-2", now=NOW)
+    assert next_claim and next_claim.assignment_id == "a2"
+    assert preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, assignment_id="a1",
+        now=NOW + timedelta(minutes=59)) is None
+    assert preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, assignment_id="a1",
+        now=NOW + timedelta(minutes=61)) is not None
+
+
+def test_repeated_failures_dead_letter_assignment(tmp_path):
+    dispatches = tmp_path / "dispatches"
+    state = tmp_path / "execution"
+    dispositions = tmp_path / "dispositions"
+    dispositions.mkdir()
+    packet(dispatches / "strategy-scout/a1.json", "a1", "high", 90)
+    now = NOW
+    for failure in range(1, 4):
+        claim = claim_next(
+            dispatches_dir=dispatches, state_dir=state,
+            dispositions_dir=dispositions, worker_id=f"worker-{failure}",
+            assignment_id="a1", now=now)
+        assert claim
+        released = release_claim(
+            claim_path=state / "claims/strategy-scout/a1.json",
+            state_dir=state, reason=f"failure {failure}", now=now,
+            retry_cooldown_minutes=60, retry_max_cooldown_minutes=240,
+            max_failures=3)
+        now += timedelta(minutes=60 * (2 ** (failure - 1)) + 1)
+
+    assert released["retry"]["dead_lettered"] is True
+    assert preview_next(
+        dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, assignment_id="a1", now=now) is None
+    status = execution_status(state, now=now)
+    assert status["dead_lettered"] == 1
+    assert status["cooling_down"] == 0
 
 
 def test_ranked_packets_skip_agents_the_worker_cannot_work(tmp_path):

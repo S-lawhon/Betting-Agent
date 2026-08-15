@@ -35,6 +35,7 @@ from src.strategy_orchestration import (
     StrategyTransitionError,
     ValidationReport,
 )
+from src.strategy_chain import enqueue_next_task
 
 logger = logging.getLogger(__name__)
 UTC = timezone.utc
@@ -73,6 +74,9 @@ class AgentSummary:
     state_counts: Dict[str, int]
     queue_depth: int
     oldest_queue_age_minutes: Optional[float]
+    task_depth: int = 0
+    task_counts: Optional[Dict[str, int]] = None
+    oldest_task_age_minutes: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -83,6 +87,9 @@ class AgentSummary:
             "state_counts": self.state_counts,
             "queue_depth": self.queue_depth,
             "oldest_queue_age_minutes": self.oldest_queue_age_minutes,
+            "task_depth": self.task_depth,
+            "task_counts": dict(self.task_counts or {}),
+            "oldest_task_age_minutes": self.oldest_task_age_minutes,
         }
 
 
@@ -93,6 +100,7 @@ class StrategyAgentRuntime:
         queue_dir: Path,
         processed_dir: Optional[Path] = None,
         heartbeat_path: Optional[Path] = None,
+        task_dir: Optional[Path] = None,
         poll_interval_s: float = 60.0,
         heartbeat_max_bytes: int = 5_000_000,
         clock: Optional[Any] = None,
@@ -103,6 +111,7 @@ class StrategyAgentRuntime:
         self.heartbeat_path = Path(
             heartbeat_path or self.queue_dir.parent / "heartbeat.jsonl"
         )
+        self.task_dir = Path(task_dir or self.queue_dir.parent / "tasks")
         self.poll_interval_s = float(poll_interval_s)
         self.heartbeat_max_bytes = int(heartbeat_max_bytes)
         self._clock = clock or (lambda: datetime.now(UTC))
@@ -125,6 +134,13 @@ class StrategyAgentRuntime:
                 role = request_path.parent.name
                 self._apply_request(registry, request, role=role)
                 registry.dump(self.registry_path)
+                strategy_id = str(
+                    request.get("strategy_id") or request.get("id") or "")
+                if strategy_id and strategy_id in registry:
+                    enqueue_next_task(
+                        task_dir=self.task_dir,
+                        record=registry.get(strategy_id),
+                        trigger_type=str(request.get("type") or ""))
                 self._archive_request(request_path, "done", request, raw_request)
                 succeeded += 1
             except Exception as exc:  # noqa: BLE001 - surface the failure
@@ -156,6 +172,9 @@ class StrategyAgentRuntime:
             state_counts=self._state_counts(registry),
             queue_depth=len(self._iter_requests()),
             oldest_queue_age_minutes=self._oldest_queue_age_minutes(),
+            task_depth=len(list(self.task_dir.glob("*/*.json"))),
+            task_counts=self._task_counts(),
+            oldest_task_age_minutes=self._oldest_task_age_minutes(),
         )
         self._append_heartbeat(summary)
         return summary
@@ -272,6 +291,9 @@ class StrategyAgentRuntime:
             "state_counts": summary.state_counts,
             "queue_depth": summary.queue_depth,
             "oldest_queue_age_minutes": summary.oldest_queue_age_minutes,
+            "task_depth": summary.task_depth,
+            "task_counts": dict(summary.task_counts or {}),
+            "oldest_task_age_minutes": summary.oldest_task_age_minutes,
             "consecutive_failed_passes": consecutive_failed,
         }
         self.heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
@@ -305,3 +327,17 @@ class StrategyAgentRuntime:
         for record in registry.values():
             counts[record.state] = counts.get(record.state, 0) + 1
         return counts
+
+    def _task_counts(self) -> Dict[str, int]:
+        return {
+            role: len(list((self.task_dir / role).glob("*.json")))
+            for role in ROLES
+            if (self.task_dir / role).exists()
+        }
+
+    def _oldest_task_age_minutes(self) -> Optional[float]:
+        tasks = list(self.task_dir.glob("*/*.json"))
+        if not tasks:
+            return None
+        oldest_mtime = min(path.stat().st_mtime for path in tasks)
+        return round(max(0.0, time.time() - oldest_mtime) / 60.0, 1)

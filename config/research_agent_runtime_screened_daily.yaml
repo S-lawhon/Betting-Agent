@@ -2,6 +2,9 @@ schema_version: 1
 enabled: true
 mode: execute
 worker_id: research-codex-screened-daily-v1
+stage_mode: screen_only
+budget_scope: screening
+status_filename: screening_status.json
 
 # Deliberately NOT exact-target pinned. The pilot config
 # (research_agent_runtime_screened_pilot.yaml) fails closed on one reviewed
@@ -53,9 +56,14 @@ limits:
   max_input_tokens_per_task: 250000
   max_output_tokens_per_task: 5000
   max_cost_usd_per_task: 0.01
-  max_cost_usd_per_day: 0.02
-  max_attempts_per_day: 2
+  max_cost_usd_per_day: 0.05
+  max_attempts_per_day: 5
   max_output_bytes: 150000
+
+retry:
+  base_cooldown_minutes: 180
+  max_cooldown_minutes: 1440
+  max_failures: 3
 
 provider:
   type: command

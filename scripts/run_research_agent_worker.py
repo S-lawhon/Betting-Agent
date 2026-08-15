@@ -17,9 +17,20 @@ from src.research_agent_worker import (  # noqa: E402
     CommandProvider,
     ResearchAgentWorker,
     ResearchWorkerError,
+    RetryLimits,
     ScreeningLimits,
     WorkerLimits,
 )
+
+
+def _merge(base: dict, override: dict) -> dict:
+    merged = dict(base)
+    for key, value in override.items():
+        if (isinstance(value, dict) and isinstance(merged.get(key), dict)):
+            merged[key] = _merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _config(path: Path) -> dict:
@@ -29,6 +40,12 @@ def _config(path: Path) -> dict:
         raise ResearchWorkerError(f"runtime config unavailable: {exc}") from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         raise ResearchWorkerError("runtime config must use schema_version 1")
+    extends = payload.pop("extends", None)
+    if extends:
+        base_path = Path(str(extends))
+        if not base_path.is_absolute():
+            base_path = path.parent / base_path
+        payload = _merge(_config(base_path.resolve()), payload)
     return payload
 
 
@@ -57,6 +74,7 @@ def main(argv=None) -> int:
         if not config.get("enabled"):
             raise ResearchWorkerError("research runtime is disabled in config")
         limits = WorkerLimits(**dict(config.get("limits") or {}))
+        retry_limits = RetryLimits(**dict(config.get("retry") or {}))
         screening_config = dict(config.get("screening") or {})
         screening_enabled = bool(screening_config.get("enabled"))
         screening_limits = ScreeningLimits(**dict(
@@ -104,6 +122,11 @@ def main(argv=None) -> int:
             screening_provider=screening_provider,
             screening_limits=screening_limits,
             screening_enabled=screening_enabled,
+            retry_limits=retry_limits,
+            stage_mode=str(config.get("stage_mode") or "combined"),
+            budget_scope=str(config.get("budget_scope") or "combined"),
+            status_filename=str(
+                config.get("status_filename") or "worker_status.json"),
             screening_agents=list(
                 screening_config.get("agents") or ["strategy-scout"]),
             allowed_agents=list(config.get("allowed_agents") or []))

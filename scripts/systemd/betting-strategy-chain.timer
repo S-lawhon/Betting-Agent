@@ -1,0 +1,10 @@
+[Unit]
+Description=Betting Pod Shop — strategy-chain role timer
+
+[Timer]
+OnCalendar=*-*-* *:05,20,35,50:00
+Persistent=false
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

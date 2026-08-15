@@ -44,9 +44,11 @@ is judged on output freshness, never on exit code.
 Plus `/manager` and `/api/manager` routes on the existing dashboard, and the
 `fund-manager` agent in `.claude/agents/`.
 
-The recursive strategy workflow now has scoped Claude role definitions in
-`.claude/agents/` and a deterministic queue worker. The worker does not generate
-research or make model decisions; it validates and persists agent-produced JSON:
+The recursive strategy workflow has scoped role definitions and two deliberately
+separate runtimes. The recorder never generates research or makes model
+decisions; it validates and persists typed JSON. The bounded chain worker reads
+the recorder's deterministic next-role tasks and may invoke one role, but can
+only submit its result back to the recorder:
 
 - `scripts/run_strategy_agents.py` consumes JSON requests from
   `data/strategy_agents/queue/<role>/`
@@ -54,6 +56,11 @@ research or make model decisions; it validates and persists agent-produced JSON:
 - `data/strategy_agents/registry.json` is the persisted strategy registry
 - `data/strategy_agents/heartbeat.jsonl` is the service heartbeat the manager
   watches
+- `data/strategy_agents/tasks/<role>/` contains idempotent next-role handoffs
+- `scripts/run_strategy_chain_worker.py` consumes at most one current task,
+  validates its typed output, and queues it for the recorder
+- unattended promotion to `live_small` or `live_scaled` is rejected even if a
+  provider returns it
 
 Research discovery has a separate deterministic attention queue:
 
@@ -77,11 +84,17 @@ Only a durable disposition proves review; a dry-run plan, invocation, or
 abandoned claim does not. This prevents a healthy queue generator from being
 reported as completed research labor.
 
-The Phase 1 worker adds a deliberately narrow automation boundary:
+The research worker uses two deliberately narrow execution stages:
 
 - `config/research_agent_runtime.yaml` contains hard time, token, output-size,
   per-task cost, and daily cost limits.
 - Dry-run status records a request hash, never source text or agent prompts.
+- Cheap screening runs up to five times per day. Only `deep_research` survivors
+  enter `data/research_execution/deep_queue/`.
+- Deep research has a separate two-call daily budget, so screening cannot
+  consume its capacity.
+- Failed assignments cool down exponentially and dead-letter after three
+  failures instead of monopolizing every later slot.
 - Actual invocation requires `mode: execute`, `provider.type: command`, and an
   explicit `--execute` flag. Provider subprocesses receive only environment
   variables named in `pass_env`; betting credentials are not inherited.

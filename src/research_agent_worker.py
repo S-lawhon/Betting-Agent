@@ -102,6 +102,22 @@ class WorkerLimits:
 
 
 @dataclass(frozen=True)
+class RetryLimits:
+    base_cooldown_minutes: int = 180
+    max_cooldown_minutes: int = 1440
+    max_failures: int = 3
+
+    def __post_init__(self) -> None:
+        if min(asdict(self).values()) <= 0:
+            raise ValueError("all retry limits must be positive")
+        if self.max_cooldown_minutes < self.base_cooldown_minutes:
+            raise ValueError("retry max cooldown cannot be below base cooldown")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ScreeningLimits:
     timeout_seconds: int = 180
     max_input_tokens: int = 25_000
@@ -279,6 +295,10 @@ class ResearchAgentWorker:
         screening_limits: Optional[ScreeningLimits] = None,
         screening_enabled: bool = False,
         screening_agents: Sequence[str] = ("strategy-scout",),
+        retry_limits: Optional[RetryLimits] = None,
+        stage_mode: str = "combined",
+        budget_scope: str = "combined",
+        status_filename: str = "worker_status.json",
         execution_enabled: bool = False,
         allowed_agents: Sequence[str] = tuple(ALLOWED_ARTIFACTS),
         clock=None,
@@ -298,6 +318,20 @@ class ResearchAgentWorker:
         self.screening_agents = tuple(
             str(agent).strip() for agent in screening_agents
             if str(agent).strip())
+        self.retry_limits = retry_limits or RetryLimits()
+        if stage_mode not in {"combined", "screen_only", "deep_only"}:
+            raise ValueError("stage_mode must be combined, screen_only, or deep_only")
+        if stage_mode == "screen_only" and not screening_enabled:
+            raise ValueError("screen_only stage requires screening_enabled=true")
+        if stage_mode == "deep_only" and screening_enabled:
+            raise ValueError("deep_only stage cannot enable screening")
+        if not str(budget_scope).strip():
+            raise ValueError("budget_scope is required")
+        self.stage_mode = stage_mode
+        self.budget_scope = str(budget_scope).strip()
+        if Path(status_filename).name != status_filename or not status_filename:
+            raise ValueError("status_filename must be a plain file name")
+        self.status_filename = status_filename
         self.execution_enabled = bool(execution_enabled)
         self.allowed_agents = tuple(allowed_agents)
         # An allowed agent outside the screened set would have its packets
@@ -317,6 +351,11 @@ class ResearchAgentWorker:
                 and str(packet.get("assigned_agent") or "")
                 in self.screening_agents)
 
+    def _deep_ready_ids(self) -> set[str]:
+        return {
+            path.stem for path in (self.state_dir / "deep_queue").glob("*/*.json")
+        }
+
     def run_once(self, *, execute: bool = False,
                  assignment_id: Optional[str] = None,
                  persist_status: bool = True) -> Dict[str, Any]:
@@ -326,7 +365,11 @@ class ResearchAgentWorker:
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
             dispositions_dir=self.dispositions_dir,
             assignment_id=target_assignment_id,
-            agents=set(self.allowed_agents), now=now)
+            agents=set(self.allowed_agents),
+            exclude_assignment_ids=(
+                self._deep_ready_ids() if self.stage_mode == "screen_only"
+                else None),
+            now=now)
         if not candidate:
             result = self._result(
                 "blocked" if target_assignment_id else "idle", now, plan=None,
@@ -358,6 +401,9 @@ class ResearchAgentWorker:
             dispositions_dir=self.dispositions_dir, worker_id=self.worker_id,
             assignment_id=target_assignment_id,
             agents=set(self.allowed_agents),
+            exclude_assignment_ids=(
+                self._deep_ready_ids() if self.stage_mode == "screen_only"
+                else None),
             now=now, lease_minutes=max(5, min(480,
                 (self.limits.timeout_seconds
                  + (self.screening_limits.timeout_seconds
@@ -429,6 +475,22 @@ class ResearchAgentWorker:
                     return self._finish(self._result(
                         "completed", self._clock(), plan=plan,
                         claim=claim.to_dict(), run=run), persist_status)
+                if self.stage_mode == "screen_only":
+                    self._write_deep_packet(packet, screening, claim, now)
+                    release_claim(
+                        claim_path=claim_path, state_dir=self.state_dir,
+                        reason="screening passed; queued for deep research",
+                        now=self._clock())
+                    elapsed = time.monotonic() - started
+                    run = self._run_record(
+                        "screened", claim, screening_result, now, elapsed,
+                        model_invocation_tracked=True,
+                        invocations=invocations,
+                        terminal_stage="screening")
+                    self._write_run(run, now)
+                    return self._finish(self._result(
+                        "screened", self._clock(), plan=plan,
+                        claim=claim.to_dict(), run=run), persist_status)
                 mark_claim_phase_invoked(
                     claim_path=claim_path, state_dir=self.state_dir,
                     provider=self.provider.name, model=self.provider.model,
@@ -459,6 +521,8 @@ class ResearchAgentWorker:
                 raise
             artifact_record = self._write_artifact(
                 claim, artifact_type, artifact, provider_result, now)
+            if disposition.decision == "advance" and artifact_type == "opportunity_card":
+                self._queue_strategy_opportunity(claim, artifact)
             complete_claim(
                 claim_path=claim_path,
                 disposition_payload=disposition.to_dict(),
@@ -482,7 +546,12 @@ class ResearchAgentWorker:
                     release_claim(
                         claim_path=claim_path, state_dir=self.state_dir,
                         reason=f"worker failure: {type(exc).__name__}: {exc}"[:500],
-                        now=self._clock())
+                        now=self._clock(),
+                        retry_cooldown_minutes=(
+                            self.retry_limits.base_cooldown_minutes),
+                        retry_max_cooldown_minutes=(
+                            self.retry_limits.max_cooldown_minutes),
+                        max_failures=self.retry_limits.max_failures)
                 except (OSError, ResearchExecutionError):
                     pass
             run = self._run_record(
@@ -506,14 +575,19 @@ class ResearchAgentWorker:
                 f"{self.limits.max_minutes_per_task}m")
         daily_usage = self._daily_usage(now)
         uses_screening = self._uses_screening(packet)
-        reserved_attempts = 2 if uses_screening else 1
+        reserved_attempts = (
+            1 if self.stage_mode == "screen_only"
+            else (2 if uses_screening else 1))
         if (daily_usage["attempts"] + reserved_attempts
                 > self.limits.max_attempts_per_day):
             raise ResearchWorkerError(
                 "daily model-attempt limit: reservation would exceed it")
         spent = daily_usage["cost_usd"]
-        reserved_cost = self.limits.max_cost_usd_per_task + (
-            self.screening_limits.max_cost_usd if uses_screening else 0)
+        reserved_cost = (
+            self.screening_limits.max_cost_usd
+            if self.stage_mode == "screen_only"
+            else self.limits.max_cost_usd_per_task + (
+                self.screening_limits.max_cost_usd if uses_screening else 0))
         if spent + reserved_cost > self.limits.max_cost_usd_per_day:
             raise ResearchWorkerError(
                 "daily cost reservation would exceed the hard limit")
@@ -614,7 +688,49 @@ class ResearchAgentWorker:
                 "budget": self._screening_budget(),
                 "safety": dict(request["safety"]),
             }
+        if self.stage_mode == "screen_only":
+            plan["stages"] = ["screening"]
+        elif self.stage_mode == "deep_only":
+            plan["stages"] = ["deep_research"]
+            request["screening_context"] = dict(
+                packet.get("screening_context") or {})
         return plan
+
+    def _write_deep_packet(
+        self, packet: Mapping[str, Any], screening: ScreeningDecision,
+        claim: ResearchClaim, now: datetime,
+    ) -> Path:
+        """Persist the durable boundary between cheap screening and deep work."""
+        payload = dict(packet) | {
+            "screening_context": screening.to_dict(),
+            "screened_at": _iso(now),
+            "screening_claim_id": claim.claim_id,
+            "pipeline_stage": "deep_ready",
+        }
+        path = (self.state_dir / "deep_queue" / claim.assigned_agent
+                / f"{claim.assignment_id}.json")
+        _write_atomic(path, payload)
+        return path
+
+    def _queue_strategy_opportunity(
+        self, claim: ResearchClaim, artifact: Mapping[str, Any],
+    ) -> Path:
+        """Bridge a validated scout advance into the recorder's scout inbox."""
+        opportunity_id = str(artifact.get("id") or "").strip()
+        if not opportunity_id:
+            raise ResearchWorkerError("advanced opportunity card has no id")
+        request = {
+            "type": "opportunity",
+            "strategy_id": opportunity_id,
+            "actor": "scout",
+            "source_assignment_id": claim.assignment_id,
+            "payload": dict(artifact),
+        }
+        path = (self.root / "data/strategy_agents/queue/scout"
+                / f"{claim.assignment_id}__{opportunity_id}.json")
+        if not path.exists():
+            _write_atomic(path, request)
+        return path
 
     def _invocation_budget(self, packet: Mapping[str, Any]) -> Dict[str, Any]:
         return {
@@ -913,6 +1029,9 @@ class ResearchAgentWorker:
         for path in directory.glob("*.json"):
             try:
                 row = json.loads(path.read_text(encoding="utf-8"))
+                row_scope = str(row.get("budget_scope") or "combined")
+                if row_scope != self.budget_scope:
+                    continue
                 usage = row.get("usage") or {}
                 costs += float(usage.get("cost_usd") or 0)
                 inputs += int(usage.get("input_tokens") or 0)
@@ -949,6 +1068,8 @@ class ResearchAgentWorker:
             aggregate_usage = result.usage.to_dict() if result else {}
         return {
             "schema_version": SCHEMA_VERSION, "status": status,
+            "budget_scope": self.budget_scope,
+            "worker_id": self.worker_id,
             "started_at": _iso(started_at), "finished_at": _iso(self._clock()),
             "elapsed_seconds": round(elapsed_seconds, 3),
             "claim_id": claim.claim_id, "assignment_id": claim.assignment_id,
@@ -983,6 +1104,8 @@ class ResearchAgentWorker:
             "provider_configured": self.provider is not None,
             "screening_enabled": self.screening_enabled,
             "screening_provider_configured": self.screening_provider is not None,
+            "stage_mode": self.stage_mode,
+            "budget_scope": self.budget_scope,
             "billing_mode": (
                 getattr(self.provider, "billing_mode", "metered_api")
                 if self.provider else "none"),
@@ -994,6 +1117,7 @@ class ResearchAgentWorker:
             "claim": claim, "run": run, "error": error,
             "daily_usage": self._daily_usage(now),
             "limits": self.limits.to_dict(),
+            "retry_limits": self.retry_limits.to_dict(),
             "safety": {
                 "trading_execution_allowed": False,
                 "model_invoked": bool(
@@ -1003,7 +1127,7 @@ class ResearchAgentWorker:
 
     def _finish(self, result: Dict[str, Any], persist: bool) -> Dict[str, Any]:
         if persist:
-            _write_atomic(self.state_dir / "worker_status.json", result)
+            _write_atomic(self.state_dir / self.status_filename, result)
         return result
 
     @staticmethod

@@ -228,3 +228,36 @@ class TestStrategyRegistry(TestCase):
             writer_a.dump(path)
             with self.assertRaises(StrategyConflictError):
                 writer_b.dump(path)
+
+    def test_paper_monitor_can_degrade_automatically_but_not_promote_live(self):
+        reg = StrategyRegistry()
+        reg.register_opportunity(_card())
+        reg.attach_spec("op_20260801_001", _spec())
+        reg.record_integrity("op_20260801_001", _integrity())
+        reg.record_validation("op_20260801_001", _validation())
+        reg.record_promotion(
+            "op_20260801_001", PromotionDecision(
+                strategy_id="strat_20260801_001",
+                decision_at="2026-08-15T10:00:00Z",
+                from_state="validated", to_state="paper_live",
+                decision="promote", rationale=["gate passed"],
+                required_conditions=[], owner_agent="promotion",
+                review_window_days=7))
+        reg.record_monitoring(
+            "op_20260801_001", MonitoringReport(
+                strategy_id="strat_20260801_001",
+                observed_at="2026-08-15T11:00:00Z", state="paper_live",
+                window="24h", status="ok", realized_edge=.01, clv=.01,
+                pnl_usd=1, fill_quality={"fills": 10},
+                recommended_state="live_small"))
+        self.assertEqual(reg.get("op_20260801_001").state, "paper_live")
+        self.assertEqual(reg.get("op_20260801_001").events[-1].kind,
+                         "promotion_requested")
+        reg.record_monitoring(
+            "op_20260801_001", MonitoringReport(
+                strategy_id="strat_20260801_001",
+                observed_at="2026-08-15T12:00:00Z", state="paper_live",
+                window="24h", status="degraded", realized_edge=-.02,
+                clv=-.01, pnl_usd=-10, fill_quality={"fills": 10},
+                guardrail_breaches=["loss"], recommended_state="degraded"))
+        self.assertEqual(reg.get("op_20260801_001").state, "degraded")

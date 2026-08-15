@@ -3,16 +3,16 @@ schema_version: 1
 portfolio:
   # The only recently authorized model path could complete one packet/day.
   # Do not manufacture ten daily tasks for a one-task execution surface.
-  max_dispatches_per_utc_day: 1
-  max_research_minutes_per_utc_day: 45
+  max_dispatches_per_utc_day: 5
+  max_research_minutes_per_utc_day: 225
   lane_concentration_cap: 0.40
 
 backpressure:
   # Stop creating packets while the existing review queue is full.  These are
   # queue limits, not model-spend authority.
-  max_pending_total: 10
-  max_pending_per_agent: 4
-  max_new_dispatches_per_run: 1
+  max_pending_total: 15
+  max_pending_per_agent: 6
+  max_new_dispatches_per_run: 5
 
 notes:
   - Triage scores allocate attention; they are not evidence of edge.

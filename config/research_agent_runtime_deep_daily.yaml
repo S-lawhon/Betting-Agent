@@ -1,0 +1,19 @@
+schema_version: 1
+extends: research_agent_runtime_screened_daily.yaml
+worker_id: research-codex-deep-daily-v1
+stage_mode: deep_only
+budget_scope: deep_research
+status_filename: deep_status.json
+
+limits:
+  max_cost_usd_per_day: 0.02
+  max_attempts_per_day: 2
+
+screening:
+  enabled: false
+
+safety:
+  trading_execution_allowed: false
+  queue_mutation_in_dry_run: false
+  service_mutation_allowed: false
+  secrets_allowed_in_output: false

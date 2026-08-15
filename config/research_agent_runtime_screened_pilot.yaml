@@ -37,6 +37,11 @@ limits:
   max_attempts_per_day: 4
   max_output_bytes: 150000
 
+retry:
+  base_cooldown_minutes: 60
+  max_cooldown_minutes: 240
+  max_failures: 3
+
 provider:
   type: command
   name: openai-codex-pro

@@ -113,6 +113,24 @@ def _claim_path(state_dir: Path, agent: str, assignment_id: str) -> Path:
     return state_dir / "claims" / agent / "{}.json".format(assignment_id)
 
 
+def _retry_path(state_dir: Path, agent: str, assignment_id: str) -> Path:
+    return state_dir / "retry_state" / agent / "{}.json".format(assignment_id)
+
+
+def _retry_blocked(state_dir: Path, packet: Mapping[str, Any],
+                   now: datetime) -> bool:
+    """Return whether a released assignment is cooling down or dead-lettered."""
+    agent = str(packet.get("assigned_agent") or "")
+    assignment_id = str(packet.get("assignment_id") or "")
+    state = _read_json(_retry_path(state_dir, agent, assignment_id))
+    if not state:
+        return False
+    if bool(state.get("dead_lettered")):
+        return True
+    retry_after = _parse_time(state.get("retry_after"))
+    return bool(retry_after and retry_after > now)
+
+
 def _archive_claim(state_dir: Path, path: Path, bucket: str,
                    payload: Mapping[str, Any]) -> Path:
     claim_id = str(payload.get("claim_id") or "").strip()
@@ -181,6 +199,7 @@ def preview_next(
     *, dispatches_dir: Path, state_dir: Path, dispositions_dir: Path,
     agent: Optional[str] = None, assignment_id: Optional[str] = None,
     agents: Optional[Set[str]] = None,
+    exclude_assignment_ids: Optional[Set[str]] = None,
     now: Optional[datetime] = None,
 ) -> Optional[Tuple[Path, Dict[str, Any]]]:
     """Return the next available packet without mutating claim state.
@@ -202,7 +221,10 @@ def preview_next(
     for packet_path, packet in _ranked_packets(
             dispatches_dir, agent, assignment_id, agents):
         candidate_id = str(packet["assignment_id"])
-        if candidate_id not in active_ids and candidate_id not in disposition_ids:
+        if (candidate_id not in active_ids
+                and candidate_id not in disposition_ids
+                and candidate_id not in (exclude_assignment_ids or set())
+                and not _retry_blocked(state_dir, packet, now)):
             return packet_path, packet
     return None
 
@@ -216,6 +238,7 @@ def claim_next(
     agent: Optional[str] = None,
     assignment_id: Optional[str] = None,
     agents: Optional[Set[str]] = None,
+    exclude_assignment_ids: Optional[Set[str]] = None,
     now: Optional[datetime] = None,
     lease_minutes: int = 90,
 ) -> Optional[ResearchClaim]:
@@ -237,7 +260,9 @@ def claim_next(
         for packet_path, packet in _ranked_packets(
                 dispatches_dir, agent, assignment_id, agents):
             candidate_id = str(packet["assignment_id"])
-            if candidate_id in active_ids or candidate_id in disposition_ids:
+            if (candidate_id in active_ids or candidate_id in disposition_ids
+                    or candidate_id in (exclude_assignment_ids or set())
+                    or _retry_blocked(state_dir, packet, now)):
                 continue
             assigned_agent = str(packet["assigned_agent"])
             claimed_at = _utc_iso(now)
@@ -421,19 +446,57 @@ def mark_claim_phase_invoked(
 
 def release_claim(
     *, claim_path: Path, state_dir: Path, reason: str,
+    retry_cooldown_minutes: int = 0,
+    retry_max_cooldown_minutes: int = 0,
+    max_failures: int = 0,
     now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """Release a claim without completing the underlying dispatch packet."""
     if not reason.strip():
         raise ResearchExecutionError("release reason is required")
+    if min(retry_cooldown_minutes, retry_max_cooldown_minutes, max_failures) < 0:
+        raise ResearchExecutionError("retry limits cannot be negative")
+    if (retry_cooldown_minutes and retry_max_cooldown_minutes
+            and retry_max_cooldown_minutes < retry_cooldown_minutes):
+        raise ResearchExecutionError(
+            "retry max cooldown cannot be below the base cooldown")
     now = now or datetime.now(timezone.utc)
     with _state_lock(state_dir):
         payload = _read_json(claim_path)
         if not payload:
             raise ResearchExecutionError("active claim does not exist")
+        assignment_id = str(payload.get("assignment_id") or claim_path.stem)
+        agent = str(payload.get("assigned_agent") or claim_path.parent.name)
+        retry: Dict[str, Any] = {}
+        if retry_cooldown_minutes or max_failures:
+            retry_path = _retry_path(state_dir, agent, assignment_id)
+            previous = _read_json(retry_path)
+            failure_count = int(previous.get("failure_count") or 0) + 1
+            dead_lettered = bool(max_failures and failure_count >= max_failures)
+            maximum = retry_max_cooldown_minutes or retry_cooldown_minutes
+            cooldown = min(
+                retry_cooldown_minutes * (2 ** max(0, failure_count - 1)),
+                maximum,
+            ) if retry_cooldown_minutes else 0
+            retry_after = None if dead_lettered else _utc_iso(
+                now + timedelta(minutes=cooldown))
+            retry = {
+                "schema_version": SCHEMA_VERSION,
+                "assignment_id": assignment_id,
+                "assigned_agent": agent,
+                "failure_count": failure_count,
+                "last_failed_at": _utc_iso(now),
+                "last_reason": reason.strip(),
+                "retry_after": retry_after,
+                "dead_lettered": dead_lettered,
+                "dead_lettered_at": _utc_iso(now) if dead_lettered else None,
+                "max_failures": max_failures or None,
+            }
+            _write_atomic(retry_path, retry)
         released = payload | {
             "status": "released", "released_at": _utc_iso(now),
             "release_reason": reason.strip(),
+            "retry": retry or None,
         }
         _archive_claim(state_dir, claim_path, "claim_released", released)
         _append_event(state_dir, {
@@ -442,6 +505,9 @@ def release_claim(
             "worker_id": payload.get("worker_id"),
             "assigned_agent": payload.get("assigned_agent"),
             "reason": reason.strip(),
+            "retry_after": retry.get("retry_after"),
+            "failure_count": retry.get("failure_count"),
+            "dead_lettered": retry.get("dead_lettered", False),
         })
         return released
 
@@ -451,6 +517,8 @@ def execution_status(state_dir: Path, now: Optional[datetime] = None) -> Dict[st
     now = now or datetime.now(timezone.utc)
     active = [_read_json(path) for path in
               sorted((state_dir / "claims").glob("*/*.json"))]
+    retries = [_read_json(path) for path in
+               sorted((state_dir / "retry_state").glob("*/*.json"))]
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": _utc_iso(now),
@@ -462,6 +530,12 @@ def execution_status(state_dir: Path, now: Optional[datetime] = None) -> Dict[st
         "completed": len(list((state_dir / "claim_archive").glob("*/*.json"))),
         "released": len(list((state_dir / "claim_released").glob("*/*.json"))),
         "expired": len(list((state_dir / "claim_expired").glob("*/*.json"))),
+        "cooling_down": sum(
+            not item.get("dead_lettered")
+            and bool(_parse_time(item.get("retry_after"))
+                     and _parse_time(item.get("retry_after")) > now)
+            for item in retries),
+        "dead_lettered": sum(bool(item.get("dead_lettered")) for item in retries),
         "claims": active,
         "semantics": {
             "claim_means": "research_work_started",

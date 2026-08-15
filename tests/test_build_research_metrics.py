@@ -120,6 +120,15 @@ class TestBuildResearchMetrics(TestCase):
             self.assertEqual(
                 operations["agents"]["literature-scout"]["queue_state"],
                 "idle")
+            self.assertEqual(
+                operations["stage_latency"]["dispatch_to_claim"]["median_hours"],
+                1.0)
+            self.assertEqual(
+                operations["stage_latency"]["claim_to_decision"]["median_hours"],
+                5.0)
+            self.assertEqual(
+                operations["stage_latency"]["dispatch_to_decision"]["median_hours"],
+                6.0)
 
     def test_operations_report_pending_and_overdue_per_agent(self):
         with tempfile.TemporaryDirectory() as tmp:

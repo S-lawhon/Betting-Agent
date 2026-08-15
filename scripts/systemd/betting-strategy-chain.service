@@ -1,31 +1,26 @@
 [Unit]
-Description=Betting Pod Shop — exact-target screened Codex Pro research pilot
-After=network-online.target research-intake.service
+Description=Betting Pod Shop — bounded strategy-chain role worker
+After=network-online.target betting-strategy-agents.service
 Wants=network-online.target
-ConditionPathExists=/var/lib/research-codex/pilot-enabled
 ConditionPathExists=/var/lib/research-codex/auth.json
 
 [Service]
 Type=oneshot
+SuccessExitStatus=0 1
 User=bettingbot
 Group=bettingbot
 WorkingDirectory=/opt/betting-pod-shop
 Environment=HOME=/var/lib/research-codex
 Environment=CODEX_HOME=/var/lib/research-codex
-ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_research_agent_worker --config /opt/betting-pod-shop/config/research_agent_runtime_screened_pilot.yaml --execute
-
+ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.run_strategy_chain_worker --execute
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=research-agent-codex-pilot
+SyslogIdentifier=betting-strategy-chain
 UMask=0077
 Nice=15
-IOSchedulingClass=idle
-MemoryMax=512M
+MemoryMax=768M
 TasksMax=64
-TimeoutStartSec=900
-
-# The model gets public network access and an empty workspace, but no betting
-# credential environment and no read access to the credential-bearing files.
+TimeoutStartSec=960
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
@@ -45,15 +40,12 @@ RestrictNamespaces=true
 SystemCallArchitectures=native
 CapabilityBoundingSet=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-
-ReadWritePaths=/opt/betting-pod-shop/data/research_execution
 ReadWritePaths=/opt/betting-pod-shop/data/strategy_agents
-ReadWritePaths=/opt/betting-pod-shop/research/dispositions
 ReadWritePaths=/var/lib/research-codex
 InaccessiblePaths=-/opt/betting-pod-shop/.git
 InaccessiblePaths=-/opt/betting-pod-shop/.env
-InaccessiblePaths=-/opt/betting-pod-shop/.env.bak-portable
-InaccessiblePaths=-/opt/betting-pod-shop/.env.prev-20260729154347
-InaccessiblePaths=-/opt/betting-pod-shop/.env.x
 InaccessiblePaths=-/opt/betting-pod-shop/kalshi_private_key.pem
 InaccessiblePaths=-/opt/betting-pod-shop/Legacy
+
+[Install]
+WantedBy=multi-user.target

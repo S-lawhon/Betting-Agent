@@ -81,7 +81,8 @@ class FakeProvider:
 def worker(root: Path, provider=None, *, execution_enabled=False,
            limits=None, screening_provider=None,
            screening_enabled=False, evidence=None,
-           agent="strategy-scout") -> ResearchAgentWorker:
+           agent="strategy-scout", stage_mode="combined",
+           budget_scope="combined") -> ResearchAgentWorker:
     dispatches, state, dispositions = setup_packet(
         root, agent=agent, evidence=evidence)
     kwargs = {}
@@ -97,6 +98,7 @@ def worker(root: Path, provider=None, *, execution_enabled=False,
         screening_provider=screening_provider,
         screening_limits=ScreeningLimits(timeout_seconds=30),
         screening_enabled=screening_enabled,
+        stage_mode=stage_mode, budget_scope=budget_scope,
         clock=lambda: NOW, **kwargs)
 
 
@@ -299,6 +301,59 @@ def test_screening_survivor_invokes_deep_research_and_aggregates_usage(tmp_path)
     archived = json.loads(archives[0].read_text())
     assert [item["phase"] for item in archived["model_invocations"]] == [
         "screening", "deep_research"]
+
+
+def test_screen_only_survivor_queues_deep_work_without_disposition(tmp_path):
+    deep = FakeProvider()
+    screen = FakeScreeningProvider("deep_research")
+    runtime = worker(
+        tmp_path, deep, execution_enabled=True,
+        screening_provider=screen, screening_enabled=True,
+        stage_mode="screen_only", budget_scope="screening",
+        limits=WorkerLimits(timeout_seconds=60, max_attempts_per_day=5))
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "screened"
+    assert screen.calls == 1 and deep.calls == 0
+    assert not (tmp_path / "research/dispositions/a1.json").exists()
+    queued = (tmp_path
+              / "data/research_execution/deep_queue/strategy-scout/a1.json")
+    payload = json.loads(queued.read_text())
+    assert payload["pipeline_stage"] == "deep_ready"
+    assert payload["screening_context"]["decision"] == "deep_research"
+    assert runtime.run_once(execute=True)["status"] == "idle"
+
+
+def test_deep_only_worker_consumes_screened_queue_with_separate_budget(tmp_path):
+    screen_runtime = worker(
+        tmp_path, FakeProvider(), execution_enabled=True,
+        screening_provider=FakeScreeningProvider("deep_research"),
+        screening_enabled=True, stage_mode="screen_only",
+        budget_scope="screening",
+        limits=WorkerLimits(timeout_seconds=60, max_attempts_per_day=5))
+    assert screen_runtime.run_once(execute=True)["status"] == "screened"
+
+    provider = FakeProvider()
+    deep_runtime = ResearchAgentWorker(
+        root=tmp_path,
+        dispatches_dir=(tmp_path / "data/research_execution/deep_queue"),
+        state_dir=(tmp_path / "data/research_execution"),
+        dispositions_dir=(tmp_path / "research/dispositions"),
+        worker_id="deep-worker",
+        limits=WorkerLimits(timeout_seconds=60, max_attempts_per_day=2),
+        provider=provider, execution_enabled=True,
+        screening_enabled=False, stage_mode="deep_only",
+        budget_scope="deep_research", allowed_agents=("strategy-scout",),
+        clock=lambda: NOW)
+
+    result = deep_runtime.run_once(execute=True)
+
+    assert result["status"] == "completed"
+    assert provider.calls == 1
+    assert provider.last_request["screening_context"]["decision"] == "deep_research"
+    assert result["daily_usage"]["attempts"] == 1
+    assert (tmp_path / "research/dispositions/a1.json").exists()
 
 
 def test_screening_guard_refuses_unscreened_allowed_agent(tmp_path):

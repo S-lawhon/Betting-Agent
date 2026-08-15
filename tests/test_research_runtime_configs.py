@@ -12,7 +12,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.research_agent_worker import ScreeningLimits, WorkerLimits
+from scripts.run_research_agent_worker import _config as load_runtime_config
+from src.research_agent_worker import RetryLimits, ScreeningLimits, WorkerLimits
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +27,7 @@ OBSERVED_DEEP_INPUT_TOKENS = (
 
 
 def _config(path: Path) -> dict:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return load_runtime_config(path)
 
 
 def test_configs_are_present():
@@ -43,6 +44,7 @@ def test_runtime_config_loads_into_valid_limits(path):
     assert limits.max_minutes_per_task > 0
     screening = dict(config.get("screening") or {})
     ScreeningLimits(**dict(screening.get("limits") or {}))
+    RetryLimits(**dict(config.get("retry") or {}))
     # Trading can never be enabled from a research runtime.
     assert (config.get("safety") or {}).get(
         "trading_execution_allowed") is False
@@ -80,10 +82,15 @@ def test_daily_config_covers_the_measured_deep_research_distribution():
     cap was raised.
     """
     path = ROOT / "config" / "research_agent_runtime_screened_daily.yaml"
-    limits = WorkerLimits(**dict(_config(path).get("limits") or {}))
+    config = _config(path)
+    limits = WorkerLimits(**dict(config.get("limits") or {}))
     assert limits.max_input_tokens_per_task >= max(OBSERVED_DEEP_INPUT_TOKENS)
-    assert limits.max_attempts_per_day == 2, (
-        "attempts per day is the real runaway guard; do not widen it")
+    assert limits.max_attempts_per_day == 5
+    assert config.get("stage_mode") == "screen_only"
+    deep = _config(
+        ROOT / "config" / "research_agent_runtime_deep_daily.yaml")
+    assert deep.get("stage_mode") == "deep_only"
+    assert deep["limits"]["max_attempts_per_day"] == 2
 
 
 def test_pilot_config_stays_exact_target_and_manual():

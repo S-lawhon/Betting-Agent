@@ -10,6 +10,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
 from typing import Any, Dict, List, Mapping, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -115,6 +116,20 @@ def _parse_timestamp(value: Any) -> Optional[datetime]:
     return parsed.astimezone(timezone.utc)
 
 
+def _latency_summary(values: List[float]) -> Dict[str, Any]:
+    ordered = sorted(round(max(0.0, value), 4) for value in values)
+    if not ordered:
+        return {"count": 0, "median_hours": None, "p90_hours": None,
+                "max_hours": None}
+    p90_index = max(0, min(len(ordered) - 1, (9 * len(ordered) + 9) // 10 - 1))
+    return {
+        "count": len(ordered),
+        "median_hours": round(float(median(ordered)), 2),
+        "p90_hours": round(ordered[p90_index], 2),
+        "max_hours": round(ordered[-1], 2),
+    }
+
+
 def _research_operations(
     assignments: List[Dict[str, Any]],
     dispositions: List[ResearchDisposition],
@@ -167,6 +182,9 @@ def _research_operations(
     agent_stats: Dict[str, Counter] = defaultdict(Counter)
     oldest_by_agent: Dict[str, datetime] = {}
     oldest_pending: Optional[datetime] = None
+    dispatch_to_claim: List[float] = []
+    claim_to_decision: List[float] = []
+    dispatch_to_decision: List[float] = []
 
     for assignment_id, dispatch in latest_dispatch.items():
         agent = str(dispatch.get("assigned_agent") or "unknown")
@@ -183,6 +201,9 @@ def _research_operations(
         if claim:
             row["started"] += 1
             claimed_at = _parse_timestamp(claim.get("claimed_at"))
+            if dispatched_at and claimed_at:
+                dispatch_to_claim.append(
+                    (claimed_at - dispatched_at).total_seconds() / 3600.0)
             if claimed_at and claimed_at >= cutoff:
                 row["started_24h"] += 1
                 activity["started"] += 1
@@ -204,6 +225,13 @@ def _research_operations(
             row[disposition.decision] += 1
             row["research_minutes"] += disposition.research_minutes
             decided_at = _parse_timestamp(disposition.decided_at)
+            claimed_at = _parse_timestamp((claim or {}).get("claimed_at"))
+            if claimed_at and decided_at:
+                claim_to_decision.append(
+                    (decided_at - claimed_at).total_seconds() / 3600.0)
+            if dispatched_at and decided_at:
+                dispatch_to_decision.append(
+                    (decided_at - dispatched_at).total_seconds() / 3600.0)
             if decided_at and decided_at >= cutoff:
                 row["reviewed_24h"] += 1
                 row[f"{disposition.decision}_24h"] += 1
@@ -298,6 +326,11 @@ def _research_operations(
             "oldest_pending_age_hours": (
                 round(max(0.0, (now - oldest_pending).total_seconds() / 3600.0), 1)
                 if oldest_pending else None),
+        },
+        "stage_latency": {
+            "dispatch_to_claim": _latency_summary(dispatch_to_claim),
+            "claim_to_decision": _latency_summary(claim_to_decision),
+            "dispatch_to_decision": _latency_summary(dispatch_to_decision),
         },
         "agents": agents,
         "worker": worker,

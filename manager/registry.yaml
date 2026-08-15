@@ -40,7 +40,7 @@
 
 meta:
   version: 1
-  updated: 2026-08-07
+  updated: 2026-08-15
   # Paths are resolved relative to project_root unless absolute.
   project_root: /opt/betting-pod-shop
   local_root: /Users/samlawhon/Desktop/Betting Fund Project
@@ -76,6 +76,12 @@ systemd_units:
   - {id: p029-gate0c-checkpoint.service, unit: p029-gate0c-checkpoint.service, source: scripts/systemd/p029-gate0c-checkpoint.service, severity: warn}
   - {id: mlb-props-execution-checkpoint.timer, unit: mlb-props-execution-checkpoint.timer, source: scripts/mlb-props-execution-checkpoint.timer, severity: warn}
   - {id: mlb-props-execution-checkpoint.service, unit: mlb-props-execution-checkpoint.service, source: scripts/mlb-props-execution-checkpoint.service, severity: warn}
+  - {id: research-agent-screened-daily.timer, unit: research-agent-screened-daily.timer, source: scripts/systemd/research-agent-screened-daily.timer, severity: warn}
+  - {id: research-agent-screened-daily.service, unit: research-agent-screened-daily.service, source: scripts/systemd/research-agent-screened-daily.service, severity: warn}
+  - {id: research-agent-deep-daily.timer, unit: research-agent-deep-daily.timer, source: scripts/systemd/research-agent-deep-daily.timer, severity: warn}
+  - {id: research-agent-deep-daily.service, unit: research-agent-deep-daily.service, source: scripts/systemd/research-agent-deep-daily.service, severity: warn}
+  - {id: betting-strategy-chain.timer, unit: betting-strategy-chain.timer, source: scripts/systemd/betting-strategy-chain.timer, severity: warn}
+  - {id: betting-strategy-chain.service, unit: betting-strategy-chain.service, source: scripts/systemd/betting-strategy-chain.service, severity: warn}
 
 # -----------------------------------------------------------------------------
 # SERVICES — process-level liveness
@@ -150,7 +156,13 @@ services:
       inspect_last_row: true
     severity: warn
 
-  # Timer-driven oneshot (05:10 UTC): the research_screened_daily JOB below
+  - id: betting-strategy-chain
+    kind: systemd
+    description: Bounded next-role strategy agent executor
+    oneshot: true
+    severity: warn
+
+  # Timer-driven screening oneshot: the research_screened_daily JOB below
   # watches its output file, but that file is also touched by the hourly
   # dry-run worker, so the job stays "fresh" while the daily unit sits failed
   # — which is exactly what happened 2026-08-10 (audit rejected a legitimate
@@ -159,7 +171,13 @@ services:
   # latched "failed" ActiveState pages.
   - id: research-agent-screened-daily
     kind: systemd
-    description: Daily screened Codex research pass + acceptance audit (ExecStartPost)
+    description: Five-per-day cheap Codex screening pass + acceptance audit
+    oneshot: true
+    severity: warn
+
+  - id: research-agent-deep-daily
+    kind: systemd
+    description: Twice-daily deep Codex research pass over screened survivors
     oneshot: true
     severity: warn
 
@@ -337,28 +355,47 @@ jobs:
 
   - id: research_screened_daily
     host: droplet
-    schedule: "10 5 * * *"
-    description: Daily screened research pass (screen, then deep research only if it survives)
+    schedule: "10 5,9,13,17,21 * * *"
+    description: Five-per-day cheap research screening pass
     output:
-      file: data/research_execution/worker_status.json
-      max_stale_hours: 30
+      file: data/research_execution/screening_status.json
+      max_stale_hours: 8
     severity: warn
     note: >
-      ARMED 2026-08-08 as research-agent-screened-daily.timer, replacing
-      manual-only invocation. Runs at 05:10 UTC, after the 04:05 intake and
-      triage pass, so the queue and every packet's measured evidence are fresh.
-      Fuses are mechanical, not marker-based: one packet per invocation, two
-      model attempts per UTC day checked before any claim, strategy-scout only
-      (screening applies to no other agent, so admitting one would route it
-      straight to the unscreened deep call), and trading execution disabled.
+      Runs five times daily with a hard five-screen UTC-day budget. A survivor
+      is written to data/research_execution/deep_queue; screening cannot create
+      an opportunity card or strategy-registry mutation.
       scripts.audit_screened_research_pilot runs as ExecStartPost and fails the
-      unit on a bad outcome. A quiet day exits 1 and is NOT a fault: it means
+      unit on a bad outcome. A quiet pass exits 1 and is NOT a fault: it means
       the queue held nothing claimable, which the backpressure caps make
-      routine. This entry shares worker_status.json with research_agent_worker,
-      whose hourly dry run refreshes it far more often, so a stale status here
-      means the hourly planner has ALSO stopped -- do not read it as proof this
-      unit ran. Its own evidence is the run record under
-      data/research_execution/runs/<date>/.
+      routine. Its durable evidence is screening_status.json plus the scoped
+      run records under data/research_execution/runs/<date>/.
+
+  - id: research_deep_daily
+    host: droplet
+    schedule: "10 7,19 * * *"
+    description: Twice-daily deep research over screened survivors
+    output:
+      file: data/research_execution/deep_status.json
+      max_stale_hours: 16
+    severity: warn
+    note: >
+      Consumes only deep_queue packets. It has an independent two-call daily
+      budget, so screening volume cannot exhaust deep-research capacity. A
+      schema-valid disposition remains the only completion signal.
+
+  - id: strategy_chain_worker
+    host: droplet
+    schedule: "5,20,35,50 * * * *"
+    description: Consumes one current typed strategy-role task per pass
+    output:
+      file: data/strategy_agents/chain_status.json
+      max_stale_hours: 1
+    severity: warn
+    note: >
+      The executor can only submit typed JSON to the recorder. It cannot deploy,
+      trade, or queue promotion into live_small/live_scaled. Failed tasks back
+      off and dead-letter after three failures.
 
   - id: clv_settlement
     host: droplet

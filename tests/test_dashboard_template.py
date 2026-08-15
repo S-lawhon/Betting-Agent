@@ -208,6 +208,14 @@ def test_research_operations_shows_agent_queues_and_execution_semantics(html):
         assert field in html
 
 
+def test_services_use_backend_display_semantics_for_oneshots(html):
+    """Do not paint a successfully resting timer-driven service red."""
+    assert "s.display_state" in html
+    assert "s.display_tone" in html
+    assert "s.heartbeat_display" in html
+    assert "Health is tracked by the scheduled run result and job status" in html
+
+
 def test_reduced_motion_is_respected(html):
     assert "prefers-reduced-motion" in html
 

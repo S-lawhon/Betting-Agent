@@ -1422,11 +1422,18 @@ function renderOps(d){
   el("o-svc").querySelector("tbody").innerHTML = (ops.services || []).length
     ? ops.services.map(function(s){
         var hb = s.heartbeat || {};
+        var svcState = s.display_state || s.active || "unknown";
+        var svcTone = s.display_tone || (s.active === "active" ? "pos" : "neg");
+        var hbText = isNum(hb.age_minutes)
+          ? hb.age_minutes.toFixed(1) + "m"
+          : (s.heartbeat_display
+            ? '<span class="dim" title="Health is tracked by the scheduled run result and job status">' + esc(s.heartbeat_display) + "</span>"
+            : '<span class="dim">none</span>');
         return "<tr>" +
           '<td data-label="Unit"><b>' + esc(s.id) + "</b></td>" +
-          '<td data-label="Active" class="' + (s.active === "active" ? "pos" : "neg") + '">' + esc(s.active) + "</td>" +
+          '<td data-label="Active" class="' + esc(svcTone) + '" title="systemd: ' + esc(s.active || "unknown") + '">' + esc(svcState) + "</td>" +
           '<td data-label="Restarts">' + (isNum(s.restarts) ? s.restarts : '<span class="unknown">—</span>') + "</td>" +
-          '<td data-label="Heartbeat">' + (isNum(hb.age_minutes) ? hb.age_minutes.toFixed(1) + "m" : '<span class="dim">none</span>') + "</td>" +
+          '<td data-label="Heartbeat">' + hbText + "</td>" +
         "</tr>";
       }).join("")
     : '<tr><td colspan="4" class="empty">' + esc(ops.reason || "no services") + "</td></tr>";

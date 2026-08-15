@@ -131,6 +131,38 @@ def test_sections_matches_the_handlers_allowlist():
     assert tuple(api.SECTIONS) == _V2_SECTIONS
 
 
+@pytest.mark.parametrize("active,label,tone", [
+    ("inactive", "idle", "pos"),
+    ("active", "running", "pos"),
+    ("activating", "running", "pos"),
+    ("failed", "failed", "neg"),
+])
+def test_oneshot_service_display_semantics(active, label, tone):
+    """A resting scheduled worker is healthy; only failure should look red."""
+    services = [{"id": "scheduled-worker", "active": active,
+                 "oneshot": True, "restarts": 0}]
+    st = status(services=services)
+    p = api.build_v2(src(manager_status=st,
+                         sources=sources(manager_status=meta())))
+    svc = p["ops"]["services"][0]
+    assert svc["active"] == active  # preserve the raw systemd fact
+    assert svc["display_state"] == label
+    assert svc["display_tone"] == tone
+    if active != "failed":
+        assert svc["heartbeat_display"] == "one-shot"
+
+
+def test_stopped_long_running_service_remains_red():
+    services = [{"id": "daemon", "active": "inactive",
+                 "oneshot": False, "restarts": 0}]
+    st = status(services=services)
+    svc = api.build_v2(
+        src(manager_status=st, sources=sources(manager_status=meta()))
+    )["ops"]["services"][0]
+    assert svc["display_state"] == "inactive"
+    assert svc["display_tone"] == "neg"
+
+
 def test_funnel_stage_order_is_canonical_and_monotone():
     assert api.FUNNEL_STAGES[0] == "markets_listed"
     assert api.FUNNEL_STAGES[-1] == "candidates_without_quote"

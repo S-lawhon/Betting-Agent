@@ -916,6 +916,43 @@ def _pipeline(src: Dict[str, Any]) -> Dict[str, Any]:
 # ── ops / work ────────────────────────────────────────────────────────
 
 
+def _service_for_display(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Add honest UI semantics while preserving systemd's raw state.
+
+    Timer-driven ``Type=oneshot`` units rest at ``inactive`` after a
+    successful run. Treating every non-active state as a failure makes the
+    dashboard contradict the manager checks, which correctly reserve red for
+    the latched ``failed`` state.
+    """
+    svc = dict(_d(raw))
+    active = svc.get("active")
+    oneshot = bool(svc.get("oneshot"))
+
+    if oneshot and active == "inactive":
+        svc.update({
+            "display_state": "idle",
+            "display_tone": "pos",
+            "heartbeat_display": "one-shot",
+        })
+    elif oneshot and active in ("active", "activating"):
+        svc.update({
+            "display_state": "running",
+            "display_tone": "pos",
+            "heartbeat_display": "one-shot",
+        })
+    elif active == "active":
+        svc.update({"display_state": "active", "display_tone": "pos"})
+    elif active in (None, "n/a", "unknown"):
+        svc.update({
+            "display_state": active or "unknown",
+            "display_tone": "unknown",
+        })
+    else:
+        # Includes a latched failure and a stopped long-running service.
+        svc.update({"display_state": active, "display_tone": "neg"})
+    return svc
+
+
 def _ops(src: Dict[str, Any],
          findings: List[Dict[str, Any]]) -> Dict[str, Any]:
     status = _d(src.get("manager_status"))
@@ -923,7 +960,8 @@ def _ops(src: Dict[str, Any],
     return {
         "available": _available(sources, "manager_status"),
         "reason": _reason(sources, "manager_status"),
-        "services": [_d(s) for s in _l(status.get("services"))],
+        "services": [_service_for_display(_d(s))
+                     for s in _l(status.get("services"))],
         "jobs": [_d(j) for j in _l(status.get("jobs"))],
         "faults": _l(status.get("faults")),
         "errors": _d(status.get("errors")),

@@ -250,7 +250,7 @@
       <div class="fact"><b>4</b> <span>active pods</span></div>
       <div class="fact"><b>12</b> <span>agent roles</span></div>
       <div class="fact"><b>90</b> <span>Python modules</span></div>
-      <div class="fact"><b>2,752</b> <span>tests</span></div>
+      <div class="fact"><b>2,755</b> <span>tests</span></div>
       <div class="fact"><b>25</b> <span>service definitions</span></div>
       <div class="fact"><span>repo</span> <b>S-lawhon/Betting-Agent</b></div>
       <div class="fact"><span>as of</span> <b>Aug 16 2026</b></div>
@@ -637,7 +637,8 @@ flowchart TD
     <h3>What it has actually done</h3>
     <p class="muted">The factory went live on <b>2 Aug 2026</b>. Its first real subject was a fantasy-football dead-heat idea, which it <b>killed at the integrity gate</b>: the market family turned out to be season-long single-rank contracts, not the weekly threshold markets the thesis assumed. The idea had a plausible mechanism and no product to trade it on.</p>
     <p class="muted">It was then run over <b>P-022</b> — a strategy already validated by hand — purely to check whether the agents could be trusted. That run found a real defect nobody had noticed: the backtest harness reports a <i>pooled</i> average where the locked decision rule specifies an <i>equal-weighted-per-tournament</i> one. On the original sample the two agree, so the original green light stands. On the widened sample they don't: +2.6¢ becomes +1.5¢ and stops being statistically significant.</p>
-    <p class="muted">Read that as the intended outcome. A factory whose first two runs both ended in "no" is behaving correctly; the failure mode to fear is the one that says yes to everything.</p>
+    <p class="muted">On <b>11 Aug 2026</b> it completed its first full chain start-to-finish on a genuinely unknown answer: a cross-venue Gemini/Kalshi MLB arb idea went scout → spec → integrity <b>PASS</b> → validation <b>NO-GO</b> → promotion <b>RETIRE</b>, every artifact agent-written and committed to the repo. The validator replayed 40,863 raw observations and found 0 of 79 pre-start-matched games with a qualifying dislocation (95% CI [0%, 4.56%]) — the fee-net edge never printed positive once across 72,875 priced paths — and a separate deterministic check found the two venues don't even settle equivalently on postponements. <b>strategy-promotion</b> wrote its first-ever verdict against a complete agent-authored chain: retire, with the specific bar a successor variant would have to clear. The read-only Gemini collector keeps running regardless; nothing has reached <code>paper_live</code> yet, so <b>strategy-monitor</b> is still the one role that has never been exercised.</p>
+    <p class="muted">Read that as the intended outcome. A factory whose first three runs all ended in "no" is behaving correctly; the failure mode to fear is the one that says yes to everything.</p>
   </div>
 </div></section>
 
@@ -717,16 +718,18 @@ flowchart LR
 
   <div class="card">
     <h3>What runs on a timer, and what doesn't</h3>
-    <p class="muted">Two jobs are automated. Neither of them thinks.</p>
+    <p class="muted">Three jobs are automated now. Two of them don't think — the third does, on a short leash.</p>
     <table>
       <thead><tr><th>When (UTC)</th><th>What</th><th>Produces</th></tr></thead>
       <tbody>
         <tr><td class="tier">03:35 daily</td><td>Market census — scan the public series inventory</td><td>New families, terms/fee changes, ranked scout inbox</td></tr>
         <tr><td class="tier">04:05 daily</td><td>Research intake — collect and rank free sources</td><td>Source ledger, assignments, coverage manifest</td></tr>
+        <tr><td class="tier">05:10 daily</td><td>Screened Codex research pass — reads the top of the queue itself</td><td>A schema-checked disposition (reject / defer / deep-research), audited every run</td></tr>
         <tr><td class="tier">1st of month</td><td>Full-universe rotation instead of a delta scan</td><td>Series that have never been looked at get priority</td></tr>
       </tbody>
     </table>
-    <p class="muted" style="margin-top:12px"><b>The timers do not invoke an agent.</b> They fill an inbox. A person or a Claude session has to actually do the research — so a green timer is evidence that <i>tasks were created</i>, never that anything was reviewed. Only a stored disposition proves review happened.</p>
+    <p class="muted" style="margin-top:12px"><b>The census and intake timers do not invoke an agent.</b> They fill an inbox. A person or a Claude session has to actually do the research — so a green timer is evidence that <i>tasks were created</i>, never that anything was reviewed.</p>
+    <p class="muted"><b>The 05:10 pass is different — added 9 Aug 2026 — and it is deliberately boxed in:</b> one packet per run, at most two model calls a day (a cheap screen first, a deep-research call only if the screen says so), a hard per-call token ceiling, trading and queue-mutation disabled, and an audit script that runs immediately after and fails the systemd unit on a bad outcome. It only ever writes a disposition — reject, defer, or "worth deep research" — never a strategy. This session has no droplet access, so it cannot confirm the timer is currently enabled and firing; the commit history shows real dated runs (and two bugs already found and fixed from them, 9–14 Aug), which is the strongest evidence available from the repo alone.</p>
   </div>
 
   <div class="card">
@@ -831,9 +834,10 @@ flowchart LR
         <tr><td><code>betting-book-capture</code></td><td>Records Kalshi order-book snapshots for research</td><td>every 1 min</td></tr>
         <tr><td><code>betting-inplay-basis</code></td><td>Kalshi ↔ Polymarket in-play basis collector</td><td>continuous</td></tr>
         <tr><td><code>market-census</code> · <code>research-intake</code></td><td>Timers that fill the research inbox. <b>Neither invokes an agent</b></td><td>03:35 · 04:05 UTC</td></tr>
+        <tr><td><code>research-agent-screened-daily</code></td><td>The one automated timer that does call a model — see the Research tab</td><td>05:10 UTC</td></tr>
       </tbody>
     </table>
-    <p class="muted">Six services were active as of 2 Aug 2026; the two research timers are in the repo and awaiting install. The deploy script now prints a warning whenever a unit file in the repo differs from the one actually installed, because those two drifting apart silently is how a fix ships to a server and never takes effect.</p>
+    <p class="muted">Six services were confirmed active as of 2 Aug 2026. This map can't SSH to the droplet, so it can't confirm what's running today — the <b>25 service definitions</b> in the header count unit files committed to <code>scripts/systemd/</code>, not confirmed-running services. Several are new since 2 Aug (a Gemini cross-venue research/analysis pair, an hourly fund-manager rollup, and the screened daily research pass above). A unit living in the repo only means it's been written and committed, not installed. The deploy script prints a warning whenever a unit file in the repo differs from the one actually installed, because those two drifting apart silently is how a fix ships to a server and never takes effect.</p>
     <p class="small muted"><code>betting-live-maker</code> (P-016) was a fourth unit — decommissioned Jul 22 2026 after it failed its gate. Kalshi throttles <b>per-IP</b>, so all services share one rate budget (hence the 2 req/s limit on the main client).</p>
   </div>
 
@@ -1268,7 +1272,7 @@ const GLOSS=[
   ["Backtest","Running a strategy against historical data to estimate whether the edge would have worked, before building it live."],
   ["The drop","Deploying: pushing code from your Mac to the live server safely (tests → sync → restart → health-check → rollback)."],
   ["systemd service / unit","A background program the Linux server keeps running and auto-restarts. Six were active as of Aug 2026."],
-  ["Agent (here)","A language model given one narrow job, a fixed set of tools, and no ability to do the next job in the chain. Ten of them exist; none can promote its own work."],
+  ["Agent (here)","A language model given one narrow job, a fixed set of tools, and no ability to do the next job in the chain. Twelve of them exist; none can promote its own work."],
   ["Typed artifact","The single JSON object an agent must return — an OpportunityCard, a StrategySpec, an IntegrityReport. Validated against a schema on arrival, so a malformed or over-reaching one is rejected rather than absorbed."],
   ["The ratchet","The rule that a strategy can move DOWN (to degraded or retired) on an agent's own authority, but can only move UP with a typed artifact and a named human approval."],
   ["approval_ref","A human's sign-off recorded against a promotion into live money. Without one the code refuses to construct the decision at all."],

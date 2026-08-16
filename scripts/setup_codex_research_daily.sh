@@ -83,9 +83,9 @@ check_daily() {
     --property=LoadState,ActiveState,SubState,Result --no-pager
   grep -q '^mode: execute$' "$ROOT/$CONFIG"
   grep -q '^stage_mode: screen_only$' "$ROOT/$CONFIG"
-  grep -q '^  max_attempts_per_day: 5$' "$ROOT/$CONFIG"
+  grep -q '^  max_attempts_per_day: 6$' "$ROOT/$CONFIG"
   grep -q '^stage_mode: deep_only$' "$ROOT/$DEEP_CONFIG"
-  grep -q '^  max_attempts_per_day: 2$' "$ROOT/$DEEP_CONFIG"
+  grep -q '^  max_attempts_per_day: 4$' "$ROOT/$DEEP_CONFIG"
   grep -q '^  max_input_tokens_per_task: 250000$' "$ROOT/$CONFIG"
 }
 

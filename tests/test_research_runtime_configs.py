@@ -85,12 +85,12 @@ def test_daily_config_covers_the_measured_deep_research_distribution():
     config = _config(path)
     limits = WorkerLimits(**dict(config.get("limits") or {}))
     assert limits.max_input_tokens_per_task >= max(OBSERVED_DEEP_INPUT_TOKENS)
-    assert limits.max_attempts_per_day == 5
+    assert limits.max_attempts_per_day == 6
     assert config.get("stage_mode") == "screen_only"
     deep = _config(
         ROOT / "config" / "research_agent_runtime_deep_daily.yaml")
     assert deep.get("stage_mode") == "deep_only"
-    assert deep["limits"]["max_attempts_per_day"] == 2
+    assert deep["limits"]["max_attempts_per_day"] == 4
 
 
 def test_pilot_config_stays_exact_target_and_manual():

@@ -6,8 +6,11 @@ budget_scope: deep_research
 status_filename: deep_status.json
 
 limits:
-  max_cost_usd_per_day: 0.02
-  max_attempts_per_day: 2
+  # One-week backlog-clearance trial, 2026-08-16 through 2026-08-23. Five of
+  # the first seven separated screens survived, so two deep calls could not
+  # keep pace. Re-evaluate the arrival/survival/advance rates after the trial.
+  max_cost_usd_per_day: 0.04
+  max_attempts_per_day: 4
 
 screening:
   enabled: false

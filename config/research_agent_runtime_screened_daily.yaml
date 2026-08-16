@@ -15,8 +15,8 @@ status_filename: screening_status.json
 # safety property, it is a lie. Nobody is present to place it, so a marker
 # would either be created by the unit itself (meaningless) or left permanently
 # on disk (meaningless). The real fuses are below and they are all mechanical:
-#   - one packet per invocation, one invocation per day
-#   - two model attempts per UTC day, hard, checked before any claim
+#   - one packet per invocation, six scheduled invocations per day
+#   - six screening attempts per UTC day, hard, checked before any claim
 #   - screening first, deep research only if the screen survives
 #   - trading execution disabled, queue mutation disabled
 #   - the audit runs immediately after and fails the unit on a bad outcome
@@ -56,8 +56,11 @@ limits:
   max_input_tokens_per_task: 250000
   max_output_tokens_per_task: 5000
   max_cost_usd_per_task: 0.01
-  max_cost_usd_per_day: 0.05
-  max_attempts_per_day: 5
+  # One-week throughput trial, 2026-08-16 through 2026-08-23. Intake produced
+  # six new dispatches in the measured prior 24h, so the five-screen budget
+  # could not keep up even before considering the inherited backlog.
+  max_cost_usd_per_day: 0.06
+  max_attempts_per_day: 6
   max_output_bytes: 150000
 
 retry:

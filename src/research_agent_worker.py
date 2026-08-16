@@ -658,8 +658,12 @@ class ResearchAgentWorker:
                 "assigned_agent": agent,
                 "dispatch_packet": dict(packet),
                 "screening_rules": [
-                    "Reject only when the mechanism is absent, duplicated, "
-                    "illegal, or falsified by the supplied/public evidence.",
+                    "Reject when there is no specific economic mechanism, "
+                    "when the mechanism is duplicated, illegal, or already "
+                    "falsified, OR when no decisive test can be executed from "
+                    "current public data within the deep-research budget. A "
+                    "market family, wide spread, low volume, or generic claim "
+                    "of inefficiency is not a mechanism.",
                     "Defer ONLY when the deciding fact DOES NOT EXIST YET and "
                     "needs time to come into being -- a market not yet listed, "
                     "an event not yet settled, a filing whose text is not yet "
@@ -676,8 +680,13 @@ class ResearchAgentWorker:
                     "evidence class is unavailable -- measured fees, quotes, "
                     "contract terms and filing documents are often already "
                     "there, with the timestamp they were measured at.",
-                    "Choose deep_research only with a concrete market "
-                    "mechanism and a cheapest decisive test.",
+                    "Choose deep_research only when mechanism names the price-"
+                    "formation, settlement, information, or incentive failure "
+                    "and identifies who should be systematically wrong. The "
+                    "cheapest decisive test must name the timestamp-correct "
+                    "data, fees/fill friction, a falsification threshold, and "
+                    "be feasible inside one deep-research call. 'Collect more "
+                    "data' or 'compare prices' alone is not a decisive test.",
                     "This phase cannot advance or create an opportunity card.",
                 ],
                 "output_contract": {

@@ -1,8 +1,8 @@
 [Unit]
-Description=Betting Pod Shop — twice-daily deep-research timer
+Description=Betting Pod Shop — four-per-day deep-research timer
 
 [Timer]
-OnCalendar=*-*-* 07,19:10:00 UTC
+OnCalendar=*-*-* 03,07,15,19:10:00 UTC
 Persistent=false
 RandomizedDelaySec=300
 

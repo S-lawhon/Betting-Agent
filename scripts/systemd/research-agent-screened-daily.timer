@@ -1,10 +1,10 @@
 [Unit]
-Description=Betting Pod Shop — daily screened research timer
+Description=Betting Pod Shop — six-per-day screened research timer
 
 [Timer]
-# After the 04:05 UTC intake/triage pass, so the queue and every packet's
-# measured evidence are fresh when the screen reads them.
-OnCalendar=*-*-* 05,09,13,17,21:10:00 UTC
+# Five passes follow the 04:05 UTC intake/triage run; the 01:10 pass drains
+# survivors from the prior intake day without replaying missed work in a burst.
+OnCalendar=*-*-* 01,05,09,13,17,21:10:00 UTC
 # Do NOT replay a missed window. A skipped day costs one research pass; a
 # burst of catch-up runs would spend the daily attempt budget on whatever
 # happened to be queued during the outage, which is worse.

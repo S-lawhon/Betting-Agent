@@ -1,0 +1,23 @@
+{
+  "assignment_id": "assignment_1b0828ec47e0e6712f60",
+  "decided_at": "2026-08-16T19:37:26Z",
+  "decision": "defer",
+  "evidence_checked": [
+    "Kalshi BASEBALLSPREAD contract terms: https://assets.kalshi.com/contract_terms/BASEBALLSPREAD.pdf",
+    "Kalshi Historical Data API Documentation: https://docs.kalshi.com/getting_started/historical_data",
+    "Kalshi Historical Market Candlesticks API: https://docs.kalshi.com/api-reference/historical/get-historical-market-candlesticks",
+    "Official KBO scoreboard: https://eng.koreabaseball.com/Schedule/Scoreboard.aspx",
+    "Official KBO team statistics: https://eng.koreabaseball.com/Stats/TeamStats.aspx"
+  ],
+  "notes": "The evidence supports a falsifiable information-latency hypothesis and confirms public sources for historical Kalshi market data and KBO outcomes. It does not yet establish timestamp-aligned pre-quote information, conservative fills, scalable depth, or positive out-of-sample net P&L after spread and fees. Execution eligibility remains reference_only.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "historical_timestamp_aligned_dataset_missing",
+    "net_edge_unverified",
+    "capacity_and_fill_history_missing",
+    "execution_not_authorized"
+  ],
+  "recheck_after": "2026-11-01T00:00:00Z",
+  "research_minutes": 2,
+  "source_item_id": "src_152ad13e829b7532b7b8"
+}

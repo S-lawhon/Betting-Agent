@@ -692,6 +692,9 @@ def test_screening_rules_route_fetchable_unknowns_to_deep_research(tmp_path):
     assert "that is deep_research, " in rules and "NOT defer" in rules
     # And the screen is pointed at the evidence it was actually handed.
     assert "dispatch_packet.market_evidence" in rules
+    assert "generic claim of inefficiency is not a mechanism" in rules
+    assert "falsification threshold" in rules
+    assert "'Collect more data'" in rules
     assert request["output_contract"]["decisions"] == [
         "reject", "defer", "deep_research"]
     assert request["output_contract"]["advance_allowed"] is False

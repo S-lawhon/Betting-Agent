@@ -143,6 +143,7 @@ class ScreeningDecision:
     cheapest_decisive_test: str = ""
     confidence: float = 0.0
     recheck_after: Optional[str] = None
+    blocking_fact: Optional[str] = None
     notes: str = ""
 
     def __post_init__(self) -> None:
@@ -157,6 +158,8 @@ class ScreeningDecision:
         if self.decision == "defer" and not self.recheck_after:
             raise ValueError("defer screening requires recheck_after")
         if self.decision == "defer":
+            if not self.blocking_fact:
+                raise ValueError("defer screening requires blocking_fact")
             try:
                 parsed = datetime.fromisoformat(
                     str(self.recheck_after).replace("Z", "+00:00"))
@@ -185,6 +188,7 @@ class ScreeningDecision:
                 payload.get("cheapest_decisive_test") or ""),
             confidence=float(payload.get("confidence") or 0),
             recheck_after=payload.get("recheck_after"),
+            blocking_fact=payload.get("blocking_fact"),
             notes=str(payload.get("notes") or ""),
         )
 
@@ -615,8 +619,14 @@ class ResearchAgentWorker:
                 "disposition_rules": [
                     "decision='defer' REQUIRES recheck_after: a "
                     "timezone-aware ISO-8601 UTC timestamp for when the "
-                    "missing fact will exist. A defer with null "
-                    "recheck_after is rejected and the run fails.",
+                    "missing fact will exist, AND blocking_fact naming that "
+                    "external fact. Use defer only when time creates the "
+                    "evidence without research work. A defer with either "
+                    "field missing is rejected and the run fails.",
+                    "decision='needs_work' REQUIRES next_action naming the "
+                    "bounded dataset, collector, analysis, or implementation "
+                    "work. needs_work MUST use null recheck_after: the "
+                    "calendar does not complete work.",
                     "reason_codes and evidence_checked must be non-empty.",
                     "research_minutes must not exceed "
                     "budget.research_minutes.",
@@ -668,7 +678,9 @@ class ResearchAgentWorker:
                     "needs time to come into being -- a market not yet listed, "
                     "an event not yet settled, a filing whose text is not yet "
                     "public. recheck_after must be an ISO-8601 UTC timestamp "
-                    "for when that fact will exist.",
+                    "for when that fact will exist, and blocking_fact must "
+                    "name it. Missing research, collection, modelling, or "
+                    "implementation work is never a defer.",
                     "If the missing input is public and FETCHABLE NOW -- a "
                     "linked filing document, contract terms, current prices, "
                     "depth, fees, a published dataset -- that is deep_research, "
@@ -863,6 +875,7 @@ class ResearchAgentWorker:
             evidence_checked=list(screening.evidence_checked),
             research_minutes=screening.research_minutes,
             recheck_after=screening.recheck_after,
+            blocking_fact=screening.blocking_fact,
             notes=("screening_only: " + screening.notes).strip(),
         )
         # This path writes the artifact directly, without the per-agent

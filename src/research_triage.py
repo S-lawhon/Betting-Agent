@@ -257,6 +257,11 @@ def _outcome_value(disposition: Mapping[str, Any]) -> Tuple[float, bool]:
         return 100.0, False
     if decision == "defer":
         return 45.0, False
+    if decision == "needs_work":
+        # A feasible idea that still needs a dataset/collector/build is more
+        # useful than an unsupported lead, but it has not earned a timed
+        # recheck: work, not the calendar, is the blocker.
+        return 35.0, False
     if decision == "reject" and reasons & INPUT_QUALITY_REJECTION_REASONS:
         return 10.0, True
     if decision == "reject":

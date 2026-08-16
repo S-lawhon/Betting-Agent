@@ -23,12 +23,15 @@
         {"type": "null"}
       ]
     },
+    "blocking_fact": {
+      "type": ["string", "null"]
+    },
     "notes": {"type": "string"}
   },
   "required": [
     "decision", "reason_codes", "evidence_checked", "research_minutes",
     "mechanism", "cheapest_decisive_test", "confidence",
-    "recheck_after", "notes"
+    "recheck_after", "blocking_fact", "notes"
   ],
   "additionalProperties": false
 }

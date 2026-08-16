@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 
-DECISIONS = {"reject", "defer", "advance"}
+DECISIONS = {"reject", "defer", "needs_work", "advance"}
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,8 @@ class ResearchDisposition:
     research_minutes: int
     opportunity_id: Optional[str] = None
     recheck_after: Optional[str] = None
+    blocking_fact: Optional[str] = None
+    next_action: Optional[str] = None
     notes: str = ""
 
     def __post_init__(self) -> None:
@@ -30,8 +32,16 @@ class ResearchDisposition:
             raise ValueError("research_minutes cannot be negative")
         if self.decision == "advance" and not self.opportunity_id:
             raise ValueError("advance disposition requires opportunity_id")
-        if self.decision == "defer" and not self.recheck_after:
-            raise ValueError("defer disposition requires recheck_after")
+        if self.decision == "defer":
+            if not self.recheck_after:
+                raise ValueError("defer disposition requires recheck_after")
+            if not self.blocking_fact:
+                raise ValueError("defer disposition requires blocking_fact")
+        if self.decision == "needs_work":
+            if self.recheck_after:
+                raise ValueError("needs_work cannot use a calendar recheck")
+            if not self.next_action:
+                raise ValueError("needs_work disposition requires next_action")
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -49,6 +59,8 @@ class ResearchDisposition:
             research_minutes=int(payload.get("research_minutes", 0)),
             opportunity_id=payload.get("opportunity_id"),
             recheck_after=payload.get("recheck_after"),
+            blocking_fact=payload.get("blocking_fact"),
+            next_action=payload.get("next_action"),
             notes=str(payload.get("notes") or ""),
         )
 
@@ -90,8 +102,7 @@ def summarize_research(
         result: Dict[str, Any] = {}
         for key, values in sorted(stats.items()):
             assigned = values["assigned"]
-            reviewed_count = (values["advance"] + values["reject"]
-                              + values["defer"])
+            reviewed_count = sum(values[decision] for decision in DECISIONS)
             result[key] = dict(values) | {
                 "advance_rate": (values["advance"] / assigned if assigned else 0.0),
                 "reviewed": reviewed_count,

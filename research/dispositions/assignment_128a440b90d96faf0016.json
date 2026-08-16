@@ -1,5 +1,6 @@
 {
   "assignment_id": "assignment_128a440b90d96faf0016",
+  "blocking_fact": "CFTC designation decision or publication of an operating TLD Markets venue with live products",
   "decided_at": "2026-08-02T18:33:00Z",
   "decision": "defer",
   "evidence_checked": [
@@ -9,6 +10,7 @@
   ],
   "notes": "TLD Markets filed a DCM application on 2026-04-22 and remains Pending in the current CFTC directory. Its proposed rulebook supports binary contracts and API access, which makes the venue relevant to monitor, but it is not designated or operating and no live products, fees, liquidity, market data, Texas eligibility, or testable pricing mechanism can yet be measured.",
   "opportunity_id": null,
+  "next_action": null,
   "reason_codes": [
     "pending_regulatory_application",
     "venue_not_operational",

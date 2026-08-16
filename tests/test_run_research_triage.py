@@ -20,6 +20,7 @@ class TestRunResearchTriage(TestCase):
                 "reason_codes": ["await_outcome"], "evidence_checked": ["terms"],
                 "research_minutes": 10,
                 "recheck_after": "2026-08-18T13:00:00Z",
+                "blocking_fact": "the Aug. 17 settlement record",
             }))
 
             reviewed, due, errors, _ = _reviewed_assignments(

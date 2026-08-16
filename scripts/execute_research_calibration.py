@@ -91,7 +91,7 @@ def _screen_request(case: Mapping[str, Any]) -> Dict[str, Any]:
             "or already falsified by supplied or public evidence.",
             "Defer only when a named external fact and recheck time can resolve "
             "the uncertainty. recheck_after must be an ISO-8601 UTC timestamp, "
-            "not a prose condition.",
+            "not a prose condition, and blocking_fact must name the fact.",
             "Choose deep_research only with a concrete economic mechanism and "
             "the cheapest decisive test.",
             "Screening cannot advance, create an OpportunityCard, or authorize "
@@ -208,6 +208,7 @@ def _screen_completion(
         evidence_checked=list(screening.evidence_checked),
         research_minutes=screening.research_minutes,
         recheck_after=screening.recheck_after,
+        blocking_fact=screening.blocking_fact,
         notes=("screening_only: " + screening.notes).strip())
 
 

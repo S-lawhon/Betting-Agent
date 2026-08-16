@@ -28,6 +28,7 @@ def screen(decision: str):
             "measure fee-net markout" if decision == "deep_research" else ""),
         "confidence": .8,
         "recheck_after": "2026-08-14T00:00:00Z" if decision == "defer" else None,
+        "blocking_fact": "the scheduled filing release" if decision == "defer" else None,
         "notes": "calibration",
     }
 
@@ -43,6 +44,8 @@ def disposition(case: int, decision: str):
         "research_minutes": 10,
         "opportunity_id": "op_calibration" if decision == "advance" else None,
         "recheck_after": None,
+        "blocking_fact": None,
+        "next_action": None,
         "notes": "calibration",
     }
 

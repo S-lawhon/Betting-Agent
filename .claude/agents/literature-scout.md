@@ -19,3 +19,8 @@ Return either a falsifiable hypothesis brief for `strategy-scout`, or a
 `ResearchDisposition` matching `src/research_outcomes.py`. Any advance must name
 the cheapest decisive test and preserve source/assignment provenance. Do not
 create an OpportunityCard, modify the running system, or trade.
+
+`defer` is only for a named external `blocking_fact` that does not exist yet and
+will arise without research effort. Missing replication, collection, modelling,
+or implementation is `needs_work`, with a bounded `next_action` and no calendar
+recheck.

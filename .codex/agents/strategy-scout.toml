@@ -26,5 +26,8 @@ Confidence is a prior, not a result.
 
 If it does not survive, return one JSON object with `type: scout_rejection`, the
 seed/run IDs, `reason_codes`, `evidence_checked`, and `recheck_after` when a later
-event could change the conclusion. Do not submit either artifact or modify the
-running system."""
+event could change the conclusion. Use `defer` only for a named external
+`blocking_fact` that will arise without research effort. Missing collection,
+data engineering, modelling, or implementation is `needs_work`, with a bounded
+`next_action` and no calendar recheck. Do not submit either artifact or modify
+the running system."""

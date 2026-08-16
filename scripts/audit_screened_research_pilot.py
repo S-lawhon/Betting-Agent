@@ -215,6 +215,14 @@ def audit_pilot(
         if disposition.decision == "defer":
             check("defer_has_dated_recheck", _aware_iso(disposition.recheck_after),
                   str(disposition.recheck_after))
+            check("defer_names_external_fact", bool(disposition.blocking_fact),
+                  str(disposition.blocking_fact))
+        if disposition.decision == "needs_work":
+            check("needs_work_has_no_calendar_recheck",
+                  disposition.recheck_after is None,
+                  str(disposition.recheck_after))
+            check("needs_work_names_next_action", bool(disposition.next_action),
+                  str(disposition.next_action))
 
     screening = _read_json(screening_path)
     screen_decision = str((screening.get("screening") or {}).get("decision") or "")

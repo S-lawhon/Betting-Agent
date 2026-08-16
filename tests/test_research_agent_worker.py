@@ -157,7 +157,7 @@ def test_dry_run_plans_without_claiming_or_invoking(tmp_path):
     assert "request_sha256" in status_text
 
 
-def test_deep_request_states_the_defer_contract(tmp_path):
+def test_deep_request_distinguishes_waiting_from_missing_work(tmp_path):
     # The worker rejects a defer with null recheck_after AFTER the model call
     # returns, with the spend already made (2026-08-14: 47.9k tokens burned).
     # The contract must therefore be stated in the request the model reads.
@@ -170,6 +170,8 @@ def test_deep_request_states_the_defer_contract(tmp_path):
     contract = provider.last_request["output_contract"]
     rules = " ".join(contract["disposition_rules"])
     assert "defer" in rules and "recheck_after" in rules
+    assert "blocking_fact" in rules
+    assert "needs_work" in rules and "next_action" in rules
     assert "ISO-8601" in rules
 
 
@@ -181,6 +183,10 @@ def test_output_schema_documents_defer_recheck_requirement():
     assert "defer" in spec.get("description", ""), (
         "recheck_after must document that defer requires it; the codex "
         "structured-output layer reads field descriptions")
+    decisions = schema["properties"]["disposition"]["properties"]["decision"]["enum"]
+    assert "needs_work" in decisions
+    assert "blocking_fact" in schema["properties"]["disposition"]["required"]
+    assert "next_action" in schema["properties"]["disposition"]["required"]
 
 
 def test_dry_run_targets_exact_assignment_instead_of_higher_score(tmp_path):
@@ -439,12 +445,14 @@ def test_deferred_screen_requires_timezone_aware_iso_recheck():
         ScreeningDecision(
             decision="defer", reason_codes=["missing_terms"],
             evidence_checked=["filing"], research_minutes=2,
-            recheck_after="after terms are published")
+            recheck_after="after terms are published",
+            blocking_fact="published terms")
     with pytest.raises(ValueError, match="timezone"):
         ScreeningDecision(
             decision="defer", reason_codes=["missing_terms"],
             evidence_checked=["filing"], research_minutes=2,
-            recheck_after="2026-08-14T15:00:00")
+            recheck_after="2026-08-14T15:00:00",
+            blocking_fact="published terms")
 
 
 def test_budget_breach_releases_claim_and_never_completes(tmp_path):

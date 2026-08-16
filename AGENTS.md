@@ -218,6 +218,15 @@ exposure — the guard rejected nothing, and only the pod's own
 - Paper-first, CLV-gated. New pods are validated in a `*_research/` folder
   (backtest → REPORT + params JSON) BEFORE writing the pod, then the pod bakes in
   the validated params. See `tennis_research/`, `golf_research/`, `mlb_props_research/`.
+- **`defer` means WAITING, not unfinished work.** A research disposition may
+  use `decision: defer` only when a named external `blocking_fact` does not
+  exist yet and will arise without research effort; it requires an exact
+  `recheck_after`. Missing datasets, collectors, modelling, analysis, or
+  implementation are `decision: needs_work`, with a bounded `next_action` and
+  `recheck_after: null`. Daily triage automatically reopens only true timed
+  deferrals. This distinction was enforced after KBO Spread was incorrectly
+  parked until November even though its historical candles were fetchable
+  immediately.
 - Edge must clear NET of fee + half-spread (`kalshi_fees.net_edge`). Use CLV vs the
   de-vigged sharp close as the north-star metric, not raw P&L.
 - Bootstrap CIs for backtests cluster by event/tournament (within-event outcomes

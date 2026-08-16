@@ -312,6 +312,7 @@ def _research_operations(
         "activity_24h": {
             key: activity[key] for key in (
                 "dispatched", "started", "invoked", "reviewed", "advance", "reject", "defer",
+                "needs_work",
                 "research_minutes")
         },
         "queue": {

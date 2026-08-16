@@ -149,6 +149,8 @@ def completed_fixture(root: Path, *, screen_input: int = 20000,
         "reason_codes": ["await_evidence"],
         "evidence_checked": ["CFTC filing"], "research_minutes": 4,
         "opportunity_id": None, "recheck_after": "2026-08-16T04:00:00Z",
+        "blocking_fact": "the scheduled filing publication",
+        "next_action": None,
         "notes": "screening_only",
     }
     write(root / f"research/dispositions/{TARGET}.json", disposition)

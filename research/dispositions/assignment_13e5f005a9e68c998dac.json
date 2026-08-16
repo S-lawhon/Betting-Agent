@@ -1,7 +1,8 @@
 {
   "assignment_id": "assignment_13e5f005a9e68c998dac",
-  "decided_at": "2026-08-16T20:00:00Z",
-  "decision": "defer",
+  "blocking_fact": null,
+  "decided_at": "2026-08-16T20:10:00Z",
+  "decision": "needs_work",
   "evidence_checked": [
     "Kalshi Economic Statistics contract terms: https://assets.kalshi.com/contract_terms/ECONSTATSOFR.pdf",
     "New York Fed Secured Overnight Financing Rate Data: https://www.newyorkfed.org/markets/reference-rates/sofr",
@@ -9,7 +10,8 @@
     "New York Fed Markets Data APIs: https://markets.newyorkfed.org/static/docs/markets-api.html",
     "Kalshi Market Rules guidance: https://help.kalshi.com/en/articles/13823822-market-rules"
   ],
-  "notes": "Official New York Fed sources confirm that SOFR is published around 8:00 a.m. ET on business days, is based on prior-day repo transactions, and has documented methodology and historical-data/API access. This supports data availability for the eventual outcome series, but no timestamp-correct historical Kalshi prices, contemporaneous depth/fill history, or validated predictor model was established here. The supplied 0.635 mid, 0.15 spread, displayed size of 38, and fee fixture remain observations, not evidence of edge. Defer until the Aug. 17 outcome and corresponding market record can be incorporated into a strictly out-of-sample, fee- and fill-adjusted test.",
+  "notes": "Reclassified from defer: the Aug. 17 outcome is not sufficient to resolve the hypothesis. The binding gaps are work that can begin now: build timestamp-correct historical Kalshi prices, predictor features, and a fee/fill-adjusted test. One new settlement does not turn a single 15-cent-spread observation into evidence of edge.",
+  "next_action": "Inventory settled KXSOFRD markets and candlesticks, align them to New York Fed inputs available before each quote, and run a strictly out-of-sample calibration and net-edge feasibility test.",
   "opportunity_id": null,
   "reason_codes": [
     "historical_market_prices_unavailable_in_research_packet",
@@ -17,7 +19,7 @@
     "current_quote_is_single_observation",
     "execution_not_authorized"
   ],
-  "recheck_after": "2026-08-18T13:00:00Z",
+  "recheck_after": null,
   "research_minutes": 10,
   "source_item_id": "src_7b80265dc4d01061f98e"
 }

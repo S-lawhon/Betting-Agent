@@ -18,6 +18,7 @@
           "enum": [
             "reject",
             "defer",
+            "needs_work",
             "advance"
           ]
         },
@@ -48,7 +49,21 @@
             "string",
             "null"
           ],
-          "description": "REQUIRED (non-null) when decision is 'defer': a timezone-aware ISO-8601 UTC timestamp for when the missing fact will exist. A defer with null recheck_after is rejected by the worker and the whole run fails. null is valid only for reject and advance."
+          "description": "REQUIRED (non-null) only when decision is 'defer': a timezone-aware ISO-8601 UTC timestamp for when the named external fact will exist. MUST be null for needs_work."
+        },
+        "blocking_fact": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "REQUIRED when decision is defer: the named external fact that does not exist yet and will arise without research work."
+        },
+        "next_action": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "REQUIRED when decision is needs_work: the bounded dataset, collector, analysis, or implementation action."
         },
         "notes": {
           "type": "string"
@@ -64,6 +79,8 @@
         "research_minutes",
         "opportunity_id",
         "recheck_after",
+        "blocking_fact",
+        "next_action",
         "notes"
       ],
       "additionalProperties": false
@@ -181,6 +198,7 @@
           "enum": [
             "reject",
             "defer",
+            "needs_work",
             "advance"
           ]
         },
@@ -212,6 +230,18 @@
             "null"
           ]
         },
+        "blocking_fact": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next_action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "notes": {
           "type": "string"
         }
@@ -226,6 +256,8 @@
         "research_minutes",
         "opportunity_id",
         "recheck_after",
+        "blocking_fact",
+        "next_action",
         "notes"
       ],
       "additionalProperties": false

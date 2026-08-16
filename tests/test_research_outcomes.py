@@ -16,6 +16,31 @@ class TestResearchOutcomes(TestCase):
         with self.assertRaises(ValueError):
             ResearchDisposition(decision="defer", **common)
 
+    def test_waiting_and_missing_work_are_distinct_states(self):
+        waiting = ResearchDisposition(
+            assignment_id="a1", source_item_id="s1", decided_at="now",
+            decision="defer", reason_codes=["await_release"],
+            evidence_checked=["calendar"], research_minutes=1,
+            recheck_after="2026-09-01T00:00:00Z",
+            blocking_fact="the scheduled public data release",
+        )
+        assert waiting.next_action is None
+
+        work = ResearchDisposition(
+            assignment_id="a2", source_item_id="s2", decided_at="now",
+            decision="needs_work", reason_codes=["dataset_missing"],
+            evidence_checked=["API docs"], research_minutes=2,
+            next_action="build the timestamp-aligned dataset",
+        )
+        assert work.recheck_after is None
+        with self.assertRaisesRegex(ValueError, "cannot use a calendar"):
+            ResearchDisposition(
+                assignment_id="a3", source_item_id="s3", decided_at="now",
+                decision="needs_work", reason_codes=["dataset_missing"],
+                evidence_checked=["API docs"], research_minutes=2,
+                next_action="build it", recheck_after="2026-11-01T00:00:00Z",
+            )
+
     def test_metrics_attribute_yield_and_rejections(self):
         assignments = [
             {"id": "a1", "source_type": "paper", "source_name": "arXiv", "attribution_key": "arXiv", "lane": "literature"},
@@ -64,6 +89,7 @@ class TestResearchOutcomes(TestCase):
             decided_at="2026-08-01T00:00:00Z", decision="defer",
             reason_codes=["await_data"], evidence_checked=["paper"],
             research_minutes=10, recheck_after="2026-08-02",
+            blocking_fact="the external dataset release",
         )]
         dispatches = [{
             "assignment_id": "a1", "assigned_agent": "literature-scout",
@@ -81,6 +107,7 @@ class TestResearchOutcomes(TestCase):
             decided_at="2026-08-02T12:00:00Z", decision="defer",
             reason_codes=["await_data"], evidence_checked=["paper"],
             research_minutes=10, recheck_after="2026-08-03",
+            blocking_fact="the external dataset release",
         )]
         dispatches = [{
             "assignment_id": "a1", "created_at": "2026-08-01T12:00:00Z",

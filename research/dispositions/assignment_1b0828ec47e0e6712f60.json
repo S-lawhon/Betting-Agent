@@ -1,15 +1,19 @@
 {
   "assignment_id": "assignment_1b0828ec47e0e6712f60",
-  "decided_at": "2026-08-16T19:37:26Z",
-  "decision": "defer",
+  "blocking_fact": null,
+  "decided_at": "2026-08-16T20:10:00Z",
+  "decision": "needs_work",
   "evidence_checked": [
     "Kalshi BASEBALLSPREAD contract terms: https://assets.kalshi.com/contract_terms/BASEBALLSPREAD.pdf",
     "Kalshi Historical Data API Documentation: https://docs.kalshi.com/getting_started/historical_data",
     "Kalshi Historical Market Candlesticks API: https://docs.kalshi.com/api-reference/historical/get-historical-market-candlesticks",
     "Official KBO scoreboard: https://eng.koreabaseball.com/Schedule/Scoreboard.aspx",
-    "Official KBO team statistics: https://eng.koreabaseball.com/Stats/TeamStats.aspx"
+    "Official KBO team statistics: https://eng.koreabaseball.com/Stats/TeamStats.aspx",
+    "kbo_spread_research/feasibility_results.json (20 events / 80 markets)",
+    "The Odds API KBO coverage and historical availability documentation: baseball_kbo from 2024-03-28"
   ],
-  "notes": "The evidence supports a falsifiable information-latency hypothesis and confirms public sources for historical Kalshi market data and KBO outcomes. It does not yet establish timestamp-aligned pre-quote information, conservative fills, scalable depth, or positive out-of-sample net P&L after spread and fees. Execution eligibility remains reference_only.",
+  "notes": "Reclassified from defer after the bounded feasibility pull. Time was not the blocker. Kalshi exposes usable historical data now: all 80 sampled markets had candlesticks and a T-15 two-sided quote; 61 had pregame prints; median T-15 spread was 1 cent and median six-hour pregame print volume was 251.12 contracts. Historical depth and fill priority remain unavailable, and no independent fair-value signal has been aligned, so this is not edge evidence.",
+  "next_action": "Match Kalshi KXKBOSPREAD strikes and pregame timestamps to The Odds API baseball_kbo historical spread snapshots, then test de-vigged sharp consensus versus the executable Kalshi touch after fees and conservative fill haircuts; stop if event matching or timestamp coverage is inadequate.",
   "opportunity_id": null,
   "reason_codes": [
     "historical_timestamp_aligned_dataset_missing",
@@ -17,7 +21,7 @@
     "capacity_and_fill_history_missing",
     "execution_not_authorized"
   ],
-  "recheck_after": "2026-11-01T00:00:00Z",
+  "recheck_after": null,
   "research_minutes": 2,
   "source_item_id": "src_152ad13e829b7532b7b8"
 }

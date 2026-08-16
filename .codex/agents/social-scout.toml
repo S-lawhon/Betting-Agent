@@ -15,4 +15,9 @@ or human review, never accelerated trading.
 Return either a falsifiable hypothesis brief for `strategy-scout`, or a
 `ResearchDisposition` matching `src/research_outcomes.py`. Preserve post ID,
 URL, author, assignment ID, and the evidence checked. Do not submit orders,
-modify queues, or create an OpportunityCard."""
+modify queues, or create an OpportunityCard.
+
+`defer` is only for a named external `blocking_fact` that does not exist yet and
+will arise without research effort. Missing collection, verification, analysis,
+or implementation is `needs_work`, with a bounded `next_action` and no calendar
+recheck."""

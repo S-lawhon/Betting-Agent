@@ -110,6 +110,48 @@ existed. **The 10% fill floor is set above P-017A's fatal 2.2%** and is
 outcome-independent — it is a statement about what is worth operating, not
 about what the data shows.
 
+## 7b. AMENDMENT 1 — the window, closed while blind (2026-08-16)
+
+**§8.1 said the window length was "fixed here" and then never stated a number.
+That gap is closed now, before any P&L, fill or settlement-conditional
+statistic has been computed.** Recording it rather than quietly picking a
+number at implementation time.
+
+Closing it surfaced a **sample-definition leak that would have invalidated the
+whole test**, and the fix is the substance of this amendment.
+
+**First-half BTTS closes EARLY when the payout criterion is met.** So
+`close_time` is *outcome-dependent*:
+
+* `result = yes` → close is **the moment the second team scored**;
+* `result = no` → close is **half-time**.
+
+A window defined as "the last N minutes before close" therefore selects a
+different part of the match depending on how the market resolved — the YES
+sample becomes the run-up to the deciding goal (prices rising into it), the NO
+sample the run-up to half-time (prices decaying). **That is the outcome
+leaking into the sample definition**, and it would have manufactured an edge
+in either direction depending on the mix.
+
+> **RULE:** the window is **every minute the market is open and in-play with a
+> live quote.** No close-anchored window. Being open is observable in real
+> time and is independent of the eventual result — while the market is open,
+> the criterion is by construction not yet met.
+
+**The "late in the half" refinement is DEFERRED, not dropped.** Testing it
+needs a **kickoff anchor**, and Kalshi does not publish one: soccer tickers
+embed **date only, no HHMM** (the `KXMLBGAME` "time is in the ticker" trick
+does not transfer), and `occurrence_datetime` is a one-hour-resolution estimate
+of match **end**, far too coarse for a 20-minute window. This is exactly the
+gap `src/golf_schedule.py` fills for golf, and its soccer analogue — ESPN's
+soccer API — **does not exist in this repo.** Building it is a separate piece
+of work and must not be improvised inside this harness.
+
+Consequently **§2's claim is tested in its unconditional form only**: does
+offering YES, every open in-play minute, earn a positive net edge? Under §8.2
+that all-in number is the number, and a time-conditional slice is not available
+as a fallback if it disappoints.
+
 ## 8. Anti-rationalisation
 
 1. **No mid-flight parameter changes.** The window length, the tick

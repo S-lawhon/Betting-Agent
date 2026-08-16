@@ -101,6 +101,28 @@ def test_changed_committed_source_is_rejected(sandbox):
             archive.backfill_index(index)
 
 
+def test_completed_sources_use_metadata_only_reconciliation(
+        sandbox, monkeypatch):
+    write_base(archive.BASE, ["A", "B"])
+    part = archive.PARTS / "run.part-000000.parquet"
+    archive._atomic_parquet(archive.build_frame([market("C")]), part)
+
+    with archive.ArchiveIndex(archive.INDEX) as index:
+        assert archive.backfill_index(index)
+        assert index.count() == 3
+
+    progress_before = archive.PROGRESS.read_bytes()
+    with archive.ArchiveIndex(archive.INDEX) as index:
+        def should_not_index(_path):
+            raise AssertionError("completed sources must not reopen Parquet")
+
+        monkeypatch.setattr(index, "index_next_row_group", should_not_index)
+        assert archive.backfill_index(index)
+        assert index.count() == 3
+
+    assert archive.PROGRESS.read_bytes() == progress_before
+
+
 def test_cursor_resume_and_exact_deduplication(sandbox):
     calls = []
     pages = {

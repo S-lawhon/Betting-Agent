@@ -382,6 +382,9 @@ by page bundle. `archive_progress.json` is the monitored progress surface.
   A clean checkpointed exit is expected; the next run resumes.
 - The wrapper streams child progress to journald. Do not restore
   `capture_output=True`, which made the 2026-08-16 timeout stage invisible.
+- Startup reconciliation verifies size/mtime for completed sources without
+  reopening every Parquet footer or fsyncing progress once per part. Only new
+  or incomplete sources enter row-group indexing; preserve that fast path.
 
 ## Recursive strategy factory — the OTHER agent system (live 2026-08-01)
 

@@ -260,10 +260,28 @@ def _write_progress(index: ArchiveIndex, status: str,
 
 
 def backfill_index(index: ArchiveIndex, deadline: Optional[float] = None) -> bool:
-    """Checkpoint legacy/part indexing one row group at a time."""
-    for source in archive_sources():
+    """Reconcile committed sources and checkpoint new indexing by row group.
+
+    Completed sources take a metadata-only fast path: their stored size/mtime
+    identity is verified, but the Parquet footer is not reopened and the
+    fsync-backed progress file is not rewritten. New or incomplete sources
+    still use the row-group path, which is what recovers an orphan published
+    just before a process kill.
+    """
+    sources = archive_sources()
+    already_complete = 0
+    indexed_sources = 0
+    indexed_rows = 0
+    for source in sources:
+        rec = index._ensure_source(source)
+        if rec["complete"]:
+            already_complete += 1
+            continue
+
+        indexed_sources += 1
         while True:
-            complete, _rows = index.index_next_row_group(source)
+            complete, rows = index.index_next_row_group(source)
+            indexed_rows += rows
             rec = index.source(source) or {}
             _write_progress(
                 index, "indexing" if not complete else "indexed_source",
@@ -276,6 +294,10 @@ def backfill_index(index: ArchiveIndex, deadline: Optional[float] = None) -> boo
                 print(f"[archive] checkpointed index at {source.name} "
                       f"row_group={rec.get('row_groups_done')}", flush=True)
                 return False
+    print(f"[archive] reconciled sources={len(sources)} "
+          f"already_complete={already_complete} "
+          f"indexed_sources={indexed_sources} indexed_rows={indexed_rows}",
+          flush=True)
     return True
 
 

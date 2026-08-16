@@ -243,6 +243,7 @@ def test_codex_daily_setup_retires_week_timer_and_keeps_run_now_bounded():
     assert 'systemctl enable --now "$TIMER"' in script
     assert 'systemctl start "$SERVICE"' in script
     assert "research_agent_runtime_screened_daily.yaml" in script
+    assert "max_minutes_per_task: 45" in script
     assert "max_attempts_per_day: 6" in script
     assert "research-agent-deep-daily" in script
     assert "max_input_tokens_per_task: 250000" in script

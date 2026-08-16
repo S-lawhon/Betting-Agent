@@ -33,7 +33,10 @@ allowed_agents:
   - social-scout
 
 limits:
-  max_minutes_per_task: 30
+  # Triage intentionally budgets literature/paper packets at 45 minutes.
+  # Keeping this at 30 blocks the entire ranked queue before screening can
+  # claim the first literature packet.
+  max_minutes_per_task: 45
   timeout_seconds: 600
   # 250k, authorised by Sam 2026-08-09, and it is NOT a spend limit.
   #

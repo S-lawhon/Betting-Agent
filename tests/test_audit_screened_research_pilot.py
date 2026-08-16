@@ -84,6 +84,26 @@ def test_cleanup_failure_dominates_safe_noop(tmp_path):
     assert any("marker_removed" in item for item in report["failures"])
 
 
+def test_unpinned_audit_reports_current_preclaim_block_not_stale_run(tmp_path):
+    path = config(tmp_path)
+    path.write_text(path.read_text().replace(
+        f"target_assignment_id: {TARGET}\n", "status_filename: screening_status.json\n"))
+    completed_fixture(tmp_path)
+    write(tmp_path / "data/research_execution/screening_status.json", {
+        "worker_id": "pilot-worker", "status": "blocked",
+        "assignment_id": "assignment_literature",
+        "error": "packet budget 45m exceeds worker limit 30m",
+        "safety": {"model_invoked": False},
+    })
+
+    report = audit_pilot(
+        root=tmp_path, config_path=path, marker_path=tmp_path / "marker")
+
+    assert report["status"] == "pending"
+    assert report["assignment_id"] == "assignment_literature"
+    assert report["invocation_phases"] == []
+
+
 def test_cli_failure_uses_exit_two_so_systemd_cannot_accept_it(
         monkeypatch, tmp_path):
     monkeypatch.setattr(

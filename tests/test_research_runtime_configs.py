@@ -14,6 +14,7 @@ import yaml
 
 from scripts.run_research_agent_worker import _config as load_runtime_config
 from src.research_agent_worker import RetryLimits, ScreeningLimits, WorkerLimits
+from src.research_triage import BUDGET_MINUTES_BY_SOURCE
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +86,7 @@ def test_daily_config_covers_the_measured_deep_research_distribution():
     config = _config(path)
     limits = WorkerLimits(**dict(config.get("limits") or {}))
     assert limits.max_input_tokens_per_task >= max(OBSERVED_DEEP_INPUT_TOKENS)
+    assert limits.max_minutes_per_task >= max(BUDGET_MINUTES_BY_SOURCE.values())
     assert limits.max_attempts_per_day == 6
     assert config.get("stage_mode") == "screen_only"
     deep = _config(

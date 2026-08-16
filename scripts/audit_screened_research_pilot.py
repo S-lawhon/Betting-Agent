@@ -59,13 +59,20 @@ def audit_pilot(
     limits = config.get("limits") or {}
     screening_limits = (config.get("screening") or {}).get("limits") or {}
     state = root / "data/research_execution"
+    worker = _read_json(
+        state / str(config.get("status_filename") or "worker_status.json"))
     pinned = bool(assignment_id)
     if not pinned:
         # A recurring worker has no pinned target, so audit whatever it most
-        # recently ran. Resolved from the run record rather than the queue:
-        # the queue says what COULD have been worked, the run says what was.
-        assignment_id = _latest_run_assignment(
-            state, worker_id=str(config.get("worker_id") or ""))
+        # recently attempted. A pre-claim block has no run record, so its
+        # status assignment must win over the previous completed run; otherwise
+        # ExecStartPost audits stale work and can report an unrelated deep run.
+        target_worker = worker.get("worker_id") == config.get("worker_id")
+        assignment_id = (
+            str(worker.get("assignment_id") or "") if target_worker else "")
+        if not assignment_id:
+            assignment_id = _latest_run_assignment(
+                state, worker_id=str(config.get("worker_id") or ""))
     runs = sorted(
         (payload for path in sorted((state / "runs").glob("*/*.json"))
          if (payload := _read_json(path)).get("assignment_id") == assignment_id),
@@ -86,8 +93,6 @@ def audit_pilot(
     released_claims = list(
         (state / "claim_released").glob(f"*/{assignment_id}--*.json"))
     deep_packet = state / "deep_queue" / agent / f"{assignment_id}.json"
-    worker = _read_json(
-        state / str(config.get("status_filename") or "worker_status.json"))
     checks: list[dict[str, Any]] = []
     failures: list[str] = []
     warnings: list[str] = []

@@ -1840,6 +1840,46 @@ workstreams:
       # (scripts/collect_inplay_basis.py), the data and the backtest gate. One
       # workstream per question; track it there.
 
+  - id: R-SOCCER-BTTS-1H
+    name: First-Half Soccer BTTS (Phase 0 feasibility)
+    stage: research
+    tier: none
+    blocked_on: human
+    owner_dir: soccer_research
+    action_required: >
+      Snapshot 2 is required before the PROCEED can be acted on. Rule section 4
+      says one snapshot is not a liquidity measurement, following the satellites
+      persistence check that caught 112 of 118 apparent violations as stable
+      one- and five-lot artifacts. Run at least 1h after snapshot 1:
+      `python3 soccer_research/btts_1h_census.py --snapshot 2 && ... --report`.
+      Then decide whether to write the mechanism rule.
+    summary: >
+      Reopens the ONE-LINE kill of soccer BTTS ("sits at P = 0.483, the exact
+      maximum of the fee parabola"), which the 2026-07-30 AFT paper review found
+      two holes in: that clause constrains a TAKER and BTTS is maker-free, and
+      FIRST-HALF BTTS was never priced or tested at all.
+      PHASE 0 SNAPSHOT 1 (2026-08-16) = PROCEED on the pre-registered gate:
+      33 first-half markets, 97% two-sided, median spread 3.5c, median mid
+      0.1875, median depth 571 bid / 916 ask. All 52 touched series verified
+      maker-free LIVE, not from the fixture. Full-match reproduced at median
+      mid 0.525, consistent with the original kill.
+      CAVEAT THAT BINDS THE NEXT PHASE: 3.5c on a 18.75c mid is a 19% relative
+      spread. The gate was written in absolute cents and passed on its own
+      terms, but relative spread is the statistic that killed the satellites
+      studies, and it is not favourable here. The gate is NOT being rewritten
+      after the fact; the caveat is carried forward into the mechanism design.
+      PROCEED authorises writing a decision rule only. No pod, no quote, no
+      backtest, and NO mechanism has been proposed yet.
+    notes: >
+      Registered BEFORE the work started, deliberately. The research triage
+      pipeline holds an open strategy-scout assignment on a Kalshi soccer family
+      (kxeredivisiespread, lane information_latency, 2026-08-05), so the same
+      census lane could surface BTTS independently. One workstream per question
+      — the same rule that removed the duplicate `inplay-basis` entry above.
+      The pipeline cannot promote itself into this: that assignment carries
+      may_enter_strategy_registry false and execution_allowed false.
+    rule_document: soccer_research/BTTS_1H_FEASIBILITY_RULE.md
+
   - id: R-RECURSIVE-STRATEGY
     name: Recursive Strategy Factory
     stage: build

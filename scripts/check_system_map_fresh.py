@@ -98,6 +98,7 @@ PAIRS = [
     ("agent roles", "agent_roles"),
     ("Python modules", "python_modules"),
     ("tests", "tests"),
+    ("service definitions", "services_installed"),
 ]
 
 

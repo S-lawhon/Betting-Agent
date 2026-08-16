@@ -143,6 +143,101 @@
     font-size:11.5px;color:var(--dim)}
   .legend span::before{content:"";width:9px;height:9px;border-radius:2px;
     background:var(--c);flex:none}
+
+  /* ---------- interactive isometric system map ---------- */
+  #system{padding:0;background:#090b10;min-height:calc(100vh - 126px)}
+  #system .map-shell{display:grid;grid-template-columns:190px minmax(0,1fr) 310px;
+    min-height:calc(100vh - 126px);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+  .map-rail,.map-inspector{background:#0d1016;min-width:0}
+  .map-rail{border-right:1px solid var(--line);padding:18px 12px}
+  .map-rail h2,.map-kicker,.map-inspector h3,.map-label{font:700 10px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .map-rail h2{margin:0 8px 14px}
+  .flow-group{margin:20px 0}
+  .flow-group .map-label{margin:0 8px 8px}
+  .flow-choice{width:100%;display:grid;grid-template-columns:23px 1fr auto;gap:7px;align-items:center;
+    text-align:left;background:#10141b;border:1px solid var(--line);color:var(--ink);padding:10px 9px;
+    margin:6px 0;cursor:pointer;font:600 11px/1.25 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .flow-choice:hover,.flow-choice.on{border-color:var(--flow-color,var(--accent));background:#151a23}
+  .flow-choice .key{color:var(--flow-color,var(--accent))}.flow-choice .steps{color:var(--faint)}
+  .flow-legend{margin-top:24px;padding:12px 8px;border-top:1px solid var(--line);
+    font:10px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)}
+  .flow-legend i{display:inline-block;width:18px;height:2px;margin-right:6px;vertical-align:middle;background:var(--accent)}
+  .flow-legend i.dash{background:repeating-linear-gradient(90deg,var(--faint) 0 4px,transparent 4px 7px)}
+  .flow-legend i.payload-key{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+
+  .map-stage{position:relative;overflow:hidden;min-height:680px;background:#090b10}
+  .map-stage-head{position:absolute;z-index:12;top:18px;left:20px;right:20px;display:flex;gap:16px;
+    align-items:flex-start;justify-content:space-between;pointer-events:none}
+  .map-stage-head h2{margin:3px 0 0;font:500 19px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .map-status{display:flex;align-items:center;gap:7px;margin-top:5px;color:var(--dim);
+    font:10px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.08em}
+  .map-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  .map-actions{position:absolute;z-index:15;right:16px;bottom:15px;display:flex;gap:7px}
+  .map-actions button{background:#10141b;color:var(--ink);border:1px solid var(--line);padding:8px 10px;cursor:pointer;
+    font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}
+  .map-actions button:hover,.map-actions button[aria-pressed="true"]{border-color:var(--accent);color:#fff}
+  .map-viewport{position:absolute;inset:72px 18px 50px}
+  .map-plane{position:absolute;inset:3% 2% 1%;overflow:hidden;
+    background-image:linear-gradient(30deg,rgba(107,118,132,.16) 1px,transparent 1px),
+      linear-gradient(150deg,rgba(107,118,132,.16) 1px,transparent 1px);
+    background-size:62px 36px;border:1px solid rgba(107,118,132,.12);
+    clip-path:polygon(50% 0,100% 26%,100% 74%,50% 100%,0 74%,0 26%)}
+  .map-edge{position:absolute;height:1px;background:rgba(107,118,132,.3);transform-origin:0 50%;z-index:2;pointer-events:none}
+  .map-edge.active{height:2px;background:var(--edge-color,var(--accent));box-shadow:0 0 8px color-mix(in srgb,var(--edge-color,var(--accent)) 50%,transparent)}
+  .map-edge.handoff{background:repeating-linear-gradient(90deg,var(--faint) 0 6px,transparent 6px 10px)}
+  .payload{position:absolute;left:-4px;top:-4px;width:9px;height:9px;border:0;border-radius:50%;padding:0;
+    background:var(--edge-color,var(--accent));box-shadow:0 0 10px var(--edge-color,var(--accent));cursor:pointer;
+    pointer-events:auto;animation:payload-run 3.2s linear infinite;animation-delay:var(--delay,0s)}
+  .map-paused .payload{animation-play-state:paused}
+  @keyframes payload-run{from{left:0}to{left:calc(100% - 8px)}}
+  .map-node{position:absolute;z-index:5;width:104px;height:112px;transform:translate(-50%,-50%);border:0;background:none;
+    color:var(--ink);padding:0;cursor:pointer;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .map-node:hover,.map-node.on{z-index:9}
+  .map-node:focus-visible{outline:2px solid var(--node-color,var(--accent));outline-offset:5px}
+  .iso{position:absolute;left:12px;top:4px;width:80px;height:82px;filter:drop-shadow(0 11px 10px rgba(0,0,0,.48));transition:.18s transform}
+  .map-node:hover .iso,.map-node.on .iso{transform:translateY(-5px)}
+  .iso-roof{position:absolute;left:0;top:0;width:80px;height:42px;background:color-mix(in srgb,var(--node-color) 30%,#151a23);
+    border:1px solid var(--node-color);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+  .iso-left,.iso-right{position:absolute;top:21px;width:40px;height:var(--node-h,38px);border:1px solid color-mix(in srgb,var(--node-color) 65%,#111)}
+  .iso-left{left:0;background:color-mix(in srgb,var(--node-color) 13%,#11151c);transform:skewY(27deg);transform-origin:top right}
+  .iso-right{left:40px;background:color-mix(in srgb,var(--node-color) 20%,#0d1117);transform:skewY(-27deg);transform-origin:top left}
+  .iso-code{position:absolute;z-index:2;left:0;right:0;top:15px;color:#fff;font-size:11px;font-weight:800;text-shadow:0 1px 3px #000}
+  .node-name{position:absolute;left:-12px;right:-12px;bottom:0;font-size:10px;line-height:1.2;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--dim)}
+  .map-node.on .node-name,.map-node:hover .node-name{color:#fff}
+
+  .map-inspector{border-left:1px solid var(--line);display:flex;flex-direction:column}
+  .inspector-tabs{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line)}
+  .inspector-tabs button{border:0;border-right:1px solid var(--line);background:#0d1016;color:var(--dim);padding:13px 7px;
+    cursor:pointer;font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase}
+  .inspector-tabs button.on{background:var(--ink);color:var(--bg)}
+  .inspector-body{padding:22px 20px;overflow:auto}
+  .inspector-body h3{margin:0 0 8px;color:var(--faint)}
+  .inspector-title{margin:0 0 8px;font:500 21px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .inspector-deck{margin:0 0 24px;color:var(--dim);font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .inspector-copy{font-size:13px;color:#c9d3df;line-height:1.7}
+  .inspector-copy p{margin:0 0 15px}
+  .source-list{list-style:none;padding:0;margin:8px 0 0}
+  .source-list li{margin:7px 0}.source-list a{display:block;background:#10141b;border:1px solid var(--line);padding:8px 9px;
+    color:#c9d6e5;font:10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+  .source-list a:hover{border-color:var(--accent)}
+  .payload-card{margin:18px 0 0;padding:11px;border:1px solid color-mix(in srgb,var(--accent) 50%,var(--line));background:#10141b}
+  .payload-card b{display:block;color:var(--accent);font:700 9px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+  .payload-card code{display:block;white-space:normal;word-break:break-word;border:0;padding:0;background:none;color:#dbe7f4}
+  .mobile-flow-select{display:none}
+  @media (max-width:980px){
+    #system .map-shell{grid-template-columns:1fr}.map-rail{display:none}.map-inspector{border:1px solid var(--line);border-width:1px 0 0}
+    .map-stage{min-height:620px}.map-inspector{min-height:360px}.mobile-flow-select{display:block;pointer-events:auto;background:#10141b;
+      border:1px solid var(--line);color:var(--ink);padding:8px;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
+  }
+  @media (max-width:620px){
+    .wrap{padding:0 12px}#system .wrap{padding:0}.map-stage{min-height:535px}.map-viewport{inset:78px 2px 54px}
+    .map-node{transform:translate(-50%,-50%) scale(.76)}.map-stage-head{left:12px;right:12px}.map-stage-head h2{font-size:15px}
+    .map-status{display:none}.map-actions{right:8px;bottom:10px}.map-actions button{padding:8px 7px;font-size:8px}
+  }
+  @media (prefers-reduced-motion:reduce){.payload{animation:none;left:calc(50% - 4px)}.map-node .iso{transition:none}}
 </style>
 </head>
 <body>
@@ -151,22 +246,63 @@
     <h1>Betting Pod Shop — System Map</h1>
     <div class="sub">How the whole machine fits together, from the first line of research to the code running live on the server. Every box below is a real file or component; click into <b>Modules</b> to search all of them and see what each function does.</div>
     <div class="facts">
-      <div class="fact paperflag"><b>PAPER / DEMO MODE</b> <span>— no real money, ever</span></div>
+      <div class="fact paperflag"><b>PAPER / DEMO CORE</b> <span>— live paths are separately guarded</span></div>
       <div class="fact"><b>4</b> <span>active pods</span></div>
       <div class="fact"><b>12</b> <span>agent roles</span></div>
-      <div class="fact"><b>76</b> <span>Python modules</span></div>
-      <div class="fact"><b>2,301</b> <span>tests</span></div>
-      <div class="fact"><b>6</b> <span>services on the VPS</span></div>
+      <div class="fact"><b>90</b> <span>Python modules</span></div>
+      <div class="fact"><b>2,752</b> <span>tests</span></div>
+      <div class="fact"><b>25</b> <span>service definitions</span></div>
       <div class="fact"><span>repo</span> <b>S-lawhon/Betting-Agent</b></div>
-      <div class="fact"><span>as of</span> <b>Aug 2 2026</b></div>
+      <div class="fact"><span>as of</span> <b>Aug 16 2026</b></div>
     </div>
   </div>
 </header>
 
 <nav><div class="wrap" id="nav"></div></nav>
 
+<!-- ============ INTERACTIVE SYSTEM ============ -->
+<section id="system" class="on"><div class="wrap">
+  <div class="map-shell">
+    <aside class="map-rail" aria-label="System flows">
+      <h2>The system</h2>
+      <div id="flow-menu"></div>
+      <div class="flow-legend">
+        <div><i></i> active dependency</div>
+        <div><i class="dash"></i> human handoff</div>
+        <div><i class="payload-key"></i> inspectable payload</div>
+      </div>
+    </aside>
+    <main class="map-stage" id="map-stage">
+      <div class="map-stage-head">
+        <div><div class="map-kicker">runtime topology</div><h2 id="map-flow-title">Market scan</h2></div>
+        <div>
+          <select id="mobile-flow-select" class="mobile-flow-select" aria-label="Select a system flow"></select>
+          <div class="map-status" id="map-status">payloads in motion</div>
+        </div>
+      </div>
+      <div class="map-viewport" id="map-viewport" aria-label="Interactive architecture map">
+        <div class="map-plane"></div>
+        <div id="map-edges"></div>
+        <div id="map-nodes"></div>
+      </div>
+      <div class="map-actions">
+        <button id="pause-flow" type="button" aria-pressed="false">Pause flow</button>
+        <button id="trace-flow" type="button">Trace one step</button>
+        <button id="reset-map" type="button">Reset view</button>
+      </div>
+    </main>
+    <aside class="map-inspector" aria-live="polite">
+      <div class="inspector-tabs">
+        <button type="button" class="on" data-inspector="plain">What it does</button>
+        <button type="button" data-inspector="built">How it's built</button>
+      </div>
+      <div class="inspector-body" id="inspector-body"></div>
+    </aside>
+  </div>
+</div></section>
+
 <!-- ============ OVERVIEW ============ -->
-<section id="overview" class="on"><div class="wrap">
+<section id="overview"><div class="wrap">
   <h2>The 60-second picture</h2>
   <p class="lede">Everything here exists to answer one question over and over: <i>“Is this betting market priced wrong, and by enough to beat the fees?”</i> When the answer is yes, the system places a (pretend) bet and later checks whether it was right.</p>
 
@@ -753,12 +889,175 @@ flowchart LR
 </div></section>
 
 <footer><div class="wrap">
-  Betting Pod Shop system map · generated Jul 23 2026 · all figures reflect the repo state at that date · paper/demo mode throughout, no real money deployed. This is a static reference — regenerate it after major structural changes.
+  Betting Pod Shop system map · refreshed Aug 16 2026 · repository facts reflect the code at that date; live service state still requires the dashboard. Re-run the freshness check after major structural changes.
 </div></footer>
 
 <script>
+/* ---------- INTERACTIVE SYSTEM MAP ---------- */
+const REPO="https://github.com/S-lawhon/Betting-Agent/blob/main/";
+const MAP_NODES={
+  research:{code:"RS",name:"Research archive",x:10,y:16,h:31,color:"var(--research)",
+    deck:"Evidence enters here before code does.",
+    plain:"Market censuses, contract terms, backtests and pre-registered decision rules make a claim falsifiable before it becomes a strategy. Research is kept as a permanent record, including ideas that fail.",
+    built:"Each strategy keeps its evidence in a dedicated research directory. The archive preserves inputs that cannot be fetched later; the commitment checker prevents important research artifacts from silently living only on one machine.",
+    sources:[["scripts/check_research_committed.sh",1],["docs/RESEARCH_OPERATING_SYSTEM.md",1],["kalshi-ev-map/src/archive_settled.py",1]]},
+  agents:{code:"AI",name:"Strategy agents",x:29,y:26,h:55,color:"var(--research)",
+    deck:"Narrow roles move an idea through a hard state machine.",
+    plain:"A scout can propose, an integrity reviewer can verify, and a validator can measure. No role can silently do the next role's job, and real-money promotion requires a named human approval.",
+    built:"Role-specific inboxes establish authority. Typed artifacts are validated by StrategyRegistry, legal transitions are enforced in Python, and every accepted mutation appends an event before an atomic save.",
+    sources:[["src/strategy_agent_runtime.py",96],["src/strategy_orchestration.py",537],["src/strategy_orchestration.py",678]]},
+  engine:{code:"EN",name:"Cycle engine",x:48,y:13,h:63,color:"var(--orch)",
+    deck:"Build dependencies, trigger scans, reconcile results, repeat.",
+    plain:"The engine is the control room. It assembles the shared clients and guards, starts the five-minute paper loop, runs settlement on its own cadence and publishes a cycle summary.",
+    built:"The CLI loads configuration and hands it to engine.py. build_shared_deps wires the store, allocator, risk guard and settlers; _run_guarded_loop coordinates scan and settlement passes.",
+    sources:[["src/cli.py",176],["src/engine.py",174],["src/engine.py",812]]},
+  markets:{code:"MK",name:"Market & score APIs",x:76,y:15,h:38,color:"var(--data)",
+    deck:"Read prices, books, schedules and final outcomes.",
+    plain:"Public venue and sports feeds supply the observable world: Kalshi markets and order books, sportsbook consensus, game state and external schedules. These are inputs, never assumed truth without normalization.",
+    built:"KalshiPublic handles public market and order-book reads. Sport-specific clients add odds, scores and schedules; callers receive normalized dictionaries rather than transport details.",
+    sources:[["src/kalshi_public.py",35],["src/live_odds_poller.py",1],["src/golf_schedule.py",1]]},
+  pricing:{code:"FV",name:"Fair value",x:64,y:34,h:47,color:"var(--brain)",
+    deck:"Turn noisy prices into a fee-aware probability.",
+    plain:"The pricing layer removes the bookmaker's margin, blends sharp sources and strategy-specific models, then asks whether the difference from the market survives fees and spread.",
+    built:"FairValueEstimator selects a Pinnacle-only or ensemble path. devig.py recovers no-vig probability, while kalshi_fees.py applies exact series-aware costs before a trade is eligible.",
+    sources:[["src/fair_value.py",54],["src/devig.py",1],["src/kalshi_fees.py",1]]},
+  pods:{code:"PD",name:"Strategy pods",x:45,y:42,h:70,color:"var(--pod)",
+    deck:"Independent strategies compete on shared plumbing.",
+    plain:"Each pod hunts one specific mispricing. Active pods cover moneylines, live games, tennis qualifiers and golf top-N markets; all return the same proposal shape so the rest of the system stays strategy-agnostic.",
+    built:"Pods subclass BasePod and register with @register_pod. scan_once returns ScanResult objects; PodRunner can scan concurrently while execution remains serialized behind shared risk.",
+    sources:[["src/base_pod.py",1],["src/pod_registry.py",1],["src/pod_runner.py",86],["src/pods/golf_topn_pod.py",152]]},
+  risk:{code:"RG",name:"Risk guard",x:66,y:53,h:56,color:"var(--risk)",
+    deck:"Measure every cap and reserve exposure inside the cycle.",
+    plain:"Every proposed trade is checked against portfolio, venue, pod and position limits. In paper research, breaches are recorded in shadow mode instead of deleting observations; live-capable paths fail closed.",
+    built:"AggregateRiskGuard evaluates trades and reserve_trade immediately holds approved exposure so later proposals see it. update_post_cycle converts reservations into actual positions and clears abandoned holds.",
+    sources:[["src/aggregate_risk.py",332],["src/aggregate_risk.py",419],["src/aggregate_risk.py",524]]},
+  executor:{code:"EX",name:"Execution router",x:80,y:70,h:36,color:"var(--orch)",
+    deck:"Route an approved proposal or record its paper equivalent.",
+    plain:"The executor is the only common path from a strategy proposal to a venue action. In paper mode it records what would have happened; authenticated order paths remain explicitly disabled unless armed.",
+    built:"MultiExecutor reserves aggregate risk, branches on mode, then routes by venue. Kalshi private access is closed by default with allow_orders=False and supports dry-run logging.",
+    sources:[["src/multi_executor.py",61],["src/multi_executor.py",120],["src/kalshi_private.py",1]]},
+  ledger:{code:"TL",name:"Trade ledger",x:53,y:77,h:66,color:"var(--risk)",
+    deck:"The durable record of scans, fills, positions and settlements.",
+    plain:"The ledger makes the research replayable. It remembers fingerprints, open positions, placed trades and outcomes so restarts do not erase history and duplicate opportunities stay duplicate.",
+    built:"TradeStore maintains indexed in-memory views over append-only JSONL. trade_log_schema normalizes records, and settlement entries are keyed back to their original fingerprints and tickers.",
+    sources:[["src/trade_store.py",89],["src/trade_store.py",422],["src/trade_store.py",467],["src/trade_log_schema.py",1]]},
+  settlers:{code:"ST",name:"Settlement workers",x:29,y:71,h:42,color:"var(--settle)",
+    deck:"Resolve open positions without inventing an outcome.",
+    plain:"Sport- and venue-aware settlers wait for a real result, calculate fee-net P&L and release exposure. Special handling matters: a closed market is not necessarily settled, and scalar payouts are real partial outcomes.",
+    built:"The engine invokes purpose-built tennis, golf and Polymarket settlers. Golf settlement reads settlement_value_dollars for scalar outcomes and writes WIN or LOSS only after realized P&L is known.",
+    sources:[["src/engine.py",855],["src/kalshi_golf_settler.py",187],["src/kalshi_golf_settler.py",214]]},
+  manager:{code:"FM",name:"Fund manager",x:13,y:51,h:58,color:"var(--monitor)",
+    deck:"Measure health, raise exceptions and say what needs attention.",
+    plain:"A separate read-only manager watches services, data freshness, strategy gates and invariants. It reports by exception so a quiet system means something rather than merely producing fewer emails.",
+    built:"collect.py measures facts, checks.py turns them into deterministic findings, and brief.py renders the daily decision surface. The monitor reads the trading system but never writes to it.",
+    sources:[["manager/collect.py",1],["manager/checks.py",125],["manager/brief.py",84]]},
+  dashboard:{code:"UI",name:"Dashboard & health",x:90,y:39,h:32,color:"var(--view)",
+    deck:"Human-readable windows onto runtime and research state.",
+    plain:"Dashboards expose cycle health, risk, settlements and manager findings without becoming part of the trading decision path. They are views over snapshots, not a second source of truth.",
+    built:"dashboard_server.py serves the standalone dashboard data plane, dashboard_api.py shapes the JSON response, and health_check.py evaluates deployment and runtime health.",
+    sources:[["src/dashboard_server.py",1],["src/dashboard_api.py",1],["src/health_check.py",1]]}
+};
+const MAP_FLOWS={
+  runtime:{label:"Market scan",short:"The live paper loop",color:"#5aa9ff",group:"THE TRADING LOOP",
+    description:"Observe → price → propose → reserve → record.",
+    edges:[
+      ["engine","markets","market query","{ series, status: open }"],
+      ["markets","pricing","odds snapshot","{ bid, ask, book, score }"],
+      ["pricing","pods","fair value","{ p_fair, fee, confidence }"],
+      ["engine","pods","cycle trigger","CycleContext(mode='paper')"],
+      ["pods","risk","trade proposal","ScanResult(venue, market, edge, usd)"],
+      ["risk","executor","reservation","RiskDecision(approved, exposure)"],
+      ["executor","ledger","paper trade","{ outcome: 'PLACED', fill_price }"],
+      ["ledger","dashboard","cycle summary","{ placed, open, pnl, risk }"],
+    ]},
+  settlement:{label:"Settlement pass",short:"Close the evidence loop",color:"#ff7b9c",group:"THE TRADING LOOP",
+    description:"Open position → final result → fee-net evidence.",
+    edges:[
+      ["ledger","settlers","open positions","[{ fingerprint, ticker, side }]"],
+      ["markets","settlers","market result","{ result, settlement_value_dollars }"],
+      ["settlers","ledger","settlement row","{ outcome, pnl_gross_usd, fees_usd }"],
+      ["settlers","risk","released exposure","close_position(market_id, pnl)"],
+      ["ledger","dashboard","settlement summary","{ wins, losses, voids, net_pnl }"],
+    ]},
+  research:{label:"Strategy factory",short:"Idea to paper evidence",color:"#bc8cff",group:"THE RESEARCH LOOP",
+    description:"Evidence → typed review → human handoff → paper validation.",
+    edges:[
+      ["research","agents","opportunity","OpportunityCard + provenance"],
+      ["agents","pods","approved spec","StrategySpec + human approval","handoff"],
+      ["pods","ledger","paper evidence","trade + CLV observations"],
+      ["ledger","agents","validation sample","ValidationReport(dataset_hash, gate_hash)"],
+      ["agents","research","decision record","PromotionDecision or retirement"],
+    ]},
+  oversight:{label:"Oversight",short:"Health and decisions",color:"#e3b341",group:"THE CONTROL PLANE",
+    description:"Fresh facts → deterministic findings → one decision surface.",
+    edges:[
+      ["engine","manager","heartbeat","{ cycle_at, service_state }"],
+      ["ledger","manager","portfolio snapshot","{ gates, exposure, pnl, freshness }"],
+      ["manager","dashboard","finding","Finding(severity, title, evidence)"],
+      ["manager","research","ranked assignment","{ next_action, blocked_on }"],
+    ]}
+};
+let currentFlow="runtime",currentNode="pods",inspectorMode="plain",traceIndex=-1,mapPaused=false;
+const mapNodesEl=document.getElementById("map-nodes"),mapEdgesEl=document.getElementById("map-edges");
+const inspectorBody=document.getElementById("inspector-body"),mapViewport=document.getElementById("map-viewport");
+
+function sourceHref(path,line){return REPO+path+"#L"+line}
+function renderMapNodes(){
+  mapNodesEl.innerHTML=Object.entries(MAP_NODES).map(([id,n])=>`<button class="map-node${id===currentNode?" on":""}" type="button"
+    data-node="${id}" style="left:${n.x}%;top:${n.y}%;--node-color:${n.color};--node-h:${n.h}px" aria-label="Inspect ${n.name}">
+    <span class="iso"><span class="iso-left"></span><span class="iso-right"></span><span class="iso-roof"></span><span class="iso-code">${n.code}</span></span>
+    <span class="node-name">${n.name}</span></button>`).join("");
+  mapNodesEl.querySelectorAll(".map-node").forEach(b=>b.onclick=()=>selectNode(b.dataset.node));
+}
+function renderFlowMenu(){
+  const groups={};Object.entries(MAP_FLOWS).forEach(([id,f])=>(groups[f.group]??=[]).push([id,f]));
+  document.getElementById("flow-menu").innerHTML=Object.entries(groups).map(([g,items])=>`<div class="flow-group"><div class="map-label">${g}</div>${items.map(([id,f])=>
+    `<button type="button" class="flow-choice${id===currentFlow?" on":""}" data-flow="${id}" style="--flow-color:${f.color}"><span class="key">${f.label.slice(0,2).toUpperCase()}</span><span>${f.label}</span><span class="steps">${f.edges.length}</span></button>`).join("")}</div>`).join("");
+  document.querySelectorAll(".flow-choice").forEach(b=>b.onclick=()=>selectFlow(b.dataset.flow));
+  const mobile=document.getElementById("mobile-flow-select");
+  mobile.innerHTML=Object.entries(MAP_FLOWS).map(([id,f])=>`<option value="${id}"${id===currentFlow?" selected":""}>${f.label}</option>`).join("");
+  mobile.onchange=()=>selectFlow(mobile.value);
+}
+function nodeCenter(id){const b=mapViewport.getBoundingClientRect(),n=MAP_NODES[id];return{x:b.width*n.x/100,y:b.height*n.y/100}}
+function renderMapEdges(){
+  const flow=MAP_FLOWS[currentFlow];mapEdgesEl.innerHTML="";
+  flow.edges.forEach((edge,i)=>{
+    const [from,to,label,payload,kind]=edge,a=nodeCenter(from),b=nodeCenter(to),dx=b.x-a.x,dy=b.y-a.y;
+    const line=document.createElement("div");line.className="map-edge active"+(kind==="handoff"?" handoff":"")+(traceIndex>=0&&traceIndex!==i?" trace-dim":"");
+    line.style.cssText=`left:${a.x}px;top:${a.y}px;width:${Math.hypot(dx,dy)}px;transform:rotate(${Math.atan2(dy,dx)*180/Math.PI}deg);--edge-color:${flow.color};opacity:${traceIndex>=0&&traceIndex!==i?.12:1}`;
+    line.innerHTML=`<button class="payload" type="button" style="--delay:${-i*.55}s" aria-label="Inspect ${label}" title="${label}"></button>`;
+    line.querySelector(".payload").onclick=e=>{e.stopPropagation();showPayload(from,to,label,payload)};
+    mapEdgesEl.appendChild(line);
+  });
+}
+function selectFlow(id){currentFlow=id;traceIndex=-1;document.documentElement.style.setProperty("--accent",MAP_FLOWS[id].color);
+  document.getElementById("map-flow-title").textContent=MAP_FLOWS[id].label;renderFlowMenu();renderMapEdges();renderInspector();}
+function selectNode(id){currentNode=id;traceIndex=-1;renderMapNodes();renderMapEdges();renderInspector();}
+function showPayload(from,to,label,payload){currentNode=to;renderMapNodes();renderInspector({label,payload,from,to});}
+function renderInspector(extra){
+  const n=MAP_NODES[currentNode],flow=MAP_FLOWS[currentFlow];
+  const copy=inspectorMode==="plain"?n.plain:n.built;
+  inspectorBody.innerHTML=`<h3>Selected ${extra?"payload":"module"}</h3><h2 class="inspector-title">${extra?extra.label:n.name}</h2>
+    <p class="inspector-deck">${extra?MAP_NODES[extra.from].name+" → "+MAP_NODES[extra.to].name:n.deck}</p>
+    <div class="inspector-copy"><p>${extra?`This moving dot carries <b>${extra.label}</b> through the ${flow.label.toLowerCase()} flow. Select either building to inspect the producer or consumer.`:copy}</p></div>
+    ${extra?`<div class="payload-card"><b>Payload</b><code>${extra.payload}</code></div>`:""}
+    <h3 style="margin-top:24px">Source</h3><ul class="source-list">${n.sources.map(([p,l])=>`<li><a href="${sourceHref(p,l)}" target="_blank" rel="noreferrer">${p}:${l}</a></li>`).join("")}</ul>`;
+}
+document.querySelectorAll("[data-inspector]").forEach(b=>b.onclick=()=>{inspectorMode=b.dataset.inspector;
+  document.querySelectorAll("[data-inspector]").forEach(x=>x.classList.toggle("on",x===b));renderInspector();});
+document.getElementById("pause-flow").onclick=()=>{mapPaused=!mapPaused;document.getElementById("map-stage").classList.toggle("map-paused",mapPaused);
+  const b=document.getElementById("pause-flow");b.setAttribute("aria-pressed",String(mapPaused));b.textContent=mapPaused?"Resume flow":"Pause flow";
+  document.getElementById("map-status").textContent=mapPaused?"flow paused":"payloads in motion";};
+document.getElementById("trace-flow").onclick=()=>{mapPaused=true;document.getElementById("map-stage").classList.add("map-paused");
+  const p=document.getElementById("pause-flow");p.setAttribute("aria-pressed","true");p.textContent="Resume flow";
+  traceIndex=(traceIndex+1)%MAP_FLOWS[currentFlow].edges.length;const e=MAP_FLOWS[currentFlow].edges[traceIndex];currentNode=e[1];renderMapNodes();renderMapEdges();showPayload(e[0],e[1],e[2],e[3]);
+  document.getElementById("map-status").textContent=`step ${traceIndex+1} of ${MAP_FLOWS[currentFlow].edges.length}`;};
+document.getElementById("reset-map").onclick=()=>{currentNode="pods";traceIndex=-1;if(mapPaused)document.getElementById("pause-flow").click();renderMapNodes();renderMapEdges();renderInspector();};
+if("ResizeObserver" in window)new ResizeObserver(()=>{if(document.getElementById("system").classList.contains("on"))renderMapEdges()}).observe(mapViewport);
+renderMapNodes();renderFlowMenu();renderMapEdges();renderInspector();
+
 /* ---------- NAV ---------- */
-const tabs=[["overview","Overview"],["lifecycle","Lifecycle"],["architecture","Architecture"],
+const tabs=[["system","System Map"],["overview","Overview"],["lifecycle","Lifecycle"],["architecture","Architecture"],
   ["agents","Agents"],["research","Research"],
   ["modules","Modules"],["pods","Pods"],["deploy","Deploy & GitHub"],["monitoring","Monitoring"],["glossary","Glossary"]];
 const nav=document.getElementById('nav');
@@ -768,7 +1067,8 @@ function show(id){document.querySelectorAll('section').forEach(s=>s.classList.to
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
   window.scrollTo({top:0,behavior:'instant'});
   /* Diagrams in a hidden section measure zero-width, so render on reveal. */
-  if(window.renderSection)window.renderSection(id);}
+  if(window.renderSection)window.renderSection(id);
+  if(id==="system")requestAnimationFrame(renderMapEdges);}
 
 /* ---------- MODULE DATA ---------- */
 // group keys → {label,color}
@@ -806,7 +1106,7 @@ const MODS=[
   {n:"live_fair_value.py",g:"brain",lc:237,d:"Computes in-play fair value from a multi-book live-odds snapshot: weighted consensus, de-vig, staleness + confidence checks.",f:["estimate()","_weighted_consensus() / _devig_home()","_compute_confidence()"]},
   {n:"mlb_win_prob.py",g:"brain",lc:241,d:"Analytical MLB live win-probability model from game state (inning, score, base/out), calibrated to a pre-game prior.",f:["home_win_probability()","implied_pregame_prob()","strength_drift_per_half_inning()"]},
   {n:"crypto_options_pricer.py",g:"brain",lc:573,d:"Turns Deribit option chains into the implied probability an asset finishes above/below a strike — via spread, Black-Scholes, and delta methods, then blends.",f:["estimate_probability() / _below()","_bsm_method() / _delta_method() / _blend()"]},
-  {n:"kalshi_fees.py",g:"brain",lc:156,d:"Kalshi's series-aware fee model and the net-edge gate. THE cost check: is a bet still positive after fees? Maker fees differ props-vs-outcomes, matched by longest ticker prefix.",f:["fee_per_contract() / fee_total()","net_edge() — worth − price − fee","should_bet()"]},
+  {n:"kalshi_fees.py",g:"brain",lc:156,d:"Kalshi's series-aware fee model and the net-edge gate. Maker-fee classification comes from a generated /series fixture and matches the exact resolved series ticker — never a prefix.",f:["fee_per_contract() / fee_total()","net_edge() — worth − price − fee","should_bet()"]},
   {n:"momentum_detector.py",g:"brain",lc:291,d:"Detects when Kalshi's retail crowd overreacts to a live game event vs the consensus — overreaction & divergence signals for the live pod.",f:["record_snapshot() / detect() / detect_all()","_detect_overreaction() / _detect_divergence()"]},
   {n:"inplay_surprise.py",g:"brain",lc:451,d:"The surprise-gated fade logic (P-018 core): detect a discrete in-play event, choose a quoting regime, and build a resting fade quote that tapers with the window.",f:["update_on_event() / select_regime()","build_quote() / _fade_spec()","settle_pnl() / fills_through()"]},
   {n:"pnl_calculator.py",g:"brain",lc:200,d:"Computes trade profit/loss with venue-specific fees deducted; the settlers use it to score outcomes.",f:["compute() / compute_batch()","VenueFees / get_fees()"]},
@@ -846,7 +1146,7 @@ const MODS=[
 
   // ---- settlement ----
   {n:"kalshi_tennis_settler.py",g:"settle",lc:252,d:"Scores P-015 tennis positions by polling Kalshi's public API for settled results; writes settlement rows and net P&L.",f:["settle_cycle()","_open_placed_entries() / _write_settlement()"]},
-  {n:"kalshi_golf_settler.py",g:"settle",lc:340,d:"Scores P-017 golf top-N positions. Handles three golf quirks: 'closed'≠settled, 'scalar' result = withdrawn→void, and P&L booked net of the taker fee.",f:["settle_cycle()","_calc_outcome_pnl() / _stale_record()"]},
+  {n:"kalshi_golf_settler.py",g:"settle",lc:340,d:"Scores P-017 golf positions. Handles two critical quirks: 'closed' is not settled, and a scalar result is a real partial payout at settlement_value_dollars — never a void. P&L is booked net of fee.",f:["settle_cycle()","scalar_settlement_value() / _calc_outcome_pnl()","_stale_record()"]},
   {n:"polymarket_settler.py",g:"settle",lc:632,d:"Scores Polymarket-based pods using Odds API scores + Polymarket's Gamma API; also updates the Elo model from results.",f:["settle_cycle() / _check_and_settle()","_check_scores() / _update_elo()"]},
 
   // ---- dashboards / health ----

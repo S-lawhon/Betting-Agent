@@ -1847,16 +1847,19 @@ workstreams:
     blocked_on: human
     owner_dir: soccer_research
     action_required: >
-      DECISION: whether to start in-play soccer book capture, which is the only
-      thing that would let the one remaining structural candidate be tested (the
-      deterministic late-first-half time bound — at minute 44 with 0-0 the
-      probability both teams score before half-time is near zero on any model).
-      src/book_capture.py:223 is hardcoded to ["KXMLBGAME"] at a 60-second
-      cadence, which the AFT review already called fatal for a minute-resolution
-      soccer signal, so this is a data-collection decision (cadence, and a 2GB
-      droplet already running six workloads) before it is a research one.
-      If the answer is no, close this workstream — Phase 1 is a KILL and nothing
-      else is testable with the data we have.
+      AUTHORISE (or decline) a capacity study. Phase 2 PASSED its pre-registered
+      gate and section 8.5 permits a capacity study and nothing else — no pod, no
+      quote, no deploy. The two open questions are what the edge is worth at
+      realistic size against a median 158-contract filling minute, and how the
+      15.45% fill rate degrades once the offer is not assumed first in queue.
+      IN-PLAY CAPTURE IS NOT NEEDED and that earlier decision is MOOT: the
+      minute-resolution in-play tape already exists retrospectively in
+      candlesticks for settled markets, so no droplet capacity, no cadence
+      change and no new unit are required.
+      SEPARATE, SMALLER: the deferred late-in-the-half slice needs a kickoff
+      anchor. Soccer tickers carry date only with no HHMM and occurrence_datetime
+      is a one-hour estimate of match END, so it needs the soccer analogue of
+      src/golf_schedule.py (ESPN). Not required for anything above.
     summary: >
       Reopens the ONE-LINE kill of soccer BTTS ("sits at P = 0.483, the exact
       maximum of the fee parabola"), which the 2026-07-30 AFT paper review found
@@ -1887,6 +1890,29 @@ workstreams:
       payout criterion is MONOTONE, which is why containment survives every
       abandonment branch. Both are reusable for any future soccer pair test.
       See soccer_research/REPORT_BTTS_Containment_2026-08-16.md.
+      PHASE 2 (late-half maker fade) = PASS, the first after a long run of
+      kills. +4.52c/contract equal-weighted per match, CI [+2.12, +6.91],
+      z 3.71, fill rate 15.45%, 768 filled matches of 908. Offer YES one tick
+      inside the ask every open in-play minute; fill only on a strictly-through
+      print; maker, so fee-free. Pooled estimator +3.16c, reported separately.
+      MECHANISM: collect ~20c five times in the 77% of matches with no
+      first-half BTTS, pay ~67c four times in the 23% that have one. The offer
+      price in YES matches averages 0.331 vs 0.198 in NO matches, which is why
+      the naive "sell 18c into a 23% base rate" read does not reconcile — and
+      it means THE STRATEGY SCALES INTO ITS LOSERS (mean -583c per YES match,
+      skew -1.25).
+      AMENDMENT 1 caught an outcome leak before any P&L existed: close_time is
+      outcome-dependent here (YES closes at the second goal, NO at half-time),
+      so a close-anchored window would have defined the sample by the result.
+      SURVIVED four break attempts: no look-ahead (candle continuity 51,741 of
+      51,753), median spread at fill 2c, median 158 contracts of volume in a
+      filling minute, leave-one-series-out +3.93 to +5.27.
+      PRIOR STILL STANDS AGAINST IT: stripped of a goal-state feed this is a
+      favourite-longshot claim, P-019 killed FLB here, and the archetype is
+      0 for 8. Sample is ONE ROLLING MONTH (Kalshi history rolls off at ~30d,
+      cannot be extended backwards) and skewed to MLS/Brasileirao/USL/UEFA —
+      KXEPL1HBTTS had zero settled markets.
+      See soccer_research/REPORT_BTTS_Decay_2026-08-16.md.
     notes: >
       Registered BEFORE the work started, deliberately. The research triage
       pipeline holds an open strategy-scout assignment on a Kalshi soccer family

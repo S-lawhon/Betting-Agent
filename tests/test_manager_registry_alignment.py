@@ -61,6 +61,17 @@ def test_closed_tennis_research_is_not_waiting_on_sam():
     assert workstream["blocked_on"] == "nothing"
 
 
+def test_research_throughput_trial_has_a_dated_decision_gate():
+    workstream = _workstream(_registry(), "R-RESEARCH-THROUGHPUT-TRIAL")
+
+    assert workstream["blocked_on"] == "time"
+    assert str(workstream["recheck_after"]) == "2026-08-23"
+    action = workstream["action_required"]
+    assert "screen-to-deep survivors" in action
+    assert "failures/safe no-ops" in action
+    assert "capacity will not" in workstream["summary"]
+
+
 def test_p018_registry_records_its_published_terminal_kill():
     workstream = _workstream(_registry(), "P-018")
     report = (ROOT / "research" / "REPORT_P018_Gate1_2026-07-28.md").read_text()

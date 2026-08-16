@@ -1985,6 +1985,30 @@ workstreams:
       paper_live; the next candidate most likely arrives via the daily
       screened research pass.
 
+  - id: R-RESEARCH-THROUGHPUT-TRIAL
+    name: Screened Research Throughput Trial
+    stage: research
+    owner_dir: config
+    blocked_on: time
+    recheck_after: 2026-08-23
+    action_required: >
+      Rebuild data/research_intake/metrics.json and review the 2026-08-16
+      through 2026-08-23 execution records. Compare arrivals, screens,
+      screen-to-deep survivors, completed deep reviews, failures/safe no-ops,
+      advances, oldest queue age, and measured subscription cost. Keep 6/4
+      only if the queue is stable or shrinking, failures are not capacity-
+      induced, and deep work is producing decisive rejects/defers/advances.
+      Raise the binding stage only when arrivals exceed completions without a
+      quality regression; reduce it if shallow survivors consume deep slots
+      without improving decisive output. Record the permanent limits in both
+      research runtime configs and update the two systemd timer schedules.
+    summary: >
+      One-week capacity trial running 2026-08-16 through 2026-08-23: six
+      screening attempts and four deep attempts per UTC day, up from five and
+      two. Durable dispositions and execution run records are the evidence.
+      The due-date check deliberately requires a decision; capacity will not
+      auto-ratchet into a higher-cost configuration.
+
   - id: R-FANTASY-DEADHEAT
     name: NFL fantasy dead-heat (op_20260801_002)
     stage: research

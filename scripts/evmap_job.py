@@ -36,6 +36,7 @@ Exit code is the job's own, so a systemd unit fails when the job fails.
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import json
 import os
 import subprocess
@@ -94,10 +95,13 @@ JOBS: Dict[str, Dict[str, Any]] = {
     },
     "archive_settled": {
         "script": "archive_settled.py",
-        "args": [],
+        # The script checkpoints below systemd's 45-minute hard timeout. A
+        # bounded run may finish only part of the cursor walk; that is a
+        # successful durable advance, not a failed archive.
+        "args": ["--budget-seconds=2100"],
         "output": "settled_archive.parquet",
         "expect_rows": 0,
-        "every": "weekly Sun 03:17 America/Chicago",
+        "every": "daily 03:17 America/Chicago",
     },
 }
 
@@ -273,10 +277,21 @@ def run(job: str, dry_run: bool = False) -> int:
     # A per-day job starts from zero by construction: only the file this run
     # writes counts (see `_rows`).
     before = 0 if per_day else _rows(spec)
-    proc = subprocess.run(
-        [sys.executable, str(script), *args],
-        cwd=str(EVMAP), capture_output=True, text=True,
+    # Stream child progress into journald. capture_output=True hid every pass-A
+    # counter, and when systemd killed the wrapper at 45 minutes the captured
+    # buffer died with it, leaving no clue which stage had timed out.
+    proc = subprocess.Popen(
+        [sys.executable, str(script), *args], cwd=str(EVMAP),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,
         env={**os.environ, "PYTHONUNBUFFERED": "1"})
+    combined_tail = deque(maxlen=8)
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        line = line.rstrip("\n")
+        combined_tail.append(line)
+        print(line, flush=True)
+    proc.wait()
     dt = _now() - t0
     after = _rows(spec, since=t0 if per_day else None)
 
@@ -306,8 +321,8 @@ def run(job: str, dry_run: bool = False) -> int:
         "expect_rows": spec["expect_rows"],
         "empty_reason": empty_reason,
         "host": os.uname().nodename,
-        "stdout_tail": (proc.stdout or "").strip().splitlines()[-3:],
-        "stderr_tail": (proc.stderr or "").strip().splitlines()[-6:],
+        "stdout_tail": list(combined_tail)[-3:] if proc.returncode == 0 else [],
+        "stderr_tail": list(combined_tail)[-6:] if proc.returncode != 0 else [],
         # `prev_fail` was captured before the START row was written, so
         # this cannot count that START as a prior failure of its own run.
         "consecutive_failures": (0 if ok else prev_fail + 1),
@@ -316,13 +331,9 @@ def run(job: str, dry_run: bool = False) -> int:
 
     print(f"[evmap_job] {job} ok={ok} exit={proc.returncode} "
           f"rows {before} -> {after} (+{delta}) in {dt:.1f}s")
-    if proc.stdout:
-        print(proc.stdout.rstrip())
     if not ok:
         print(f"[evmap_job] FAILED: {empty_reason or 'nonzero exit'}",
               file=sys.stderr)
-        if proc.stderr:
-            print(proc.stderr.rstrip(), file=sys.stderr)
         # A wrapper that swallows the failure recreates the bug it exists to
         # fix, so the unit must see a nonzero exit.
         return proc.returncode or 3

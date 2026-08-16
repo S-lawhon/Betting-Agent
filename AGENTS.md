@@ -365,6 +365,24 @@ them. P-029 uses subaccount 1.
 **Cowork cannot SSH** — port 22 is blocked outbound from the sandbox. Package VPS work as
 self-contained scripts for Sam to run (the DigitalOcean web console works when no key is installed).
 
+## EV-Map settled archive (resumable since 2026-08-16)
+
+`kalshi-ev-map/src/archive_settled.py` no longer rewrites one growing lifetime
+Parquet file. The valid 8.68M-row `settled_archive.parquet` is an immutable base;
+new rows are atomically published under `settled_archive_parts/`. Exact ticker
+deduplication and API-cursor state live in `settled_archive_index.sqlite`.
+Legacy-base indexing checkpoints by Parquet row group, and ingestion checkpoints
+by page bundle. `archive_progress.json` is the monitored progress surface.
+
+- Never merge the parts back into the base or delete the SQLite index to “start
+  clean”; either action restores the unbounded weekly rewrite that timed out.
+- A `*.parquet.tmp` or the old `settled_archive.parquet.raw` is not committed
+  archive data. Final `*.parquet` parts are committed and corruption fails closed.
+- The script budgets 35 minutes inside a 45-minute systemd limit and runs daily.
+  A clean checkpointed exit is expected; the next run resumes.
+- The wrapper streams child progress to journald. Do not restore
+  `capture_output=True`, which made the 2026-08-16 timeout stage invisible.
+
 ## Recursive strategy factory — the OTHER agent system (live 2026-08-01)
 
 Separate from the pods. Six subagents in `.Codex/agents/` move an idea through

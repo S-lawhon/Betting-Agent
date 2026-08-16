@@ -1,321 +1,466 @@
-"""Incremental settled-market archiver (cron target).
+"""Resumable settled-market archiver.
 
-Appends all newly settled markets since the last run to
-data/settled_archive.parquet. The public API only keeps ~90 days reachable;
-run at least weekly so calibration history is never lost.
+The original archiver rewrote one lifetime Parquet file every Sunday. By
+2026-08-16 the valid base had reached 8.68 million rows and pass A alone ran
+past the 45-minute systemd limit, leaving an unreadable 401 MB ``.raw`` file.
 
-STATUS 2026-07-28: memory rebuilt from the ground up. See the version
-history in main(). The short version, because three fixes in a row treated a
-symptom:
-
-  **89.5% of every settled market Kalshi returns is a zero-volume MVE parlay
-  husk**, and the filter that dropped them ran AFTER they had been paginated,
-  parsed and built into a DataFrame. v1 said so in a comment and then v2
-  (chunking) and v3 (streaming writer) both optimised the memory that the
-  waste consumed instead of removing the waste. Peak RSS across the four
-  attempts: 1.66 GB -> (v2, unmeasured, still >1.4 GB) -> 599 MB -> 182 MB.
-
-They cannot be excluded server-side — `exclude_mve`, `mve=false`,
-`is_mve=false`, `multivariate=false`, `min_volume=1`, `min_open_interest=1`
-are all silently ignored by `/markets`. So they are skipped in the ingest loop
-before `build_frame` ever sees them.
-
-RUN IT UNDER A CAP until the above is done — on a 2 GB box the largest RSS
-consumer is P-022's runner, and the global OOM killer scores by RSS:
-
-    systemd-run --unit=evmap-archive-probe --property=MemoryMax=600M \\
-        --property=MemorySwapMax=0 --uid=bettingbot \\
-        --working-directory=/opt/betting-pod-shop/kalshi-ev-map \\
-        /opt/betting-pod-shop/venv/bin/python src/archive_settled.py
+This version treats the existing file as an immutable base and appends atomic
+Parquet parts under ``data/settled_archive_parts``. A disk-backed SQLite index
+provides exact ticker de-duplication without loading the lifetime archive into
+RAM. Both indexing the legacy base and API pagination are checkpointed, so a
+timeout or process kill repeats at most one row group/page bundle and can never
+damage committed archive data.
 """
+from __future__ import annotations
+
 import argparse
-import hashlib
 import json
+import os
+import sqlite3
 import sys
 import time
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kalshi_client as kc
 from pull_settled import build_frame
 
-import numpy as np
-import pandas as pd
-
 kc.MIN_INTERVAL = 0.25
+
 STATE = kc.DATA_DIR / "archive_state.json"
-OUT = kc.DATA_DIR / "settled_archive.parquet"
+BASE = kc.DATA_DIR / "settled_archive.parquet"
+PARTS = kc.DATA_DIR / "settled_archive_parts"
+INDEX = kc.DATA_DIR / "settled_archive_index.sqlite"
+PROGRESS = kc.DATA_DIR / "archive_progress.json"
+LEGACY_RAW = BASE.with_suffix(".parquet.raw")
+
+SCHEMA_VERSION = 2
+DEFAULT_BUDGET_SECONDS = 35 * 60
+DEFAULT_PAGES_PER_PART = 20
+SQL_VARS = 800
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--from-raw", action="store_true",
-                    help="skip pass A and merge an existing "
-                         "settled_archive.parquet.raw. Pass A is ~7 minutes of "
-                         "rate-limited pulling over 7M markets; a pass-B "
-                         "failure should not cost that twice.")
-    args = ap.parse_args()
-    state = json.load(open(STATE)) if STATE.exists() else {}
-    # overlap 2 days to be safe against settlement lag
-    min_close = int(state.get("last_run_ts", time.time() - 8 * 86400)) - 2 * 86400
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
-    # ── THE MEMORY HISTORY, so the next person does not repeat it ──────────
-    #
-    # v1  accumulated every settled market in one list, then built one
-    #     DataFrame. 1.66 GB, killed by the GLOBAL OOM killer at 433 s.
-    # v2  (2026-07-29) chunked the accumulation — but kept every chunk in
-    #     `parts` and concatenated at the end, so peak was still the whole
-    #     frame plus a copy. It moved WHERE the memory went, not HOW MUCH.
-    # v3  (2026-07-28) streamed row groups to a ParquetWriter. A real ~3x
-    #     win (1.66 GB -> 599 MB, 4x the work done) and STILL killed, at a
-    #     600 MB cap, because two things still grew with KEPT ROWS: the
-    #     `new_tickers` de-duplication set, and the array pandas materialises
-    #     for `part.ticker.isin(set)` on every single chunk.
-    #
-    # v4, below, is bounded BY CONSTRUCTION rather than by a component being
-    # small enough. The ingest loop holds NO cross-chunk Python state at all —
-    # no set, no list of frames, nothing whose size depends on how much has
-    # been read. De-duplication is deferred to a second pass that works on ONE
-    # COLUMN of the file just written.
-    #
-    # Still exactly equivalent to the original
-    # `pd.concat([old, new]).drop_duplicates(subset="ticker", keep="last")`:
-    #   * within the new data, keep="last" is reproduced by
-    #     `Series.duplicated(keep="last")` over the ticker column in file order;
-    #   * new beats old is reproduced by writing the deduped new rows first and
-    #     then streaming the old archive back in, dropping any ticker the new
-    #     pass wrote.
-    #
-    # The rejected alternative was seeding `archive_state.json` to shrink the
-    # 10-day window. It does not work: the timer is WEEKLY, so a window shorter
-    # than 7 days drops settled markets permanently — and the archive has never
-    # existed, so there is nothing to seed from. It trades an OOM for silent
-    # data loss.
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-    import pyarrow.compute as pc
 
-    CHUNK = 20000
-    raw = OUT.with_suffix(".parquet.raw")     # pass A output (with duplicates)
-    tmp = OUT.with_suffix(".parquet.tmp")     # pass B output (final)
+def _atomic_json(path: Path, payload: Dict[str, Any]) -> None:
+    """Durably replace a JSON checkpoint; a killed write leaves the old one."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
 
-    # A killed run cannot clean up after itself — SIGKILL does not run
-    # `finally` — so stale temporaries are cleared at STARTUP. v3 left a 34 MB
-    # orphan behind exactly this way.
-    keep_raw = args.from_raw and raw.exists()
-    for stale in ((tmp,) if keep_raw else (raw, tmp)):
-        if stale.exists():
-            print(f"[archive] removing stale {stale.name} from a killed run",
-                  flush=True)
-            stale.unlink()
 
-    # ── PASS A: ingest → raw parquet. No dedup, no set, no growing state. ──
-    #
-    # THE HUSK FILTER RUNS BEFORE `build_frame`, NOT AFTER — measured
-    # 2026-07-28 and this is the single biggest cost in the whole job.
-    # **89.5% of every settled market Kalshi returns is a zero-volume MVE
-    # parlay husk**: over 250k markets, `KXMVESPORTSMULTIGAMEEXTENDED` is
-    # 75.4% and `KXMVECROSSCATEGORY` 14.1%. v1's own comment said the filter
-    # "ran only AFTER everything was in memory" and every fix since — the
-    # chunking, the streaming writer — treated the MEMORY CONSEQUENCE instead
-    # of the CAUSE, which is that nine rows in ten are built into a DataFrame
-    # only to be thrown away.
-    #
-    # They cannot be excluded server-side: `exclude_mve`, `mve=false`,
-    # `is_mve=false`, `multivariate=false`, `min_volume=1` and
-    # `min_open_interest=1` are all silently IGNORED by `/markets` (89.5%
-    # unchanged on every one). So they must be fetched — but they need not be
-    # parsed, framed, or written.
-    #
-    # Exactly equivalent to the old post-filter: `build_frame` sets
-    # `is_mve = bool(mve_collection_ticker)` and `volume = fnum(volume_fp)`,
-    # and `~is_mve | (volume > 0)` drops a null-volume husk because
-    # `NaN > 0` is False — which `(fnum(...) or 0) > 0` reproduces.
-    #
-    # CHUNK now counts KEPT rows, so a chunk is a real unit of work rather
-    # than mostly husks.
-    rows, seen, skipped, written = [], 0, 0, 0
-    writer = None
-    if keep_raw:
-        written = pq.ParquetFile(raw, pre_buffer=False).metadata.num_rows
-        print(f"[archive] --from-raw: reusing {raw.name} with {written} rows, "
-              f"skipping pass A", flush=True)
+def _atomic_parquet(frame, path: Path) -> None:
+    """Publish a readable Parquet part only after its footer is durable."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
     try:
-        if keep_raw:
-            raise StopIteration
-        def _flush():
-            nonlocal writer, written
-            if not rows:
-                return
-            part = build_frame(rows)
-            rows.clear()
-            if part.empty:
-                return
-            table = pa.Table.from_pandas(part, preserve_index=False)
-            if writer is None:
-                writer = pq.ParquetWriter(raw, table.schema)
-            writer.write_table(table)
-            written += table.num_rows
-
-        for m in kc.paginate("/markets", {"status": "settled", "limit": 1000,
-                                          "min_close_ts": min_close},
-                             list_key="markets"):
-            seen += 1
-            if m.get("mve_collection_ticker") and not (
-                    (kc.fnum(m.get("volume_fp")) or 0.0) > 0):
-                skipped += 1                      # zero-volume parlay husk
-                continue
-            rows.append(m)
-            if len(rows) >= CHUNK:
-                _flush()
-                print(f"[archive] pass A: {seen} scanned, {skipped} husks "
-                      f"skipped, {written} kept...", flush=True)
-        _flush()
-    except StopIteration:
-        pass
+        frame.to_parquet(tmp, index=False)
+        with open(tmp, "rb") as fh:
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
     finally:
-        if writer is not None:
-            writer.close()
-            writer = None
-    if keep_raw:
-        print(f"[archive] pass A skipped ({written} rows reused)", flush=True)
-    else:
-        print(f"[archive] pass A done: {seen} scanned, {skipped} husks "
-              f"skipped ({100*skipped/max(seen,1):.1f}%), {written} kept",
-              flush=True)
+        if tmp.exists():
+            tmp.unlink()
 
-    if written == 0 and not OUT.exists():
-        # A run that legitimately found nothing must still leave a readable
-        # archive, or the next run cannot tell "empty" from "never ran".
-        build_frame([]).iloc[0:0].to_parquet(tmp, index=False)
-        tmp.replace(OUT)
-        json.dump({"last_run_ts": int(time.time())}, open(STATE, "w"))
-        print(f"[done] no settled markets in window -> empty {OUT}", flush=True)
-        return
 
-    # ── PASS B: merge. Bounded — no column is ever materialised in pandas. ──
-    #
-    # v5 finished pass A fine (7,055,386 markets scanned, 3,680,825 kept, 402 MB)
-    # and was then OOM-KILLED HERE, because this pass called `.to_pandas()` on
-    # the whole ticker column: 3.68 M Python strings is ~400 MB in one spike.
-    #
-    # And it was computing a NO-OP. Measured on that very file with a bounded
-    # hash pass: 3,680,825 rows, **3,680,825 distinct tickers, zero duplicates**.
-    # Kalshi's cursor pagination does not repeat a market, so the within-run
-    # `drop_duplicates` never removed anything. It is gone — but the assumption
-    # is now CHECKED rather than assumed, at ~30 MB (uint64 hashes) instead of
-    # ~400 MB (strings), so if Kalshi ever starts repeating we find out.
-    # ── The reader that does NOT leak ──────────────────────────────────────
-    #
-    # MEASURED 2026-07-28, after pass B was OOM-killed three times and the
-    # first two diagnoses (the ticker set, then the pandas column read) were
-    # both wrong. Reading `settled_archive.parquet` (3.68 M rows, 185 row
-    # groups) with the OBVIOUS code grows without bound:
-    #
-    #   pq.ParquetFile(p).iter_batches(...)              -> 509 MB, arrow 304 MB
-    #   ...same, use_threads=False                       -> 507 MB, arrow 360 MB
-    #   ds.dataset(p).to_batches(...)                    -> 826 MB
-    #   pq.ParquetFile(p, pre_buffer=False).iter_batches -> 177 MB, arrow  22 MB  <-
-    #
-    # `pre_buffer=True` is the DEFAULT and it is the leak: the reader caches
-    # every column chunk it touches and never releases it, so
-    # `pool.bytes_allocated()` climbs monotonically with the file. It is not
-    # allocator retention — `release_unused()` does not help, because the bytes
-    # are still allocated, not merely unreturned.
-    #
-    # This is why the archiver died at ~700 MB anon-rss on a TWO-DAY window:
-    # the size of the pull never mattered, only the size of the archive being
-    # read back.
-    def _open(path):
-        return pq.ParquetFile(path, pre_buffer=False, memory_map=False)
+def _chunks(values: Sequence[str], size: int = SQL_VARS) -> Iterable[Sequence[str]]:
+    for start in range(0, len(values), size):
+        yield values[start:start + size]
 
-    def _ticker_hashes(path):
-        """uint64 hash per row, in file order. ~8 B/row instead of ~110 B."""
-        pf_ = _open(path)
-        out = np.empty(pf_.metadata.num_rows, dtype=np.uint64)
-        i = 0
-        for b in pf_.iter_batches(batch_size=200000, columns=["ticker"]):
-            for t in b.column("ticker").to_pylist():
-                out[i] = np.frombuffer(
-                    hashlib.blake2b((t or "").encode(), digest_size=8).digest(),
-                    dtype=np.uint64)[0]
-                i += 1
-        return out[:i]
 
-    if written:
-        h = _ticker_hashes(raw)
-        n_distinct = len(np.unique(h))
-        if n_distinct != len(h):
-            print(f"[archive] WARNING: {len(h) - n_distinct} DUPLICATE tickers "
-                  f"in this pull — pagination has started repeating. The "
-                  f"within-run de-duplication removed in v6 is now needed "
-                  f"again; the archive keeps every copy until it is restored.",
-                  flush=True)
+class ArchiveIndex:
+    """Disk-backed exact ticker index plus transactional resume metadata."""
+
+    def __init__(self, path: Path = INDEX):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.path = path
+        self.db = sqlite3.connect(path, timeout=60)
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA synchronous=FULL")
+        self.db.execute("PRAGMA temp_store=FILE")
+        self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS tickers (
+                ticker TEXT PRIMARY KEY
+            ) WITHOUT ROWID;
+            CREATE TABLE IF NOT EXISTS sources (
+                path TEXT PRIMARY KEY,
+                size_bytes INTEGER NOT NULL,
+                mtime_ns INTEGER NOT NULL,
+                row_groups_done INTEGER NOT NULL DEFAULT 0,
+                rows_indexed INTEGER NOT NULL DEFAULT 0,
+                complete INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+        """)
+        self.db.commit()
+
+    def close(self) -> None:
+        self.db.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self.close()
+
+    def count(self) -> int:
+        return int(self.db.execute("SELECT COUNT(*) FROM tickers").fetchone()[0])
+
+    def get_meta(self, key: str) -> Optional[Dict[str, Any]]:
+        row = self.db.execute("SELECT value FROM metadata WHERE key=?", (key,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def set_meta(self, key: str, value: Dict[str, Any]) -> None:
+        with self.db:
+            self.db.execute(
+                "INSERT INTO metadata(key,value) VALUES(?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (key, json.dumps(value, sort_keys=True)),
+            )
+
+    def delete_meta(self, key: str) -> None:
+        with self.db:
+            self.db.execute("DELETE FROM metadata WHERE key=?", (key,))
+
+    def unseen(self, tickers: Sequence[str]) -> List[bool]:
+        """Return a position-preserving mask without materialising the archive."""
+        present = set()
+        unique = list(dict.fromkeys(str(t) for t in tickers if t))
+        for group in _chunks(unique):
+            marks = ",".join("?" for _ in group)
+            present.update(row[0] for row in self.db.execute(
+                f"SELECT ticker FROM tickers WHERE ticker IN ({marks})", tuple(group)))
+        batch_seen = set()
+        mask = []
+        for ticker in tickers:
+            keep = bool(ticker) and ticker not in present and ticker not in batch_seen
+            mask.append(keep)
+            if ticker:
+                batch_seen.add(ticker)
+        return mask
+
+    def source(self, path: Path) -> Optional[Dict[str, int]]:
+        row = self.db.execute(
+            "SELECT size_bytes,mtime_ns,row_groups_done,rows_indexed,complete "
+            "FROM sources WHERE path=?", (str(path),)).fetchone()
+        if not row:
+            return None
+        return dict(zip(("size_bytes", "mtime_ns", "row_groups_done",
+                         "rows_indexed", "complete"), map(int, row)))
+
+    def _ensure_source(self, path: Path) -> Dict[str, int]:
+        stat = path.stat()
+        rec = self.source(path)
+        identity = (stat.st_size, stat.st_mtime_ns)
+        if rec and (rec["size_bytes"], rec["mtime_ns"]) != identity:
+            raise RuntimeError(f"committed archive source changed: {path}")
+        if not rec:
+            with self.db:
+                self.db.execute(
+                    "INSERT INTO sources(path,size_bytes,mtime_ns) VALUES(?,?,?)",
+                    (str(path), *identity),
+                )
+            rec = self.source(path)
+        assert rec is not None
+        return rec
+
+    def index_next_row_group(self, path: Path) -> Tuple[bool, int]:
+        """Index one Parquet row group transactionally; return (complete, rows)."""
+        import pyarrow.parquet as pq
+
+        rec = self._ensure_source(path)
+        pf = pq.ParquetFile(path, pre_buffer=False, memory_map=False)
+        group = rec["row_groups_done"]
+        if group >= pf.metadata.num_row_groups:
+            if not rec["complete"]:
+                with self.db:
+                    self.db.execute("UPDATE sources SET complete=1 WHERE path=?",
+                                    (str(path),))
+            return True, 0
+
+        table = pf.read_row_group(group, columns=["ticker"], use_threads=False)
+        tickers = [str(t) for t in table.column("ticker").to_pylist() if t]
+        with self.db:
+            self.db.executemany("INSERT OR IGNORE INTO tickers(ticker) VALUES(?)",
+                                ((t,) for t in tickers))
+            self.db.execute(
+                "UPDATE sources SET row_groups_done=row_groups_done+1, "
+                "rows_indexed=rows_indexed+? WHERE path=?",
+                (len(tickers), str(path)),
+            )
+        complete = group + 1 >= pf.metadata.num_row_groups
+        if complete:
+            with self.db:
+                self.db.execute("UPDATE sources SET complete=1 WHERE path=?",
+                                (str(path),))
+        return complete, len(tickers)
+
+    def commit_part(self, path: Path, tickers: Sequence[str],
+                    ingest: Dict[str, Any]) -> None:
+        """Atomically index a published part and advance its API cursor."""
+        stat = path.stat()
+        import pyarrow.parquet as pq
+        pf = pq.ParquetFile(path, pre_buffer=False, memory_map=False)
+        with self.db:
+            self.db.executemany("INSERT OR IGNORE INTO tickers(ticker) VALUES(?)",
+                                ((str(t),) for t in tickers if t))
+            self.db.execute(
+                "INSERT OR REPLACE INTO sources"
+                "(path,size_bytes,mtime_ns,row_groups_done,rows_indexed,complete) "
+                "VALUES(?,?,?,?,?,1)",
+                (str(path), stat.st_size, stat.st_mtime_ns,
+                 pf.metadata.num_row_groups, pf.metadata.num_rows),
+            )
+            self.db.execute(
+                "INSERT INTO metadata(key,value) VALUES('ingest',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (json.dumps(ingest, sort_keys=True),),
+            )
+
+
+def archive_sources(base: Optional[Path] = None,
+                    parts: Optional[Path] = None) -> List[Path]:
+    """Return committed archive sources; temporary files are never data."""
+    base = BASE if base is None else base
+    parts = PARTS if parts is None else parts
+    out = [base] if base.exists() else []
+    if parts.exists():
+        out.extend(sorted(parts.glob("*.parquet")))
+    return out
+
+
+def _write_progress(index: ArchiveIndex, status: str,
+                    **extra: Any) -> Dict[str, Any]:
+    sources = archive_sources()
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": _utc_now(),
+        "status": status,
+        "base_archive_exists": BASE.exists(),
+        "committed_parts": max(0, len(sources) - int(BASE.exists())),
+        "indexed_tickers": index.count(),
+        "legacy_raw_present": LEGACY_RAW.exists(),
+        **extra,
+    }
+    _atomic_json(PROGRESS, payload)
+    return payload
+
+
+def backfill_index(index: ArchiveIndex, deadline: Optional[float] = None) -> bool:
+    """Checkpoint legacy/part indexing one row group at a time."""
+    for source in archive_sources():
+        while True:
+            complete, _rows = index.index_next_row_group(source)
+            rec = index.source(source) or {}
+            _write_progress(
+                index, "indexing" if not complete else "indexed_source",
+                source=str(source), rows_indexed=rec.get("rows_indexed"),
+                row_groups_done=rec.get("row_groups_done"),
+            )
+            if complete:
+                break
+            if deadline is not None and time.monotonic() >= deadline:
+                print(f"[archive] checkpointed index at {source.name} "
+                      f"row_group={rec.get('row_groups_done')}", flush=True)
+                return False
+    return True
+
+
+def _load_state() -> Dict[str, Any]:
+    try:
+        return json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"unreadable archive state: {STATE}: {exc}") from exc
+
+
+def _new_ingest() -> Dict[str, Any]:
+    now = int(time.time())
+    state = _load_state()
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "run_id": datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                  + "-" + uuid.uuid4().hex[:8],
+        "started_at": _utc_now(),
+        "min_close_ts": int(state.get("last_run_ts", now - 8 * 86400)) - 2 * 86400,
+        "through_ts": now,
+        "cursor": None,
+        "next_part": 0,
+        "pages": 0,
+        "seen": 0,
+        "skipped_husks": 0,
+        "written": 0,
+        "complete": False,
+    }
+
+
+def _collapse_last(frame):
+    """Keep the last row for a ticker inside one fetched page bundle."""
+    if frame.empty:
+        return frame
+    return frame.drop_duplicates(subset="ticker", keep="last").reset_index(drop=True)
+
+
+def _empty_frame():
+    """Return build_frame's stable schema without special-casing downstream."""
+    return build_frame([{}]).iloc[0:0]
+
+
+def ingest(index: ArchiveIndex, deadline: Optional[float] = None,
+           pages_per_part: int = DEFAULT_PAGES_PER_PART,
+           get_page: Callable[..., Dict[str, Any]] = kc.get,
+           max_parts: Optional[int] = None) -> bool:
+    """Resume API pagination and publish immutable parts; return completeness."""
+    run = index.get_meta("ingest") or _new_ingest()
+    if run.get("complete"):
+        return True
+
+    committed_this_call = 0
+    while True:
+        bundle: List[Dict[str, Any]] = []
+        next_cursor = run.get("cursor")
+        terminal = False
+        pages = 0
+        seen = skipped = 0
+        while pages < pages_per_part:
+            params = {
+                "status": "settled",
+                "limit": 1000,
+                "min_close_ts": run["min_close_ts"],
+                "max_close_ts": run["through_ts"],
+            }
+            if next_cursor:
+                params["cursor"] = next_cursor
+            data = get_page("/markets", params)
+            items = data.get("markets") or []
+            seen += len(items)
+            for market in items:
+                if market.get("mve_collection_ticker") and not (
+                        (kc.fnum(market.get("volume_fp")) or 0.0) > 0):
+                    skipped += 1
+                else:
+                    bundle.append(market)
+            pages += 1
+            next_cursor = data.get("cursor")
+            if not next_cursor or not items:
+                terminal = True
+                break
+
+        frame = _collapse_last(build_frame(bundle)) if bundle else _empty_frame()
+        tickers = [str(t) for t in frame.get("ticker", [])]
+        if tickers:
+            mask = index.unseen(tickers)
+            frame = frame.loc[mask].reset_index(drop=True)
+            tickers = [str(t) for t in frame["ticker"].tolist()]
+
+        next_run = dict(run)
+        next_run.update({
+            "cursor": next_cursor,
+            "next_part": int(run["next_part"]) + int(not frame.empty),
+            "pages": int(run["pages"]) + pages,
+            "seen": int(run["seen"]) + seen,
+            "skipped_husks": int(run["skipped_husks"]) + skipped,
+            "written": int(run["written"]) + len(frame),
+            "complete": terminal,
+        })
+
+        if not frame.empty:
+            # UUID suffix prevents an orphan (published just before a kill,
+            # before the cursor transaction) from occupying the sequence name
+            # that the resumed run would otherwise try to reuse.
+            name = (f"{run['run_id']}.part-{int(run['next_part']):06d}-"
+                    f"{uuid.uuid4().hex[:8]}.parquet")
+            part = PARTS / name
+            if part.exists():
+                raise RuntimeError(f"refusing to overwrite committed part: {part}")
+            _atomic_parquet(frame, part)
+            # Publish first, then transact index + cursor. A kill between them
+            # leaves an orphan that backfill_index repairs before any refetch.
+            index.commit_part(part, tickers, next_run)
+            committed_this_call += 1
         else:
-            print(f"[archive] pass B: {len(h)} rows, all tickers distinct",
+            index.set_meta("ingest", next_run)
+
+        run = next_run
+        _write_progress(index, "ingest_complete" if terminal else "ingesting",
+                        ingest=run)
+        print(f"[archive] pages={run['pages']} seen={run['seen']} "
+              f"skipped={run['skipped_husks']} written={run['written']} "
+              f"complete={terminal}", flush=True)
+
+        if terminal:
+            return True
+        if max_parts is not None and committed_this_call >= max_parts:
+            return False
+        if deadline is not None and time.monotonic() >= deadline:
+            print("[archive] runtime budget reached; cursor and parts committed",
                   flush=True)
+            return False
 
-    if not OUT.exists():
-        # First run, or the archive was lost. Nothing to merge — the raw file
-        # IS the archive. A rename costs no memory and no time, where the old
-        # code streamed 3.68 M rows through a second writer to achieve exactly
-        # the same bytes.
-        raw.replace(OUT)
-        print("[archive] no existing archive to merge — raw promoted in place",
-              flush=True)
-    else:
-        # Merge: every new row wins, then carry forward the old rows whose
-        # ticker this pull did not rewrite. Compared by uint64 hash, so the
-        # exclusion set is ~30 MB rather than ~125 MB of arrow strings or
-        # ~400 MB of Python strings. Collision risk over 3.7 M keys in a 64-bit
-        # space is ~1e-6 and its only consequence is dropping one superseded
-        # OLD row that a NEW row already replaces — it cannot lose new data.
-        new_h = np.sort(h) if written else np.empty(0, dtype=np.uint64)
-        out_writer = None
-        carried = 0
-        try:
-            for src in (raw, OUT):
-                if src is raw and not written:
-                    continue
-                for batch in _open(src).iter_batches(batch_size=CHUNK):
-                    tbl = pa.Table.from_batches([batch])
-                    if src is OUT and len(new_h):
-                        bh = np.array(
-                            [np.frombuffer(hashlib.blake2b(
-                                (t or "").encode(), digest_size=8).digest(),
-                                dtype=np.uint64)[0]
-                             for t in tbl.column("ticker").to_pylist()],
-                            dtype=np.uint64)
-                        idx = np.searchsorted(new_h, bh)
-                        idx[idx >= len(new_h)] = 0
-                        keep = new_h[idx] != bh
-                        tbl = tbl.filter(pa.array(keep))
-                        carried += tbl.num_rows
-                    if tbl.num_rows == 0:
-                        continue
-                    if out_writer is None:
-                        out_writer = pq.ParquetWriter(tmp, tbl.schema)
-                    out_writer.write_table(tbl)
-            if out_writer is None:
-                build_frame([]).iloc[0:0].to_parquet(tmp, index=False)
-            else:
-                out_writer.close()
-                out_writer = None
-            tmp.replace(OUT)
-            print(f"[archive] carried {carried} existing rows forward",
-                  flush=True)
-        finally:
-            if out_writer is not None:
-                out_writer.close()
 
-    for leftover in (raw, tmp):
-        if leftover.exists():
-            leftover.unlink()
+def finalize(index: ArchiveIndex) -> bool:
+    """Advance the high-water mark only after a complete, indexed ingest."""
+    run = index.get_meta("ingest")
+    if not run or not run.get("complete"):
+        return False
+    state = {
+        "schema_version": SCHEMA_VERSION,
+        "last_run_ts": int(run["through_ts"]),
+        "last_run_id": run["run_id"],
+        "updated_at": _utc_now(),
+        "archive_layout": "immutable_base_plus_parts",
+    }
+    _atomic_json(STATE, state)
+    index.delete_meta("ingest")
+    _write_progress(index, "complete", last_run=state, ingest=run)
+    print(f"[done] archive index has {index.count()} unique tickers; "
+          f"committed {run['written']} rows in run {run['run_id']}", flush=True)
+    return True
 
-    json.dump({"last_run_ts": int(time.time())}, open(STATE, "w"))
-    total = _open(OUT).metadata.num_rows
-    print(f"[done] archive now {total} rows -> {OUT}", flush=True)
+
+def run_cycle(*, budget_seconds: int = DEFAULT_BUDGET_SECONDS,
+              pages_per_part: int = DEFAULT_PAGES_PER_PART,
+              max_parts: Optional[int] = None,
+              index_path: Path = INDEX) -> int:
+    deadline = time.monotonic() + budget_seconds if budget_seconds > 0 else None
+    with ArchiveIndex(index_path) as index:
+        if LEGACY_RAW.exists():
+            print(f"[archive] ignoring legacy partial file {LEGACY_RAW}; "
+                  "only committed base/parts are archive data", flush=True)
+        if not backfill_index(index, deadline):
+            return 0
+        if deadline is not None and time.monotonic() >= deadline:
+            return 0
+        if not ingest(index, deadline, pages_per_part, max_parts=max_parts):
+            return 0
+        finalize(index)
+    return 0
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--budget-seconds", type=int, default=DEFAULT_BUDGET_SECONDS,
+                    help="checkpoint and exit cleanly before systemd's hard timeout")
+    ap.add_argument("--pages-per-part", type=int, default=DEFAULT_PAGES_PER_PART)
+    ap.add_argument("--max-parts", type=int,
+                    help="test/recovery bound; normally omitted")
+    args = ap.parse_args(argv)
+    return run_cycle(budget_seconds=args.budget_seconds,
+                     pages_per_part=args.pages_per_part,
+                     max_parts=args.max_parts)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

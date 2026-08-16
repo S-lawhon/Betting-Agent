@@ -1257,7 +1257,7 @@ EVMAP_MAX_AGE_MIN = {
     "weather_depth": 60 * 30,     # 09:23 and 12:23 local
     "paper_maker": 60 * 20,       # every 30 min inside a 13h local window
     "paper_eval": 60 * 30,        # daily 07:37 local
-    "archive_settled": 60 * 24 * 9,   # weekly, plus two days of slack
+    "archive_settled": 60 * 24 * 2,   # daily, plus one day of slack
 }
 # A 24h span in which the maker collected nothing is a dead day, whatever the
 # exit codes said. Trailing 24h, not the UTC calendar day — the maker's local

@@ -178,6 +178,16 @@ def test_every_configured_job_points_at_a_script_that_exists():
         assert (ROOT / "kalshi-ev-map" / "src" / spec["script"]).exists(), name
 
 
+def test_archive_is_daily_resumable_and_finishes_before_hard_timeout():
+    spec = ej.JOBS["archive_settled"]
+    assert spec["every"].startswith("daily")
+    assert "--budget-seconds=2100" in spec["args"]
+    timer = (ROOT / "scripts/systemd/evmap-archive-settled.timer").read_text()
+    service = (ROOT / "scripts/systemd/evmap-archive-settled.service").read_text()
+    assert "OnCalendar=*-*-* 03:17:00 America/Chicago" in timer
+    assert "TimeoutStartSec=2700" in service
+
+
 # ── the alert path ───────────────────────────────────────────────────
 
 def _f(jobs):

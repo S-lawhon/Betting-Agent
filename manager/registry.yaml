@@ -76,6 +76,8 @@ systemd_units:
   - {id: p029-gate0c-checkpoint.service, unit: p029-gate0c-checkpoint.service, source: scripts/systemd/p029-gate0c-checkpoint.service, severity: warn}
   - {id: mlb-props-execution-checkpoint.timer, unit: mlb-props-execution-checkpoint.timer, source: scripts/mlb-props-execution-checkpoint.timer, severity: warn}
   - {id: mlb-props-execution-checkpoint.service, unit: mlb-props-execution-checkpoint.service, source: scripts/mlb-props-execution-checkpoint.service, severity: warn}
+  - {id: evmap-archive-settled.timer, unit: evmap-archive-settled.timer, source: scripts/systemd/evmap-archive-settled.timer, severity: warn}
+  - {id: evmap-archive-settled.service, unit: evmap-archive-settled.service, source: scripts/systemd/evmap-archive-settled.service, severity: warn}
   - {id: research-agent-screened-daily.timer, unit: research-agent-screened-daily.timer, source: scripts/systemd/research-agent-screened-daily.timer, severity: warn}
   - {id: research-agent-screened-daily.service, unit: research-agent-screened-daily.service, source: scripts/systemd/research-agent-screened-daily.service, severity: warn}
   - {id: research-agent-deep-daily.timer, unit: research-agent-deep-daily.timer, source: scripts/systemd/research-agent-deep-daily.timer, severity: warn}
@@ -688,30 +690,21 @@ jobs:
 
   - id: evmap_archive_settled
     host: droplet
-    schedule: "Sun *-*-* 03:17 America/Chicago (evmap-archive-settled.timer)"
-    description: Weekly settled-market archiver — 90-day API horizon means gaps are permanent
+    schedule: "*-*-* 03:17 America/Chicago (evmap-archive-settled.timer)"
+    description: Daily resumable settled-market archiver — 90-day API horizon means gaps are permanent
     output:
-      file: kalshi-ev-map/data/settled_archive.parquet
-      max_stale_hours: 216   # weekly + a day of slack
+      file: kalshi-ev-map/data/archive_progress.json
+      max_stale_hours: 48
     severity: warn
-    enabled: false
+    enabled: true
     note: >
-      TIMER DISABLED 2026-07-29 — this job is BLOCKED, and deliberately so.
-
-      It has NEVER SUCCEEDED ANYWHERE: settled_archive.parquet and
-      archive_state.json have never existed on the Mac, and cron_archive.log
-      does not exist either, so the Mac line never even executed (Sunday 03:17
-      local; cron does not run jobs missed while asleep — a different failure
-      mode from the other four, which were TCC).
-
-      On the droplet the first run was OOM-killed at 433s, 1.66GB RSS on a 2GB
-      box, because the script accumulated every settled market of the window
-      before filtering. Chunked accumulation (row-wise equivalent; no
-      methodology change) got it further but it was still climbing past 1.4GB
-      at 35 minutes with 95MB free, so it was stopped and disabled: the same
-      box runs betting-pod-shop and betting-round-leader-fade, and letting the
-      OOM killer choose between them the night before P-022's first placement
-      window is not a trade worth making.
+      The 2026-08-16 monolithic run timed out after 45 minutes with an intact
+      8.68M-row base and an unreadable 401MB raw temporary. The replacement
+      never rewrites that base: it checkpoints its disk index by row group and
+      publishes immutable Parquet parts by atomic rename. API cursor progress
+      is committed transactionally with each part. A 35-minute internal budget
+      exits cleanly before systemd's 45-minute hard limit; the next daily run
+      resumes. archive_progress.json exposes indexing/ingesting/complete state.
 
       Root cause is the window, not the loop: with no archive_state.json it
       pulls a 10-day slice of ALL settled Kalshi markets, most of which are

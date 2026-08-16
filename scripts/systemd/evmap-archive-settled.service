@@ -1,4 +1,4 @@
-# EV-Map weekly settled-market archive
+# EV-Map daily resumable settled-market archive
 #
 # Moved off the Mac 2026-07-29.  On the Mac these ran under cron and failed
 # 139 of 139 times with `Operation not permitted` -- macOS TCC denying cron
@@ -11,7 +11,7 @@
 # which manager/collect.py reads and manager/checks.py alarms on.  Exit 0 with
 # zero rows is treated as a failure -- that is the whole lesson.
 [Unit]
-Description=Betting Pod Shop — EV-Map weekly settled-market archive
+Description=Betting Pod Shop — EV-Map daily resumable settled-market archive
 After=network-online.target
 Wants=network-online.target
 
@@ -22,6 +22,8 @@ Group=bettingbot
 WorkingDirectory=/opt/betting-pod-shop
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/betting-pod-shop/venv/bin/python -m scripts.evmap_job archive_settled
-# These are read-only public API pulls; a hung request must not wedge the timer.
-TimeoutStartSec=900
+# The archiver checkpoints itself at 35 minutes. This hard limit is only the
+# backstop for a hung request/process; the append-only archive never relies on
+# receiving SIGTERM cleanly.
+TimeoutStartSec=2700
 Nice=10

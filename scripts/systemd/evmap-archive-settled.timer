@@ -1,4 +1,4 @@
-# EV-Map weekly settled-market archive
+# EV-Map daily resumable settled-market archive
 #
 # Times are AMERICA/CHICAGO on purpose: they reproduce the Mac crontab's local
 # schedule exactly, and the weather jobs are keyed to US local calendar days
@@ -11,10 +11,10 @@
 # not sleep, but a reboot or a maintenance window would otherwise drop a run
 # with no trace.
 [Unit]
-Description=Betting Pod Shop — EV-Map weekly settled-market archive (timer)
+Description=Betting Pod Shop — EV-Map daily resumable settled-market archive (timer)
 
 [Timer]
-OnCalendar=Sun *-*-* 03:17:00 America/Chicago
+OnCalendar=*-*-* 03:17:00 America/Chicago
 Persistent=true
 # The paper maker fires 26x/day across five stations; a fixed second would put
 # every unit on the same instant after a reboot.

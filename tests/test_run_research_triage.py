@@ -2,14 +2,42 @@ from __future__ import annotations
 
 import json
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts.run_research_triage import main
+from scripts.run_research_triage import _reviewed_assignments, main
 
 
 class TestRunResearchTriage(TestCase):
+    def test_defer_recheck_honors_the_full_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dispositions = Path(tmp)
+            (dispositions / "a1.json").write_text(json.dumps({
+                "assignment_id": "a1", "source_item_id": "s1",
+                "decided_at": "2026-08-16T20:00:00Z", "decision": "defer",
+                "reason_codes": ["await_outcome"], "evidence_checked": ["terms"],
+                "research_minutes": 10,
+                "recheck_after": "2026-08-18T13:00:00Z",
+            }))
+
+            reviewed, due, errors, _ = _reviewed_assignments(
+                dispositions,
+                now=datetime(2026, 8, 18, 4, 5, tzinfo=timezone.utc),
+            )
+            self.assertEqual(reviewed, {"a1"})
+            self.assertEqual(due, set())
+            self.assertEqual(errors, [])
+
+            reviewed, due, errors, _ = _reviewed_assignments(
+                dispositions,
+                now=datetime(2026, 8, 18, 13, 0, tzinfo=timezone.utc),
+            )
+            self.assertEqual(reviewed, set())
+            self.assertEqual(due, {"a1"})
+            self.assertEqual(errors, [])
+
     def test_quarantine_reclaims_same_day_capacity_for_valid_replacement(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

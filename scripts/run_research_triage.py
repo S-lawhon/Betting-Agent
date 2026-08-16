@@ -7,7 +7,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -92,7 +92,11 @@ def _reviewed_assignments(directory: Path, *, now: datetime) -> tuple:
             record = ResearchDisposition.from_dict(payload)
             records.append(record)
             if record.decision == "defer" and record.recheck_after:
-                if date.fromisoformat(record.recheck_after[:10]) <= now.date():
+                due_at = datetime.fromisoformat(
+                    record.recheck_after.replace("Z", "+00:00"))
+                if due_at.tzinfo is None:
+                    due_at = due_at.replace(tzinfo=timezone.utc)
+                if due_at.astimezone(timezone.utc) <= now:
                     due_deferrals.add(record.assignment_id)
                     continue
             reviewed.add(record.assignment_id)

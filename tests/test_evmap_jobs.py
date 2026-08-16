@@ -182,10 +182,46 @@ def test_archive_is_daily_resumable_and_finishes_before_hard_timeout():
     spec = ej.JOBS["archive_settled"]
     assert spec["every"].startswith("daily")
     assert "--budget-seconds=2100" in spec["args"]
+    assert spec["row_counter"] == "archive_progress"
     timer = (ROOT / "scripts/systemd/evmap-archive-settled.timer").read_text()
     service = (ROOT / "scripts/systemd/evmap-archive-settled.service").read_text()
     assert "OnCalendar=*-*-* 03:17:00 America/Chicago" in timer
     assert "TimeoutStartSec=2700" in service
+
+
+def test_archive_rows_use_base_plus_parts_progress_total(sandbox):
+    (sandbox / "archive_progress.json").write_text(json.dumps({
+        "status": "complete",
+        "indexed_tickers": 11_954_801,
+    }))
+
+    assert ej._rows(ej.JOBS["archive_settled"]) == 11_954_801
+
+
+def test_archive_job_reports_real_part_delta(sandbox, tmp_path, monkeypatch):
+    (sandbox / "archive_progress.json").write_text(json.dumps({
+        "indexed_tickers": 100,
+    }))
+    _script(
+        tmp_path, "archive_counter.py",
+        "from pathlib import Path\n"
+        "Path('data/archive_progress.json').write_text("
+        "'{\"indexed_tickers\": 137}')\n",
+    )
+    monkeypatch.setitem(ej.JOBS, "archive_counter", {
+        "script": "archive_counter.py",
+        "args": [],
+        "output": "settled_archive.parquet",
+        "row_counter": "archive_progress",
+        "expect_rows": 0,
+        "every": "test",
+    })
+
+    assert ej.run("archive_counter") == 0
+    rec = _status(sandbox)[-1]
+    assert rec["rows_before"] == 100
+    assert rec["rows_after"] == 137
+    assert rec["rows_added"] == 37
 
 
 # ── the alert path ───────────────────────────────────────────────────

@@ -100,6 +100,10 @@ JOBS: Dict[str, Dict[str, Any]] = {
         # successful durable advance, not a failed archive.
         "args": ["--budget-seconds=2100"],
         "output": "settled_archive.parquet",
+        # The immutable base never changes. The atomic progress surface counts
+        # base + committed parts, so this reports real additions instead of
+        # the misleading `+0` emitted throughout the 2026-08-16 recovery.
+        "row_counter": "archive_progress",
         "expect_rows": 0,
         "every": "daily 03:17 America/Chicago",
     },
@@ -127,6 +131,18 @@ def _rows(spec: Dict[str, Any], since: Optional[float] = None) -> Optional[int]:
       ``since`` set, only a file written by THIS run counts, and its own row
       count is what the run collected.
     """
+    if spec.get("row_counter") == "archive_progress":
+        progress = DATA / "archive_progress.json"
+        if progress.exists():
+            try:
+                value = json.loads(progress.read_text(encoding="utf-8"))[
+                    "indexed_tickers"]
+                return int(value) if int(value) >= 0 else None
+            except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+                return None
+        # Bootstrap compatibility: before the first resumable run creates its
+        # progress surface, fall back to the immutable base footer below.
+
     path = _output_path(spec, since=since)
     if path is None:
         return None

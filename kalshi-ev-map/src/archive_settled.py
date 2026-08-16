@@ -106,6 +106,7 @@ class ArchiveIndex:
             );
         """)
         self.db.commit()
+        self._ensure_ticker_count()
 
     def close(self) -> None:
         self.db.close()
@@ -117,7 +118,36 @@ class ArchiveIndex:
         self.close()
 
     def count(self) -> int:
-        return int(self.db.execute("SELECT COUNT(*) FROM tickers").fetchone()[0])
+        row = self.db.execute(
+            "SELECT value FROM metadata WHERE key='ticker_count'").fetchone()
+        if row is None:
+            self._ensure_ticker_count()
+            row = self.db.execute(
+                "SELECT value FROM metadata WHERE key='ticker_count'").fetchone()
+        assert row is not None
+        return int(json.loads(row[0]))
+
+    def _ensure_ticker_count(self) -> None:
+        """Migrate an existing index once; normal counts are O(1)."""
+        row = self.db.execute(
+            "SELECT 1 FROM metadata WHERE key='ticker_count'").fetchone()
+        if row:
+            return
+        count = int(self.db.execute("SELECT COUNT(*) FROM tickers").fetchone()[0])
+        with self.db:
+            self.db.execute(
+                "INSERT OR IGNORE INTO metadata(key,value) VALUES(?,?)",
+                ("ticker_count", json.dumps(count)),
+            )
+
+    def _increment_ticker_count(self, added: int) -> None:
+        if added:
+            self.db.execute(
+                "UPDATE metadata SET value="
+                "CAST(CAST(value AS INTEGER) + ? AS TEXT) "
+                "WHERE key='ticker_count'",
+                (int(added),),
+            )
 
     def get_meta(self, key: str) -> Optional[Dict[str, Any]]:
         row = self.db.execute("SELECT value FROM metadata WHERE key=?", (key,)).fetchone()
@@ -194,8 +224,10 @@ class ArchiveIndex:
         table = pf.read_row_group(group, columns=["ticker"], use_threads=False)
         tickers = [str(t) for t in table.column("ticker").to_pylist() if t]
         with self.db:
+            before = self.db.total_changes
             self.db.executemany("INSERT OR IGNORE INTO tickers(ticker) VALUES(?)",
                                 ((t,) for t in tickers))
+            self._increment_ticker_count(self.db.total_changes - before)
             self.db.execute(
                 "UPDATE sources SET row_groups_done=row_groups_done+1, "
                 "rows_indexed=rows_indexed+? WHERE path=?",
@@ -215,8 +247,10 @@ class ArchiveIndex:
         import pyarrow.parquet as pq
         pf = pq.ParquetFile(path, pre_buffer=False, memory_map=False)
         with self.db:
+            before = self.db.total_changes
             self.db.executemany("INSERT OR IGNORE INTO tickers(ticker) VALUES(?)",
                                 ((str(t),) for t in tickers if t))
+            self._increment_ticker_count(self.db.total_changes - before)
             self.db.execute(
                 "INSERT OR REPLACE INTO sources"
                 "(path,size_bytes,mtime_ns,row_groups_done,rows_indexed,complete) "

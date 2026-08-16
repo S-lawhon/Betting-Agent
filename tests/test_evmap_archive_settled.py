@@ -123,6 +123,23 @@ def test_completed_sources_use_metadata_only_reconciliation(
     assert archive.PROGRESS.read_bytes() == progress_before
 
 
+def test_ticker_count_uses_cached_metadata_after_transactional_updates(sandbox):
+    write_base(archive.BASE, ["A", "B", "B"])
+    with archive.ArchiveIndex(archive.INDEX) as index:
+        assert archive.backfill_index(index)
+        assert index.count() == 2
+        queries = []
+        index.db.set_trace_callback(queries.append)
+        assert index.count() == 2
+        assert not any("COUNT(*)" in query.upper() for query in queries)
+
+        def get_page(_path, _params):
+            return {"markets": [market("B"), market("C")], "cursor": None}
+
+        assert archive.ingest(index, get_page=get_page)
+        assert index.count() == 3
+
+
 def test_cursor_resume_and_exact_deduplication(sandbox):
     calls = []
     pages = {

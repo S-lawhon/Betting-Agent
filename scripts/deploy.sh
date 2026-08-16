@@ -38,6 +38,24 @@ HEALTH_TIMEOUT=60      # seconds to wait for healthy response
 HEALTH_INTERVAL=5      # seconds between health check retries
 BACKUP_SUFFIX=".deploy-backup"
 PYTHON="${PYTHON:-python3}"
+DEPLOY_TOKEN="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+REMOTE_LOCK_DIR="/run/lock/betting-pod-shop-deploy"
+REMOTE_BACKUP_DIR="${REMOTE_DIR}${BACKUP_SUFFIX}.${DEPLOY_TOKEN}"
+LOCK_HELD=false
+
+release_deploy_lock() {
+  if [[ "$LOCK_HELD" != "true" ]]; then
+    return
+  fi
+  ssh "${REMOTE_USER}@${SERVER_IP}" "
+    owner=\$(cat '${REMOTE_LOCK_DIR}/owner' 2>/dev/null || true)
+    if [ \"\$owner\" = '${DEPLOY_TOKEN}' ]; then
+      rm -f '${REMOTE_LOCK_DIR}/owner'
+      rmdir '${REMOTE_LOCK_DIR}'
+    fi
+  " >/dev/null 2>&1 || true
+  LOCK_HELD=false
+}
 
 if [[ -z "$SERVER_IP" ]]; then
   echo "Usage: bash scripts/deploy.sh SERVER_IP [restart]"
@@ -114,6 +132,33 @@ if ! "$PYTHON" -m pytest tests/ -q --tb=no 2>&1 | tail -3; then
   fi
 fi
 
+# ── Serialize deploys before either one can rsync production ─────────
+# A shared backup directory is not a lock. Measured 2026-08-16: two deploys
+# both passed tests, interleaved rsync, and one removed the other's backup
+# parent while `cp -a` was still populating it. The code reached production,
+# but the deploy aborted before its own restart/health gate. An atomic remote
+# mkdir covers sync through health/rollback; a token prevents one caller from
+# releasing another's lock. /run is cleared by reboot. A stale lock is removed
+# manually only after proving no deploy owns it -- guessing by age could delete
+# a valid lock during a slow test or backup.
+echo ""
+echo "==> Acquiring deployment lock ..."
+if ! ssh "${REMOTE_USER}@${SERVER_IP}" "
+  if mkdir '${REMOTE_LOCK_DIR}' 2>/dev/null; then
+    printf '%s\n' '${DEPLOY_TOKEN}' > '${REMOTE_LOCK_DIR}/owner'
+    exit 0
+  fi
+  echo 'DEPLOY LOCKED: owner='\"\$(cat '${REMOTE_LOCK_DIR}/owner' 2>/dev/null || echo unknown)\" >&2
+  exit 73
+"; then
+  echo "ABORT: another deployment owns ${REMOTE_LOCK_DIR}."
+  echo "Verify the owner before removing a stale lock; nothing was synced."
+  exit 1
+fi
+LOCK_HELD=true
+trap release_deploy_lock EXIT INT TERM
+echo "    acquired: ${DEPLOY_TOKEN}"
+
 # ── Sync files to server ──────────────────────────────────────────────
 echo ""
 echo "==> Syncing files to $SERVER_IP:$REMOTE_DIR ..."
@@ -178,10 +223,11 @@ if [[ "$RESTART" == "restart" ]]; then
   echo ""
   echo "==> Creating pre-deploy backup on server ..."
   ssh "${REMOTE_USER}@${SERVER_IP}" "
-    if [ -d '${REMOTE_DIR}${BACKUP_SUFFIX}' ]; then
-      rm -rf '${REMOTE_DIR}${BACKUP_SUFFIX}'
+    if [ -e '${REMOTE_BACKUP_DIR}' ]; then
+      echo 'ERROR: unique backup path already exists: ${REMOTE_BACKUP_DIR}' >&2
+      exit 1
     fi
-    cp -a '${REMOTE_DIR}' '${REMOTE_DIR}${BACKUP_SUFFIX}'
+    cp -a '${REMOTE_DIR}' '${REMOTE_BACKUP_DIR}'
   "
 
   echo "==> Restarting services on server ..."
@@ -215,16 +261,16 @@ if [[ "$RESTART" == "restart" ]]; then
     echo ""
     echo "==> Deploy successful. Dashboard: https://dashboard.htxtrades.org (standalone, :8081)"
     # Clean up backup after successful deploy
-    ssh "${REMOTE_USER}@${SERVER_IP}" "rm -rf '${REMOTE_DIR}${BACKUP_SUFFIX}'" 2>/dev/null || true
+    ssh "${REMOTE_USER}@${SERVER_IP}" "rm -rf '${REMOTE_BACKUP_DIR}'" 2>/dev/null || true
   else
     echo ""
     echo "==> HEALTH CHECK FAILED — initiating rollback ..."
     ssh "${REMOTE_USER}@${SERVER_IP}" "
       systemctl stop ${SERVICE_NAME} 2>/dev/null || true
       systemctl stop ${DASHBOARD_SERVICE} 2>/dev/null || true
-      if [ -d '${REMOTE_DIR}${BACKUP_SUFFIX}' ]; then
+      if [ -d '${REMOTE_BACKUP_DIR}' ]; then
         rm -rf '${REMOTE_DIR}'
-        mv '${REMOTE_DIR}${BACKUP_SUFFIX}' '${REMOTE_DIR}'
+        mv '${REMOTE_BACKUP_DIR}' '${REMOTE_DIR}'
         echo 'Restored from backup.'
         # Both services must reload the RESTORED code — leaving the dashboard
         # down (or running rolled-back-from code) recreates the stale-process

@@ -385,6 +385,9 @@ by page bundle. `archive_progress.json` is the monitored progress surface.
 - Startup reconciliation verifies size/mtime for completed sources without
   reopening every Parquet footer or fsyncing progress once per part. Only new
   or incomplete sources enter row-group indexing; preserve that fast path.
+- `metadata.ticker_count` is updated in the same SQLite transaction as ticker
+  inserts. Progress and the wrapper use this cached exact total; do not restore
+  a routine `COUNT(*)` over the 11.95M-row ticker index or count only the base.
 
 ## Recursive strategy factory — the OTHER agent system (live 2026-08-01)
 
@@ -422,6 +425,11 @@ is unrelated to this chain — it reports on the fund from `manager/`.
 
 ### Deploying a NEW systemd unit (learned the hard way, 2026-08-01)
 
+- **Deploys are serialized before rsync.** Two 2026-08-16 deploys interleaved
+  sync and one deleted the other's shared backup while `cp -a` was running.
+  `deploy.sh` now holds `/run/lock/betting-pod-shop-deploy` through health or
+  rollback and uses a tokenized backup path. Never move lock acquisition after
+  rsync or restore a shared `.deploy-backup` directory.
 - **`deploy.sh` rsyncs `scripts/systemd/` but installs nothing** and never runs
   `daemon-reload`, so the repo unit and the running unit drift silently. The
   deploy now PRINTS the drift after each sync; installing is still manual and

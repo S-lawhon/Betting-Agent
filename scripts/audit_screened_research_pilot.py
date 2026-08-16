@@ -118,11 +118,16 @@ def audit_pilot(
 
     if not runs and not disposition_path.exists():
         target_worker = worker.get("worker_id") == config.get("worker_id")
+        blocked_error = str(worker.get("error") or "")
+        safe_block = any(fragment in blocked_error for fragment in (
+            "target assignment is not available",
+            "daily model-attempt limit",
+            "daily cost reservation would exceed the hard limit",
+        ))
         safe_noop = (
             target_worker and worker.get("status") == "blocked"
-            and worker.get("assignment_id") is None
             and not bool((worker.get("safety") or {}).get("model_invoked"))
-            and "target assignment is not available" in str(worker.get("error") or "")
+            and safe_block
         )
         if not pinned and not assignment_id:
             # An unpinned worker with no recorded run has not invoked a model.

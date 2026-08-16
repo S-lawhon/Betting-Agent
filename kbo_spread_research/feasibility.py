@@ -27,6 +27,9 @@ SCHEDULE_RE = re.compile(
     r"originally scheduled for (?P<date>[A-Z][a-z]{2} \d{1,2}, \d{4}) "
     r"at (?P<time>\d{1,2}:\d{2} [AP]M) E(?:D|S)T"
 )
+TARGET_RE = re.compile(
+    r"Will the (?P<team>.+?) win by over (?P<margin>\d+(?:\.\d+)?) runs\?"
+)
 
 
 def scheduled_start(market: Dict[str, Any]) -> Optional[datetime]:
@@ -37,6 +40,13 @@ def scheduled_start(market: Dict[str, Any]) -> Optional[datetime]:
         f"{match.group('date')} {match.group('time')}", "%b %d, %Y %I:%M %p"
     ).replace(tzinfo=ZoneInfo("America/New_York"))
     return local.astimezone(timezone.utc)
+
+
+def contract_target(market: Dict[str, Any]) -> tuple[Optional[str], Optional[float]]:
+    match = TARGET_RE.fullmatch(str(market.get("title") or "").strip())
+    if not match:
+        return None, None
+    return match.group("team"), float(match.group("margin"))
 
 
 def settled_markets(client: KalshiPublic, *, max_pages: int) -> List[Dict[str, Any]]:
@@ -111,10 +121,14 @@ def run(event_limit: int, max_pages: int, min_interval: float) -> Dict[str, Any]
     rows: List[Dict[str, Any]] = []
     for market in sample:
         start = scheduled_start(market)
+        target_team, margin = contract_target(market)
         row: Dict[str, Any] = {
             "ticker": market.get("ticker"),
             "event_ticker": market.get("event_ticker"),
             "result": market.get("result"),
+            "title": market.get("title"),
+            "target_team": target_team,
+            "margin": margin,
             "lifetime_volume": fnum(market.get("volume_fp")) or 0.0,
             "scheduled_start": start.isoformat().replace("+00:00", "Z")
             if start else None,

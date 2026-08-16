@@ -58,7 +58,15 @@ def check(snapshot: str, regions: str) -> Dict[str, Any]:
     bookmakers: Counter[str] = Counter()
     spread_markets = 0
     two_sided_lines = 0
+    event_samples = []
     for event in events:
+        sample = {
+            "event_id": event.get("id"),
+            "commence_time": event.get("commence_time"),
+            "home_team": event.get("home_team"),
+            "away_team": event.get("away_team"),
+            "books": [],
+        }
         for book in event.get("bookmakers") or []:
             bookmakers[str(book.get("key") or "unknown")] += 1
             for market in book.get("markets") or []:
@@ -70,6 +78,11 @@ def check(snapshot: str, regions: str) -> Dict[str, Any]:
                     if outcome.get("point") is not None:
                         points[abs(float(outcome["point"]))] += 1
                 two_sided_lines += sum(count >= 2 for count in points.values())
+                sample["books"].append({
+                    "bookmaker": book.get("key"),
+                    "points": sorted(points),
+                })
+        event_samples.append(sample)
     return {
         "schema_version": 1,
         "status": "available",
@@ -82,6 +95,7 @@ def check(snapshot: str, regions: str) -> Dict[str, Any]:
         "bookmakers": dict(sorted(bookmakers.items())),
         "spread_market_books": spread_markets,
         "two_sided_spread_lines": two_sided_lines,
+        "event_samples": event_samples,
         "quota": quota,
     }
 

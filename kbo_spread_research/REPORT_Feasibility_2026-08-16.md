@@ -66,6 +66,12 @@ Odds API documents `baseball_kbo` coverage, including historical odds from
 alignment the next bounded test, subject to the account's historical-data
 entitlement and actual bookmaker coverage.
 
+That entitlement/coverage condition was checked after deployment with one
+historical EU-region request at 2026-08-16 09:45 UTC. It succeeded and returned
+five KBO events, 31 two-sided spread books, and nine bookmakers, including
+Pinnacle on three events. The request cost 10 credits with 4,961,820 remaining.
+The durable summary is `odds_coverage_results.json`; it contains no credential.
+
 ## Next gate
 
 Match KBO games, teams, start times, and alternate spread strikes between

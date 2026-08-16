@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from kbo_spread_research.feasibility import (
+    contract_target,
     latest_distinct_events,
     latest_quote_before,
     scheduled_start,
@@ -17,6 +18,12 @@ def test_scheduled_start_uses_market_rules_and_dst():
     assert scheduled_start(market) == datetime(
         2026, 8, 16, 10, 0, tzinfo=timezone.utc
     )
+
+
+def test_contract_target_parses_team_and_margin():
+    assert contract_target({
+        "title": "Will the SSG Landers win by over 2.5 runs?"
+    }) == ("SSG Landers", 2.5)
 
 
 def test_latest_quote_requires_real_two_sided_touch_in_age_window():

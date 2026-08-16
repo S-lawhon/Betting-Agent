@@ -1,0 +1,28 @@
+{
+  "bookmakers": {
+    "betonlineag": 3,
+    "betsson": 3,
+    "coolbet": 3,
+    "leovegas_se": 4,
+    "mybookieag": 3,
+    "nordicbet": 3,
+    "onexbet": 5,
+    "pinnacle": 3,
+    "unibet_se": 4
+  },
+  "events": 5,
+  "http_status": 200,
+  "next_timestamp": "2026-08-16T09:45:38Z",
+  "previous_timestamp": "2026-08-16T09:35:38Z",
+  "provider_timestamp": "2026-08-16T09:40:38Z",
+  "quota": {
+    "requests_last": "10",
+    "requests_remaining": "4961820",
+    "requests_used": "38180"
+  },
+  "requested_snapshot": "2026-08-16T09:45:00Z",
+  "schema_version": 1,
+  "spread_market_books": 31,
+  "status": "available",
+  "two_sided_spread_lines": 31
+}

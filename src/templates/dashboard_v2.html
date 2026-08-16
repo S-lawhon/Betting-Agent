@@ -1139,7 +1139,8 @@ function renderResearchPipeline(r){
       numTxt(activity.reviewed) + " reviewed · " +
       numTxt(activity.advance) + " advanced · " +
       numTxt(activity.reject) + " rejected · " +
-      numTxt(activity.defer) + " deferred · queue " +
+      numTxt(activity.defer) + " waiting · " +
+      numTxt(activity.needs_work) + " needs work · queue " +
       numTxt(queue.pending) + " pending / " + numTxt(queue.in_progress) +
       " in progress / " + numTxt(queue.overdue) + " overdue"
     : "Daily agent activity will appear after the operations metric is generated.";

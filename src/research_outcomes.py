@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 
@@ -37,6 +38,14 @@ class ResearchDisposition:
                 raise ValueError("defer disposition requires recheck_after")
             if not self.blocking_fact:
                 raise ValueError("defer disposition requires blocking_fact")
+            try:
+                parsed = datetime.fromisoformat(
+                    str(self.recheck_after).replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError(
+                    "defer recheck_after must be ISO-8601") from exc
+            if parsed.tzinfo is None:
+                raise ValueError("defer recheck_after must include a timezone")
         if self.decision == "needs_work":
             if self.recheck_after:
                 raise ValueError("needs_work cannot use a calendar recheck")
@@ -111,6 +120,20 @@ def summarize_research(
         return result
 
     total_minutes = sum(item.research_minutes for item in dispositions)
+    work_queue = []
+    for item in dispositions:
+        if item.decision != "needs_work":
+            continue
+        assignment = by_id.get(item.assignment_id) or {}
+        work_queue.append({
+            "assignment_id": item.assignment_id,
+            "source_item_id": item.source_item_id,
+            "title": str(assignment.get("title") or item.assignment_id),
+            "decided_at": item.decided_at,
+            "next_action": item.next_action,
+            "reason_codes": list(item.reason_codes),
+        })
+    work_queue.sort(key=lambda row: (row["decided_at"], row["assignment_id"]))
     dispatch_by_assignment: Dict[str, Mapping[str, Any]] = {}
     for item in dispatches:
         assignment_id = str(item.get("assignment_id") or "")
@@ -157,6 +180,7 @@ def summarize_research(
         "reviewed": len(set(by_id) & set(disposition_by_assignment)),
         "unreviewed": len(set(by_id) - set(disposition_by_assignment)),
         "decisions": dict(sorted(decisions.items())),
+        "work_queue": work_queue,
         "top_rejection_reasons": dict(reasons.most_common(20)),
         "research_minutes": total_minutes,
         "minutes_per_advance": (

@@ -33,5 +33,14 @@
     "mechanism", "cheapest_decisive_test", "confidence",
     "recheck_after", "blocking_fact", "notes"
   ],
+  "allOf": [{
+    "if": {"properties": {"decision": {"type": "string", "const": "defer"}}},
+    "then": {
+      "properties": {
+        "recheck_after": {"type": "string", "format": "date-time"},
+        "blocking_fact": {"type": "string", "minLength": 1}
+      }
+    }
+  }],
   "additionalProperties": false
 }

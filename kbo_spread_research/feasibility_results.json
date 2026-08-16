@@ -6,7 +6,7 @@
     "markets_with_t60_two_sided": 58,
     "scheduled_start_parsed": 80
   },
-  "generated_at": "2026-08-16T20:06:06.775503Z",
+  "generated_at": "2026-08-16T20:17:35.135183Z",
   "limitations": [
     "Candlesticks preserve historical touch and prints, not orderbook depth or fill priority.",
     "Kalshi settlement validates contract outcomes but does not supply an independent fair-value signal.",
@@ -24,6 +24,7 @@
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600SSGLG",
       "lifetime_volume": 1346.2,
+      "margin": 2.5,
       "n_candles": 131,
       "pregame_print_volume_6h": 0.0,
       "result": "yes",
@@ -32,19 +33,22 @@
         "age_minutes": 0.0,
         "ask": 0.22,
         "bid": 0.21,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.22,
         "bid": 0.21,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-SSG3"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-SSG3",
+      "title": "Will the SSG Landers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600SSGLG",
       "lifetime_volume": 817.45,
+      "margin": 1.5,
       "n_candles": 134,
       "pregame_print_volume_6h": 1.27,
       "result": "yes",
@@ -53,19 +57,22 @@
         "age_minutes": 0.0,
         "ask": 0.3,
         "bid": 0.29,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.29,
         "bid": 0.28,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-SSG2"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-SSG2",
+      "title": "Will the SSG Landers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600SSGLG",
       "lifetime_volume": 2639.66,
+      "margin": 2.5,
       "n_candles": 35,
       "pregame_print_volume_6h": 1176.44,
       "result": "no",
@@ -74,19 +81,22 @@
         "age_minutes": 5.0,
         "ask": 0.32,
         "bid": 0.31,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 28.0,
         "ask": 0.32,
         "bid": 0.31,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-LG3"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-LG3",
+      "title": "Will the LG Twins win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600SSGLG",
       "lifetime_volume": 1121.39,
+      "margin": 1.5,
       "n_candles": 146,
       "pregame_print_volume_6h": 564.09,
       "result": "no",
@@ -95,19 +105,22 @@
         "age_minutes": 0.0,
         "ask": 0.43,
         "bid": 0.41,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.42,
         "bid": 0.41,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-LG2"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG160600SSGLG-LG2",
+      "title": "Will the LG Twins win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600KIWKTW",
       "lifetime_volume": 11277.98,
+      "margin": 2.5,
       "n_candles": 152,
       "pregame_print_volume_6h": 3052.8,
       "result": "yes",
@@ -116,19 +129,22 @@
         "age_minutes": 0.0,
         "ask": 0.52,
         "bid": 0.5,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.52,
         "bid": 0.51,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KTW3"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KTW3",
+      "title": "Will the KT Wiz win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600KIWKTW",
       "lifetime_volume": 7495.45,
+      "margin": 1.5,
       "n_candles": 145,
       "pregame_print_volume_6h": 1840.51,
       "result": "yes",
@@ -137,19 +153,22 @@
         "age_minutes": 0.0,
         "ask": 0.61,
         "bid": 0.59,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.61,
         "bid": 0.6,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KTW2"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KTW2",
+      "title": "Will the KT Wiz win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600KIWKTW",
       "lifetime_volume": 2333.15,
+      "margin": 2.5,
       "n_candles": 14,
       "pregame_print_volume_6h": 222.37,
       "result": "no",
@@ -161,11 +180,14 @@
         "spread": 0.09
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KIW3"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KIW3",
+      "title": "Will the Kiwoom Heroes win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600KIWKTW",
       "lifetime_volume": 1641.77,
+      "margin": 1.5,
       "n_candles": 66,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -174,14 +196,17 @@
         "age_minutes": 0.0,
         "ask": 0.2,
         "bid": 0.18,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KIW2"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG160600KIWKTW-KIW2",
+      "title": "Will the Kiwoom Heroes win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600DOOKIA",
       "lifetime_volume": 1345.23,
+      "margin": 2.5,
       "n_candles": 143,
       "pregame_print_volume_6h": 486.07,
       "result": "no",
@@ -190,19 +215,22 @@
         "age_minutes": 0.0,
         "ask": 0.22,
         "bid": 0.21,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.22,
         "bid": 0.2,
-        "spread": 0.01999999999999999
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-KIA3"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-KIA3",
+      "title": "Will the Kia Tigers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600DOOKIA",
       "lifetime_volume": 2906.05,
+      "margin": 1.5,
       "n_candles": 138,
       "pregame_print_volume_6h": 371.63,
       "result": "no",
@@ -211,19 +239,22 @@
         "age_minutes": 0.0,
         "ask": 0.34,
         "bid": 0.33,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.31,
         "bid": 0.3,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-KIA2"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-KIA2",
+      "title": "Will the Kia Tigers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600DOOKIA",
       "lifetime_volume": 979.7,
+      "margin": 2.5,
       "n_candles": 122,
       "pregame_print_volume_6h": 363.91,
       "result": "no",
@@ -232,19 +263,22 @@
         "age_minutes": 4.0,
         "ask": 0.29,
         "bid": 0.28,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.3,
         "bid": 0.29,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-DOO3"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-DOO3",
+      "title": "Will the Doosan Bears win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG160600DOOKIA",
       "lifetime_volume": 1377.86,
+      "margin": 1.5,
       "n_candles": 143,
       "pregame_print_volume_6h": 433.39,
       "result": "no",
@@ -253,19 +287,22 @@
         "age_minutes": 1.0,
         "ask": 0.38,
         "bid": 0.37,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.39,
         "bid": 0.38,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-DOO2"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG160600DOOKIA-DOO2",
+      "title": "Will the Doosan Bears win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600SSGLG",
       "lifetime_volume": 485.34,
+      "margin": 2.5,
       "n_candles": 90,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -274,19 +311,22 @@
         "age_minutes": 5.0,
         "ask": 0.25,
         "bid": 0.24,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.25,
         "bid": 0.24,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-SSG3"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-SSG3",
+      "title": "Will the SSG Landers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600SSGLG",
       "lifetime_volume": 2525.65,
+      "margin": 1.5,
       "n_candles": 111,
       "pregame_print_volume_6h": 15.87,
       "result": "no",
@@ -295,19 +335,22 @@
         "age_minutes": 5.0,
         "ask": 0.33,
         "bid": 0.31,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.33,
         "bid": 0.31,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-SSG2"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-SSG2",
+      "title": "Will the SSG Landers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600SSGLG",
       "lifetime_volume": 3277.74,
+      "margin": 2.5,
       "n_candles": 95,
       "pregame_print_volume_6h": 1428.54,
       "result": "yes",
@@ -316,19 +359,22 @@
         "age_minutes": 5.0,
         "ask": 0.32,
         "bid": 0.31,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.32,
         "bid": 0.31,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-LG3"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-LG3",
+      "title": "Will the LG Twins win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600SSGLG",
       "lifetime_volume": 7005.91,
+      "margin": 1.5,
       "n_candles": 128,
       "pregame_print_volume_6h": 1683.68,
       "result": "yes",
@@ -337,19 +383,22 @@
         "age_minutes": 1.0,
         "ask": 0.43,
         "bid": 0.42,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.42,
         "bid": 0.41,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-LG2"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG150600SSGLG-LG2",
+      "title": "Will the LG Twins win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600NCDLOT",
       "lifetime_volume": 897.81,
+      "margin": 2.5,
       "n_candles": 135,
       "pregame_print_volume_6h": 1.64,
       "result": "no",
@@ -358,19 +407,22 @@
         "age_minutes": 2.0,
         "ask": 0.29,
         "bid": 0.28,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.31,
         "bid": 0.29,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-NCD3"
+      "target_team": "NC Dinos",
+      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-NCD3",
+      "title": "Will the NC Dinos win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600NCDLOT",
       "lifetime_volume": 843.03,
+      "margin": 1.5,
       "n_candles": 129,
       "pregame_print_volume_6h": 19.16,
       "result": "no",
@@ -379,19 +431,22 @@
         "age_minutes": 0.0,
         "ask": 0.37,
         "bid": 0.36,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.38,
         "bid": 0.37,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-NCD2"
+      "target_team": "NC Dinos",
+      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-NCD2",
+      "title": "Will the NC Dinos win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600NCDLOT",
       "lifetime_volume": 4653.63,
+      "margin": 2.5,
       "n_candles": 86,
       "pregame_print_volume_6h": 1.64,
       "result": "yes",
@@ -400,19 +455,22 @@
         "age_minutes": 5.0,
         "ask": 0.28,
         "bid": 0.27,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.28,
         "bid": 0.27,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-LOT3"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-LOT3",
+      "title": "Will the Lotte Giants win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600NCDLOT",
       "lifetime_volume": 7479.86,
+      "margin": 1.5,
       "n_candles": 133,
       "pregame_print_volume_6h": 2332.8,
       "result": "yes",
@@ -421,19 +479,22 @@
         "age_minutes": 0.0,
         "ask": 0.38,
         "bid": 0.37,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-LOT2"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG150600NCDLOT-LOT2",
+      "title": "Will the Lotte Giants win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600KIWKTW",
       "lifetime_volume": 590.37,
+      "margin": 2.5,
       "n_candles": 89,
       "pregame_print_volume_6h": 10.37,
       "result": "no",
@@ -442,19 +503,22 @@
         "age_minutes": 8.0,
         "ask": 0.41,
         "bid": 0.4,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.41,
         "bid": 0.39,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KTW3"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KTW3",
+      "title": "Will the KT Wiz win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600KIWKTW",
       "lifetime_volume": 7601.15,
+      "margin": 1.5,
       "n_candles": 192,
       "pregame_print_volume_6h": 6410.53,
       "result": "no",
@@ -463,19 +527,22 @@
         "age_minutes": 0.0,
         "ask": 0.51,
         "bid": 0.5,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.51,
         "bid": 0.49,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KTW2"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KTW2",
+      "title": "Will the KT Wiz win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600KIWKTW",
       "lifetime_volume": 5107.11,
+      "margin": 2.5,
       "n_candles": 76,
       "pregame_print_volume_6h": 71.02,
       "result": "yes",
@@ -484,19 +551,22 @@
         "age_minutes": 5.0,
         "ask": 0.2,
         "bid": 0.19,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.2,
         "bid": 0.19,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KIW3"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KIW3",
+      "title": "Will the Kiwoom Heroes win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600KIWKTW",
       "lifetime_volume": 1810.5,
+      "margin": 1.5,
       "n_candles": 106,
       "pregame_print_volume_6h": 93.59,
       "result": "yes",
@@ -505,19 +575,22 @@
         "age_minutes": 5.0,
         "ask": 0.27,
         "bid": 0.26,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.27,
         "bid": 0.26,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KIW2"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG150600KIWKTW-KIW2",
+      "title": "Will the Kiwoom Heroes win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600HANSAM",
       "lifetime_volume": 5341.9,
+      "margin": 2.5,
       "n_candles": 95,
       "pregame_print_volume_6h": 0.0,
       "result": "yes",
@@ -526,19 +599,22 @@
         "age_minutes": 1.0,
         "ask": 0.34,
         "bid": 0.33,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.34,
         "bid": 0.33,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-SAM3"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-SAM3",
+      "title": "Will the Samsung Lions win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600HANSAM",
       "lifetime_volume": 11680.22,
+      "margin": 1.5,
       "n_candles": 145,
       "pregame_print_volume_6h": 5084.13,
       "result": "yes",
@@ -547,19 +623,22 @@
         "age_minutes": 0.0,
         "ask": 0.44,
         "bid": 0.43,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.43,
         "bid": 0.42,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-SAM2"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-SAM2",
+      "title": "Will the Samsung Lions win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600HANSAM",
       "lifetime_volume": 701.05,
+      "margin": 2.5,
       "n_candles": 95,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -568,19 +647,22 @@
         "age_minutes": 0.0,
         "ask": 0.27,
         "bid": 0.25,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.27,
         "bid": 0.25,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-HAN3"
+      "target_team": "Hanwha Eagles",
+      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-HAN3",
+      "title": "Will the Hanwha Eagles win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600HANSAM",
       "lifetime_volume": 1253.3,
+      "margin": 1.5,
       "n_candles": 107,
       "pregame_print_volume_6h": 1.4,
       "result": "no",
@@ -589,19 +671,22 @@
         "age_minutes": 1.0,
         "ask": 0.34,
         "bid": 0.32,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.34,
         "bid": 0.33,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-HAN2"
+      "target_team": "Hanwha Eagles",
+      "ticker": "KXKBOSPREAD-26AUG150600HANSAM-HAN2",
+      "title": "Will the Hanwha Eagles win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600DOOKIA",
       "lifetime_volume": 1699.8,
+      "margin": 2.5,
       "n_candles": 154,
       "pregame_print_volume_6h": 128.94,
       "result": "yes",
@@ -610,19 +695,22 @@
         "age_minutes": 1.0,
         "ask": 0.3,
         "bid": 0.29,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.3,
         "bid": 0.29,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-KIA3"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-KIA3",
+      "title": "Will the Kia Tigers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600DOOKIA",
       "lifetime_volume": 3453.55,
+      "margin": 1.5,
       "n_candles": 75,
       "pregame_print_volume_6h": 1295.48,
       "result": "yes",
@@ -631,19 +719,22 @@
         "age_minutes": 0.0,
         "ask": 0.41,
         "bid": 0.4,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.4,
         "bid": 0.39,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-KIA2"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-KIA2",
+      "title": "Will the Kia Tigers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600DOOKIA",
       "lifetime_volume": 494.0,
+      "margin": 2.5,
       "n_candles": 142,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -652,19 +743,22 @@
         "age_minutes": 5.0,
         "ask": 0.25,
         "bid": 0.23,
-        "spread": 0.01999999999999999
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.26,
         "bid": 0.25,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-DOO3"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-DOO3",
+      "title": "Will the Doosan Bears win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG150600DOOKIA",
       "lifetime_volume": 708.5,
+      "margin": 1.5,
       "n_candles": 144,
       "pregame_print_volume_6h": 240.73,
       "result": "no",
@@ -673,19 +767,22 @@
         "age_minutes": 4.0,
         "ask": 0.34,
         "bid": 0.33,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.34,
         "bid": 0.33,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-DOO2"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG150600DOOKIA-DOO2",
+      "title": "Will the Doosan Bears win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600SSGLG",
       "lifetime_volume": 1469.04,
+      "margin": 2.5,
       "n_candles": 113,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -694,19 +791,22 @@
         "age_minutes": 0.0,
         "ask": 0.2,
         "bid": 0.19,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.22,
         "bid": 0.2,
-        "spread": 0.01999999999999999
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-SSG3"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-SSG3",
+      "title": "Will the SSG Landers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600SSGLG",
       "lifetime_volume": 3187.85,
+      "margin": 1.5,
       "n_candles": 104,
       "pregame_print_volume_6h": 0.0,
       "result": "yes",
@@ -715,19 +815,22 @@
         "age_minutes": 0.0,
         "ask": 0.27,
         "bid": 0.26,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.3,
         "bid": 0.28,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-SSG2"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-SSG2",
+      "title": "Will the SSG Landers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600SSGLG",
       "lifetime_volume": 2952.53,
+      "margin": 2.5,
       "n_candles": 116,
       "pregame_print_volume_6h": 2118.82,
       "result": "no",
@@ -736,19 +839,22 @@
         "age_minutes": 0.0,
         "ask": 0.37,
         "bid": 0.36,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.33,
         "bid": 0.32,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-LG3"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-LG3",
+      "title": "Will the LG Twins win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600SSGLG",
       "lifetime_volume": 10793.56,
+      "margin": 1.5,
       "n_candles": 112,
       "pregame_print_volume_6h": 7784.12,
       "result": "no",
@@ -757,19 +863,22 @@
         "age_minutes": 0.0,
         "ask": 0.48,
         "bid": 0.47,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.45,
         "bid": 0.44,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-LG2"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG140600SSGLG-LG2",
+      "title": "Will the LG Twins win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600NCDLOT",
       "lifetime_volume": 8949.0,
+      "margin": 2.5,
       "n_candles": 108,
       "pregame_print_volume_6h": 12.0,
       "result": "no",
@@ -778,19 +887,22 @@
         "age_minutes": 0.0,
         "ask": 0.32,
         "bid": 0.31,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.32,
         "bid": 0.31,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-NCD3"
+      "target_team": "NC Dinos",
+      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-NCD3",
+      "title": "Will the NC Dinos win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600NCDLOT",
       "lifetime_volume": 4476.7,
+      "margin": 1.5,
       "n_candles": 118,
       "pregame_print_volume_6h": 957.63,
       "result": "no",
@@ -799,19 +911,22 @@
         "age_minutes": 0.0,
         "ask": 0.4,
         "bid": 0.39,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.4,
         "bid": 0.39,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-NCD2"
+      "target_team": "NC Dinos",
+      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-NCD2",
+      "title": "Will the NC Dinos win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600NCDLOT",
       "lifetime_volume": 531.38,
+      "margin": 2.5,
       "n_candles": 109,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -828,11 +943,14 @@
         "bid": 0.23,
         "spread": 0.03
       },
-      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-LOT3"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-LOT3",
+      "title": "Will the Lotte Giants win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600NCDLOT",
       "lifetime_volume": 974.48,
+      "margin": 1.5,
       "n_candles": 96,
       "pregame_print_volume_6h": 217.84,
       "result": "no",
@@ -841,19 +959,22 @@
         "age_minutes": 0.0,
         "ask": 0.34,
         "bid": 0.33,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.35,
         "bid": 0.33,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-LOT2"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG140600NCDLOT-LOT2",
+      "title": "Will the Lotte Giants win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600KIWKTW",
       "lifetime_volume": 10169.1,
+      "margin": 2.5,
       "n_candles": 117,
       "pregame_print_volume_6h": 4794.06,
       "result": "yes",
@@ -862,19 +983,22 @@
         "age_minutes": 0.0,
         "ask": 0.54,
         "bid": 0.53,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.55,
         "bid": 0.54,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KTW3"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KTW3",
+      "title": "Will the KT Wiz win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600KIWKTW",
       "lifetime_volume": 12647.3,
+      "margin": 1.5,
       "n_candles": 95,
       "pregame_print_volume_6h": 3100.7,
       "result": "yes",
@@ -883,19 +1007,22 @@
         "age_minutes": 0.0,
         "ask": 0.6,
         "bid": 0.58,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.65,
         "bid": 0.64,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KTW2"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KTW2",
+      "title": "Will the KT Wiz win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600KIWKTW",
       "lifetime_volume": 1260.38,
+      "margin": 2.5,
       "n_candles": 18,
       "pregame_print_volume_6h": 266.99,
       "result": "no",
@@ -904,14 +1031,17 @@
         "age_minutes": 0.0,
         "ask": 0.15,
         "bid": 0.07,
-        "spread": 0.07999999999999999
+        "spread": 0.08
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KIW3"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KIW3",
+      "title": "Will the Kiwoom Heroes win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600KIWKTW",
       "lifetime_volume": 2515.16,
+      "margin": 1.5,
       "n_candles": 51,
       "pregame_print_volume_6h": 261.52,
       "result": "no",
@@ -920,19 +1050,22 @@
         "age_minutes": 0.0,
         "ask": 0.19,
         "bid": 0.18,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 6.0,
         "ask": 0.17,
         "bid": 0.15,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KIW2"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG140600KIWKTW-KIW2",
+      "title": "Will the Kiwoom Heroes win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600HANSAM",
       "lifetime_volume": 6154.17,
+      "margin": 2.5,
       "n_candles": 129,
       "pregame_print_volume_6h": 233.94,
       "result": "yes",
@@ -941,19 +1074,22 @@
         "age_minutes": 0.0,
         "ask": 0.31,
         "bid": 0.29,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.35,
         "bid": 0.33,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-SAM3"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-SAM3",
+      "title": "Will the Samsung Lions win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600HANSAM",
       "lifetime_volume": 44733.14,
+      "margin": 1.5,
       "n_candles": 170,
       "pregame_print_volume_6h": 29730.5,
       "result": "yes",
@@ -962,19 +1098,22 @@
         "age_minutes": 0.0,
         "ask": 0.39,
         "bid": 0.36,
-        "spread": 0.030000000000000027
+        "spread": 0.03
       },
       "t60": {
         "age_minutes": 2.0,
         "ask": 0.42,
         "bid": 0.4,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-SAM2"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-SAM2",
+      "title": "Will the Samsung Lions win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600HANSAM",
       "lifetime_volume": 610.19,
+      "margin": 2.5,
       "n_candles": 106,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -983,19 +1122,22 @@
         "age_minutes": 0.0,
         "ask": 0.28,
         "bid": 0.27,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.25,
         "bid": 0.24,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-HAN3"
+      "target_team": "Hanwha Eagles",
+      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-HAN3",
+      "title": "Will the Hanwha Eagles win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600HANSAM",
       "lifetime_volume": 1617.38,
+      "margin": 1.5,
       "n_candles": 107,
       "pregame_print_volume_6h": 860.21,
       "result": "no",
@@ -1004,19 +1146,22 @@
         "age_minutes": 0.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.32,
         "bid": 0.31,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-HAN2"
+      "target_team": "Hanwha Eagles",
+      "ticker": "KXKBOSPREAD-26AUG140600HANSAM-HAN2",
+      "title": "Will the Hanwha Eagles win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600DOOKIA",
       "lifetime_volume": 2305.49,
+      "margin": 2.5,
       "n_candles": 92,
       "pregame_print_volume_6h": 783.61,
       "result": "no",
@@ -1025,19 +1170,22 @@
         "age_minutes": 0.0,
         "ask": 0.19,
         "bid": 0.18,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 2.0,
         "ask": 0.19,
         "bid": 0.17,
-        "spread": 0.01999999999999999
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-KIA3"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-KIA3",
+      "title": "Will the Kia Tigers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600DOOKIA",
       "lifetime_volume": 5028.4,
+      "margin": 1.5,
       "n_candles": 75,
       "pregame_print_volume_6h": 4350.25,
       "result": "no",
@@ -1046,19 +1194,22 @@
         "age_minutes": 7.0,
         "ask": 0.28,
         "bid": 0.27,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.28,
         "bid": 0.27,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-KIA2"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-KIA2",
+      "title": "Will the Kia Tigers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600DOOKIA",
       "lifetime_volume": 4670.17,
+      "margin": 2.5,
       "n_candles": 79,
       "pregame_print_volume_6h": 62.96,
       "result": "yes",
@@ -1067,19 +1218,22 @@
         "age_minutes": 0.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.37,
         "bid": 0.36,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-DOO3"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-DOO3",
+      "title": "Will the Doosan Bears win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG140600DOOKIA",
       "lifetime_volume": 2366.56,
+      "margin": 1.5,
       "n_candles": 103,
       "pregame_print_volume_6h": 1247.18,
       "result": "yes",
@@ -1088,19 +1242,22 @@
         "age_minutes": 4.0,
         "ask": 0.46,
         "bid": 0.45,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.46,
         "bid": 0.45,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-DOO2"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG140600DOOKIA-DOO2",
+      "title": "Will the Doosan Bears win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600SAMKIA",
       "lifetime_volume": 5015.3,
+      "margin": 2.5,
       "n_candles": 69,
       "pregame_print_volume_6h": 4042.59,
       "result": "no",
@@ -1109,14 +1266,17 @@
         "age_minutes": 0.0,
         "ask": 0.39,
         "bid": 0.37,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-SAM3"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-SAM3",
+      "title": "Will the Samsung Lions win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600SAMKIA",
       "lifetime_volume": 24018.91,
+      "margin": 1.5,
       "n_candles": 130,
       "pregame_print_volume_6h": 14166.83,
       "result": "no",
@@ -1125,14 +1285,17 @@
         "age_minutes": 0.0,
         "ask": 0.48,
         "bid": 0.46,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-SAM2"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-SAM2",
+      "title": "Will the Samsung Lions win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600SAMKIA",
       "lifetime_volume": 4754.49,
+      "margin": 2.5,
       "n_candles": 76,
       "pregame_print_volume_6h": 63.0,
       "result": "no",
@@ -1141,14 +1304,17 @@
         "age_minutes": 0.0,
         "ask": 0.19,
         "bid": 0.18,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-KIA3"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-KIA3",
+      "title": "Will the Kia Tigers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600SAMKIA",
       "lifetime_volume": 8079.51,
+      "margin": 1.5,
       "n_candles": 71,
       "pregame_print_volume_6h": 1361.75,
       "result": "no",
@@ -1157,14 +1323,17 @@
         "age_minutes": 0.0,
         "ask": 0.27,
         "bid": 0.26,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-KIA2"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG130600SAMKIA-KIA2",
+      "title": "Will the Kia Tigers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LOTSSG",
       "lifetime_volume": 551.0,
+      "margin": 2.5,
       "n_candles": 52,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -1173,14 +1342,17 @@
         "age_minutes": 0.0,
         "ask": 0.21,
         "bid": 0.2,
-        "spread": 0.009999999999999981
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-SSG3"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-SSG3",
+      "title": "Will the SSG Landers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LOTSSG",
       "lifetime_volume": 650.88,
+      "margin": 1.5,
       "n_candles": 58,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -1189,14 +1361,17 @@
         "age_minutes": 0.0,
         "ask": 0.3,
         "bid": 0.28,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-SSG2"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-SSG2",
+      "title": "Will the SSG Landers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LOTSSG",
       "lifetime_volume": 1099.29,
+      "margin": 2.5,
       "n_candles": 54,
       "pregame_print_volume_6h": 0.0,
       "result": "yes",
@@ -1205,14 +1380,17 @@
         "age_minutes": 0.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-LOT3"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-LOT3",
+      "title": "Will the Lotte Giants win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LOTSSG",
       "lifetime_volume": 2057.92,
+      "margin": 1.5,
       "n_candles": 48,
       "pregame_print_volume_6h": 283.53,
       "result": "yes",
@@ -1221,14 +1399,17 @@
         "age_minutes": 2.0,
         "ask": 0.45,
         "bid": 0.44,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-LOT2"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG130600LOTSSG-LOT2",
+      "title": "Will the Lotte Giants win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LGKIW",
       "lifetime_volume": 1744.37,
+      "margin": 2.5,
       "n_candles": 55,
       "pregame_print_volume_6h": 698.75,
       "result": "yes",
@@ -1237,19 +1418,22 @@
         "age_minutes": 0.0,
         "ask": 0.39,
         "bid": 0.37,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.43,
         "bid": 0.35,
-        "spread": 0.08000000000000002
+        "spread": 0.08
       },
-      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-LG3"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-LG3",
+      "title": "Will the LG Twins win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LGKIW",
       "lifetime_volume": 6047.39,
+      "margin": 1.5,
       "n_candles": 96,
       "pregame_print_volume_6h": 4065.25,
       "result": "yes",
@@ -1258,14 +1442,17 @@
         "age_minutes": 0.0,
         "ask": 0.5,
         "bid": 0.48,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-LG2"
+      "target_team": "LG Twins",
+      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-LG2",
+      "title": "Will the LG Twins win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LGKIW",
       "lifetime_volume": 999.08,
+      "margin": 2.5,
       "n_candles": 29,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -1274,14 +1461,17 @@
         "age_minutes": 2.0,
         "ask": 0.16,
         "bid": 0.14,
-        "spread": 0.01999999999999999
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-KIW3"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-KIW3",
+      "title": "Will the Kiwoom Heroes win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600LGKIW",
       "lifetime_volume": 1416.07,
+      "margin": 1.5,
       "n_candles": 75,
       "pregame_print_volume_6h": 601.52,
       "result": "no",
@@ -1293,11 +1483,14 @@
         "spread": 0.03
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-KIW2"
+      "target_team": "Kiwoom Heroes",
+      "ticker": "KXKBOSPREAD-26AUG130600LGKIW-KIW2",
+      "title": "Will the Kiwoom Heroes win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600KTWNCD",
       "lifetime_volume": 1452.45,
+      "margin": 2.5,
       "n_candles": 60,
       "pregame_print_volume_6h": 179.18,
       "result": "no",
@@ -1306,14 +1499,17 @@
         "age_minutes": 0.0,
         "ask": 0.21,
         "bid": 0.2,
-        "spread": 0.009999999999999981
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-NCD3"
+      "target_team": "NC Dinos",
+      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-NCD3",
+      "title": "Will the NC Dinos win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600KTWNCD",
       "lifetime_volume": 3408.24,
+      "margin": 1.5,
       "n_candles": 67,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -1322,14 +1518,17 @@
         "age_minutes": 0.0,
         "ask": 0.3,
         "bid": 0.28,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-NCD2"
+      "target_team": "NC Dinos",
+      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-NCD2",
+      "title": "Will the NC Dinos win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600KTWNCD",
       "lifetime_volume": 3524.26,
+      "margin": 2.5,
       "n_candles": 61,
       "pregame_print_volume_6h": 101.3,
       "result": "no",
@@ -1338,14 +1537,17 @@
         "age_minutes": 0.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-KTW3"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-KTW3",
+      "title": "Will the KT Wiz win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600KTWNCD",
       "lifetime_volume": 7870.78,
+      "margin": 1.5,
       "n_candles": 72,
       "pregame_print_volume_6h": 4124.92,
       "result": "no",
@@ -1354,14 +1556,17 @@
         "age_minutes": 0.0,
         "ask": 0.44,
         "bid": 0.43,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-KTW2"
+      "target_team": "KT Wiz",
+      "ticker": "KXKBOSPREAD-26AUG130600KTWNCD-KTW2",
+      "title": "Will the KT Wiz win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600HANDOO",
       "lifetime_volume": 1072.36,
+      "margin": 2.5,
       "n_candles": 57,
       "pregame_print_volume_6h": 7.19,
       "result": "no",
@@ -1370,14 +1575,17 @@
         "age_minutes": 0.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-HAN3"
+      "target_team": "Hanwha Eagles",
+      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-HAN3",
+      "title": "Will the Hanwha Eagles win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600HANDOO",
       "lifetime_volume": 1917.39,
+      "margin": 1.5,
       "n_candles": 61,
       "pregame_print_volume_6h": 1072.8,
       "result": "no",
@@ -1386,14 +1594,17 @@
         "age_minutes": 0.0,
         "ask": 0.45,
         "bid": 0.44,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-HAN2"
+      "target_team": "Hanwha Eagles",
+      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-HAN2",
+      "title": "Will the Hanwha Eagles win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600HANDOO",
       "lifetime_volume": 4239.66,
+      "margin": 2.5,
       "n_candles": 27,
       "pregame_print_volume_6h": 0.0,
       "result": "yes",
@@ -1402,14 +1613,17 @@
         "age_minutes": 0.0,
         "ask": 0.17,
         "bid": 0.16,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-DOO3"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-DOO3",
+      "title": "Will the Doosan Bears win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG130600HANDOO",
       "lifetime_volume": 5331.4,
+      "margin": 1.5,
       "n_candles": 61,
       "pregame_print_volume_6h": 204.0,
       "result": "yes",
@@ -1418,14 +1632,17 @@
         "age_minutes": 0.0,
         "ask": 0.27,
         "bid": 0.25,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": null,
-      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-DOO2"
+      "target_team": "Doosan Bears",
+      "ticker": "KXKBOSPREAD-26AUG130600HANDOO-DOO2",
+      "title": "Will the Doosan Bears win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600SAMKIA",
       "lifetime_volume": 549.95,
+      "margin": 2.5,
       "n_candles": 119,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -1434,19 +1651,22 @@
         "age_minutes": 0.0,
         "ask": 0.29,
         "bid": 0.28,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.29,
         "bid": 0.27,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
-      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-SAM3"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-SAM3",
+      "title": "Will the Samsung Lions win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600SAMKIA",
       "lifetime_volume": 2691.44,
+      "margin": 1.5,
       "n_candles": 74,
       "pregame_print_volume_6h": 1154.19,
       "result": "no",
@@ -1455,19 +1675,22 @@
         "age_minutes": 1.0,
         "ask": 0.37,
         "bid": 0.36,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 21.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-SAM2"
+      "target_team": "Samsung Lions",
+      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-SAM2",
+      "title": "Will the Samsung Lions win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600SAMKIA",
       "lifetime_volume": 1888.51,
+      "margin": 2.5,
       "n_candles": 141,
       "pregame_print_volume_6h": 0.0,
       "result": "yes",
@@ -1476,19 +1699,22 @@
         "age_minutes": 0.0,
         "ask": 0.29,
         "bid": 0.28,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.31,
         "bid": 0.3,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-KIA3"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-KIA3",
+      "title": "Will the Kia Tigers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600SAMKIA",
       "lifetime_volume": 4121.14,
+      "margin": 1.5,
       "n_candles": 144,
       "pregame_print_volume_6h": 802.07,
       "result": "yes",
@@ -1497,19 +1723,22 @@
         "age_minutes": 0.0,
         "ask": 0.39,
         "bid": 0.37,
-        "spread": 0.020000000000000018
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.39,
         "bid": 0.38,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-KIA2"
+      "target_team": "Kia Tigers",
+      "ticker": "KXKBOSPREAD-26AUG120600SAMKIA-KIA2",
+      "title": "Will the Kia Tigers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600LOTSSG",
       "lifetime_volume": 3031.25,
+      "margin": 2.5,
       "n_candles": 111,
       "pregame_print_volume_6h": 1134.0,
       "result": "yes",
@@ -1518,19 +1747,22 @@
         "age_minutes": 9.0,
         "ask": 0.31,
         "bid": 0.3,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 0.0,
         "ask": 0.25,
         "bid": 0.24,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-SSG3"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-SSG3",
+      "title": "Will the SSG Landers win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600LOTSSG",
       "lifetime_volume": 2471.53,
+      "margin": 1.5,
       "n_candles": 123,
       "pregame_print_volume_6h": 1057.35,
       "result": "yes",
@@ -1539,19 +1771,22 @@
         "age_minutes": 0.0,
         "ask": 0.41,
         "bid": 0.39,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.36,
         "bid": 0.35,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-SSG2"
+      "target_team": "SSG Landers",
+      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-SSG2",
+      "title": "Will the SSG Landers win by over 1.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600LOTSSG",
       "lifetime_volume": 641.7,
+      "margin": 2.5,
       "n_candles": 137,
       "pregame_print_volume_6h": 0.0,
       "result": "no",
@@ -1560,19 +1795,22 @@
         "age_minutes": 0.0,
         "ask": 0.29,
         "bid": 0.27,
-        "spread": 0.019999999999999962
+        "spread": 0.02
       },
       "t60": {
         "age_minutes": 1.0,
         "ask": 0.33,
         "bid": 0.3,
-        "spread": 0.030000000000000027
+        "spread": 0.03
       },
-      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-LOT3"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-LOT3",
+      "title": "Will the Lotte Giants win by over 2.5 runs?"
     },
     {
       "event_ticker": "KXKBOSPREAD-26AUG120600LOTSSG",
       "lifetime_volume": 1894.68,
+      "margin": 1.5,
       "n_candles": 107,
       "pregame_print_volume_6h": 570.27,
       "result": "no",
@@ -1581,15 +1819,17 @@
         "age_minutes": 0.0,
         "ask": 0.35,
         "bid": 0.34,
-        "spread": 0.009999999999999953
+        "spread": 0.01
       },
       "t60": {
         "age_minutes": 20.0,
         "ask": 0.4,
         "bid": 0.39,
-        "spread": 0.010000000000000009
+        "spread": 0.01
       },
-      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-LOT2"
+      "target_team": "Lotte Giants",
+      "ticker": "KXKBOSPREAD-26AUG120600LOTSSG-LOT2",
+      "title": "Will the Lotte Giants win by over 1.5 runs?"
     }
   ],
   "schema_version": 1,

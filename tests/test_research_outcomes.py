@@ -41,6 +41,19 @@ class TestResearchOutcomes(TestCase):
                 next_action="build it", recheck_after="2026-11-01T00:00:00Z",
             )
 
+        metrics = summarize_research(
+            [{"id": "a2", "title": "Buildable lead"}], [work]
+        )
+        assert metrics["decisions"]["needs_work"] == 1
+        assert metrics["work_queue"] == [{
+            "assignment_id": "a2",
+            "source_item_id": "s2",
+            "title": "Buildable lead",
+            "decided_at": "now",
+            "next_action": "build the timestamp-aligned dataset",
+            "reason_codes": ["dataset_missing"],
+        }]
+
     def test_metrics_attribute_yield_and_rejections(self):
         assignments = [
             {"id": "a1", "source_type": "paper", "source_name": "arXiv", "attribution_key": "arXiv", "lane": "literature"},
@@ -88,7 +101,7 @@ class TestResearchOutcomes(TestCase):
             assignment_id="a1", source_item_id="s1",
             decided_at="2026-08-01T00:00:00Z", decision="defer",
             reason_codes=["await_data"], evidence_checked=["paper"],
-            research_minutes=10, recheck_after="2026-08-02",
+            research_minutes=10, recheck_after="2026-08-02T00:00:00Z",
             blocking_fact="the external dataset release",
         )]
         dispatches = [{
@@ -106,7 +119,7 @@ class TestResearchOutcomes(TestCase):
             assignment_id="a1", source_item_id="s1",
             decided_at="2026-08-02T12:00:00Z", decision="defer",
             reason_codes=["await_data"], evidence_checked=["paper"],
-            research_minutes=10, recheck_after="2026-08-03",
+            research_minutes=10, recheck_after="2026-08-03T00:00:00Z",
             blocking_fact="the external dataset release",
         )]
         dispatches = [{

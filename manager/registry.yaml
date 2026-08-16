@@ -1847,12 +1847,16 @@ workstreams:
     blocked_on: human
     owner_dir: soccer_research
     action_required: >
-      Snapshot 2 is required before the PROCEED can be acted on. Rule section 4
-      says one snapshot is not a liquidity measurement, following the satellites
-      persistence check that caught 112 of 118 apparent violations as stable
-      one- and five-lot artifacts. Run at least 1h after snapshot 1:
-      `python3 soccer_research/btts_1h_census.py --snapshot 2 && ... --report`.
-      Then decide whether to write the mechanism rule.
+      DECISION: whether to start in-play soccer book capture, which is the only
+      thing that would let the one remaining structural candidate be tested (the
+      deterministic late-first-half time bound — at minute 44 with 0-0 the
+      probability both teams score before half-time is near zero on any model).
+      src/book_capture.py:223 is hardcoded to ["KXMLBGAME"] at a 60-second
+      cadence, which the AFT review already called fatal for a minute-resolution
+      soccer signal, so this is a data-collection decision (cadence, and a 2GB
+      droplet already running six workloads) before it is a research one.
+      If the answer is no, close this workstream — Phase 1 is a KILL and nothing
+      else is testable with the data we have.
     summary: >
       Reopens the ONE-LINE kill of soccer BTTS ("sits at P = 0.483, the exact
       maximum of the fee parabola"), which the 2026-07-30 AFT paper review found
@@ -1868,8 +1872,21 @@ workstreams:
       terms, but relative spread is the statistic that killed the satellites
       studies, and it is not favourable here. The gate is NOT being rewritten
       after the fact; the caveat is carried forward into the mechanism design.
-      PROCEED authorises writing a decision rule only. No pod, no quote, no
-      backtest, and NO mechanism has been proposed yet.
+      PHASE 1 (containment) = KILL, provisional on snapshot 2. The forecast-free
+      entailment P(1H) <= P(full) is not violated anywhere: 33 matched pairs,
+      ZERO mid inversions, zero executable, best executable credit -28c, closest
+      pair 19.5c from violating. Fees never came into play — the market is
+      simply right. Rule section 5's stated reason this might beat the WINS
+      result (different series, not one ladder, so no single maker is forced to
+      keep them consistent) was real and failed in the stronger direction: the
+      WINS ladder threw 118 mid inversions, this threw none. Dutch-book is now
+      0 for 3 on this exchange.
+      BANKED REGARDLESS: SOCCERBTTS.pdf and SOCCERHBTTS.pdf are the SAME
+      DOCUMENT (byte-identical bodies) — one rulebook governs full-match and
+      both halves, the inverse of the GOLDENGLOBESNOM trap. The full-match BTTS
+      payout criterion is MONOTONE, which is why containment survives every
+      abandonment branch. Both are reusable for any future soccer pair test.
+      See soccer_research/REPORT_BTTS_Containment_2026-08-16.md.
     notes: >
       Registered BEFORE the work started, deliberately. The research triage
       pipeline holds an open strategy-scout assignment on a Kalshi soccer family

@@ -1,0 +1,27 @@
+{
+  "assignment_id": "assignment_a8dd319a6d39917a7a28",
+  "blocking_fact": null,
+  "decided_at": "2026-08-16T19:20:00Z",
+  "decision": "needs_work",
+  "evidence_checked": [
+    "Kalshi Soccer Spread contract terms: https://assets.kalshi.com/contract_terms/SOCCERSPREAD.pdf",
+    "Kalshi Market Settlement API Documentation: https://docs.kalshi.com/getting_started/market_settlement",
+    "Kalshi Market Lifecycle API Documentation: https://docs.kalshi.com/getting_started/market_lifecycle",
+    "CFTC Kalshi Designated Contract Markets filing: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/42993",
+    "Kalshi Help Center, Signing Up as an Individual: https://help.kalshi.com/en/articles/13823778-signing-up-as-an-individual",
+    "KNVB, Definitief competitieprogramma 2026/'27 vastgesteld: https://www.knvb.nl/nieuws/betaald-voetbal/competitiezaken/71918/definitief-competitieprogramma-202627-vastgesteld",
+    "Supplied Kalshi census observations for KXEREDIVISIESPREAD, including fees and representative quote"
+  ],
+  "notes": "Reclassified from defer: several matchweeks passing will not create a synchronized Kalshi/external-odds dataset unless a collector is built and running. Collection, event matching, and fill/capacity measurement are work available now, not facts supplied by the calendar.",
+  "next_action": "Build a read-only Eredivisie spread collector that aligns Kalshi books, timestamped sharp odds, scheduled starts, and public lineup/news timestamps; preregister the latency and net-edge test before accumulating matchweeks.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "historical_net_edge_unmeasured",
+    "no_timestamped_external_odds_sample",
+    "capacity_and_slippage_unmeasured",
+    "execution_not_authorized_reference_only"
+  ],
+  "recheck_after": null,
+  "research_minutes": 10,
+  "source_item_id": "src_607b9c51d7fe1f1ab2d2"
+}

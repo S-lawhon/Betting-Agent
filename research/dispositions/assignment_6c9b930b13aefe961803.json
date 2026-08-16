@@ -1,0 +1,24 @@
+{
+  "assignment_id": "assignment_6c9b930b13aefe961803",
+  "blocking_fact": null,
+  "decided_at": "2026-08-16T07:20:00Z",
+  "decision": "needs_work",
+  "evidence_checked": [
+    "CFTC filing page: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizationRules/62577",
+    "CFTC filing document: https://www.cftc.gov/filings/orgrules/rules08112615603.pdf",
+    "CFTC prior ProphetX maintenance filing, describing Rule 4.8 and temporary trading unavailability during maintenance windows: https://www.cftc.gov/filings/orgrules/rules0623267042.pdf",
+    "CFTC Designated Contract Market Products listing ProphetX binary option event contracts: https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizationProducts?Status=Certified&col=AssociatedDocuments&dir=DESC&page=46"
+  ],
+  "notes": "Reclassified from defer: the maintenance event will occur, but timestamp-correct order-book and trade evidence will not create or preserve itself. A capture path must be running before the window. Missing collection and settlement/fee mapping are research work, not a calendar blocker.",
+  "next_action": "Before the August 17 maintenance window, verify the exact UTC window and affected ProphetX products, then run a read-only capture of pre-halt and post-resumption books/trades with fees and settlement identifiers.",
+  "opportunity_id": null,
+  "reason_codes": [
+    "future_maintenance_event_not_yet_observed",
+    "executable_prices_and_depth_unverified",
+    "fees_fills_and_settlement_terms_unverified",
+    "no_timestamp_correct_event_data_yet"
+  ],
+  "recheck_after": null,
+  "research_minutes": 5,
+  "source_item_id": "src_795cef93443d721deaa9"
+}

@@ -2,9 +2,10 @@
 
 ## Verdict
 
-**PRICE-DATA FEASIBILITY PASSES; EDGE IS UNTESTED.** Do not wait for November.
-The missing evidence is research work available now, so the assignment is
-classified `needs_work`, not `defer`.
+**PRICE-DATA FEASIBILITY PASSES; SIMPLE PRE-GAME LATENCY THESIS REJECTED.** Do
+not wait for November. The missing evidence was fetchable work, not time. Once
+that work was performed, the fee-net discrepancy was absent on 22 of 24 exact-
+line contracts, so the assignment is now `reject`, not `defer` or `needs_work`.
 
 ## Prespecified question
 
@@ -86,3 +87,34 @@ Kalshi fee and conservative fill/capacity haircuts. Stop without modelling if:
   holdout sample.
 
 Execution eligibility remains `reference_only`.
+
+## Completed alignment gate
+
+The next gate above was run immediately against five historical Odds API slate
+snapshots, one at T-15 for each distinct date in the 20-event sample. All 20
+Kalshi events matched a bookmaker event. Twenty-four Kalshi contracts had an
+exact opposite spread line; 20 of those carried Pinnacle. The five requests
+cost 50 credits.
+
+| Alignment result | Value |
+|---|---:|
+| Matched events | 20 / 20 |
+| Exact-line contracts | 24 / 80 |
+| Exact lines with Pinnacle | 20 / 24 |
+| Positive predicted fee-net discrepancies | 2 / 24 |
+| Median predicted fee-net edge | -1.38 cents |
+| Mean predicted fee-net edge | -1.15 cents |
+| Exploratory realized net mean, all best sides | -4.12 cents |
+| Realized net mean, two predicted-positive rows | -42.67 cents |
+
+This is a small exploratory sample, so the realized return is not treated as a
+validation statistic. The more basic falsifier is already decisive for the
+proposed mechanism: the independent pregame fair value usually sat inside the
+Kalshi spread, and fees pushed the best side negative before any fill haircut.
+The two positives were only +1.19 cents and +0.64 cents; one lacked Pinnacle.
+Historical depth cannot turn a negative pre-fill estimate positive.
+
+**Final decision: REJECT the generic KBO pregame information-latency lead.** A
+future KBO idea must name a different mechanism—such as a specific timestamped
+lineup/news shock—and enter as a new assignment with evidence that distinguishes
+it from this tested sharp-consensus comparison.

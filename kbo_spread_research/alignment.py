@@ -165,6 +165,8 @@ def run(input_path: Path, *, regions: str) -> Dict[str, Any]:
 
     predicted = [row["predicted_net_edge"] for row in aligned]
     realized = [row["realized_net"] for row in aligned]
+    positive_realized = [row["realized_net"] for row in aligned
+                         if row["predicted_net_edge"] > 0]
     return {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -180,6 +182,9 @@ def run(input_path: Path, *, regions: str) -> Dict[str, Any]:
         "predicted_edge_median": round(median(predicted), 6) if predicted else None,
         "predicted_edge_mean": round(mean(predicted), 6) if predicted else None,
         "realized_net_mean": round(mean(realized), 6) if realized else None,
+        "positive_edge_realized_net_mean": (
+            round(mean(positive_realized), 6) if positive_realized else None
+        ),
         "limitations": [
             "Exploratory latest-event sample; no train/holdout split or clustered confidence interval.",
             "Pinnacle is preferred when present; otherwise the multi-book consensus is used.",

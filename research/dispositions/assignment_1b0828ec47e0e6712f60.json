@@ -1,8 +1,8 @@
 {
   "assignment_id": "assignment_1b0828ec47e0e6712f60",
   "blocking_fact": null,
-  "decided_at": "2026-08-16T20:10:00Z",
-  "decision": "needs_work",
+  "decided_at": "2026-08-16T20:21:00Z",
+  "decision": "reject",
   "evidence_checked": [
     "Kalshi BASEBALLSPREAD contract terms: https://assets.kalshi.com/contract_terms/BASEBALLSPREAD.pdf",
     "Kalshi Historical Data API Documentation: https://docs.kalshi.com/getting_started/historical_data",
@@ -10,15 +10,16 @@
     "Official KBO scoreboard: https://eng.koreabaseball.com/Schedule/Scoreboard.aspx",
     "Official KBO team statistics: https://eng.koreabaseball.com/Stats/TeamStats.aspx",
     "kbo_spread_research/feasibility_results.json (20 events / 80 markets)",
-    "The Odds API KBO coverage and historical availability documentation: baseball_kbo from 2024-03-28"
+    "The Odds API KBO coverage and historical availability documentation: baseball_kbo from 2024-03-28",
+    "kbo_spread_research/alignment_results.json (20 events, five timestamped slates, 24 exact-line contracts)"
   ],
-  "notes": "Reclassified from defer after the bounded feasibility pull. Time was not the blocker. Kalshi exposes usable historical data now: all 80 sampled markets had candlesticks and a T-15 two-sided quote; 61 had pregame prints; median T-15 spread was 1 cent and median six-hour pregame print volume was 251.12 contracts. Historical depth and fill priority remain unavailable, and no independent fair-value signal has been aligned, so this is not edge evidence.",
-  "next_action": "Match Kalshi KXKBOSPREAD strikes and pregame timestamps to The Odds API baseball_kbo historical spread snapshots, then test de-vigged sharp consensus versus the executable Kalshi touch after fees and conservative fill haircuts; stop if event matching or timestamp coverage is inadequate.",
+  "notes": "The original November defer was invalid because time was not the blocker. Immediate feasibility and alignment work found usable Kalshi history and timestamp-correct KBO bookmaker spreads. All 20 sampled events matched, but only 2 of 24 exact-line contracts showed any predicted fee-net discrepancy; median predicted edge was -1.38 cents and mean was -1.15 cents. The simple pregame information-latency mechanism is falsified. Historical depth remains unavailable, but it cannot rescue a signal that is already negative before a fill haircut.",
+  "next_action": null,
   "opportunity_id": null,
   "reason_codes": [
-    "historical_timestamp_aligned_dataset_missing",
-    "net_edge_unverified",
-    "capacity_and_fill_history_missing",
+    "timestamp_aligned_benchmark_available",
+    "fee_net_discrepancy_absent",
+    "simple_information_latency_falsified",
     "execution_not_authorized"
   ],
   "recheck_after": null,

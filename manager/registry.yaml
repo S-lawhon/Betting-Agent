@@ -1845,11 +1845,12 @@ workstreams:
 
   - id: R-SOCCER-BTTS-1H
     name: First-Half Soccer BTTS (Phase 0 feasibility)
-    stage: research
+    stage: killed
     tier: none
-    blocked_on: human
+    blocked_on: retired
     owner_dir: soccer_research
-    action_required: >
+    action_required: null
+    superseded_action_required: >
       NOTHING IS AUTHORISED. Phase 2's PASS stands as arithmetic and FALLS as a
       mechanism: Gate P's stratified control shows the +4.52c is a PRICE-LEVEL
       effect, not a first-half effect, present in the full-match control at
@@ -1862,7 +1863,23 @@ workstreams:
       in-play soccer or one of the two is wrong. Resolve that before trusting
       either. It needs its own registration, universe and gate; it does not
       inherit Phase 2's PASS.
-      SUPERSEDED (was): authorise or decline a capacity study. Phase 2 PASSED its pre-registered
+      SUPERSEDED (was): authorise or decline a capacity study.
+      FINAL 2026-08-16: CLOSED. There is NO favourite-longshot bias. The clean
+      contemporaneous calibration curve is flat — mid buckets realize 9.1 /
+      17.9 / 31.4 / 51.5 / 69.5 percent yes against their own price ranges over
+      350k quoted minutes — and per-fill EV is small, positive and NON-monotone
+      (+0.18c in the CHEAPEST bucket, where FLB predicts the most overpricing).
+      That is maker half-spread capture, not a mispricing.
+      TWO OF MY OWN DIAGNOSTICS WERE WRONG, both flattering. The monotone
+      price-level effect does not exist: bucketing markets by PATH-AVERAGE fill
+      price sorts them by outcome, because prices converge to the result. It
+      manufactured the +17c and the +37c (z=25 on a 50c contract — an alarm,
+      not a finding). The +4.52c headline is the same family: equal-weight-
+      per-match over mean-P&L-per-fill mixes per-fill EV with path structure.
+      P-019 COLLISION RESOLVED IN P-019'S FAVOUR on independent data (it tested
+      politics/season futures; this is in-play soccer; flat in both).
+      'We price it better than Kalshi' is now 0 for 9.
+      See soccer_research/REPORT_BTTS_Calibration_2026-08-16.md. Phase 2 PASSED its pre-registered
       gate and section 8.5 permits a capacity study and nothing else — no pod, no
       quote, no deploy. The two open questions are what the edge is worth at
       realistic size against a median 158-contract filling minute, and how the

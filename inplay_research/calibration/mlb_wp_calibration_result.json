@@ -1,0 +1,5132 @@
+{
+  "evaluated_at_utc": "2026-08-16T16:49:16.206750Z",
+  "exclusions": {
+    "invalid_mid": 5114,
+    "no_pregame_anchor": 21,
+    "schedule_no_match": 24,
+    "too_few_book_checkpoints": 14,
+    "too_few_state_checkpoints": 2
+  },
+  "games_by_state_lag_seconds": {
+    "30": [
+      {
+        "checkpoints": [
+          {
+            "delta": -0.040625651958051956,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.29565065195805196,
+            "model_home_probability": 0.5437376683273396,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.03700084525745834,
+            "market_brier": 0.16402500000000003,
+            "market_home_mid": 0.405,
+            "model_brier": 0.20102584525745837,
+            "model_home_probability": 0.44835905840905943,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.012561812970280438,
+            "market_brier": 0.009024999999999998,
+            "market_home_mid": 0.09499999999999999,
+            "model_brier": 0.021586812970280436,
+            "model_home_probability": 0.14692451453137573,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0016384095434070563,
+            "market_brier": 0.0012250000000000013,
+            "market_home_mid": 0.03500000000000002,
+            "model_brier": 0.0028634095434070576,
+            "model_home_probability": 0.053510835756947935,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.022956679932299447,
+        "event_ticker": "KXMLBGAME-26AUG071840NYMPIT",
+        "market_brier": 0.107325,
+        "model_brier": 0.13028167993229944,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.555,
+        "scheduled_start_utc": "2026-08-07T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.010901678526005723,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.06612667852600572,
+            "model_home_probability": 0.7428489188706263,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.024323137897480418,
+            "market_brier": 0.20702499999999996,
+            "market_home_mid": 0.545,
+            "model_brier": 0.18270186210251954,
+            "model_home_probability": 0.5725636163093746,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0067107296857373475,
+        "event_ticker": "KXMLBGAME-26AUG071845CINWSH",
+        "market_brier": 0.131125,
+        "model_brier": 0.12441427031426264,
+        "n_checkpoints": 2,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.535,
+        "scheduled_start_utc": "2026-08-07T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.005808977512934813,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.885,
+            "model_brier": 0.01903397751293481,
+            "model_home_probability": 0.8620363181379432,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.00047415036081838093,
+            "market_brier": 0.0006250000000000011,
+            "market_home_mid": 0.975,
+            "model_brier": 0.001099150360818382,
+            "model_home_probability": 0.9668465633633799,
+            "offset_seconds": 3600
+          }
+        ],
+        "delta": -0.0031415639368765967,
+        "event_ticker": "KXMLBGAME-26AUG071910ATHBOS",
+        "market_brier": 0.006924999999999999,
+        "model_brier": 0.010066563936876596,
+        "n_checkpoints": 2,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.715,
+        "scheduled_start_utc": "2026-08-07T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0470103984300429,
+            "market_brier": 0.20702499999999996,
+            "market_home_mid": 0.45499999999999996,
+            "model_brier": 0.25403539843004286,
+            "model_home_probability": 0.5040192441068524,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.049138208444157255,
+            "market_brier": 0.225625,
+            "market_home_mid": 0.475,
+            "model_brier": 0.27476320844415725,
+            "model_home_probability": 0.5241786035733977,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.006754168240310943,
+            "market_brier": 0.36,
+            "market_home_mid": 0.6,
+            "model_brier": 0.36675416824031093,
+            "model_home_probability": 0.6056023185559241,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.07887585468865099,
+            "market_brier": 0.49702499999999994,
+            "market_home_mid": 0.705,
+            "model_brier": 0.41814914531134895,
+            "model_home_probability": 0.6466445277827293,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.006006730106465026,
+        "event_ticker": "KXMLBGAME-26AUG071910LAAMIA",
+        "market_brier": 0.32241875,
+        "model_brier": 0.328425480106465,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-07T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.030964785922187883,
+            "market_brier": 0.04409999999999999,
+            "market_home_mid": 0.21,
+            "model_brier": 0.07506478592218788,
+            "model_home_probability": 0.2739795355901383,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.0248595135380395,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.13048451353803947,
+            "model_home_probability": 0.3612264020500709,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.00034657434793666504,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.00027842565206333573,
+            "model_home_probability": 0.016686091575421003,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.0001972450394380624,
+            "market_brier": 0.0002250000000000003,
+            "market_home_mid": 0.01500000000000001,
+            "model_brier": 2.7754960561937874e-05,
+            "model_home_probability": 0.005268297691089397,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.013820120018213164,
+        "event_ticker": "KXMLBGAME-26AUG071940CLECWS",
+        "market_brier": 0.03764374999999999,
+        "model_brier": 0.051463870018213155,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.42500000000000004,
+        "scheduled_start_utc": "2026-08-07T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.04471834002861186,
+            "market_brier": 0.5776,
+            "market_home_mid": 0.76,
+            "model_brier": 0.5328816599713881,
+            "model_home_probability": 0.7299874382284863,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03180515822784935,
+            "market_brier": 0.525625,
+            "market_home_mid": 0.725,
+            "model_brier": 0.49381984177215066,
+            "model_home_probability": 0.7027231615452494,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.06701821930472024,
+            "market_brier": 0.275625,
+            "market_home_mid": 0.525,
+            "model_brier": 0.34264321930472025,
+            "model_home_probability": 0.5853573432568522,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.056533133775048594,
+            "market_brier": 0.06760000000000001,
+            "market_home_mid": 0.26,
+            "model_brier": 0.1241331337750486,
+            "model_home_probability": 0.3523253237776822,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.011756963705826906,
+        "event_ticker": "KXMLBGAME-26AUG071940MINMIL",
+        "market_brier": 0.3616125,
+        "model_brier": 0.3733694637058269,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.625,
+        "scheduled_start_utc": "2026-08-07T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.006053511843629289,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.2610785118436293,
+            "model_home_probability": 0.48904157522981445,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.06247506993182353,
+            "market_brier": 0.13322499999999998,
+            "market_home_mid": 0.635,
+            "model_brier": 0.1957000699318235,
+            "model_home_probability": 0.5576199937476565,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.10715754241078135,
+            "market_brier": 0.08702500000000002,
+            "market_home_mid": 0.705,
+            "model_brier": 0.19418254241078137,
+            "model_home_probability": 0.5593385172144253,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.027825305829136223,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.885,
+            "model_brier": 0.04105030582913622,
+            "model_home_probability": 0.7973912493766959,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0508778575038426,
+        "event_ticker": "KXMLBGAME-26AUG081505ATLNYY",
+        "market_brier": 0.122125,
+        "model_brier": 0.1730028575038426,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.41500000000000004,
+        "scheduled_start_utc": "2026-08-08T19:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.0466934632762932,
+            "market_brier": 0.801025,
+            "market_home_mid": 0.895,
+            "model_brier": 0.7543315367237068,
+            "model_home_probability": 0.8685226172781609,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.034510457422479934,
+            "market_brier": 0.697225,
+            "market_home_mid": 0.835,
+            "model_brier": 0.66271454257752,
+            "model_home_probability": 0.8140728115945896,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.019372748328615574,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2743977483286156,
+            "model_home_probability": 0.5238298849136193,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.003211678186994124,
+            "market_brier": 0.015625,
+            "market_home_mid": 0.125,
+            "model_brier": 0.018836678186994124,
+            "model_home_probability": 0.137246778421186,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.01465487354579086,
+        "event_ticker": "KXMLBGAME-26AUG081610ATHBOS",
+        "market_brier": 0.442225,
+        "model_brier": 0.4275701264542091,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.715,
+        "scheduled_start_utc": "2026-08-08T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0032416220927042605,
+            "market_brier": 0.20249999999999996,
+            "market_home_mid": 0.55,
+            "model_brier": 0.20574162209270422,
+            "model_home_probability": 0.5464124978654017,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.0013752302785283248,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.00440023027852833,
+            "model_home_probability": 0.9336657684258849,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.00013819837635991087,
+            "market_brier": 0.0002250000000000004,
+            "market_home_mid": 0.985,
+            "model_brier": 8.680162364008952e-05,
+            "model_home_probability": 0.9906832611048667,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": -0.0014928846649575583,
+        "event_ticker": "KXMLBGAME-26AUG081610LAAMIA",
+        "market_brier": 0.06858333333333332,
+        "model_brier": 0.07007621799829088,
+        "n_checkpoints": 3,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-08T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.005648236635699855,
+            "market_brier": 0.366025,
+            "market_home_mid": 0.605,
+            "model_brier": 0.37167323663569984,
+            "model_home_probability": 0.6096500936075544,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.01077341913813673,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.18725158086186322,
+            "model_home_probability": 0.43272575710473166,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.039862744472998035,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.145487744472998,
+            "model_home_probability": 0.38142855749536897,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.10877723583998439,
+            "market_brier": 0.540225,
+            "market_home_mid": 0.735,
+            "model_brier": 0.43144776416001557,
+            "model_home_probability": 0.6568468346273852,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.018509918467355807,
+        "event_ticker": "KXMLBGAME-26AUG081805TORPHI",
+        "market_brier": 0.30247499999999994,
+        "model_brier": 0.28396508153264416,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.625,
+        "scheduled_start_utc": "2026-08-08T22:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0013220906833038594,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.031947090683303876,
+            "model_home_probability": 0.8212625090158646,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.0008594641304025194,
+            "market_brier": 0.015625,
+            "market_home_mid": 0.875,
+            "model_brier": 0.01648446413040252,
+            "model_home_probability": 0.8716081617453721,
+            "offset_seconds": 3600
+          }
+        ],
+        "delta": -0.0010907774068531894,
+        "event_ticker": "KXMLBGAME-26AUG081840NYMPIT",
+        "market_brier": 0.023125000000000007,
+        "model_brier": 0.024215777406853198,
+        "n_checkpoints": 2,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.525,
+        "scheduled_start_utc": "2026-08-08T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.018628452108439775,
+            "market_brier": 0.265225,
+            "market_home_mid": 0.485,
+            "model_brier": 0.28385345210843976,
+            "model_home_probability": 0.46722101007224415,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.04656722592271152,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.10179222592271152,
+            "model_home_probability": 0.6809510603015401,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.02096375928358482,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.21898875928358477,
+            "model_home_probability": 0.5320376518526466,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -9.64821965331172e-05,
+            "market_brier": 0.0012250000000000021,
+            "market_home_mid": 0.965,
+            "model_brier": 0.0013214821965331193,
+            "model_home_probability": 0.9636478034152939,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.02156397987781731,
+        "event_ticker": "KXMLBGAME-26AUG081845CINWSH",
+        "market_brier": 0.12992499999999998,
+        "model_brier": 0.1514889798778173,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.43499999999999994,
+        "scheduled_start_utc": "2026-08-08T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.011693741776783312,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.725,
+            "model_brier": 0.08731874177678332,
+            "model_home_probability": 0.704502551996158,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.014832735664883287,
+            "market_brier": 0.10890000000000005,
+            "market_home_mid": 0.6699999999999999,
+            "model_brier": 0.12373273566488334,
+            "model_home_probability": 0.6482433573265697,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.04756679324887263,
+            "market_brier": 0.09922499999999997,
+            "market_home_mid": 0.685,
+            "model_brier": 0.1467917932488726,
+            "model_home_probability": 0.6168658286593682,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.08889747773742984,
+            "market_brier": 0.004224999999999993,
+            "market_home_mid": 0.935,
+            "model_brier": 0.09312247773742983,
+            "model_home_probability": 0.6948402422706594,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.04074768710699227,
+        "event_ticker": "KXMLBGAME-26AUG081910CHCKC",
+        "market_brier": 0.07199375000000001,
+        "model_brier": 0.11274143710699228,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.405,
+        "scheduled_start_utc": "2026-08-08T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.001669585123043535,
+            "market_brier": 0.11222499999999998,
+            "market_home_mid": 0.665,
+            "model_brier": 0.11055541487695644,
+            "model_home_probability": 0.6675012558264972,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.04529608348135522,
+            "market_brier": 0.46922500000000006,
+            "market_home_mid": 0.31499999999999995,
+            "model_brier": 0.42392891651864484,
+            "model_home_probability": 0.3489017612382561,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.01782667258269202,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.19839832741730795,
+            "model_home_probability": 0.5545807285070526,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.009327708091344644,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.2073527080913446,
+            "model_home_probability": 0.5446400236171995,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.013866158273936533,
+        "event_ticker": "KXMLBGAME-26AUG081910MINMIL",
+        "market_brier": 0.24892499999999998,
+        "model_brier": 0.23505884172606345,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-08T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.04124488260580059,
+            "market_brier": 0.265225,
+            "market_home_mid": 0.485,
+            "model_brier": 0.2239801173941994,
+            "model_home_probability": 0.5267346226542666,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.024553670691029428,
+            "market_brier": 0.08702500000000002,
+            "market_home_mid": 0.705,
+            "model_brier": 0.11157867069102945,
+            "model_home_probability": 0.6659660635638507,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.02602600936370804,
+            "market_brier": 0.060024999999999995,
+            "market_home_mid": 0.755,
+            "model_brier": 0.08605100936370803,
+            "model_home_probability": 0.7066554766768126,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.035922358207290554,
+            "market_brier": 0.042024999999999986,
+            "market_home_mid": 0.795,
+            "model_brier": 0.07794735820729054,
+            "model_home_probability": 0.7208094589580611,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.011314288914056858,
+        "event_ticker": "KXMLBGAME-26AUG081915BALTEX",
+        "market_brier": 0.113575,
+        "model_brier": 0.12488928891405686,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.004010903776625441,
+            "market_brier": 0.2916,
+            "market_home_mid": 0.45999999999999996,
+            "model_brier": 0.29561090377662547,
+            "model_home_probability": 0.45629888378206773,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.006352322227456075,
+            "market_brier": 0.29702500000000004,
+            "market_home_mid": 0.45499999999999996,
+            "model_brier": 0.3033773222274561,
+            "model_home_probability": 0.44920301178432703,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.030300979574954118,
+            "market_brier": 0.235225,
+            "market_home_mid": 0.515,
+            "model_brier": 0.2655259795749541,
+            "model_home_probability": 0.484707869674925,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.03213990111345927,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.375,
+            "model_brier": 0.35848509888654073,
+            "model_home_probability": 0.40126374847806257,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0021310761163940914,
+        "event_ticker": "KXMLBGAME-26AUG081915CLECWS",
+        "market_brier": 0.30361875,
+        "model_brier": 0.3057498261163941,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.44499999999999995,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.027818092551288254,
+            "market_brier": 0.5112249999999999,
+            "market_home_mid": 0.715,
+            "model_brier": 0.4834069074487117,
+            "model_home_probability": 0.6952746992726772,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.03263000725561846,
+            "market_brier": 0.18922499999999995,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.2218550072556184,
+            "model_home_probability": 0.4710148694633943,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.03717746370062541,
+            "market_brier": 0.09302500000000002,
+            "market_home_mid": 0.30500000000000005,
+            "model_brier": 0.13020246370062544,
+            "model_home_probability": 0.36083578495019786,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.01962422799836845,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.275,
+            "model_brier": 0.09524922799836846,
+            "model_home_probability": 0.30862473653025363,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.015403401600831017,
+        "event_ticker": "KXMLBGAME-26AUG081915COLSTL",
+        "market_brier": 0.21727499999999997,
+        "model_brier": 0.232678401600831,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.019906588745616127,
+            "market_brier": 0.20702499999999996,
+            "market_home_mid": 0.45499999999999996,
+            "model_brier": 0.2269315887456161,
+            "model_home_probability": 0.4763733711550385,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.00781859520805872,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2628435952080587,
+            "model_home_probability": 0.5126827432321657,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.032725057766765375,
+            "market_brier": 0.07022500000000001,
+            "market_home_mid": 0.265,
+            "model_brier": 0.10295005776676538,
+            "model_home_probability": 0.3208583141618203,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.00021516063899071374,
+            "market_brier": 0.0002250000000000003,
+            "market_home_mid": 0.01500000000000001,
+            "model_brier": 9.839361009286537e-06,
+            "model_home_probability": 0.00313677557521837,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.015058770270362377,
+        "event_ticker": "KXMLBGAME-26AUG081915DETSF",
+        "market_brier": 0.133125,
+        "model_brier": 0.14818377027036236,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.475,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.027882171712957426,
+            "market_brier": 0.09302500000000002,
+            "market_home_mid": 0.695,
+            "model_brier": 0.12090717171295745,
+            "model_home_probability": 0.6522829142636827,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.11758711936594861,
+            "market_brier": 0.09922499999999997,
+            "market_home_mid": 0.685,
+            "model_brier": 0.21681211936594857,
+            "model_home_probability": 0.5343691168254101,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.022031034004589164,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.865,
+            "model_brier": 0.040256034004589165,
+            "model_home_probability": 0.7993609359955316,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.028730077835040887,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.885,
+            "model_brier": 0.041955077835040884,
+            "model_home_probability": 0.7951706128627025,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.04905760072963402,
+        "event_ticker": "KXMLBGAME-26AUG081915HOUSD",
+        "market_brier": 0.055924999999999996,
+        "model_brier": 0.10498260072963402,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.525,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.005822345019135505,
+            "market_brier": 0.17222500000000002,
+            "market_home_mid": 0.585,
+            "model_brier": 0.1664026549808645,
+            "model_home_probability": 0.5920751846468953,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.02012118140372457,
+            "market_brier": 0.060024999999999995,
+            "market_home_mid": 0.755,
+            "model_brier": 0.08014618140372456,
+            "model_home_probability": 0.7168989908111867,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.02992108965204138,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.0605460896520414,
+            "model_home_probability": 0.7539388497709535,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.010914699300638962,
+            "market_brier": 0.009024999999999995,
+            "market_home_mid": 0.905,
+            "model_brier": 0.019939699300638956,
+            "model_home_probability": 0.858791999870266,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.013783656334317352,
+        "event_ticker": "KXMLBGAME-26AUG091215CINWSH",
+        "market_brier": 0.06797500000000001,
+        "model_brier": 0.08175865633431736,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.515,
+        "scheduled_start_utc": "2026-08-09T16:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.012145644626561036,
+            "market_brier": 0.366025,
+            "market_home_mid": 0.605,
+            "model_brier": 0.378170644626561,
+            "model_home_probability": 0.6149558070516621,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.020915759100895215,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.555,
+            "model_brier": 0.32894075910089526,
+            "model_home_probability": 0.5735335727757315,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.05238365324489924,
+            "market_brier": 0.6006250000000001,
+            "market_home_mid": 0.775,
+            "model_brier": 0.5482413467551008,
+            "model_home_probability": 0.7404332155941553,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.11726220520325459,
+            "market_brier": 0.6006250000000001,
+            "market_home_mid": 0.775,
+            "model_brier": 0.4833627947967455,
+            "model_home_probability": 0.6952429753667027,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.034146113680174395,
+        "event_ticker": "KXMLBGAME-26AUG091335ATHBOS",
+        "market_brier": 0.46882500000000005,
+        "model_brier": 0.43467888631982565,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.675,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.013429308801557627,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.555,
+            "model_brier": 0.3214543088015577,
+            "model_home_probability": 0.5669694072889274,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.034549937931838526,
+            "market_brier": 0.275625,
+            "market_home_mid": 0.525,
+            "model_brier": 0.31017493793183853,
+            "model_home_probability": 0.5569335130263203,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.04160775532574368,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2966327553257437,
+            "model_home_probability": 0.5446400236171995,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.10273880070582381,
+            "market_brier": 0.08702500000000002,
+            "market_home_mid": 0.29500000000000004,
+            "model_brier": 0.18976380070582383,
+            "model_home_probability": 0.43561887092483015,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.04808145069124091,
+        "event_ticker": "KXMLBGAME-26AUG091335ATLNYY",
+        "market_brier": 0.23142500000000002,
+        "model_brier": 0.2795064506912409,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.038695352070738404,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.14432035207073837,
+            "model_home_probability": 0.37989518563774716,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.005085658046201645,
+            "market_brier": 0.007224999999999999,
+            "market_home_mid": 0.08499999999999999,
+            "model_brier": 0.012310658046201644,
+            "model_home_probability": 0.1109534048427611,
+            "offset_seconds": 3600
+          }
+        ],
+        "delta": -0.021890505058470025,
+        "event_ticker": "KXMLBGAME-26AUG091335NYMPIT",
+        "market_brier": 0.05642499999999998,
+        "model_brier": 0.07831550505847001,
+        "n_checkpoints": 2,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.0004301832537881023,
+            "market_brier": 0.065025,
+            "market_home_mid": 0.745,
+            "model_brier": 0.0645948167462119,
+            "model_home_probability": 0.7458448962814008,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.004508287004594946,
+            "market_brier": 0.024025000000000008,
+            "market_home_mid": 0.845,
+            "model_brier": 0.028533287004594954,
+            "model_home_probability": 0.8310820110094992,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.001698206191613063,
+            "market_brier": 0.011024999999999997,
+            "market_home_mid": 0.895,
+            "model_brier": 0.01272320619161306,
+            "model_home_probability": 0.8872028094693265,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.00016245106504787798,
+            "market_brier": 0.0012250000000000021,
+            "market_home_mid": 0.965,
+            "model_brier": 0.0013874510650478801,
+            "model_home_probability": 0.9627514958012019,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.001484690251866946,
+        "event_ticker": "KXMLBGAME-26AUG091335TORPHI",
+        "market_brier": 0.025325,
+        "model_brier": 0.026809690251866948,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.685,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.00029599569510199014,
+            "market_brier": 0.03802499999999998,
+            "market_home_mid": 0.805,
+            "model_brier": 0.03772900430489799,
+            "model_home_probability": 0.8057604460855153,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.03644415863775563,
+            "market_brier": 0.060024999999999995,
+            "market_home_mid": 0.755,
+            "model_brier": 0.09646915863775563,
+            "model_home_probability": 0.6894051535557043,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.018231837596457752,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.02125683759645776,
+            "model_home_probability": 0.8542027517527928,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": -0.018126666846370463,
+        "event_ticker": "KXMLBGAME-26AUG091340LAAMIA",
+        "market_brier": 0.03369166666666666,
+        "model_brier": 0.05181833351303713,
+        "n_checkpoints": 3,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-09T17:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.016969544779132192,
+            "market_brier": 0.09302500000000002,
+            "market_home_mid": 0.30500000000000005,
+            "model_brier": 0.10999454477913222,
+            "model_home_probability": 0.33165425487867967,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 4.044306645835036e-05,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.11499999999999999,
+            "model_brier": 0.013184556933541647,
+            "model_home_probability": 0.11482402594205468,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.006250005899188192,
+            "market_brier": 0.04202499999999999,
+            "market_home_mid": 0.205,
+            "model_brier": 0.048275005899188185,
+            "model_home_probability": 0.21971573885179047,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": -0.007726369203954011,
+        "event_ticker": "KXMLBGAME-26AUG091410CHCKC",
+        "market_brier": 0.049425000000000004,
+        "model_brier": 0.05715136920395402,
+        "n_checkpoints": 3,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-09T18:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.05112970662071514,
+            "market_brier": 0.45562500000000006,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03772970662071512,
+            "market_brier": 0.44222500000000003,
+            "market_home_mid": 0.33499999999999996,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.02452970662071513,
+            "market_brier": 0.42902500000000005,
+            "market_home_mid": 0.345,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.02452970662071513,
+            "market_brier": 0.42902500000000005,
+            "market_home_mid": 0.345,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.03447970662071513,
+        "event_ticker": "KXMLBGAME-26AUG091410CLECWS",
+        "market_brier": 0.43897500000000006,
+        "model_brier": 0.4044952933792849,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.45499999999999996,
+        "scheduled_start_utc": "2026-08-09T18:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.001992714152907929,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.835,
+            "model_brier": 0.025232285847092084,
+            "model_home_probability": 0.841153263026614,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.003381654557820458,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.034006654557820475,
+            "model_home_probability": 0.8155910670335613,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.0045062126846919515,
+            "market_brier": 0.011024999999999997,
+            "market_home_mid": 0.895,
+            "model_brier": 0.015531212684691948,
+            "model_home_probability": 0.8753757139049858,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.0456766658584572,
+            "market_brier": 0.17222500000000002,
+            "market_home_mid": 0.585,
+            "model_brier": 0.12654833414154282,
+            "model_home_probability": 0.6442636732894111,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.00994537819221318,
+        "event_ticker": "KXMLBGAME-26AUG091410MINMIL",
+        "market_brier": 0.06027500000000001,
+        "model_brier": 0.05032962180778683,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.715,
+        "scheduled_start_utc": "2026-08-09T18:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.013275261205307698,
+            "market_brier": 0.15602500000000002,
+            "market_home_mid": 0.605,
+            "model_brier": 0.14274973879469233,
+            "model_home_probability": 0.6221776359257007,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.006821520053760091,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.715,
+            "model_brier": 0.08804652005376011,
+            "model_home_probability": 0.703273661341363,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.017858387837092114,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.835,
+            "model_brier": 0.04508338783709213,
+            "model_home_probability": 0.7876715095963518,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.015779828922133435,
+            "market_brier": 0.05062499999999999,
+            "market_home_mid": 0.775,
+            "model_brier": 0.06640482892213342,
+            "model_home_probability": 0.7423086557097165,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.006796118901919486,
+        "event_ticker": "KXMLBGAME-26AUG091415COLSTL",
+        "market_brier": 0.07877500000000001,
+        "model_brier": 0.0855711189019195,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.605,
+        "scheduled_start_utc": "2026-08-09T18:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.05566043556066816,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.135,
+            "model_brier": 0.07388543556066816,
+            "model_home_probability": 0.2718187549832943,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.008534887344148884,
+            "market_brier": 0.007224999999999999,
+            "market_home_mid": 0.08499999999999999,
+            "model_brier": 0.015759887344148883,
+            "model_home_probability": 0.1255383899217641,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.015274683218872053,
+            "market_brier": 0.009024999999999998,
+            "market_home_mid": 0.09499999999999999,
+            "model_brier": 0.02429968321887205,
+            "model_home_probability": 0.15588355660194583,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.00046843571789243377,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.0010934357178924345,
+            "model_home_probability": 0.0330671395480836,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.01998461046039538,
+        "event_ticker": "KXMLBGAME-26AUG091435BALTEX",
+        "market_brier": 0.008775,
+        "model_brier": 0.028759610460395383,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.545,
+        "scheduled_start_utc": "2026-08-09T18:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.01014805093016835,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2081730509301683,
+            "model_home_probability": 0.45625985022810006,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.039144484260383194,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.2841694842603832,
+            "model_home_probability": 0.5330754958356116,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.07687408656179101,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.28500000000000003,
+            "model_brier": 0.15809908656179103,
+            "model_home_probability": 0.39761675840159333,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.040798974019622236,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.555,
+            "model_brier": 0.3488239740196223,
+            "model_home_probability": 0.590613218629267,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0417413989429912,
+        "event_ticker": "KXMLBGAME-26AUG091605DETSF",
+        "market_brier": 0.208075,
+        "model_brier": 0.2498163989429912,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.45499999999999996,
+        "scheduled_start_utc": "2026-08-09T20:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.03812715663698718,
+            "market_brier": 0.065025,
+            "market_home_mid": 0.745,
+            "model_brier": 0.10315215663698718,
+            "model_home_probability": 0.6788269054902214,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.007801201353681633,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.06302620135368163,
+            "model_home_probability": 0.7489498031196119,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.00521917379150523,
+            "market_brier": 0.021025000000000005,
+            "market_home_mid": 0.855,
+            "model_brier": 0.026244173791505235,
+            "model_home_probability": 0.8379994636073533,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.01008115379850591,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.865,
+            "model_brier": 0.02830615379850591,
+            "model_home_probability": 0.8317556723140245,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.015307171395169988,
+        "event_ticker": "KXMLBGAME-26AUG091610LADAZ",
+        "market_brier": 0.039875,
+        "model_brier": 0.05518217139516999,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.43499999999999994,
+        "scheduled_start_utc": "2026-08-09T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.06153431784840119,
+            "market_brier": 0.41602500000000003,
+            "market_home_mid": 0.645,
+            "model_brier": 0.35449068215159885,
+            "model_home_probability": 0.5953912009356528,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03150079629212427,
+            "market_brier": 0.46922500000000006,
+            "market_home_mid": 0.685,
+            "model_brier": 0.4377242037078758,
+            "model_home_probability": 0.6616072881308638,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.007676760304936081,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.2527017603049361,
+            "model_home_probability": 0.5026944999748217,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.010488264067424747,
+            "market_brier": 0.005624999999999997,
+            "market_home_mid": 0.07499999999999998,
+            "model_brier": 0.016113264067424745,
+            "model_home_probability": 0.126938032391497,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.018717522442041157,
+        "event_ticker": "KXMLBGAME-26AUG091610TBSEA",
+        "market_brier": 0.28397500000000003,
+        "model_brier": 0.26525747755795887,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.505,
+        "scheduled_start_utc": "2026-08-09T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.009353872761798943,
+            "market_brier": 0.354025,
+            "market_home_mid": 0.405,
+            "model_brier": 0.34467112723820104,
+            "model_home_probability": 0.41291301561165483,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.02091137834491269,
+            "market_brier": 0.286225,
+            "market_home_mid": 0.46499999999999997,
+            "model_brier": 0.2653136216550873,
+            "model_home_probability": 0.48491396674430465,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.0071268100043773985,
+            "market_brier": 0.2304,
+            "market_home_mid": 0.52,
+            "model_brier": 0.2375268100043774,
+            "model_home_probability": 0.5126327770516595,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.07669080230699662,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.865,
+            "model_brier": 0.09491580230699663,
+            "model_home_probability": 0.691915916823026,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.013388090301165598,
+        "event_ticker": "KXMLBGAME-26AUG101907BOSTOR",
+        "market_brier": 0.22221875,
+        "model_brier": 0.2356068403011656,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.405,
+        "scheduled_start_utc": "2026-08-10T23:07:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.009634710616831396,
+            "market_brier": 0.05062499999999999,
+            "market_home_mid": 0.22499999999999998,
+            "model_brier": 0.060259710616831386,
+            "model_home_probability": 0.24547853392268618,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.009402584933357421,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.17500000000000004,
+            "model_brier": 0.04002758493335744,
+            "model_home_probability": 0.2000689504479829,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.014340239530813433,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.17500000000000004,
+            "model_brier": 0.016284760469186584,
+            "model_home_probability": 0.1276117567827768,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.009851521311598194,
+            "market_brier": 0.09922499999999997,
+            "market_home_mid": 0.31499999999999995,
+            "model_brier": 0.10907652131159816,
+            "model_home_probability": 0.33026734823714887,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0036371443327433946,
+        "event_ticker": "KXMLBGAME-26AUG101915NYMATL",
+        "market_brier": 0.052774999999999996,
+        "model_brier": 0.05641214433274339,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-10T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.0002299624411640777,
+            "market_brier": 0.16402500000000003,
+            "market_home_mid": 0.595,
+            "model_brier": 0.16379503755883595,
+            "model_home_probability": 0.5952840038263425,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.003394164624042184,
+            "market_brier": 0.19359999999999997,
+            "market_home_mid": 0.56,
+            "model_brier": 0.19020583537595778,
+            "model_home_probability": 0.5638740601890805,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.030835517584920202,
+            "market_brier": 0.07022500000000001,
+            "market_home_mid": 0.735,
+            "model_brier": 0.10106051758492021,
+            "model_home_probability": 0.6820998307881542,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": -0.009070463506571314,
+        "event_ticker": "KXMLBGAME-26AUG101940BALMIN",
+        "market_brier": 0.14261666666666667,
+        "model_brier": 0.15168713017323798,
+        "n_checkpoints": 3,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.505,
+        "scheduled_start_utc": "2026-08-10T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.021311837404522818,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.28500000000000003,
+            "model_brier": 0.10253683740452284,
+            "model_home_probability": 0.3202137370640473,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.022824190723982618,
+            "market_brier": 0.065025,
+            "market_home_mid": 0.255,
+            "model_brier": 0.08784919072398262,
+            "model_home_probability": 0.29639364150396785,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.01955122981099738,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.11499999999999999,
+            "model_brier": 0.03277622981099738,
+            "model_home_probability": 0.18104206641274667,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0612003737974421,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.275,
+            "model_brier": 0.1368253737974421,
+            "model_home_probability": 0.36989914003339086,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.03122190793423623,
+        "event_ticker": "KXMLBGAME-26AUG101945PHISTL",
+        "market_brier": 0.05877500000000001,
+        "model_brier": 0.08999690793423623,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.475,
+        "scheduled_start_utc": "2026-08-10T23:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.02485840241015433,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.675,
+            "model_brier": 0.08076659758984564,
+            "model_home_probability": 0.7158053526368844,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.0279234440854145,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.18830155591458547,
+            "model_home_probability": 0.5660627281339093,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.0019894970532500457,
+            "market_brier": 0.005624999999999994,
+            "market_home_mid": 0.925,
+            "model_brier": 0.007614497053250039,
+            "model_home_probability": 0.9127389144391955,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0031973829123517856,
+            "market_brier": 0.005624999999999994,
+            "market_home_mid": 0.925,
+            "model_brier": 0.00882238291235178,
+            "model_home_probability": 0.9060724592446295,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.011898741632491749,
+        "event_ticker": "KXMLBGAME-26AUG111840CLEDET",
+        "market_brier": 0.08327499999999999,
+        "model_brier": 0.07137625836750823,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-11T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.010527781322203889,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2555527813222039,
+            "model_home_probability": 0.4944777143169612,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.044734374132787885,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.675,
+            "model_brier": 0.15035937413278785,
+            "model_home_probability": 0.6122379929224785,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.012207178329966806,
+            "market_brier": 0.011024999999999997,
+            "market_home_mid": 0.895,
+            "model_brier": 0.023232178329966803,
+            "model_home_probability": 0.8475789439415709,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.01859209645603248,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.02161709645603249,
+            "model_home_probability": 0.8529724636129936,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.021515357560247764,
+        "event_ticker": "KXMLBGAME-26AUG111840PITMIA",
+        "market_brier": 0.09117499999999999,
+        "model_brier": 0.11269035756024776,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.495,
+        "scheduled_start_utc": "2026-08-11T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.017044834492150385,
+            "market_brier": 0.265225,
+            "market_home_mid": 0.515,
+            "model_brier": 0.2481801655078496,
+            "model_home_probability": 0.4981768416013029,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.017375155968509637,
+            "market_brier": 0.286225,
+            "market_home_mid": 0.535,
+            "model_brier": 0.26884984403149037,
+            "model_home_probability": 0.5185073230259052,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.006816575797507187,
+            "market_brier": 0.021025000000000005,
+            "market_home_mid": 0.14500000000000002,
+            "model_brier": 0.027841575797507193,
+            "model_home_probability": 0.16685795095681594,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.008277359175824664,
+            "market_brier": 0.011024999999999998,
+            "market_home_mid": 0.105,
+            "model_brier": 0.019302359175824662,
+            "model_home_probability": 0.1389329304946263,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.004831513871832043,
+        "event_ticker": "KXMLBGAME-26AUG111845CHCWSH",
+        "market_brier": 0.145875,
+        "model_brier": 0.14104348612816794,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.375,
+        "scheduled_start_utc": "2026-08-11T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0025587134777113885,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.20058371347771134,
+            "model_home_probability": 0.5521342684713293,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.002025121561196247,
+            "market_brier": 0.15602500000000002,
+            "market_home_mid": 0.605,
+            "model_brier": 0.15805012156119627,
+            "model_home_probability": 0.6024448194763445,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.016719240606195368,
+            "market_brier": 0.19359999999999997,
+            "market_home_mid": 0.56,
+            "model_brier": 0.21031924060619533,
+            "model_home_probability": 0.5413942427245431,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.08534053287867582,
+            "market_brier": 0.403225,
+            "market_home_mid": 0.365,
+            "model_brier": 0.3178844671213242,
+            "model_home_probability": 0.4361875603347119,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.016009364308393205,
+        "event_ticker": "KXMLBGAME-26AUG111905SEANYY",
+        "market_brier": 0.23771874999999998,
+        "model_brier": 0.22170938569160678,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.555,
+        "scheduled_start_utc": "2026-08-11T23:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.044640824836095355,
+            "market_brier": 0.24009999999999998,
+            "market_home_mid": 0.51,
+            "model_brier": 0.19545917516390462,
+            "model_home_probability": 0.5578923488968952,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.11111881991863681,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.375,
+            "model_brier": 0.2795061800813632,
+            "model_home_probability": 0.4713165596679207,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.0006070778012027822,
+            "market_brier": 0.286225,
+            "market_home_mid": 0.46499999999999997,
+            "model_brier": 0.2856179221987972,
+            "model_home_probability": 0.4655676635917348,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0016698044599568612,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.725,
+            "model_brier": 0.07729480445995687,
+            "model_home_probability": 0.7219805681971908,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.03867422952399452,
+        "event_ticker": "KXMLBGAME-26AUG111907BOSTOR",
+        "market_brier": 0.24814375,
+        "model_brier": 0.20946952047600548,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-11T23:07:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.013799522211721704,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.21182452221172166,
+            "model_home_probability": 0.5397560188207545,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.028265755927965514,
+            "market_brier": 0.18922499999999995,
+            "market_home_mid": 0.5650000000000001,
+            "model_brier": 0.21749075592796546,
+            "model_home_probability": 0.5336409581363674,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.0528374149857859,
+            "market_brier": 0.03422499999999998,
+            "market_home_mid": 0.8150000000000001,
+            "model_brier": 0.08706241498578587,
+            "model_home_probability": 0.7049365915844767,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.005228923512912007,
+            "market_brier": 0.0012250000000000021,
+            "market_home_mid": 0.965,
+            "model_brier": 0.006453923512912009,
+            "model_home_probability": 0.9196636849680544,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.02503290415959628,
+        "event_ticker": "KXMLBGAME-26AUG111915NYMATL",
+        "market_brier": 0.10567499999999996,
+        "model_brier": 0.13070790415959624,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.545,
+        "scheduled_start_utc": "2026-08-11T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.011296058251739766,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.16500000000000004,
+            "model_brier": 0.03852105825173978,
+            "model_home_probability": 0.19626782276201002,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.010433584265022475,
+            "market_brier": 0.024025000000000008,
+            "market_home_mid": 0.15500000000000003,
+            "model_brier": 0.034458584265022484,
+            "model_home_probability": 0.18563023532017214,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.01379277371206053,
+            "market_brier": 0.03802499999999999,
+            "market_home_mid": 0.19499999999999998,
+            "model_brier": 0.05181777371206052,
+            "model_home_probability": 0.22763517678966166,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.01234456769252978,
+            "market_brier": 0.005624999999999997,
+            "market_home_mid": 0.07499999999999998,
+            "model_brier": 0.01796956769252978,
+            "model_home_probability": 0.13405061615870992,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.011966745980338138,
+        "event_ticker": "KXMLBGAME-26AUG111940BALMIN",
+        "market_brier": 0.023725000000000003,
+        "model_brier": 0.03569174598033814,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.515,
+        "scheduled_start_utc": "2026-08-11T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.06394050849326383,
+            "market_brier": 0.6480250000000001,
+            "market_home_mid": 0.805,
+            "model_brier": 0.5840844915067362,
+            "model_home_probability": 0.7642542060772294,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.054978290725169354,
+            "market_brier": 0.8372250000000001,
+            "market_home_mid": 0.915,
+            "model_brier": 0.7822467092748308,
+            "model_home_probability": 0.8844471206775625,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.07016965254883134,
+            "market_brier": 0.8742250000000001,
+            "market_home_mid": 0.935,
+            "model_brier": 0.8040553474511688,
+            "model_home_probability": 0.8966913334315041,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.0780424135802742,
+            "market_brier": 0.616225,
+            "market_home_mid": 0.785,
+            "model_brier": 0.5381825864197258,
+            "model_home_probability": 0.7336092873047109,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.06678271633688468,
+        "event_ticker": "KXMLBGAME-26AUG111940CINCWS",
+        "market_brier": 0.7439250000000001,
+        "model_brier": 0.6771422836631154,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-11T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.01934573664869116,
+            "market_brier": 0.3192250000000001,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.29987926335130893,
+            "model_home_probability": 0.45238767056309903,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.007050315321310063,
+            "market_brier": 0.3192250000000001,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.31217468467869003,
+            "model_home_probability": 0.4412740522593478,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.06011827361042815,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.375,
+            "model_brier": 0.33050672638957185,
+            "model_home_probability": 0.42510285581717155,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.022253599093035648,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.22277140090696435,
+            "model_home_probability": 0.5280133466855611,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.027191981168366255,
+        "event_ticker": "KXMLBGAME-26AUG111945PHISTL",
+        "market_brier": 0.31852500000000006,
+        "model_brier": 0.29133301883163376,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-11T23:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.012597230089655964,
+            "market_brier": 0.21159999999999995,
+            "market_home_mid": 0.54,
+            "model_brier": 0.22419723008965592,
+            "model_home_probability": 0.526505300885368,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.05349095984769908,
+            "market_brier": 0.43560000000000004,
+            "market_home_mid": 0.33999999999999997,
+            "model_brier": 0.38210904015230096,
+            "model_home_probability": 0.38185030926781094,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.025649981422635124,
+            "market_brier": 0.11902499999999998,
+            "market_home_mid": 0.655,
+            "model_brier": 0.1446749814226351,
+            "model_home_probability": 0.6196383544274803,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.006607328083195,
+            "market_brier": 0.004224999999999993,
+            "market_home_mid": 0.935,
+            "model_brier": 0.010832328083194993,
+            "model_home_probability": 0.8959215292041866,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0021591050630532485,
+        "event_ticker": "KXMLBGAME-26AUG121340BALMIN",
+        "market_brier": 0.1926125,
+        "model_brier": 0.19045339493694674,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.505,
+        "scheduled_start_utc": "2026-08-12T17:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -1.1447346191878482e-05,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.21623644734619185,
+            "model_home_probability": 0.5349876911885107,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03169405808556136,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2763309419144387,
+            "model_home_probability": 0.4743281043136901,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.005870902855313486,
+            "market_brier": 0.009024999999999995,
+            "market_home_mid": 0.905,
+            "model_brier": 0.01489590285531348,
+            "model_home_probability": 0.8779512275550734,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0007380724626354136,
+            "market_brier": 0.0009000000000000016,
+            "market_home_mid": 0.97,
+            "model_brier": 0.0016380724626354152,
+            "model_home_probability": 0.9595268921055546,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.006268408855355146,
+        "event_ticker": "KXMLBGAME-26AUG121415PHISTL",
+        "market_brier": 0.13354375000000002,
+        "model_brier": 0.12727534114464487,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-12T18:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.009973381293510178,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.16500000000000004,
+            "model_brier": 0.03719838129351019,
+            "model_home_probability": 0.19286881887311436,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.004877268431479235,
+            "market_brier": 0.0144,
+            "market_home_mid": 0.12,
+            "model_brier": 0.019277268431479234,
+            "model_home_probability": 0.13884260308521745,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.00010149166796084917,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.0005235083320391516,
+            "model_home_probability": 0.022880304456871888,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.00032820971611776756,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.0002967902838822332,
+            "model_home_probability": 0.01722760238344945,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.003605237085227699,
+        "event_ticker": "KXMLBGAME-26AUG121505TBATH",
+        "market_brier": 0.010718750000000004,
+        "model_brier": 0.014323987085227703,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.31499999999999995,
+        "scheduled_start_utc": "2026-08-12T19:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.004342106353096953,
+            "market_brier": 0.13322499999999998,
+            "market_home_mid": 0.365,
+            "model_brier": 0.13756710635309694,
+            "model_home_probability": 0.370900399505173,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.004405698187240209,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.135,
+            "model_brier": 0.02263069818724021,
+            "model_home_probability": 0.15043502978774662,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.001978553010968387,
+            "market_brier": 0.0324,
+            "market_home_mid": 0.18,
+            "model_brier": 0.034378553010968385,
+            "model_home_probability": 0.18541454368783583,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.01237601412194465,
+            "market_brier": 0.04202499999999999,
+            "market_home_mid": 0.205,
+            "model_brier": 0.029648985878055343,
+            "model_home_probability": 0.17218880880607584,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0004124141426597753,
+        "event_ticker": "KXMLBGAME-26AUG121540COLAZ",
+        "market_brier": 0.05646874999999999,
+        "model_brier": 0.05605633585734022,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.615,
+        "scheduled_start_utc": "2026-08-12T19:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.020038101964549915,
+            "market_brier": 0.354025,
+            "market_home_mid": 0.595,
+            "model_brier": 0.33398689803545006,
+            "model_home_probability": 0.5779159956563324,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.002505356730691799,
+            "market_brier": 0.18922499999999995,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.19173035673069175,
+            "model_home_probability": 0.43787025102271077,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.05649646236056777,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.625,
+            "model_brier": 0.33412853763943223,
+            "model_home_probability": 0.5780385260857898,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.04235165803282853,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.29737665803282853,
+            "model_home_probability": 0.5453225266141392,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.007919387390399338,
+        "event_ticker": "KXMLBGAME-26AUG121545HOUSF",
+        "market_brier": 0.29722499999999996,
+        "model_brier": 0.28930561260960064,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.42500000000000004,
+        "scheduled_start_utc": "2026-08-12T19:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.07004494844465664,
+            "market_brier": 0.42902500000000005,
+            "market_home_mid": 0.345,
+            "model_brier": 0.3589800515553434,
+            "model_home_probability": 0.40085055991401997,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.04587101134205407,
+            "market_brier": 0.570025,
+            "market_home_mid": 0.245,
+            "model_brier": 0.5241539886579459,
+            "model_home_probability": 0.2760152013626626,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.06341621251970336,
+            "market_brier": 0.45562500000000006,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.3922087874802967,
+            "model_home_probability": 0.37373425171074803,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.15478463221749272,
+            "market_brier": 0.585225,
+            "market_home_mid": 0.235,
+            "model_brier": 0.43044036778250727,
+            "model_home_probability": 0.3439204562078564,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0835292011309767,
+        "event_ticker": "KXMLBGAME-26AUG121610MILSD",
+        "market_brier": 0.5099750000000001,
+        "model_brier": 0.42644579886902334,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.475,
+        "scheduled_start_utc": "2026-08-12T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.01866190250974642,
+            "market_brier": 0.275625,
+            "market_home_mid": 0.525,
+            "model_brier": 0.29428690250974643,
+            "model_home_probability": 0.5424821679186759,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.029590542005830334,
+            "market_brier": 0.44222500000000003,
+            "market_home_mid": 0.665,
+            "model_brier": 0.4126344579941697,
+            "model_home_probability": 0.6423662958111748,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.05343170368857403,
+            "market_brier": 0.126025,
+            "market_home_mid": 0.355,
+            "model_brier": 0.17945670368857403,
+            "model_home_probability": 0.4236233039961022,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.04702744052206857,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.275,
+            "model_brier": 0.12265244052206858,
+            "model_home_probability": 0.35021770446690526,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.02238262617863967,
+        "event_ticker": "KXMLBGAME-26AUG121840CLEDET",
+        "market_brier": 0.22987500000000002,
+        "model_brier": 0.25225762617863967,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.545,
+        "scheduled_start_utc": "2026-08-12T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.011240044610291183,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.24378495538970882,
+            "model_home_probability": 0.5062541591165463,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.05849114982034316,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.725,
+            "model_brier": 0.13411614982034317,
+            "model_home_probability": 0.633781281444622,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.006863791719999154,
+            "market_brier": 0.005624999999999994,
+            "market_home_mid": 0.925,
+            "model_brier": 0.012488791719999148,
+            "model_home_probability": 0.8882467373183264,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.00011558264724254058,
+            "market_brier": 0.0002250000000000004,
+            "market_home_mid": 0.985,
+            "model_brier": 0.00010941735275745983,
+            "model_home_probability": 0.9895397250152083,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.013499828570702147,
+        "event_ticker": "KXMLBGAME-26AUG121840PITMIA",
+        "market_brier": 0.084125,
+        "model_brier": 0.09762482857070215,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.515,
+        "scheduled_start_utc": "2026-08-12T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.12960088816814108,
+            "market_brier": 0.5184,
+            "market_home_mid": 0.72,
+            "model_brier": 0.3887991118318589,
+            "model_home_probability": 0.6235375785242289,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.04639839079479213,
+            "market_brier": 0.354025,
+            "market_home_mid": 0.595,
+            "model_brier": 0.30762660920520785,
+            "model_home_probability": 0.5546409732477469,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.014104868667004007,
+            "market_brier": 0.04202499999999999,
+            "market_home_mid": 0.205,
+            "model_brier": 0.056129868667004,
+            "model_home_probability": 0.23691743006162294,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.0001442825028323963,
+            "market_brier": 0.0020250000000000025,
+            "market_home_mid": 0.045000000000000026,
+            "model_brier": 0.0018807174971676062,
+            "model_home_probability": 0.04336723990718808,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0405096731996904,
+        "event_ticker": "KXMLBGAME-26AUG121845CHCWSH",
+        "market_brier": 0.22911874999999998,
+        "model_brier": 0.18860907680030958,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-12T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.07194419142986502,
+            "market_brier": 0.525625,
+            "market_home_mid": 0.275,
+            "model_brier": 0.453680808570135,
+            "model_home_probability": 0.3264416813889572,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.11205371589383095,
+            "market_brier": 0.616225,
+            "market_home_mid": 0.21499999999999997,
+            "model_brier": 0.5041712841061691,
+            "model_home_probability": 0.2899498016997889,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.04206964929848528,
+            "market_brier": 0.366025,
+            "market_home_mid": 0.395,
+            "model_brier": 0.3239553507015147,
+            "model_home_probability": 0.43082924293186436,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.006003867790059486,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.2102211322099405,
+            "model_home_probability": 0.5415012189656984,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.058017856103060185,
+        "event_ticker": "KXMLBGAME-26AUG121905SEANYY",
+        "market_brier": 0.431025,
+        "model_brier": 0.3730071438969398,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-12T23:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.027651868126760487,
+            "market_brier": 0.140625,
+            "market_home_mid": 0.625,
+            "model_brier": 0.1682768681267605,
+            "model_home_probability": 0.5897843638685131,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.015705145088285355,
+            "market_brier": 0.148225,
+            "market_home_mid": 0.615,
+            "model_brier": 0.16393014508828535,
+            "model_home_probability": 0.5951171217644721,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.056659653566931645,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2513653464330684,
+            "model_home_probability": 0.4986365126646452,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.026981121147645226,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2810438788523548,
+            "model_home_probability": 0.4698642826102406,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.010070940374882757,
+        "event_ticker": "KXMLBGAME-26AUG121907BOSTOR",
+        "market_brier": 0.226225,
+        "model_brier": 0.21615405962511727,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.44499999999999995,
+        "scheduled_start_utc": "2026-08-12T23:07:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.0006238839633768978,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.715,
+            "model_brier": 0.08060111603662312,
+            "model_home_probability": 0.7160966431395657,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.009697807355442376,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.04032280735544239,
+            "model_home_probability": 0.7991946032711212,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.013251533654224129,
+            "market_brier": 0.015625,
+            "market_home_mid": 0.875,
+            "model_brier": 0.02887653365422413,
+            "model_home_probability": 0.8300690326802553,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -2.8901470775351956e-05,
+            "market_brier": 0.0002250000000000004,
+            "market_home_mid": 0.985,
+            "model_brier": 0.00025390147077535236,
+            "model_home_probability": 0.9840657139860189,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0055885896292662395,
+        "event_ticker": "KXMLBGAME-26AUG121915NYMATL",
+        "market_brier": 0.03192500000000001,
+        "model_brier": 0.03751358962926625,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.625,
+        "scheduled_start_utc": "2026-08-12T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.006890494223702803,
+            "market_brier": 0.18062500000000004,
+            "market_home_mid": 0.575,
+            "model_brier": 0.18751549422370284,
+            "model_home_probability": 0.5669694072889274,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.007269710065610641,
+            "market_brier": 0.07022500000000001,
+            "market_home_mid": 0.735,
+            "model_brier": 0.07749471006561065,
+            "model_home_probability": 0.7216212830232694,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.023503996997475643,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.07872899699747564,
+            "model_home_probability": 0.7194131204110291,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0017631451726172766,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.004788145172617282,
+            "model_home_probability": 0.9308035754347287,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.00985683661485159,
+        "event_ticker": "KXMLBGAME-26AUG121940CINCWS",
+        "market_brier": 0.07727500000000001,
+        "model_brier": 0.0871318366148516,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-12T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.004686510448336845,
+            "market_brier": 0.2601,
+            "market_home_mid": 0.49,
+            "model_brier": 0.26478651044833684,
+            "model_home_probability": 0.48542589411403836,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.01630060292558283,
+            "market_brier": 0.13322499999999998,
+            "market_home_mid": 0.635,
+            "model_brier": 0.1495256029255828,
+            "model_home_probability": 0.6133145943721398,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.024054523231889686,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.0546795232318897,
+            "model_home_probability": 0.766163468996203,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.013479269336227333,
+            "market_brier": 0.009024999999999995,
+            "market_home_mid": 0.905,
+            "model_brier": 0.022504269336227328,
+            "model_home_probability": 0.8499857695542609,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.014630226485509174,
+        "event_ticker": "KXMLBGAME-26AUG131310CLEDET",
+        "market_brier": 0.10824375,
+        "model_brier": 0.12287397648550917,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.485,
+        "scheduled_start_utc": "2026-08-13T17:10:00Z"
+      }
+    ],
+    "60": [
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0008619114679236928,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2558869114679237,
+            "model_home_probability": 0.5058526578638524,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.03700084525745834,
+            "market_brier": 0.16402500000000003,
+            "market_home_mid": 0.405,
+            "model_brier": 0.20102584525745837,
+            "model_home_probability": 0.44835905840905943,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.012561812970280438,
+            "market_brier": 0.009024999999999998,
+            "market_home_mid": 0.09499999999999999,
+            "model_brier": 0.021586812970280436,
+            "model_home_probability": 0.14692451453137573,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0016384095434070563,
+            "market_brier": 0.0012250000000000013,
+            "market_home_mid": 0.03500000000000002,
+            "model_brier": 0.0028634095434070576,
+            "model_home_probability": 0.053510835756947935,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.01301574480976738,
+        "event_ticker": "KXMLBGAME-26AUG071840NYMPIT",
+        "market_brier": 0.107325,
+        "model_brier": 0.12034074480976739,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.555,
+        "scheduled_start_utc": "2026-08-07T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.010901678526005723,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.06612667852600572,
+            "model_home_probability": 0.7428489188706263,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.008402041942367017,
+            "market_brier": 0.20702499999999996,
+            "market_home_mid": 0.545,
+            "model_brier": 0.19862295805763294,
+            "model_home_probability": 0.5543286434404462,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0012498182918193532,
+        "event_ticker": "KXMLBGAME-26AUG071845CINWSH",
+        "market_brier": 0.131125,
+        "model_brier": 0.13237481829181932,
+        "n_checkpoints": 2,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.535,
+        "scheduled_start_utc": "2026-08-07T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.005808977512934813,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.885,
+            "model_brier": 0.01903397751293481,
+            "model_home_probability": 0.8620363181379432,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.00047415036081838093,
+            "market_brier": 0.0006250000000000011,
+            "market_home_mid": 0.975,
+            "model_brier": 0.001099150360818382,
+            "model_home_probability": 0.9668465633633799,
+            "offset_seconds": 3600
+          }
+        ],
+        "delta": -0.0031415639368765967,
+        "event_ticker": "KXMLBGAME-26AUG071910ATHBOS",
+        "market_brier": 0.006924999999999999,
+        "model_brier": 0.010066563936876596,
+        "n_checkpoints": 2,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.715,
+        "scheduled_start_utc": "2026-08-07T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0470103984300429,
+            "market_brier": 0.20702499999999996,
+            "market_home_mid": 0.45499999999999996,
+            "model_brier": 0.25403539843004286,
+            "model_home_probability": 0.5040192441068524,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.049138208444157255,
+            "market_brier": 0.225625,
+            "market_home_mid": 0.475,
+            "model_brier": 0.27476320844415725,
+            "model_home_probability": 0.5241786035733977,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.04226602562049875,
+            "market_brier": 0.36,
+            "market_home_mid": 0.6,
+            "model_brier": 0.40226602562049874,
+            "model_home_probability": 0.6342444525736892,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.006694542930028358,
+            "market_brier": 0.49702499999999994,
+            "market_home_mid": 0.705,
+            "model_brier": 0.4903304570699716,
+            "model_home_probability": 0.7002360009810775,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.032930022391167636,
+        "event_ticker": "KXMLBGAME-26AUG071910LAAMIA",
+        "market_brier": 0.32241875,
+        "model_brier": 0.3553487723911676,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-07T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.021134248728126408,
+            "market_brier": 0.04409999999999999,
+            "market_home_mid": 0.21,
+            "model_brier": 0.0652342487281264,
+            "model_home_probability": 0.2554099620769057,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.03390454385933889,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.13952954385933886,
+            "model_home_probability": 0.3735365361773047,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.00034657434793666504,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.00027842565206333573,
+            "model_home_probability": 0.016686091575421003,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.0001972450394380624,
+            "market_brier": 0.0002250000000000003,
+            "market_home_mid": 0.01500000000000001,
+            "model_brier": 2.7754960561937874e-05,
+            "model_home_probability": 0.005268297691089397,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.013623743300022641,
+        "event_ticker": "KXMLBGAME-26AUG071940CLECWS",
+        "market_brier": 0.03764374999999999,
+        "model_brier": 0.051267493300022636,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.42500000000000004,
+        "scheduled_start_utc": "2026-08-07T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.016597473753231506,
+            "market_brier": 0.5776,
+            "market_home_mid": 0.76,
+            "model_brier": 0.5610025262467685,
+            "model_home_probability": 0.7490010188556278,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03180515822784935,
+            "market_brier": 0.525625,
+            "market_home_mid": 0.725,
+            "model_brier": 0.49381984177215066,
+            "model_home_probability": 0.7027231615452494,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.06701821930472024,
+            "market_brier": 0.275625,
+            "market_home_mid": 0.525,
+            "model_brier": 0.34264321930472025,
+            "model_home_probability": 0.5853573432568522,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.09407309240864141,
+            "market_brier": 0.06760000000000001,
+            "market_home_mid": 0.26,
+            "model_brier": 0.16167309240864142,
+            "model_home_probability": 0.40208592664832404,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.028172169933070198,
+        "event_ticker": "KXMLBGAME-26AUG071940MINMIL",
+        "market_brier": 0.3616125,
+        "model_brier": 0.3897846699330702,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.625,
+        "scheduled_start_utc": "2026-08-07T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.006053511843629289,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.2610785118436293,
+            "model_home_probability": 0.48904157522981445,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.06247506993182353,
+            "market_brier": 0.13322499999999998,
+            "market_home_mid": 0.635,
+            "model_brier": 0.1957000699318235,
+            "model_home_probability": 0.5576199937476565,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.10715754241078135,
+            "market_brier": 0.08702500000000002,
+            "market_home_mid": 0.705,
+            "model_brier": 0.19418254241078137,
+            "model_home_probability": 0.5593385172144253,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.027825305829136223,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.885,
+            "model_brier": 0.04105030582913622,
+            "model_home_probability": 0.7973912493766959,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0508778575038426,
+        "event_ticker": "KXMLBGAME-26AUG081505ATLNYY",
+        "market_brier": 0.122125,
+        "model_brier": 0.1730028575038426,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.41500000000000004,
+        "scheduled_start_utc": "2026-08-08T19:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.062885506265005,
+            "market_brier": 0.801025,
+            "market_home_mid": 0.895,
+            "model_brier": 0.738139493734995,
+            "model_home_probability": 0.8591504488359387,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.034510457422479934,
+            "market_brier": 0.697225,
+            "market_home_mid": 0.835,
+            "model_brier": 0.66271454257752,
+            "model_home_probability": 0.8140728115945896,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.019372748328615574,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2743977483286156,
+            "model_home_probability": 0.5238298849136193,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.04132906679908862,
+            "market_brier": 0.015625,
+            "market_home_mid": 0.125,
+            "model_brier": 0.05695406679908862,
+            "model_home_probability": 0.2386505118349605,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.009173537139945185,
+        "event_ticker": "KXMLBGAME-26AUG081610ATHBOS",
+        "market_brier": 0.442225,
+        "model_brier": 0.4330514628600548,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.715,
+        "scheduled_start_utc": "2026-08-08T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0032416220927042605,
+            "market_brier": 0.20249999999999996,
+            "market_home_mid": 0.55,
+            "model_brier": 0.20574162209270422,
+            "model_home_probability": 0.5464124978654017,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.0013752302785283248,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.00440023027852833,
+            "model_home_probability": 0.9336657684258849,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.00013819837635991087,
+            "market_brier": 0.0002250000000000004,
+            "market_home_mid": 0.985,
+            "model_brier": 8.680162364008952e-05,
+            "model_home_probability": 0.9906832611048667,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": -0.0014928846649575583,
+        "event_ticker": "KXMLBGAME-26AUG081610LAAMIA",
+        "market_brier": 0.06858333333333332,
+        "model_brier": 0.07007621799829088,
+        "n_checkpoints": 3,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-08T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.03805422506256423,
+            "market_brier": 0.366025,
+            "market_home_mid": 0.605,
+            "model_brier": 0.32797077493743576,
+            "model_home_probability": 0.572687327376323,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.011334986674654324,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.20935998667465427,
+            "model_home_probability": 0.45755872483721066,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.06281643618145008,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.16844143618145005,
+            "model_home_probability": 0.4104161743662767,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.1528496013523784,
+            "market_brier": 0.540225,
+            "market_home_mid": 0.735,
+            "model_brier": 0.38737539864762155,
+            "model_home_probability": 0.6223948896380991,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.029188100889709558,
+        "event_ticker": "KXMLBGAME-26AUG081805TORPHI",
+        "market_brier": 0.30247499999999994,
+        "model_brier": 0.2732868991102904,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.625,
+        "scheduled_start_utc": "2026-08-08T22:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0013220906833038594,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.031947090683303876,
+            "model_home_probability": 0.8212625090158646,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.0008594641304025194,
+            "market_brier": 0.015625,
+            "market_home_mid": 0.875,
+            "model_brier": 0.01648446413040252,
+            "model_home_probability": 0.8716081617453721,
+            "offset_seconds": 3600
+          }
+        ],
+        "delta": -0.0010907774068531894,
+        "event_ticker": "KXMLBGAME-26AUG081840NYMPIT",
+        "market_brier": 0.023125000000000007,
+        "model_brier": 0.024215777406853198,
+        "n_checkpoints": 2,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.525,
+        "scheduled_start_utc": "2026-08-08T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.018628452108439775,
+            "market_brier": 0.265225,
+            "market_home_mid": 0.485,
+            "model_brier": 0.28385345210843976,
+            "model_home_probability": 0.46722101007224415,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.04656722592271152,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.10179222592271152,
+            "model_home_probability": 0.6809510603015401,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.02096375928358482,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.21898875928358477,
+            "model_home_probability": 0.5320376518526466,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -9.64821965331172e-05,
+            "market_brier": 0.0012250000000000021,
+            "market_home_mid": 0.965,
+            "model_brier": 0.0013214821965331193,
+            "model_home_probability": 0.9636478034152939,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.02156397987781731,
+        "event_ticker": "KXMLBGAME-26AUG081845CINWSH",
+        "market_brier": 0.12992499999999998,
+        "model_brier": 0.1514889798778173,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.43499999999999994,
+        "scheduled_start_utc": "2026-08-08T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.011693741776783312,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.725,
+            "model_brier": 0.08731874177678332,
+            "model_home_probability": 0.704502551996158,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.07536458833419227,
+            "market_brier": 0.10890000000000005,
+            "market_home_mid": 0.6699999999999999,
+            "model_brier": 0.033535411665807785,
+            "model_home_probability": 0.8168732360745492,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.04756679324887263,
+            "market_brier": 0.09922499999999997,
+            "market_home_mid": 0.685,
+            "model_brier": 0.1467917932488726,
+            "model_home_probability": 0.6168658286593682,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.08889747773742984,
+            "market_brier": 0.004224999999999993,
+            "market_home_mid": 0.935,
+            "model_brier": 0.09312247773742983,
+            "model_home_probability": 0.6948402422706594,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.01819835610722338,
+        "event_ticker": "KXMLBGAME-26AUG081910CHCKC",
+        "market_brier": 0.07199375000000001,
+        "model_brier": 0.09019210610722339,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.405,
+        "scheduled_start_utc": "2026-08-08T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.028143314651286958,
+            "market_brier": 0.11222499999999998,
+            "market_home_mid": 0.665,
+            "model_brier": 0.14036831465128694,
+            "model_home_probability": 0.6253424034517825,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.07462039808890863,
+            "market_brier": 0.46922500000000006,
+            "market_home_mid": 0.31499999999999995,
+            "model_brier": 0.3946046019110914,
+            "model_home_probability": 0.3718243860900907,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.01782667258269202,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.19839832741730795,
+            "model_home_probability": 0.5545807285070526,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.009327708091344644,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.2073527080913446,
+            "model_home_probability": 0.5446400236171995,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.013744011982242264,
+        "event_ticker": "KXMLBGAME-26AUG081910MINMIL",
+        "market_brier": 0.24892499999999998,
+        "model_brier": 0.23518098801775772,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-08T23:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.04124488260580059,
+            "market_brier": 0.265225,
+            "market_home_mid": 0.485,
+            "model_brier": 0.2239801173941994,
+            "model_home_probability": 0.5267346226542666,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.024553670691029428,
+            "market_brier": 0.08702500000000002,
+            "market_home_mid": 0.705,
+            "model_brier": 0.11157867069102945,
+            "model_home_probability": 0.6659660635638507,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.02602600936370804,
+            "market_brier": 0.060024999999999995,
+            "market_home_mid": 0.755,
+            "model_brier": 0.08605100936370803,
+            "model_home_probability": 0.7066554766768126,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.035922358207290554,
+            "market_brier": 0.042024999999999986,
+            "market_home_mid": 0.795,
+            "model_brier": 0.07794735820729054,
+            "model_home_probability": 0.7208094589580611,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.011314288914056858,
+        "event_ticker": "KXMLBGAME-26AUG081915BALTEX",
+        "market_brier": 0.113575,
+        "model_brier": 0.12488928891405686,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.004010903776625441,
+            "market_brier": 0.2916,
+            "market_home_mid": 0.45999999999999996,
+            "model_brier": 0.29561090377662547,
+            "model_home_probability": 0.45629888378206773,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.006352322227456075,
+            "market_brier": 0.29702500000000004,
+            "market_home_mid": 0.45499999999999996,
+            "model_brier": 0.3033773222274561,
+            "model_home_probability": 0.44920301178432703,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.06040511720299588,
+            "market_brier": 0.235225,
+            "market_home_mid": 0.515,
+            "model_brier": 0.29563011720299587,
+            "model_home_probability": 0.4562812149621867,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.03213990111345927,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.375,
+            "model_brier": 0.35848509888654073,
+            "model_home_probability": 0.40126374847806257,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.009657110523404532,
+        "event_ticker": "KXMLBGAME-26AUG081915CLECWS",
+        "market_brier": 0.30361875,
+        "model_brier": 0.31327586052340456,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.44499999999999995,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.027818092551288254,
+            "market_brier": 0.5112249999999999,
+            "market_home_mid": 0.715,
+            "model_brier": 0.4834069074487117,
+            "model_home_probability": 0.6952746992726772,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.003809967937573183,
+            "market_brier": 0.18922499999999995,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.18541503206242677,
+            "model_home_probability": 0.4305984580353566,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.03717746370062541,
+            "market_brier": 0.09302500000000002,
+            "market_home_mid": 0.30500000000000005,
+            "model_brier": 0.13020246370062544,
+            "model_home_probability": 0.36083578495019786,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.01962422799836845,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.275,
+            "model_brier": 0.09524922799836846,
+            "model_home_probability": 0.30862473653025363,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.006293407802533107,
+        "event_ticker": "KXMLBGAME-26AUG081915COLSTL",
+        "market_brier": 0.21727499999999997,
+        "model_brier": 0.2235684078025331,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.019906588745616127,
+            "market_brier": 0.20702499999999996,
+            "market_home_mid": 0.45499999999999996,
+            "model_brier": 0.2269315887456161,
+            "model_home_probability": 0.4763733711550385,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.00781859520805872,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2628435952080587,
+            "model_home_probability": 0.5126827432321657,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.032725057766765375,
+            "market_brier": 0.07022500000000001,
+            "market_home_mid": 0.265,
+            "model_brier": 0.10295005776676538,
+            "model_home_probability": 0.3208583141618203,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.00021516063899071374,
+            "market_brier": 0.0002250000000000003,
+            "market_home_mid": 0.01500000000000001,
+            "model_brier": 9.839361009286537e-06,
+            "model_home_probability": 0.00313677557521837,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.015058770270362377,
+        "event_ticker": "KXMLBGAME-26AUG081915DETSF",
+        "market_brier": 0.133125,
+        "model_brier": 0.14818377027036236,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.475,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.027882171712957426,
+            "market_brier": 0.09302500000000002,
+            "market_home_mid": 0.695,
+            "model_brier": 0.12090717171295745,
+            "model_home_probability": 0.6522829142636827,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.11758711936594861,
+            "market_brier": 0.09922499999999997,
+            "market_home_mid": 0.685,
+            "model_brier": 0.21681211936594857,
+            "model_home_probability": 0.5343691168254101,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.022031034004589164,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.865,
+            "model_brier": 0.040256034004589165,
+            "model_home_probability": 0.7993609359955316,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.028730077835040887,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.885,
+            "model_brier": 0.041955077835040884,
+            "model_home_probability": 0.7951706128627025,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.04905760072963402,
+        "event_ticker": "KXMLBGAME-26AUG081915HOUSD",
+        "market_brier": 0.055924999999999996,
+        "model_brier": 0.10498260072963402,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.525,
+        "scheduled_start_utc": "2026-08-08T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0715599553897088,
+            "market_brier": 0.17222500000000002,
+            "market_home_mid": 0.585,
+            "model_brier": 0.24378495538970882,
+            "model_home_probability": 0.5062541591165463,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.02012118140372457,
+            "market_brier": 0.060024999999999995,
+            "market_home_mid": 0.755,
+            "model_brier": 0.08014618140372456,
+            "model_home_probability": 0.7168989908111867,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.02992108965204138,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.0605460896520414,
+            "model_home_probability": 0.7539388497709535,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.010914699300638962,
+            "market_brier": 0.009024999999999995,
+            "market_home_mid": 0.905,
+            "model_brier": 0.019939699300638956,
+            "model_home_probability": 0.858791999870266,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.03312923143652843,
+        "event_ticker": "KXMLBGAME-26AUG091215CINWSH",
+        "market_brier": 0.06797500000000001,
+        "model_brier": 0.10110423143652844,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.515,
+        "scheduled_start_utc": "2026-08-09T16:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.06810183928919,
+            "market_brier": 0.366025,
+            "market_home_mid": 0.605,
+            "model_brier": 0.43412683928919,
+            "model_home_probability": 0.658883023980122,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.020915759100895215,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.555,
+            "model_brier": 0.32894075910089526,
+            "model_home_probability": 0.5735335727757315,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.05238365324489924,
+            "market_brier": 0.6006250000000001,
+            "market_home_mid": 0.775,
+            "model_brier": 0.5482413467551008,
+            "model_home_probability": 0.7404332155941553,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.030124061161005522,
+            "market_brier": 0.6006250000000001,
+            "market_home_mid": 0.775,
+            "model_brier": 0.5705009388389946,
+            "model_home_probability": 0.7553151255198022,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0016274709960451134,
+        "event_ticker": "KXMLBGAME-26AUG091335ATHBOS",
+        "market_brier": 0.46882500000000005,
+        "model_brier": 0.47045247099604515,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.675,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.05500419715948962,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.555,
+            "model_brier": 0.36302919715948967,
+            "model_home_probability": 0.6025190429849414,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.034549937931838526,
+            "market_brier": 0.275625,
+            "market_home_mid": 0.525,
+            "model_brier": 0.31017493793183853,
+            "model_home_probability": 0.5569335130263203,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.04160775532574368,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2966327553257437,
+            "model_home_probability": 0.5446400236171995,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.10273880070582381,
+            "market_brier": 0.08702500000000002,
+            "market_home_mid": 0.29500000000000004,
+            "model_brier": 0.18976380070582383,
+            "model_home_probability": 0.43561887092483015,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.05847517278072391,
+        "event_ticker": "KXMLBGAME-26AUG091335ATLNYY",
+        "market_brier": 0.23142500000000002,
+        "model_brier": 0.28990017278072394,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.038695352070738404,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.14432035207073837,
+            "model_home_probability": 0.37989518563774716,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.005085658046201645,
+            "market_brier": 0.007224999999999999,
+            "market_home_mid": 0.08499999999999999,
+            "model_brier": 0.012310658046201644,
+            "model_home_probability": 0.1109534048427611,
+            "offset_seconds": 3600
+          }
+        ],
+        "delta": -0.021890505058470025,
+        "event_ticker": "KXMLBGAME-26AUG091335NYMPIT",
+        "market_brier": 0.05642499999999998,
+        "model_brier": 0.07831550505847001,
+        "n_checkpoints": 2,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0178985799506136,
+            "market_brier": 0.065025,
+            "market_home_mid": 0.745,
+            "model_brier": 0.0829235799506136,
+            "model_home_probability": 0.7120354536568545,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.0014858850076128471,
+            "market_brier": 0.024025000000000008,
+            "market_home_mid": 0.845,
+            "model_brier": 0.02253911499238716,
+            "model_home_probability": 0.8498696733088642,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.001698206191613063,
+            "market_brier": 0.011024999999999997,
+            "market_home_mid": 0.895,
+            "model_brier": 0.01272320619161306,
+            "model_home_probability": 0.8872028094693265,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.00016245106504787798,
+            "market_brier": 0.0012250000000000021,
+            "market_home_mid": 0.965,
+            "model_brier": 0.0013874510650478801,
+            "model_home_probability": 0.9627514958012019,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.004568338049915423,
+        "event_ticker": "KXMLBGAME-26AUG091335TORPHI",
+        "market_brier": 0.025325,
+        "model_brier": 0.029893338049915424,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.685,
+        "scheduled_start_utc": "2026-08-09T17:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.00029599569510199014,
+            "market_brier": 0.03802499999999998,
+            "market_home_mid": 0.805,
+            "model_brier": 0.03772900430489799,
+            "model_home_probability": 0.8057604460855153,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.03644415863775563,
+            "market_brier": 0.060024999999999995,
+            "market_home_mid": 0.755,
+            "model_brier": 0.09646915863775563,
+            "model_home_probability": 0.6894051535557043,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.018231837596457752,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.02125683759645776,
+            "model_home_probability": 0.8542027517527928,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": -0.018126666846370463,
+        "event_ticker": "KXMLBGAME-26AUG091340LAAMIA",
+        "market_brier": 0.03369166666666666,
+        "model_brier": 0.05181833351303713,
+        "n_checkpoints": 3,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-09T17:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.003054159033881884,
+            "market_brier": 0.09302500000000002,
+            "market_home_mid": 0.30500000000000005,
+            "model_brier": 0.09607915903388191,
+            "model_home_probability": 0.30996638371585056,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 4.044306645835036e-05,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.11499999999999999,
+            "model_brier": 0.013184556933541647,
+            "model_home_probability": 0.11482402594205468,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.003265084880937179,
+            "market_brier": 0.04202499999999999,
+            "market_home_mid": 0.205,
+            "model_brier": 0.038759915119062814,
+            "model_home_probability": 0.19687537966709504,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": 8.378963783788167e-05,
+        "event_ticker": "KXMLBGAME-26AUG091410CHCKC",
+        "market_brier": 0.049425000000000004,
+        "model_brier": 0.04934121036216212,
+        "n_checkpoints": 3,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-09T18:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.05112970662071514,
+            "market_brier": 0.45562500000000006,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03772970662071512,
+            "market_brier": 0.44222500000000003,
+            "market_home_mid": 0.33499999999999996,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.02452970662071513,
+            "market_brier": 0.42902500000000005,
+            "market_home_mid": 0.345,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.02452970662071513,
+            "market_brier": 0.42902500000000005,
+            "market_home_mid": 0.345,
+            "model_brier": 0.4044952933792849,
+            "model_home_probability": 0.3640005555196727,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.03447970662071513,
+        "event_ticker": "KXMLBGAME-26AUG091410CLECWS",
+        "market_brier": 0.43897500000000006,
+        "model_brier": 0.4044952933792849,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.45499999999999996,
+        "scheduled_start_utc": "2026-08-09T18:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.001992714152907929,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.835,
+            "model_brier": 0.025232285847092084,
+            "model_home_probability": 0.841153263026614,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.003381654557820458,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.034006654557820475,
+            "model_home_probability": 0.8155910670335613,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.002576968599777737,
+            "market_brier": 0.011024999999999997,
+            "market_home_mid": 0.895,
+            "model_brier": 0.013601968599777733,
+            "model_home_probability": 0.8833725221065905,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.0456766658584572,
+            "market_brier": 0.17222500000000002,
+            "market_home_mid": 0.585,
+            "model_brier": 0.12654833414154282,
+            "model_home_probability": 0.6442636732894111,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.010427689213441733,
+        "event_ticker": "KXMLBGAME-26AUG091410MINMIL",
+        "market_brier": 0.06027500000000001,
+        "model_brier": 0.049847310786558276,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.715,
+        "scheduled_start_utc": "2026-08-09T18:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.013275261205307698,
+            "market_brier": 0.15602500000000002,
+            "market_home_mid": 0.605,
+            "model_brier": 0.14274973879469233,
+            "model_home_probability": 0.6221776359257007,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.006821520053760091,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.715,
+            "model_brier": 0.08804652005376011,
+            "model_home_probability": 0.703273661341363,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.017858387837092114,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.835,
+            "model_brier": 0.04508338783709213,
+            "model_home_probability": 0.7876715095963518,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.015779828922133435,
+            "market_brier": 0.05062499999999999,
+            "market_home_mid": 0.775,
+            "model_brier": 0.06640482892213342,
+            "model_home_probability": 0.7423086557097165,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.006796118901919486,
+        "event_ticker": "KXMLBGAME-26AUG091415COLSTL",
+        "market_brier": 0.07877500000000001,
+        "model_brier": 0.0855711189019195,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.605,
+        "scheduled_start_utc": "2026-08-09T18:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.05566043556066816,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.135,
+            "model_brier": 0.07388543556066816,
+            "model_home_probability": 0.2718187549832943,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.008534887344148884,
+            "market_brier": 0.007224999999999999,
+            "market_home_mid": 0.08499999999999999,
+            "model_brier": 0.015759887344148883,
+            "model_home_probability": 0.1255383899217641,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.015274683218872053,
+            "market_brier": 0.009024999999999998,
+            "market_home_mid": 0.09499999999999999,
+            "model_brier": 0.02429968321887205,
+            "model_home_probability": 0.15588355660194583,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.00046843571789243377,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.0010934357178924345,
+            "model_home_probability": 0.0330671395480836,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.01998461046039538,
+        "event_ticker": "KXMLBGAME-26AUG091435BALTEX",
+        "market_brier": 0.008775,
+        "model_brier": 0.028759610460395383,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.545,
+        "scheduled_start_utc": "2026-08-09T18:35:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.01014805093016835,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2081730509301683,
+            "model_home_probability": 0.45625985022810006,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.039144484260383194,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.2841694842603832,
+            "model_home_probability": 0.5330754958356116,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.07687408656179101,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.28500000000000003,
+            "model_brier": 0.15809908656179103,
+            "model_home_probability": 0.39761675840159333,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.040798974019622236,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.555,
+            "model_brier": 0.3488239740196223,
+            "model_home_probability": 0.590613218629267,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0417413989429912,
+        "event_ticker": "KXMLBGAME-26AUG091605DETSF",
+        "market_brier": 0.208075,
+        "model_brier": 0.2498163989429912,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.45499999999999996,
+        "scheduled_start_utc": "2026-08-09T20:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.03812715663698718,
+            "market_brier": 0.065025,
+            "market_home_mid": 0.745,
+            "model_brier": 0.10315215663698718,
+            "model_home_probability": 0.6788269054902214,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.007801201353681633,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.06302620135368163,
+            "model_home_probability": 0.7489498031196119,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.00521917379150523,
+            "market_brier": 0.021025000000000005,
+            "market_home_mid": 0.855,
+            "model_brier": 0.026244173791505235,
+            "model_home_probability": 0.8379994636073533,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.01008115379850591,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.865,
+            "model_brier": 0.02830615379850591,
+            "model_home_probability": 0.8317556723140245,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.015307171395169988,
+        "event_ticker": "KXMLBGAME-26AUG091610LADAZ",
+        "market_brier": 0.039875,
+        "model_brier": 0.05518217139516999,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.43499999999999994,
+        "scheduled_start_utc": "2026-08-09T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.06153431784840119,
+            "market_brier": 0.41602500000000003,
+            "market_home_mid": 0.645,
+            "model_brier": 0.35449068215159885,
+            "model_home_probability": 0.5953912009356528,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03150079629212427,
+            "market_brier": 0.46922500000000006,
+            "market_home_mid": 0.685,
+            "model_brier": 0.4377242037078758,
+            "model_home_probability": 0.6616072881308638,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.007676760304936081,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.2527017603049361,
+            "model_home_probability": 0.5026944999748217,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.010488264067424747,
+            "market_brier": 0.005624999999999997,
+            "market_home_mid": 0.07499999999999998,
+            "model_brier": 0.016113264067424745,
+            "model_home_probability": 0.126938032391497,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.018717522442041157,
+        "event_ticker": "KXMLBGAME-26AUG091610TBSEA",
+        "market_brier": 0.28397500000000003,
+        "model_brier": 0.26525747755795887,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.505,
+        "scheduled_start_utc": "2026-08-09T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.009353872761798943,
+            "market_brier": 0.354025,
+            "market_home_mid": 0.405,
+            "model_brier": 0.34467112723820104,
+            "model_home_probability": 0.41291301561165483,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.02091137834491269,
+            "market_brier": 0.286225,
+            "market_home_mid": 0.46499999999999997,
+            "model_brier": 0.2653136216550873,
+            "model_home_probability": 0.48491396674430465,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.0071268100043773985,
+            "market_brier": 0.2304,
+            "market_home_mid": 0.52,
+            "model_brier": 0.2375268100043774,
+            "model_home_probability": 0.5126327770516595,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.10985151506655426,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.865,
+            "model_brier": 0.12807651506655426,
+            "model_home_probability": 0.6421222065193842,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.021678268491055006,
+        "event_ticker": "KXMLBGAME-26AUG101907BOSTOR",
+        "market_brier": 0.22221875,
+        "model_brier": 0.243897018491055,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.405,
+        "scheduled_start_utc": "2026-08-10T23:07:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.009634710616831396,
+            "market_brier": 0.05062499999999999,
+            "market_home_mid": 0.22499999999999998,
+            "model_brier": 0.060259710616831386,
+            "model_home_probability": 0.24547853392268618,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.009402584933357421,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.17500000000000004,
+            "model_brier": 0.04002758493335744,
+            "model_home_probability": 0.2000689504479829,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.0055517903642883885,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.17500000000000004,
+            "model_brier": 0.025073209635711628,
+            "model_home_probability": 0.15834522296460865,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.009851521311598194,
+            "market_brier": 0.09922499999999997,
+            "market_home_mid": 0.31499999999999995,
+            "model_brier": 0.10907652131159816,
+            "model_home_probability": 0.33026734823714887,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.005834256624374656,
+        "event_ticker": "KXMLBGAME-26AUG101915NYMATL",
+        "market_brier": 0.052774999999999996,
+        "model_brier": 0.058609256624374655,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-10T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.0002299624411640777,
+            "market_brier": 0.16402500000000003,
+            "market_home_mid": 0.595,
+            "model_brier": 0.16379503755883595,
+            "model_home_probability": 0.5952840038263425,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.003394164624042184,
+            "market_brier": 0.19359999999999997,
+            "market_home_mid": 0.56,
+            "model_brier": 0.19020583537595778,
+            "model_home_probability": 0.5638740601890805,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.030835517584920202,
+            "market_brier": 0.07022500000000001,
+            "market_home_mid": 0.735,
+            "model_brier": 0.10106051758492021,
+            "model_home_probability": 0.6820998307881542,
+            "offset_seconds": 5400
+          }
+        ],
+        "delta": -0.009070463506571314,
+        "event_ticker": "KXMLBGAME-26AUG101940BALMIN",
+        "market_brier": 0.14261666666666667,
+        "model_brier": 0.15168713017323798,
+        "n_checkpoints": 3,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.505,
+        "scheduled_start_utc": "2026-08-10T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.005483698792316624,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.28500000000000003,
+            "model_brier": 0.08670869879231664,
+            "model_home_probability": 0.29446340823999956,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.010159146274756309,
+            "market_brier": 0.065025,
+            "market_home_mid": 0.255,
+            "model_brier": 0.07518414627475631,
+            "model_home_probability": 0.27419727619864553,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.01955122981099738,
+            "market_brier": 0.013224999999999997,
+            "market_home_mid": 0.11499999999999999,
+            "model_brier": 0.03277622981099738,
+            "model_home_probability": 0.18104206641274667,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0612003737974421,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.275,
+            "model_brier": 0.1368253737974421,
+            "model_home_probability": 0.36989914003339086,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.024098612168878104,
+        "event_ticker": "KXMLBGAME-26AUG101945PHISTL",
+        "market_brier": 0.05877500000000001,
+        "model_brier": 0.0828736121688781,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.475,
+        "scheduled_start_utc": "2026-08-10T23:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.02485840241015433,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.675,
+            "model_brier": 0.08076659758984564,
+            "model_home_probability": 0.7158053526368844,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.04399183100437845,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.17223316899562152,
+            "model_home_probability": 0.5849901579533064,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.0019894970532500457,
+            "market_brier": 0.005624999999999994,
+            "market_home_mid": 0.925,
+            "model_brier": 0.007614497053250039,
+            "model_home_probability": 0.9127389144391955,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0031973829123517856,
+            "market_brier": 0.005624999999999994,
+            "market_home_mid": 0.925,
+            "model_brier": 0.00882238291235178,
+            "model_home_probability": 0.9060724592446295,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.01591583836223274,
+        "event_ticker": "KXMLBGAME-26AUG111840CLEDET",
+        "market_brier": 0.08327499999999999,
+        "model_brier": 0.06735916163776724,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-11T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.010527781322203889,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.2555527813222039,
+            "model_home_probability": 0.4944777143169612,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.044734374132787885,
+            "market_brier": 0.10562499999999997,
+            "market_home_mid": 0.675,
+            "model_brier": 0.15035937413278785,
+            "model_home_probability": 0.6122379929224785,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.02404959957440198,
+            "market_brier": 0.011024999999999997,
+            "market_home_mid": 0.895,
+            "model_brier": 0.035074599574401975,
+            "model_home_probability": 0.8127178610374124,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.01859209645603248,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.02161709645603249,
+            "model_home_probability": 0.8529724636129936,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.02447596287135656,
+        "event_ticker": "KXMLBGAME-26AUG111840PITMIA",
+        "market_brier": 0.09117499999999999,
+        "model_brier": 0.11565096287135655,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.495,
+        "scheduled_start_utc": "2026-08-11T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.017044834492150385,
+            "market_brier": 0.265225,
+            "market_home_mid": 0.515,
+            "model_brier": 0.2481801655078496,
+            "model_home_probability": 0.4981768416013029,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.017375155968509637,
+            "market_brier": 0.286225,
+            "market_home_mid": 0.535,
+            "model_brier": 0.26884984403149037,
+            "model_home_probability": 0.5185073230259052,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.006816575797507187,
+            "market_brier": 0.021025000000000005,
+            "market_home_mid": 0.14500000000000002,
+            "model_brier": 0.027841575797507193,
+            "model_home_probability": 0.16685795095681594,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.03991075410427401,
+            "market_brier": 0.011024999999999998,
+            "market_home_mid": 0.105,
+            "model_brier": 0.05093575410427401,
+            "model_home_probability": 0.2256895081838631,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.0030768348602802946,
+        "event_ticker": "KXMLBGAME-26AUG111845CHCWSH",
+        "market_brier": 0.145875,
+        "model_brier": 0.1489518348602803,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.375,
+        "scheduled_start_utc": "2026-08-11T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.0025587134777113885,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.20058371347771134,
+            "model_home_probability": 0.5521342684713293,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.002025121561196247,
+            "market_brier": 0.15602500000000002,
+            "market_home_mid": 0.605,
+            "model_brier": 0.15805012156119627,
+            "model_home_probability": 0.6024448194763445,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.016719240606195368,
+            "market_brier": 0.19359999999999997,
+            "market_home_mid": 0.56,
+            "model_brier": 0.21031924060619533,
+            "model_home_probability": 0.5413942427245431,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.12217411429935426,
+            "market_brier": 0.403225,
+            "market_home_mid": 0.365,
+            "model_brier": 0.28105088570064574,
+            "model_home_probability": 0.46985767410944657,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.025217759663562815,
+        "event_ticker": "KXMLBGAME-26AUG111905SEANYY",
+        "market_brier": 0.23771874999999998,
+        "model_brier": 0.21250099033643716,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.555,
+        "scheduled_start_utc": "2026-08-11T23:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.044640824836095355,
+            "market_brier": 0.24009999999999998,
+            "market_home_mid": 0.51,
+            "model_brier": 0.19545917516390462,
+            "model_home_probability": 0.5578923488968952,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.11111881991863681,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.375,
+            "model_brier": 0.2795061800813632,
+            "model_home_probability": 0.4713165596679207,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.0006070778012027822,
+            "market_brier": 0.286225,
+            "market_home_mid": 0.46499999999999997,
+            "model_brier": 0.2856179221987972,
+            "model_home_probability": 0.4655676635917348,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0016698044599568612,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.725,
+            "model_brier": 0.07729480445995687,
+            "model_home_probability": 0.7219805681971908,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.03867422952399452,
+        "event_ticker": "KXMLBGAME-26AUG111907BOSTOR",
+        "market_brier": 0.24814375,
+        "model_brier": 0.20946952047600548,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-11T23:07:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.013799522211721704,
+            "market_brier": 0.19802499999999995,
+            "market_home_mid": 0.555,
+            "model_brier": 0.21182452221172166,
+            "model_home_probability": 0.5397560188207545,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.028265755927965514,
+            "market_brier": 0.18922499999999995,
+            "market_home_mid": 0.5650000000000001,
+            "model_brier": 0.21749075592796546,
+            "model_home_probability": 0.5336409581363674,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.07297043035181346,
+            "market_brier": 0.03422499999999998,
+            "market_home_mid": 0.8150000000000001,
+            "model_brier": 0.10719543035181343,
+            "model_home_probability": 0.6725928675917193,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.009372610496343286,
+            "market_brier": 0.0012250000000000021,
+            "market_home_mid": 0.965,
+            "model_brier": 0.010597610496343288,
+            "model_home_probability": 0.897055303699786,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.03110207974696099,
+        "event_ticker": "KXMLBGAME-26AUG111915NYMATL",
+        "market_brier": 0.10567499999999996,
+        "model_brier": 0.13677707974696096,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.545,
+        "scheduled_start_utc": "2026-08-11T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.011296058251739766,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.16500000000000004,
+            "model_brier": 0.03852105825173978,
+            "model_home_probability": 0.19626782276201002,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.010433584265022475,
+            "market_brier": 0.024025000000000008,
+            "market_home_mid": 0.15500000000000003,
+            "model_brier": 0.034458584265022484,
+            "model_home_probability": 0.18563023532017214,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.01379277371206053,
+            "market_brier": 0.03802499999999999,
+            "market_home_mid": 0.19499999999999998,
+            "model_brier": 0.05181777371206052,
+            "model_home_probability": 0.22763517678966166,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.018982011113153723,
+            "market_brier": 0.005624999999999997,
+            "market_home_mid": 0.07499999999999998,
+            "model_brier": 0.02460701111315372,
+            "model_home_probability": 0.1568662204336986,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.013626106835494124,
+        "event_ticker": "KXMLBGAME-26AUG111940BALMIN",
+        "market_brier": 0.023725000000000003,
+        "model_brier": 0.03735110683549413,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.515,
+        "scheduled_start_utc": "2026-08-11T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.06394050849326383,
+            "market_brier": 0.6480250000000001,
+            "market_home_mid": 0.805,
+            "model_brier": 0.5840844915067362,
+            "model_home_probability": 0.7642542060772294,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.0699701240876881,
+            "market_brier": 0.8372250000000001,
+            "market_home_mid": 0.915,
+            "model_brier": 0.767254875912312,
+            "model_home_probability": 0.8759308625184479,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.051384783893296926,
+            "market_brier": 0.8742250000000001,
+            "market_home_mid": 0.935,
+            "model_brier": 0.8228402161067032,
+            "model_home_probability": 0.9071054051799621,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.09369644221251527,
+            "market_brier": 0.616225,
+            "market_home_mid": 0.785,
+            "model_brier": 0.5225285577874847,
+            "model_home_probability": 0.722861368304798,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.06974796467169103,
+        "event_ticker": "KXMLBGAME-26AUG111940CINCWS",
+        "market_brier": 0.7439250000000001,
+        "model_brier": 0.6741770353283091,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.595,
+        "scheduled_start_utc": "2026-08-11T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.01934573664869116,
+            "market_brier": 0.3192250000000001,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.29987926335130893,
+            "model_home_probability": 0.45238767056309903,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.021326647246643293,
+            "market_brier": 0.3192250000000001,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.2978983527533568,
+            "model_home_probability": 0.45419934705667786,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.06011827361042815,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.375,
+            "model_brier": 0.33050672638957185,
+            "model_home_probability": 0.42510285581717155,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.022253599093035648,
+            "market_brier": 0.245025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.22277140090696435,
+            "model_home_probability": 0.5280133466855611,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.030761064149699563,
+        "event_ticker": "KXMLBGAME-26AUG111945PHISTL",
+        "market_brier": 0.31852500000000006,
+        "model_brier": 0.28776393585030047,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-11T23:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.012597230089655964,
+            "market_brier": 0.21159999999999995,
+            "market_home_mid": 0.54,
+            "model_brier": 0.22419723008965592,
+            "model_home_probability": 0.526505300885368,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.05349095984769908,
+            "market_brier": 0.43560000000000004,
+            "market_home_mid": 0.33999999999999997,
+            "model_brier": 0.38210904015230096,
+            "model_home_probability": 0.38185030926781094,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.025649981422635124,
+            "market_brier": 0.11902499999999998,
+            "market_home_mid": 0.655,
+            "model_brier": 0.1446749814226351,
+            "model_home_probability": 0.6196383544274803,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.006607328083195,
+            "market_brier": 0.004224999999999993,
+            "market_home_mid": 0.935,
+            "model_brier": 0.010832328083194993,
+            "model_home_probability": 0.8959215292041866,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0021591050630532485,
+        "event_ticker": "KXMLBGAME-26AUG121340BALMIN",
+        "market_brier": 0.1926125,
+        "model_brier": 0.19045339493694674,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.505,
+        "scheduled_start_utc": "2026-08-12T17:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.028603230080446962,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.187621769919553,
+            "model_home_probability": 0.5668467131377704,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.03169405808556136,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2763309419144387,
+            "model_home_probability": 0.4743281043136901,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.005870902855313486,
+            "market_brier": 0.009024999999999995,
+            "market_home_mid": 0.905,
+            "model_brier": 0.01489590285531348,
+            "model_home_probability": 0.8779512275550734,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0016844717229501111,
+            "market_brier": 0.0009000000000000016,
+            "market_home_mid": 0.97,
+            "model_brier": 0.0025844717229501126,
+            "model_home_probability": 0.9491623001803768,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.013185478396936182,
+        "event_ticker": "KXMLBGAME-26AUG121415PHISTL",
+        "market_brier": 0.13354375000000002,
+        "model_brier": 0.12035827160306382,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-12T18:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.009973381293510178,
+            "market_brier": 0.027225000000000013,
+            "market_home_mid": 0.16500000000000004,
+            "model_brier": 0.03719838129351019,
+            "model_home_probability": 0.19286881887311436,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.004877268431479235,
+            "market_brier": 0.0144,
+            "market_home_mid": 0.12,
+            "model_brier": 0.019277268431479234,
+            "model_home_probability": 0.13884260308521745,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.00010149166796084917,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.0005235083320391516,
+            "model_home_probability": 0.022880304456871888,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.00032820971611776756,
+            "market_brier": 0.0006250000000000008,
+            "market_home_mid": 0.025000000000000015,
+            "model_brier": 0.0002967902838822332,
+            "model_home_probability": 0.01722760238344945,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.003605237085227699,
+        "event_ticker": "KXMLBGAME-26AUG121505TBATH",
+        "market_brier": 0.010718750000000004,
+        "model_brier": 0.014323987085227703,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.31499999999999995,
+        "scheduled_start_utc": "2026-08-12T19:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.004342106353096953,
+            "market_brier": 0.13322499999999998,
+            "market_home_mid": 0.365,
+            "model_brier": 0.13756710635309694,
+            "model_home_probability": 0.370900399505173,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.004405698187240209,
+            "market_brier": 0.018225,
+            "market_home_mid": 0.135,
+            "model_brier": 0.02263069818724021,
+            "model_home_probability": 0.15043502978774662,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.001978553010968387,
+            "market_brier": 0.0324,
+            "market_home_mid": 0.18,
+            "model_brier": 0.034378553010968385,
+            "model_home_probability": 0.18541454368783583,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.01237601412194465,
+            "market_brier": 0.04202499999999999,
+            "market_home_mid": 0.205,
+            "model_brier": 0.029648985878055343,
+            "model_home_probability": 0.17218880880607584,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0004124141426597753,
+        "event_ticker": "KXMLBGAME-26AUG121540COLAZ",
+        "market_brier": 0.05646874999999999,
+        "model_brier": 0.05605633585734022,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.615,
+        "scheduled_start_utc": "2026-08-12T19:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.020038101964549915,
+            "market_brier": 0.354025,
+            "market_home_mid": 0.595,
+            "model_brier": 0.33398689803545006,
+            "model_home_probability": 0.5779159956563324,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.002505356730691799,
+            "market_brier": 0.18922499999999995,
+            "market_home_mid": 0.43499999999999994,
+            "model_brier": 0.19173035673069175,
+            "model_home_probability": 0.43787025102271077,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.04963493082062015,
+            "market_brier": 0.390625,
+            "market_home_mid": 0.625,
+            "model_brier": 0.34099006917937985,
+            "model_home_probability": 0.5839435496513168,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.04235165803282853,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.505,
+            "model_brier": 0.29737665803282853,
+            "model_home_probability": 0.5453225266141392,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.006204004505412433,
+        "event_ticker": "KXMLBGAME-26AUG121545HOUSF",
+        "market_brier": 0.29722499999999996,
+        "model_brier": 0.29102099549458754,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.42500000000000004,
+        "scheduled_start_utc": "2026-08-12T19:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.07004494844465664,
+            "market_brier": 0.42902500000000005,
+            "market_home_mid": 0.345,
+            "model_brier": 0.3589800515553434,
+            "model_home_probability": 0.40085055991401997,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.04587101134205407,
+            "market_brier": 0.570025,
+            "market_home_mid": 0.245,
+            "model_brier": 0.5241539886579459,
+            "model_home_probability": 0.2760152013626626,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.06341621251970336,
+            "market_brier": 0.45562500000000006,
+            "market_home_mid": 0.32499999999999996,
+            "model_brier": 0.3922087874802967,
+            "model_home_probability": 0.37373425171074803,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.18873386605064474,
+            "market_brier": 0.585225,
+            "market_home_mid": 0.235,
+            "model_brier": 0.39649113394935526,
+            "model_home_probability": 0.37032458047867606,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0920165095892647,
+        "event_ticker": "KXMLBGAME-26AUG121610MILSD",
+        "market_brier": 0.5099750000000001,
+        "model_brier": 0.4179584904107353,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.475,
+        "scheduled_start_utc": "2026-08-12T20:10:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.01866190250974642,
+            "market_brier": 0.275625,
+            "market_home_mid": 0.525,
+            "model_brier": 0.29428690250974643,
+            "model_home_probability": 0.5424821679186759,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.029590542005830334,
+            "market_brier": 0.44222500000000003,
+            "market_home_mid": 0.665,
+            "model_brier": 0.4126344579941697,
+            "model_home_probability": 0.6423662958111748,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.05343170368857403,
+            "market_brier": 0.126025,
+            "market_home_mid": 0.355,
+            "model_brier": 0.17945670368857403,
+            "model_home_probability": 0.4236233039961022,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.04702744052206857,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.275,
+            "model_brier": 0.12265244052206858,
+            "model_home_probability": 0.35021770446690526,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.02238262617863967,
+        "event_ticker": "KXMLBGAME-26AUG121840CLEDET",
+        "market_brier": 0.22987500000000002,
+        "model_brier": 0.25225762617863967,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.545,
+        "scheduled_start_utc": "2026-08-12T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.011240044610291183,
+            "market_brier": 0.255025,
+            "market_home_mid": 0.495,
+            "model_brier": 0.24378495538970882,
+            "model_home_probability": 0.5062541591165463,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.05849114982034316,
+            "market_brier": 0.07562500000000001,
+            "market_home_mid": 0.725,
+            "model_brier": 0.13411614982034317,
+            "model_home_probability": 0.633781281444622,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.006863791719999154,
+            "market_brier": 0.005624999999999994,
+            "market_home_mid": 0.925,
+            "model_brier": 0.012488791719999148,
+            "model_home_probability": 0.8882467373183264,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 2.457479912311097e-05,
+            "market_brier": 0.0002250000000000004,
+            "market_home_mid": 0.985,
+            "model_brier": 0.00020042520087688943,
+            "model_home_probability": 0.9858428392367364,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.013522580532732005,
+        "event_ticker": "KXMLBGAME-26AUG121840PITMIA",
+        "market_brier": 0.084125,
+        "model_brier": 0.09764758053273201,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.515,
+        "scheduled_start_utc": "2026-08-12T22:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": 0.12960088816814108,
+            "market_brier": 0.5184,
+            "market_home_mid": 0.72,
+            "model_brier": 0.3887991118318589,
+            "model_home_probability": 0.6235375785242289,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.006861722286069738,
+            "market_brier": 0.354025,
+            "market_home_mid": 0.595,
+            "model_brier": 0.34716327771393024,
+            "model_home_probability": 0.5892056327920926,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.014104868667004007,
+            "market_brier": 0.04202499999999999,
+            "market_home_mid": 0.205,
+            "model_brier": 0.056129868667004,
+            "model_home_probability": 0.23691743006162294,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.0001442825028323963,
+            "market_brier": 0.0020250000000000025,
+            "market_home_mid": 0.045000000000000026,
+            "model_brier": 0.0018807174971676062,
+            "model_home_probability": 0.04336723990718808,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.0306255060725098,
+        "event_ticker": "KXMLBGAME-26AUG121845CHCWSH",
+        "market_brier": 0.22911874999999998,
+        "model_brier": 0.19849324392749018,
+        "n_checkpoints": 4,
+        "outcome_home_win": false,
+        "pregame_home_mid": 0.395,
+        "scheduled_start_utc": "2026-08-12T22:45:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.02551508567573102,
+            "market_brier": 0.525625,
+            "market_home_mid": 0.275,
+            "model_brier": 0.551140085675731,
+            "model_home_probability": 0.2576119036004612,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": 0.11205371589383095,
+            "market_brier": 0.616225,
+            "market_home_mid": 0.21499999999999997,
+            "model_brier": 0.5041712841061691,
+            "model_home_probability": 0.2899498016997889,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.04206964929848528,
+            "market_brier": 0.366025,
+            "market_home_mid": 0.395,
+            "model_brier": 0.3239553507015147,
+            "model_home_probability": 0.43082924293186436,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.041260356317168706,
+            "market_brier": 0.21622499999999997,
+            "market_home_mid": 0.535,
+            "model_brier": 0.2574853563171687,
+            "model_home_probability": 0.49256985079996607,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.021836980799854126,
+        "event_ticker": "KXMLBGAME-26AUG121905SEANYY",
+        "market_brier": 0.431025,
+        "model_brier": 0.40918801920014586,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.5650000000000001,
+        "scheduled_start_utc": "2026-08-12T23:05:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.027651868126760487,
+            "market_brier": 0.140625,
+            "market_home_mid": 0.625,
+            "model_brier": 0.1682768681267605,
+            "model_home_probability": 0.5897843638685131,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.015705145088285355,
+            "market_brier": 0.148225,
+            "market_home_mid": 0.615,
+            "model_brier": 0.16393014508828535,
+            "model_home_probability": 0.5951171217644721,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": 0.056659653566931645,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2513653464330684,
+            "model_home_probability": 0.4986365126646452,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 0.026981121147645226,
+            "market_brier": 0.30802500000000005,
+            "market_home_mid": 0.44499999999999995,
+            "model_brier": 0.2810438788523548,
+            "model_home_probability": 0.4698642826102406,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": 0.010070940374882757,
+        "event_ticker": "KXMLBGAME-26AUG121907BOSTOR",
+        "market_brier": 0.226225,
+        "model_brier": 0.21615405962511727,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.44499999999999995,
+        "scheduled_start_utc": "2026-08-12T23:07:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.05697342875645783,
+            "market_brier": 0.08122500000000002,
+            "market_home_mid": 0.715,
+            "model_brier": 0.13819842875645785,
+            "model_home_probability": 0.6282495073890851,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.009697807355442376,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.04032280735544239,
+            "model_home_probability": 0.7991946032711212,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.013251533654224129,
+            "market_brier": 0.015625,
+            "market_home_mid": 0.875,
+            "model_brier": 0.02887653365422413,
+            "model_home_probability": 0.8300690326802553,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": 3.3367289703506756e-05,
+            "market_brier": 0.0002250000000000004,
+            "market_home_mid": 0.985,
+            "model_brier": 0.00019163271029649364,
+            "model_home_probability": 0.9861568533094353,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.019972350619105208,
+        "event_ticker": "KXMLBGAME-26AUG121915NYMATL",
+        "market_brier": 0.03192500000000001,
+        "model_brier": 0.05189735061910522,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.625,
+        "scheduled_start_utc": "2026-08-12T23:15:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.006890494223702803,
+            "market_brier": 0.18062500000000004,
+            "market_home_mid": 0.575,
+            "model_brier": 0.18751549422370284,
+            "model_home_probability": 0.5669694072889274,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.007269710065610641,
+            "market_brier": 0.07022500000000001,
+            "market_home_mid": 0.735,
+            "model_brier": 0.07749471006561065,
+            "model_home_probability": 0.7216212830232694,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.023503996997475643,
+            "market_brier": 0.055224999999999996,
+            "market_home_mid": 0.765,
+            "model_brier": 0.07872899699747564,
+            "model_home_probability": 0.7194131204110291,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.0017631451726172766,
+            "market_brier": 0.0030250000000000055,
+            "market_home_mid": 0.945,
+            "model_brier": 0.004788145172617282,
+            "model_home_probability": 0.9308035754347287,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.00985683661485159,
+        "event_ticker": "KXMLBGAME-26AUG121940CINCWS",
+        "market_brier": 0.07727500000000001,
+        "model_brier": 0.0871318366148516,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.575,
+        "scheduled_start_utc": "2026-08-12T23:40:00Z"
+      },
+      {
+        "checkpoints": [
+          {
+            "delta": -0.004686510448336845,
+            "market_brier": 0.2601,
+            "market_home_mid": 0.49,
+            "model_brier": 0.26478651044833684,
+            "model_home_probability": 0.48542589411403836,
+            "offset_seconds": 1800
+          },
+          {
+            "delta": -0.01630060292558283,
+            "market_brier": 0.13322499999999998,
+            "market_home_mid": 0.635,
+            "model_brier": 0.1495256029255828,
+            "model_home_probability": 0.6133145943721398,
+            "offset_seconds": 3600
+          },
+          {
+            "delta": -0.024054523231889686,
+            "market_brier": 0.030625000000000017,
+            "market_home_mid": 0.825,
+            "model_brier": 0.0546795232318897,
+            "model_home_probability": 0.766163468996203,
+            "offset_seconds": 5400
+          },
+          {
+            "delta": -0.013479269336227333,
+            "market_brier": 0.009024999999999995,
+            "market_home_mid": 0.905,
+            "model_brier": 0.022504269336227328,
+            "model_home_probability": 0.8499857695542609,
+            "offset_seconds": 7200
+          }
+        ],
+        "delta": -0.014630226485509174,
+        "event_ticker": "KXMLBGAME-26AUG131310CLEDET",
+        "market_brier": 0.10824375,
+        "model_brier": 0.12287397648550917,
+        "n_checkpoints": 4,
+        "outcome_home_win": true,
+        "pregame_home_mid": 0.485,
+        "scheduled_start_utc": "2026-08-13T17:10:00Z"
+      }
+    ]
+  },
+  "interpretation": "Model calibration only; no execution edge and no authority to revive P-016 or P-018.",
+  "look_size": 60,
+  "manifest_model_sha256": "93f50dbc7fe4a1b80d1bc98df840f5f621a0390e7b656494a83a809e9b38887d",
+  "manifest_rule_sha256": "e07513ed29ea610d2643a2c075ee340d33fb10693c5020618367fd211262b9dd",
+  "schema_version": 1,
+  "summaries_by_state_lag_seconds": {
+    "30": {
+      "hi": 0.0048716044050362865,
+      "lo": -0.008427567588835736,
+      "market_brier": 0.17240902777777778,
+      "mean": -0.002023884071786817,
+      "model_brier": 0.1744329118495646,
+      "n_checkpoints": 228,
+      "n_games": 60,
+      "se": 0.003412091542007564
+    },
+    "60": {
+      "hi": 0.002808250132012025,
+      "lo": -0.010309528605085038,
+      "market_brier": 0.17240902777777778,
+      "mean": -0.004044584511854799,
+      "model_brier": 0.17645361228963258,
+      "n_checkpoints": 228,
+      "n_games": 60,
+      "se": 0.003383042783415802
+    }
+  },
+  "verdict": "KILL"
+}

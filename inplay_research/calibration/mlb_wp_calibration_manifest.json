@@ -1,0 +1,23 @@
+{
+  "armed_at_utc": "2026-08-07T20:10:26.969878Z",
+  "checkpoints_seconds": [
+    1800,
+    3600,
+    5400,
+    7200
+  ],
+  "final_look_games": 120,
+  "first_look_games": 60,
+  "model_path": "src/mlb_win_prob.py",
+  "model_sha256": "93f50dbc7fe4a1b80d1bc98df840f5f621a0390e7b656494a83a809e9b38887d",
+  "read_not_before_utc": "2026-08-14T20:10:26.969878Z",
+  "rule_path": "research/MLB_WIN_PROB_CALIBRATION_RULE.md",
+  "rule_sha256": "e07513ed29ea610d2643a2c075ee340d33fb10693c5020618367fd211262b9dd",
+  "sample_start_utc": "2026-08-07T20:10:26.969878Z",
+  "schema_version": 1,
+  "state_lags_seconds": [
+    30,
+    60
+  ],
+  "status": "ARMED"
+}

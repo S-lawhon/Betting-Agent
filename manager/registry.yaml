@@ -1342,9 +1342,21 @@ workstreams:
         residual -3.25c. The locked rule says a Gate #1 KILL is final at any T
         and z cannot rescue it. Do not re-parameterise or rerun this mechanism.
       surviving_question: >
-        Whether src/mlb_win_prob beats the contemporaneous Kalshi mid out of
-        sample is a separate calibration hypothesis, not a P-018 revival. It
-        needs a new opportunity/spec if pursued.
+        ANSWERED 2026-08-16, and the answer is NO. The separate calibration
+        hypothesis — whether src/mlb_win_prob beats the contemporaneous Kalshi
+        mid out of sample — was armed blind on 2026-08-07 under
+        research/MLB_WIN_PROB_CALIBRATION_RULE.md and read at its first look of
+        60 games. Terminal KILL: mean paired Brier delta -0.00202 at the
+        30s primary state lag and -0.00404 at 60s, model Brier 0.17443 vs
+        market 0.17241, model better in only 22 of 60 games. The model is
+        slightly WORSE than the price it would have traded against, so it
+        cannot be the source of the +30c/ct top-tercile figure in the P-018
+        replay; the stale-mid and pregame-anchor artifacts named in
+        REPORT_P018_Gate1_2026-07-28.md section 5 are what remain.
+        In-play MLB is closed on both counts: mechanism refuted 2026-07-28,
+        model refuted 2026-08-16. Terminal for this frozen model version only —
+        a different baseball model is a new manifest and a sample from zero.
+        See inplay_research/REPORT_MLB_WP_Calibration_2026-08-16.md.
     gate:
       status: CLOSED
       resolved_on: 2026-07-28

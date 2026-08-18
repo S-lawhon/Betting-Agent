@@ -154,7 +154,7 @@ aggregate_risk:
   exempt_pods:                   # Pods that bypass aggregate exposure cap
     # NOTE: exempt_pods bypasses ONLY the total-exposure check. Venue,
     # per-pod, position-count and halt checks still apply to these pods.
-    - P-014                      # Live Game Agent — trades even when portfolio is over 50%
+    # P-014 removed 2026-08-18 after its locked n=500 gate returned KILL.
 
 # ── Settlement ──────────────────────────────────────────────────────
 settlement:
@@ -222,7 +222,7 @@ pods:
 #    - P-009                   # Sign-Up Bonus Blitz (promo hedging)   # disabled 2026-07-18 pivot
 #    - P-010                   # Daily Odds Boost Grind (boost EV)   # disabled 2026-07-18 pivot
 #    - P-013                   # Kalshi-Deribit Crypto Options Arb   # disabled 2026-07-18 pivot
-    - P-014                   # Live Game Agent (in-play consensus edge)
+    # P-014 retired 2026-08-18: n=503, edge -2.75c/ct => locked KILL.
     - P-015                   # Tennis Qualifier Favorite (paper validation, added 2026-07-20)
     - P-017                   # Golf Top-N pre-tournament value (paper, restored 2026-07-21)
 #   - P-016 / P-017M are STANDALONE maker engines with their own fast loops
@@ -439,7 +439,7 @@ pods:
   P-014:
     # Live Game Agent — in-play consensus edge on Kalshi
     # Scans live NBA/MLB markets for mispricings vs sharp sportsbook consensus
-    enabled: true
+    enabled: false            # retired 2026-08-18 by locked n=500 gate
     environment: demo          # paper mode
     sports:
       - basketball_nba

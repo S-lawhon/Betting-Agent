@@ -116,14 +116,33 @@ def audit_pilot(
     check("no_active_target_claim", not active_claims,
           f"active_claims={len(active_claims)}")
 
+    # A recurring, unpinned worker can legitimately revisit an assignment that
+    # has old failed-run history after all of today's model slots are spent.
+    # The current pass made no claim and invoked no model, so audit the current
+    # safe no-op rather than falling through to the old failed run.  The latter
+    # latched systemd failed every four hours after a healthy six-run day on
+    # 2026-08-18.
+    target_worker = worker.get("worker_id") == config.get("worker_id")
+    blocked_error = str(worker.get("error") or "")
+    safe_block = any(fragment in blocked_error for fragment in (
+        "target assignment is not available",
+        "daily model-attempt limit",
+        "daily cost reservation would exceed the hard limit",
+    ))
+    current_safe_noop = (
+        not pinned and target_worker and worker.get("status") == "blocked"
+        and not bool((worker.get("safety") or {}).get("model_invoked"))
+        and safe_block
+    )
+    if current_safe_noop:
+        return {
+            "schema_version": 1, "status": "safe_noop",
+            "assignment_id": assignment_id, "decision": None,
+            "invocation_phases": [], "usage": {},
+            "checks": checks, "failures": failures, "warnings": warnings,
+        }
+
     if not runs and not disposition_path.exists():
-        target_worker = worker.get("worker_id") == config.get("worker_id")
-        blocked_error = str(worker.get("error") or "")
-        safe_block = any(fragment in blocked_error for fragment in (
-            "target assignment is not available",
-            "daily model-attempt limit",
-            "daily cost reservation would exceed the hard limit",
-        ))
         safe_noop = (
             target_worker and worker.get("status") == "blocked"
             and not bool((worker.get("safety") or {}).get("model_invoked"))

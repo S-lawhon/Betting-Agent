@@ -92,13 +92,13 @@ P-012, P-013, P-016 (retired). P-017M golf fade maker shelved.
 
 ## Active Pods
 
-Roster as of 2026-07-22. Full per-workstream state, gates, and history live in
+Roster as of 2026-08-18. Full per-workstream state, gates, and history live in
 `manager/registry.yaml` (authoritative) — this is the orientation summary.
 
 | Pod | Status | Tier | Gate |
 |---|---|---|---|
 | **P-001** Kalshi Moneyline Value | active | validating | 200 CLV rows (~81) |
-| **P-014** Live Game Agent | active | validating | 500 settled trades |
+| P-014 Live Game Agent | ☠ retired | none | failed locked gate at 503 trades |
 | **P-015** Tennis Qualifier Favorite | active | validating | 120 trades (0; US Open quals Aug) |
 | **P-017** Golf Top-N (taker) | active | validating | 8 tournaments (1) |
 | P-002 Cross-Venue Arb | ⛔ shelved | none | no Poly execution access |
@@ -126,8 +126,10 @@ paper. Kill switch for the maker unit: `touch data/KILL_MAKER`.
 
 ### P-014 — Live Game Agent
 
-- In-play consensus-edge agent. Verdict was INCONCLUSIVE-but-well-calibrated;
-  gate is 500 settled trades to resolve significance. Hold, do not scale.
+- **RETIRED 2026-08-18.** The locked reader reached 503 admissible settlements
+  and returned KILL: fee-net game-clustered edge −2.75¢/contract, z=−1.00.
+  The rule requires KILL when `n >= 500` and `edge <= 0`; P-014 was removed
+  from `pods.active` and disabled. Existing positions remain settlement-eligible.
 
 ### P-015 — Tennis Qualifier Favorite (paper validation)
 
@@ -250,8 +252,9 @@ the unit at ~06:05 UTC after the last games settle.
 | P-006 Poly Consensus | paper | **SHELVED** | No Polymarket execution access (executes on Polymarket only) |
 | P-015b lower-tour tennis | proposed | **DROPPED** | Edge did not replicate on Challenger/ITF |
 | P-017M golf fade maker | promising | **SHELVED** | +9.1¢ was a weighting-bug artifact; true ~+3.3¢, below baseline |
+| P-014 Live Game Agent | validating | **RETIRED** | Locked n=500 gate returned −2.75¢/ct at n=503 |
 
-Engine now runs **4 active pods**: P-001, P-014, P-015, P-017 (down from 6).
+Engine now runs **3 active pods**: P-001, P-015, P-017.
 
 ### P-016 Live Maker — RETIRED (failed gate), and its successor rejected too
 
@@ -468,7 +471,7 @@ reset) are covered in System Overview and the July 21–22 entry.
 | File | Pod | Strategy |
 |------|-----|----------|
 | `kalshi_moneyline.py` | P-001 | Kalshi Moneyline Value (delegates to legacy Scanner) — **active** |
-| `live_game_pod.py` | P-014 | Live Game Agent (in-play consensus) — **active** |
+| `live_game_pod.py` | P-014 | Live Game Agent (in-play consensus) — **retired** |
 | `qualifier_favorite_pod.py` | P-015 | Tennis Qualifier Favorite — **active** |
 | `golf_topn_pod.py` | P-017 | Golf Top-N pre-tournament value — **active** |
 | `live_maker_pod.py` | P-016 | Live In-Play Maker — **retired** (own unit, idle) |
@@ -878,7 +881,7 @@ During deployment, `rsync -av /root/Betting-Fund-Project/ /opt/betting-pod-shop/
 
 **Trade Log Schema** — Created `src/trade_log_schema.py` with `TradeLogSchema.normalize()`, `validate()`, and `migrate_file()`. Handles field aliasing (market_ticker→market_id, kalshi_prob→venue_prob), defaults, numeric coercion, and atomic file rewrite.
 
-**BasePod Helpers** — Added `get_bankroll()` and `compute_position_size()` to `BasePod`, simplifying all 4 active pods from ~12 lines of duplicated position-sizing logic to a single method call.
+**BasePod Helpers** — Added `get_bankroll()` and `compute_position_size()` to `BasePod`, simplifying the active pods from ~12 lines of duplicated position-sizing logic to a single method call.
 
 **Deploy Script Hardening** — Rewrote `scripts/deploy.sh` with pre-deploy `pytest` gate, post-deploy health check (60s timeout), and automatic rollback on failure. Added rsync excludes for `*.log`, `.mypy_cache`, `.pytest_cache`, `venv/`.
 

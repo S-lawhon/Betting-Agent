@@ -925,6 +925,14 @@ def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]
             title="MLB props gate sample is frozen but settlements are incomplete",
             detail=mlb_cp.get("reason") or "Selected markets have missing results.",
             workstream="R-MLB-PROPS", value=mlb_cp.get("settlements_missing")))
+    elif mlb_verdict == "UNSCORABLE":
+        out.append(Finding(
+            key="gate.R-MLB-PROPS.unscorable", severity="info",
+            title="MLB props locked execution sample is unscorable",
+            detail=(mlb_cp.get("reason") or
+                    "The frozen sample cannot produce the locked statistic."),
+            workstream="R-MLB-PROPS",
+            value=len(mlb_cp.get("scalar_settlements") or [])))
     return out
 
 

@@ -123,6 +123,26 @@ def test_unpinned_audit_accepts_daily_attempt_cap_as_safe_noop(tmp_path):
     assert not report["failures"]
 
 
+def test_unpinned_attempt_cap_does_not_reaudit_old_failed_run(tmp_path):
+    path = config(tmp_path)
+    path.write_text(path.read_text().replace(
+        f"target_assignment_id: {TARGET}\n", "status_filename: screening_status.json\n"))
+    failed_attempt_fixture(tmp_path)
+    write(tmp_path / "data/research_execution/screening_status.json", {
+        "worker_id": "pilot-worker", "status": "blocked",
+        "assignment_id": TARGET,
+        "error": "daily model-attempt limit: reservation would exceed it",
+        "safety": {"model_invoked": False},
+    })
+
+    report = audit_pilot(
+        root=tmp_path, config_path=path, marker_path=tmp_path / "marker")
+
+    assert report["status"] == "safe_noop"
+    assert report["assignment_id"] == TARGET
+    assert not report["failures"]
+
+
 def test_cli_failure_uses_exit_two_so_systemd_cannot_accept_it(
         monkeypatch, tmp_path):
     monkeypatch.setattr(

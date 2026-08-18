@@ -124,6 +124,27 @@ def test_first_27_days_freeze_and_pass_only_after_settlements(tmp_path):
     assert result["mean_daily_displayed_pnl_usd"] > 10
 
 
+def test_finalized_scalar_makes_locked_sample_unscorable(tmp_path):
+    rows = []
+    start = date(2026, 7, 22)
+    for offset in range(27):
+        rows.append(market_row(start + timedelta(days=offset), size=100))
+    write_rows(tmp_path / "snapshots_all.jsonl", rows)
+    settlements = {row["tk"]: "yes" for row in rows}
+    settlements[rows[0]["tk"]] = "scalar"
+    cache = tmp_path / "settlements.json"
+    cache.write_text(json.dumps(settlements), encoding="utf-8")
+
+    result = gate.run(
+        tmp_path, datetime(2026, 8, 21, 12, tzinfo=timezone.utc), cache)
+
+    assert result["verdict"] == "UNSCORABLE"
+    assert result["scalar_settlements"] == [rows[0]["tk"]]
+    assert "no substitution or sample extension" in result["reason"]
+    assert result["authorization"] == (
+        "none; successor study requires a new locked rule")
+
+
 def test_gate_estimator_equal_weights_days_not_markets():
     days = [(date(2026, 7, 22) + timedelta(days=i)).isoformat()
             for i in range(27)]

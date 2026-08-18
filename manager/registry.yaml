@@ -444,8 +444,10 @@ jobs:
     schedule: "0 6 * * *"
     description: Size-rotates trade_log.jsonl into gzipped archives; prune consolidates into monthly files
     output:
-      glob: data/trade_logs/trade_log.archive_*.jsonl.gz
-      max_stale_hours: 48
+      # The archive is deliberately NOT the heartbeat: this job runs daily but
+      # creates an archive only above 50 MiB, normally every 3-4 days.
+      file: /var/log/trade_log_rotate.log
+      max_stale_hours: 30
     severity: info
     note: >
       Since 2026-08-05 the prune step no longer deletes history: an archive
@@ -638,19 +640,6 @@ jobs:
       latest.json atomically. The August 30 timer refuses to run when August 23
       already produced CONTINUE or STOP. Every artifact carries the known
       six-minute non-backfillable tape gap.
-
-  - id: mlb_props_execution_checkpoint
-    host: droplet
-    schedule: "*-*-* 00:30 America/New_York"
-    description: Outcome-blind MLB props 27-day execution checkpoint
-    output:
-      file: /opt/mlb-props/mlb_props_research/data/execution_gate/latest.json
-      max_stale_hours: 30
-    severity: warn
-    note: >
-      Scans the separate /opt/mlb-props snapshot tape once daily after the
-      collector closes. Before both the read time and 27 clean completed ET
-      game-days it emits coverage only and does not load or fetch outcomes.
 
   - id: evmap_weather_sheet
     host: droplet
@@ -925,10 +914,15 @@ workstreams:
 
   - id: P-014
     name: Live Game Agent
-    stage: paper
-    tier: validating
-    blocked_on: time
-    summary: INCONCLUSIVE — not significant but excellently calibrated. Hold, do not scale.
+    stage: killed
+    tier: none
+    blocked_on: retired
+    summary: >
+      RETIRED 2026-08-18. The locked n=500 rule returned KILL at n=503:
+      fee-net game-clustered edge -2.75c/contract, z=-1.00. The rule is
+      explicit that edge <= 0 at n >= 500 is final; no extension or parameter
+      change is authorized under P-014. Existing positions may settle, but no
+      new P-014 entries are permitted.
     # ---- PRE-REGISTERED AND LOCKED 2026-07-31. DO NOT RENEGOTIATE. ----
     # Written blind at n=331 (2026-07-29); locked by Sam, option (a), with the
     # §0 contamination (a raw 96W/99L count seen once) recorded rather than
@@ -936,6 +930,14 @@ workstreams:
     # contract-weighted within a game, EQUAL weight per game across games.
     # n counts admissible settled rows; the statistic is computed on games.
     gate:
+      status: CLOSED
+      resolved_on: 2026-08-18
+      verdict: KILL
+      final_progress: 503
+      resolved_by: >
+        scripts/p014_checkpoint.py returned edge=-2.7539c/contract at n=503,
+        z=-0.9964. The locked rule says n>=500 and edge<=0 => KILL.
+        See research/REPORT_P014_GATE_2026-08-18.md.
       locked: true
       locked_date: 2026-07-31
       doc: research/P014_DECISION_RULE.md
@@ -1638,25 +1640,29 @@ workstreams:
   # ---------------------------------------------------------------------------
   - id: R-MLB-PROPS
     name: MLB Props Research (Phase 3)
-    stage: build
+    stage: shelved
+    tier: none
     owner_dir: mlb_props_research
-    blocked_on: time
-    recheck_after: 2026-08-18
-    action_required: >
-      PHASE 3 COMPLETE 2026-07-20 with two NEGATIVE results (PHASE3_REPORT.md).
-      Next step is a live paper EXECUTION test, NOT more modelling: every edge so
-      far was measured against trade prints, never against a live book. Must
-      measure whether fills are actually available at the ask near first pitch,
-      using the collector orderbook snapshots in mlb_props_research/data/live/.
-
-      BLOCKED ON DATA UNTIL AT LEAST 2026-08-18 00:30 ET — do not read outcomes
-      before then. PHASE3_REPORT.md:115 is explicit that the existing 2-day / 170-market
-      Test A is badly underpowered and must NOT be read as a refutation; running
-      it again on the same thin sample would only relaunder that error. See
-      collection_status below. Nothing is required of a human until the sample
-      lands; the standing decision (does ~$10-35/day justify the build) is then
-      taken against a properly powered result.
+    blocked_on: retired
+    recheck_after: null
+    action_required: null
+    closed:
+      decided: 2026-08-18
+      verdict: UNSCORABLE
+      reason: >
+        The first 27 admissible game-days froze correctly, but four selected
+        KXMLBHIT markets finalized as scalar payouts. The locked rule requires
+        every selected market to be binary and authorizes neither substitution
+        nor a sample extension. Those finalized markets will never become
+        binary, so the study cannot produce BUILD_CANDIDATE or STOP. This is no
+        economic verdict on the strategy; it is a terminal design failure in
+        the pre-registered gate. See
+        mlb_props_research/REPORT_EXECUTION_GATE_2026-08-18.md.
+      successor_condition: >
+        A new study must pre-register realized scalar payout treatment before
+        collecting or reading outcomes and must start with a new frozen sample.
     collection_status:
+      status: stopped_after_frozen_gate_became_unscorable
       script: mlb_props_research/collector.py
       unit: mlb-props-collector.timer -> .service (droplet, 10:00 ET daily)
       data_path: /opt/mlb-props/mlb_props_research/data/live/snapshots_YYYYMMDD.jsonl
@@ -1705,6 +1711,10 @@ workstreams:
         runs --rate 2.0, which spreads the same ~570 requests across the full
         cycle: same throughput, peak cut 56%.
     summary: >
+      CLOSED UNSCORABLE 2026-08-18 — no build is authorized. Four finalized
+      scalar settlements permanently invalidate the binary-only locked sample;
+      the tape and checkpoint are retained for audit.
+
       Phase 3 killed two things. (1) The batter-hits model FAILS: well calibrated
       in isolation but loses to market on Brier (0.2236 vs 0.2210) at every
       strike, with NEGATIVE selection value — bets it liked returned +7.73c,
@@ -1730,35 +1740,7 @@ workstreams:
         5c). Realistic capture 5-15% of ~447k contracts/90d = ~$10-35/day — far
         below Phase 1's "low hundreds/day" projection. Gate before real capital
         is a live paper execution test against real book depth.
-    open_questions:
-      - id: websocket-capture
-        blocked_on: time
-        text: >
-          COLLECTION STARTED 2026-07-21. Sizing the repricing-lag edge needs
-          1-minute or websocket book capture for a two-week window; 5-minute
-          sampling is underpowered. This is no longer unscheduled — the
-          betting-book-capture systemd unit is live on the droplet writing
-          data/book_capture/ at 60s cadence.
-
-          REST polling, not websocket, and that is a constraint not a shortcut:
-          Kalshi's websocket requires PRODUCTION API credentials and this
-          project holds demo-only keys (.env KALSHI_ENVIRONMENT=demo), so demo
-          carries no real book data. The on-disk schema is websocket-shaped
-          (rows keyed by ticker+epoch) so an authenticated feed could later
-          write the same records with no migration.
-
-          COVERAGE CAVEAT — do not read the capture as complete. It runs at
-          2.5 req/s, which caps it at 45 markets and truncates ~23 of ~68
-          discovered (lowest 24h volume first, mostly next-day games). Each
-          truncation is logged AND written into the data as a DISCOVERY record,
-          so analysis can see the gap rather than assume full coverage. The
-          rate was set conservatively during the 429 investigation; now that
-          the root cause is fixed (kalshi.rate_limit 5->2), it can be raised
-          toward 5.0 req/s to cover the full slate — check the unit's 429
-          count first.
-        started: 2026-07-21
-        eta: two weeks of capture -> ~2026-08-04
-        build_notes: research/BOOK_CAPTURE_2026-07-20.md
+    open_questions: []
     note: >
       NEVER use last_price for calibration — it is settlement-contaminated.
       Use pregame trade prices.
@@ -1829,15 +1811,19 @@ workstreams:
           table became a generated fixture off one GET /series call with a
           committed drift checker. It was only still open because nobody came
           back to close it.
-    open_questions:
       - id: polymarket-us-api
-        blocked_on: external
-        text: >
-          Determine Polymarket US API availability (relaunched Dec 2025, 49
-          states). Retained here only as the standing record of the question;
-          it is NOT gating this shelved workstream. The execution-access finding
-          that shelved P-002 and P-006 is the same question — if it is ever
-          answered, those two are the entries that change.
+        closed: 2026-08-18
+        answer: >
+          RESOLVED YES. Polymarket US now publishes official REST, WebSocket,
+          institutional/FIX, Python and TypeScript API documentation, including
+          authenticated order placement. Primary sources:
+          https://docs.polymarket.us/api-reference/introduction and
+          https://docs.polymarket.us/getting-started/quickstart. This resolves
+          API availability only. P-002/P-006 remain shelved because the repo's
+          client targets the incompatible offshore CLOB, no authenticated US
+          account/keys are wired, and both strategies retain known matching and
+          validation defects documented in their own entries.
+    open_questions: []
       # REMOVED 2026-08-06: `inplay-basis` ("log in-play Kalshi-vs-Polymarket
       # basis for a few weeks"). Duplicated P-018, which owns the collector
       # (scripts/collect_inplay_basis.py), the data and the backtest gate. One

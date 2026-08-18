@@ -45,6 +45,7 @@ def test_collector_reads_checkpoint_and_rejects_wrong_identity(tmp_path, monkeyp
     ("BUILD_CANDIDATE", "gate.R-MLB-PROPS.build_candidate", "action"),
     ("STOP", "gate.R-MLB-PROPS.stop", "warn"),
     ("RESULTS_PENDING", "gate.R-MLB-PROPS.results_pending", "warn"),
+    ("UNSCORABLE", "gate.R-MLB-PROPS.unscorable", "info"),
 ])
 def test_terminal_gate_states_surface(verdict, key, severity):
     checkpoint = {"verdict": verdict, "progress": 27, "reason": "locked"}

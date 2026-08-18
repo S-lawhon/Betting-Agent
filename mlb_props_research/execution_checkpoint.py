@@ -240,7 +240,7 @@ def load_settlements(path: Path) -> Dict[str, str]:
     if not isinstance(payload, dict):
         return {}
     return {str(ticker): str(result).lower() for ticker, result in payload.items()
-            if str(result).lower() in {"yes", "no"}}
+            if str(result).lower() in {"yes", "no", "scalar"}}
 
 
 def fetch_result(ticker: str, retries: int = 3) -> Optional[str]:
@@ -251,7 +251,7 @@ def fetch_result(ticker: str, retries: int = 3) -> Optional[str]:
             with urlopen(request, timeout=20) as response:  # noqa: S310 - fixed host
                 payload = json.loads(response.read().decode("utf-8"))
             result = str((payload.get("market") or {}).get("result") or "").lower()
-            return result if result in {"yes", "no"} else None
+            return result if result in {"yes", "no", "scalar"} else None
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
             if attempt < retries:
                 time.sleep(2.0 * (attempt + 1))
@@ -348,6 +348,24 @@ def run(live_dir: Path, now: datetime, settlements_path: Path,
     days = base["selected_days"]
     settlements, missing = fill_settlements(
         qualified["entries_by_day"], days, settlements_path, fetch)
+    selected_tickers = sorted({
+        entry["ticker"] for day in days
+        for entry in qualified["entries_by_day"][day]
+    })
+    scalar = [ticker for ticker in selected_tickers
+              if settlements.get(ticker) == "scalar"]
+    if scalar:
+        return base | {
+            "verdict": "UNSCORABLE",
+            "reason": (
+                f"{len(scalar)} selected market(s) finalized scalar; the locked "
+                "rule requires binary outcomes and authorizes no substitution "
+                "or sample extension"
+            ),
+            "scalar_settlements": scalar,
+            "outcomes_read": True,
+            "authorization": "none; successor study requires a new locked rule",
+        }
     if missing:
         return base | {
             "verdict": "RESULTS_PENDING",

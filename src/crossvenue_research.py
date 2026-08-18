@@ -154,7 +154,11 @@ def evaluate_pair_signals(pair_id: str, metrics: Mapping[str, Any], *,
             and isinstance(qualifying, (int, float)) and qualifying > 0):
         terms = str(metrics.get("terms_equivalence") or "unverified")
         signals.append({
-            "id": f"{pair_id}.persistent_dislocation", "severity": "warn",
+            "id": f"{pair_id}.persistent_dislocation",
+            # A non-equivalent pair can still be worth measuring, but its
+            # price gap is basis research rather than an operational alarm.
+            # Reserve WARN for pairs whose terms gate is actually verified.
+            "severity": "warn" if terms == "verified" else "info",
             "kind": "research_opportunity", "trade_allowed": False,
             "title": f"{pair_id} has a persistent research dislocation",
             "detail": (

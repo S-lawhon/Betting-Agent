@@ -221,6 +221,29 @@ def test_codex_output_schema_is_strict_for_every_object():
     check(schema)
 
 
+def test_codex_provider_schemas_avoid_unsupported_composition_keywords():
+    """Codex structured outputs reject conditional JSON Schema composition.
+
+    Decision-dependent defer/needs_work rules are enforced after parsing by
+    ScreeningDecision and ResearchDisposition instead.
+    """
+    forbidden = {"allOf", "if", "then", "else", "not"}
+
+    def check(node, path):
+        if isinstance(node, dict):
+            assert not (forbidden & set(node)), path
+            for key, value in node.items():
+                check(value, f"{path}.{key}")
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                check(value, f"{path}[{index}]")
+
+    for schema_path in (
+            Path("config/research_agent_output.schema.json"),
+            Path("config/research_screen_output.schema.json")):
+        check(json.loads(schema_path.read_text()), str(schema_path))
+
+
 def test_codex_pilot_setup_keeps_each_run_explicit_and_self_disabling():
     script = Path("scripts/setup_codex_research_pilot.sh").read_text()
 

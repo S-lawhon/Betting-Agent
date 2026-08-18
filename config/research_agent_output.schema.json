@@ -83,28 +83,6 @@
         "next_action",
         "notes"
       ],
-      "allOf": [
-        {
-          "if": {"properties": {"decision": {"type": "string", "const": "defer"}}},
-          "then": {
-            "properties": {
-              "recheck_after": {"type": "string", "format": "date-time"},
-              "blocking_fact": {"type": "string", "minLength": 1},
-              "next_action": {"type": "null"}
-            }
-          }
-        },
-        {
-          "if": {"properties": {"decision": {"type": "string", "const": "needs_work"}}},
-          "then": {
-            "properties": {
-              "recheck_after": {"type": "null"},
-              "blocking_fact": {"type": "null"},
-              "next_action": {"type": "string", "minLength": 1}
-            }
-          }
-        }
-      ],
       "additionalProperties": false
     },
     "artifact_type": {
@@ -281,28 +259,6 @@
         "blocking_fact",
         "next_action",
         "notes"
-      ],
-      "allOf": [
-        {
-          "if": {"properties": {"decision": {"type": "string", "const": "defer"}}},
-          "then": {
-            "properties": {
-              "recheck_after": {"type": "string", "format": "date-time"},
-              "blocking_fact": {"type": "string", "minLength": 1},
-              "next_action": {"type": "null"}
-            }
-          }
-        },
-        {
-          "if": {"properties": {"decision": {"type": "string", "const": "needs_work"}}},
-          "then": {
-            "properties": {
-              "recheck_after": {"type": "null"},
-              "blocking_fact": {"type": "null"},
-              "next_action": {"type": "string", "minLength": 1}
-            }
-          }
-        }
       ],
       "additionalProperties": false
     }

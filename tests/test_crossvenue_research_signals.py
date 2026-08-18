@@ -38,7 +38,7 @@ def test_healthy_pair_without_dislocation_has_no_signal():
     assert evaluate_pair_signals("pair", _metrics()) == []
 
 
-def test_persistent_dislocation_is_research_only_warning():
+def test_non_equivalent_persistent_dislocation_is_research_only_info():
     signals = evaluate_pair_signals("pair", _metrics(
         qualifying_path_observations=4,
         episodes={"persistent_count": 2, "recent": [{
@@ -50,10 +50,27 @@ def test_persistent_dislocation_is_research_only_warning():
 
     signal = next(row for row in signals
                   if row["kind"] == "research_opportunity")
-    assert signal["severity"] == "warn"
+    assert signal["severity"] == "info"
     assert signal["trade_allowed"] is False
     assert "not_equivalent" in signal["detail"]
     assert signal["detail"].count("qualifying observations") == 1
+
+
+def test_verified_persistent_dislocation_remains_warning():
+    metrics = _metrics(
+        qualifying_path_observations=4,
+        episodes={"persistent_count": 1, "recent": [{
+            "persistent": True, "last_seen": "2026-08-02T12:05:00Z",
+        }]},
+    )
+    metrics["terms_equivalence"] = "verified"
+
+    signal = next(
+        row for row in evaluate_pair_signals("pair", metrics)
+        if row["kind"] == "research_opportunity")
+
+    assert signal["severity"] == "warn"
+    assert signal["trade_allowed"] is False
 
 
 def test_old_persistent_episode_does_not_keep_alerting():

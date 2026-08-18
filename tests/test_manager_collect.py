@@ -9,8 +9,10 @@ evidence gate, so the brief was structurally unable to see evidence accrue.
 
 from __future__ import annotations
 
+import gzip
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -81,6 +83,55 @@ def test_local_job_on_droplet_is_uncheckable_not_missing(tmp_path):
     # The droplet job is unaffected — it is measured normally.
     assert jobs["droplet_job"]["state"] == "measured"
     assert jobs["droplet_job"]["exists"] is True
+
+
+def test_trade_activity_continues_into_rotated_archive_and_dedupes_carry(
+        tmp_path, monkeypatch):
+    """A size rotation must not zero the rolling 24h settlement totals."""
+    project = tmp_path / "opt" / "betting-pod-shop"
+    logs = project / "data" / "trade_logs"
+    logs.mkdir(parents=True)
+    local = tmp_path / "local"
+    local.mkdir()
+    reg = write_registry(tmp_path, str(local), str(project))
+
+    fixed = datetime(2026, 8, 18, 22, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(collect, "now", lambda: fixed)
+
+    def row(hours_ago, action, fingerprint, pnl=None):
+        result = {
+            "timestamp_utc": (fixed - timedelta(hours=hours_ago)).isoformat(),
+            "action": action,
+            "pod_id": "P-017",
+            "fingerprint": fingerprint,
+        }
+        if pnl is not None:
+            result["pnl_usd"] = pnl
+        return json.dumps(result, sort_keys=True)
+
+    old = row(25, "SKIPPED_EDGE", "old")
+    placed_settled = row(3, "PLACED", "settled-trade")
+    won = row(2, "WIN", "settled-trade", 7.25)
+    carried = row(1, "PLACED", "open-trade")
+    archive = logs / "trade_log.archive_20260818_214837.jsonl.gz"
+    with gzip.open(archive, "wt", encoding="utf-8") as fh:
+        fh.write("\n".join((old, placed_settled, won, carried)) + "\n")
+
+    # rotate_active_log carries open PLACED rows forward with their original
+    # timestamps, so the new active file is not necessarily chronological.
+    ancient_carry = row(48, "PLACED", "ancient-open")
+    (logs / "trade_log.jsonl").write_text(
+        ancient_carry + "\n" + carried + "\n", encoding="utf-8")
+
+    result = collect.Collector(reg, root=project, local_root=local).trade_activity()
+
+    assert result["complete"] is True
+    assert result["actions"] == {"PLACED": 2, "WIN": 1}
+    assert result["per_pod"]["P-017"] == {
+        "placed": 2, "settled": 1, "won": 1, "lost": 0, "void": 0,
+    }
+    assert result["realized_pnl_24h"] == 7.25
+    assert result["last_row_ts"] == "2026-08-18T21:00:00Z"
 
 
 def test_local_job_is_measured_when_local_root_exists(tmp_path):

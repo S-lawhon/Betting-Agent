@@ -29,6 +29,8 @@ from __future__ import annotations
 
 import argparse
 import filecmp
+import gzip
+import hashlib
 import json
 import os
 import re
@@ -651,10 +653,75 @@ class Collector:
         realized = 0.0
         scanned = 0
         complete = True
+        latest_dt: Optional[datetime] = None
+        seen_rows: set = set()
+
+        def consume(raw: bytes, *, stop_on_old: bool) -> bool:
+            """Count one row; return True when a reverse scan crosses cutoff."""
+            nonlocal latest_dt, realized
+            if not raw.strip():
+                return False
+            try:
+                row = json.loads(raw)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return False
+            if not isinstance(row, dict):
+                return False
+            dt = row_ts(row)
+            if dt is None:
+                return False
+            if latest_dt is None or dt > latest_dt:
+                latest_dt = dt
+            if dt < cutoff:
+                return stop_on_old
+
+            # Rotation carries still-open PLACED rows verbatim into the new
+            # active log.  Count an exact row once across active + archives;
+            # action is part of the serialized row, so a later WIN/LOSS with
+            # the same trade fingerprint remains a distinct observation.
+            identity = hashlib.blake2b(raw.strip(), digest_size=16).digest()
+            if identity in seen_rows:
+                return False
+            seen_rows.add(identity)
+
+            action = str(row.get("action", "?")).upper()
+            actions[action] = actions.get(action, 0) + 1
+            if action not in _REAL_ACTIONS:
+                return False
+            pod = str(row.get("pod_id") or row.get("pod") or "unknown")
+            bucket = per_pod.setdefault(
+                pod, {"placed": 0, "settled": 0, "won": 0,
+                      "lost": 0, "void": 0})
+            if action in ("PLACED", "PAPER_PLACED"):
+                bucket["placed"] += 1
+            elif action in ("WIN", "WON"):
+                bucket["settled"] += 1
+                bucket["won"] += 1
+            elif action in ("LOSS", "LOST"):
+                bucket["settled"] += 1
+                bucket["lost"] += 1
+            elif action == "VOID":
+                bucket["void"] += 1
+            pnl = row.get("pnl_usd")
+            if pnl is None and isinstance(row.get("extra"), dict):
+                pnl = row["extra"].get("pnl_usd")
+            if isinstance(pnl, (int, float)):
+                realized += float(pnl)
+            return False
 
         try:
+            archives = sorted(
+                path.parent.glob("trade_log.archive_*.jsonl.gz"),
+                key=lambda item: item.name,
+                reverse=True,
+            )
+            recent_archives = [
+                item for item in archives
+                if datetime.fromtimestamp(item.stat().st_mtime, UTC) >= cutoff
+            ]
             size = path.stat().st_size
             pos, chunk, leftover = size, 4_000_000, b""
+            crossed_cutoff = False
             with path.open("rb") as fh:
                 while pos > 0 and scanned < 80_000_000:
                     step = min(chunk, pos)
@@ -664,49 +731,50 @@ class Collector:
                     data = fh.read(step) + leftover
                     parts = data.split(b"\n")
                     leftover = parts[0] if pos > 0 else b""
-                    stop = False
                     for raw in reversed(parts[1:] if pos > 0 else parts):
-                        if not raw.strip():
-                            continue
-                        try:
-                            row = json.loads(raw)
-                        except (json.JSONDecodeError, UnicodeDecodeError):
-                            continue
-                        if not isinstance(row, dict):
-                            continue
-                        dt = row_ts(row)
-                        if dt is None:
-                            continue
-                        if dt < cutoff:
-                            stop = True
+                        # Immediately after rotation, carried open rows at the
+                        # start of the active file retain their original (and
+                        # possibly old) timestamps.  They break chronological
+                        # ordering, so an old carried row is not a safe cutoff.
+                        if consume(raw, stop_on_old=not recent_archives):
+                            crossed_cutoff = True
                             break
-                        action = str(row.get("action", "?")).upper()
-                        actions[action] = actions.get(action, 0) + 1
-                        if action not in _REAL_ACTIONS:
-                            continue
-                        pod = str(row.get("pod_id") or row.get("pod") or "unknown")
-                        bucket = per_pod.setdefault(
-                            pod, {"placed": 0, "settled": 0, "won": 0,
-                                  "lost": 0, "void": 0})
-                        if action in ("PLACED", "PAPER_PLACED"):
-                            bucket["placed"] += 1
-                        elif action in ("WIN", "WON"):
-                            bucket["settled"] += 1
-                            bucket["won"] += 1
-                        elif action in ("LOSS", "LOST"):
-                            bucket["settled"] += 1
-                            bucket["lost"] += 1
-                        elif action == "VOID":
-                            bucket["void"] += 1
-                        pnl = row.get("pnl_usd")
-                        if pnl is None and isinstance(row.get("extra"), dict):
-                            pnl = row["extra"].get("pnl_usd")
-                        if isinstance(pnl, (int, float)):
-                            realized += float(pnl)
-                    if stop:
+                    if crossed_cutoff:
                         break
-                else:
-                    complete = pos <= 0
+            complete = crossed_cutoff or pos <= 0
+
+            # A size rotation replaces the active log with carried open rows.
+            # If its oldest row is still inside the window, continue through
+            # newest rotated archives.  Gzip is not reverse-seekable, so these
+            # are streamed forward under the same decompressed-byte budget.
+            if recent_archives and pos <= 0:
+                for archive in recent_archives:
+                    archive_saw_old = False
+                    archive_saw_recent = False
+                    with gzip.open(archive, "rb") as fh:
+                        for raw in fh:
+                            scanned += len(raw)
+                            if scanned > 80_000_000:
+                                complete = False
+                                break
+                            dt = None
+                            try:
+                                obj = json.loads(raw)
+                                dt = row_ts(obj) if isinstance(obj, dict) else None
+                            except (json.JSONDecodeError, UnicodeDecodeError):
+                                pass
+                            if dt is not None:
+                                archive_saw_old = archive_saw_old or dt < cutoff
+                                archive_saw_recent = archive_saw_recent or dt >= cutoff
+                            consume(raw, stop_on_old=False)
+                    if not complete:
+                        break
+                    if archive_saw_old:
+                        crossed_cutoff = True
+                        break
+                    if not archive_saw_recent:
+                        crossed_cutoff = True
+                        break
         except OSError as exc:
             return {"available": False, "error": str(exc)}
 
@@ -717,8 +785,9 @@ class Collector:
             "actions": actions,
             "per_pod": per_pod,
             "realized_pnl_24h": round(realized, 2),
-            "last_row_ts": iso(row_ts(last_json_row(path) or {})),
+            "last_row_ts": iso(latest_dt),
             "age_minutes": round(file_age(path) or 0, 1),
+            "bytes_scanned": scanned,
         }
 
     # ---- P-016 maker gate ------------------------------------------------

@@ -85,6 +85,8 @@ systemd_units:
   - {id: betting-strategy-chain.timer, unit: betting-strategy-chain.timer, source: scripts/systemd/betting-strategy-chain.timer, severity: warn}
   - {id: betting-strategy-chain.service, unit: betting-strategy-chain.service, source: scripts/systemd/betting-strategy-chain.service, severity: warn}
   - {id: laliga-spread-latency.service, unit: laliga-spread-latency.service, source: scripts/systemd/laliga-spread-latency.service, severity: warn}
+  - {id: laliga-spread-latency-analysis.timer, unit: laliga-spread-latency-analysis.timer, source: scripts/systemd/laliga-spread-latency-analysis.timer, severity: warn}
+  - {id: laliga-spread-latency-analysis.service, unit: laliga-spread-latency-analysis.service, source: scripts/systemd/laliga-spread-latency-analysis.service, severity: warn}
 
 # -----------------------------------------------------------------------------
 # SERVICES — process-level liveness
@@ -1862,9 +1864,11 @@ workstreams:
       matches, 20 qualifying shocks and at least 10 matches before reading a
       verdict.
     next_step: >
-      No human action. Keep laliga-spread-latency.service healthy through the
-      forward sample, then run `python3 soccer_research/laliga_spread_latency.py
-      --analyze` and apply the frozen kill/pass thresholds without tuning.
+      No human action. Keep laliga-spread-latency.service and its daily analysis
+      timer healthy through the forward sample. The timer rewrites analysis.json
+      from the full immutable tape and applies the frozen kill/pass thresholds
+      without tuning; NO DECISION remains mandatory until every sample floor is
+      met.
     recheck: 2026-09-15
     governing_rule: soccer_research/LALIGA_SPREAD_LATENCY_RULE.md
     status_file: data/laliga_spread_latency/status.json

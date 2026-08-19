@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily evaluation of the preregistered La Liga spread latency gate
+
+[Timer]
+OnCalendar=*-*-* 06:15:00 UTC
+Persistent=true
+RandomizedDelaySec=5m
+Unit=laliga-spread-latency-analysis.service
+
+[Install]
+WantedBy=timers.target
+

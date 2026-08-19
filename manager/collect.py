@@ -1047,7 +1047,8 @@ class Collector:
     def p022_window(self) -> Dict[str, Any]:
         """P-022's quotable-window detector, surfaced to the alert path.
 
-        `scripts/p022_window_check.py` runs */30 and appends one row per run,
+        `scripts/p022_window_check.py` runs at 8/23/38/53 each hour and appends
+        one row per run,
         but nothing read it: its only consumer was a human opening
         status.jsonl. The one state that matters —
         WINDOW_OPEN_CANDIDATE_NO_QUOTE — is the pod being structurally unable
@@ -1059,7 +1060,7 @@ class Collector:
         path = self.root / "data/p022_window_check/status.jsonl"
         if not path.exists():
             return {"available": False,
-                    "error": "no status.jsonl — the */30 checker has never run"}
+                    "error": "no status.jsonl — the */15 checker has never run"}
         row = last_json_row(path)
         if not row:
             return {"available": False,

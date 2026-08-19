@@ -114,9 +114,12 @@ paper. Kill switch for the maker unit: `touch data/KILL_MAKER`.
 1. **MLB props successor trial — IN PROGRESS.** Lock a new forward execution
    rule that counts scalar settlements at realized value, targets 27 clean ET
    game-days, and starts no earlier than 2026-08-19.
-2. **P-022 window automation — MONITOR.** Require automatic transition from
-   `NO_WINDOW` into pricing/quoting when a registered window opens; intervene
-   only if an in-window candidate receives no quote.
+2. **P-022 window automation — REHEARSAL PASSED; LIVE CHECK ARMED.** A
+   time-controlled 2026-08-19 Nexo Championship rehearsal found one eligible
+   name and the real maker cycle wrote the expected isolated paper quote.
+   Production remains responsible for the real transition at 17:01 UTC; the
+   8/23/38/53 checker cadence escalates only if the same eligible name remains
+   unquoted across two runs.
 3. **Log rotation follow-through — MONITOR ONCE.** Confirm the next automatic
    rotation refreshes its cron log within 30 hours and leaves rolling manager
    totals reconciled with the lifetime rollup.

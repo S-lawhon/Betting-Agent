@@ -3,7 +3,7 @@ tests/test_manager_p022_window.py
 ─────────────────────────────────
 The P-022 window detector only matters if it reaches Sam.
 
-Before this wiring the detector ran */30 on the droplet, appended a row to
+Before this wiring the detector ran */15 on the droplet, appended a row to
 `data/p022_window_check/status.jsonl`, and stopped there — its only consumer
 was a human deciding to open the file. So the state that means "the fund's
 only validated edge is structurally unable to trade" was recorded and never
@@ -169,6 +169,17 @@ def test_stale_row_warns_on_top_of_the_state():
     keys = {x.key for x in f}
     assert "p022.window.stale" in keys
     assert "p022.window.state" in keys
+
+
+def test_stale_threshold_matches_three_missed_quarter_hour_checks():
+    assert "p022.window.stale" not in {
+        x.key for x in _findings(
+            {"available": True, "state": "NO_WINDOW", "age_min": 45.0,
+             "detail": "d"})}
+    assert "p022.window.stale" in {
+        x.key for x in _findings(
+            {"available": True, "state": "NO_WINDOW", "age_min": 45.1,
+             "detail": "d"})}
 
 
 def test_absent_section_produces_nothing():

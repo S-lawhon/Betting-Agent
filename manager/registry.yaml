@@ -519,21 +519,19 @@ jobs:
   # the pod is wrong, and would have sat silent through all three dead days.
   - id: p022_window_check
     host: droplet
-    schedule: "*/30 * * * *"
+    schedule: "8,23,38,53 * * * *"
     description: P-022 quotable-window detector — makes the pod's silence observable
     output:
       file: data/p022_window_check/status.jsonl
-      max_stale_hours: 3
+      max_stale_hours: 1
     severity: warn
     note: >
-      DEPLOYED 2026-07-27 16:00 UTC and verified on the droplet, but NOT YET
-      CRONTABBED — it only runs when invoked by hand, so this job will read
-      stale until the schedule above is actually installed. Adding it is a
-      one-line crontab change and is Sam's call.
-      Currently ALARMING (state CLOSE_REF_PLACEHOLDER) on every run: 346 markets
-      across 3 events are listed, and all five Kalshi time fields collapse to
-      one ~20-day fallback, so the pod's [12h, 24h] window opens roughly a
-      fortnight after the round has settled. Exit 1 = alarm, 0 = fine.
+      CRONTABBED and live as root, running at minutes 8/23/38/53 as bettingbot.
+      The offset avoids the manager's quarter-hour collection boundary. A first
+      unquoted candidate is recorded without paging; the same name still
+      missing on the next run escalates, and manager collection plus the alert
+      timer delivers it. Exit 1 = alarm, 0 = fine. The old note saying this was
+      not crontabbed became false on 2026-07-28 and is retired.
 
   # --- kalshi-ev-map weather pipeline — MOVED TO THE DROPLET 2026-07-29 -----
   #

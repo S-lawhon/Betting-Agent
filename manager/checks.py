@@ -1161,7 +1161,7 @@ P022_CRITICAL_STATES = {
 def check_p022_window(snap: Dict[str, Any]) -> List[Finding]:
     """Route P-022's quotable-window detector into the alert path.
 
-    The detector has run */30 since 2026-07-28 and nothing consumed it, so
+    The detector has run */15 since 2026-07-28 and nothing consumed it, so
     the one state that means "the fund's only validated edge is structurally
     unable to trade" reached a log file and stopped there. P-022 has now been
     mute for five days across three fixes, two of which were declared verified
@@ -1186,12 +1186,13 @@ def check_p022_window(snap: Dict[str, Any]) -> List[Finding]:
 
     out: List[Finding] = []
     age = win.get("age_min")
-    if isinstance(age, (int, float)) and age > 90:
+    if isinstance(age, (int, float)) and age > 45:
         out.append(Finding(
             key="p022.window.stale",
             severity="warn",
             title="P-022 window detector last ran {:.0f} min ago".format(age),
-            detail="It is crontabbed */30. A stale row means the checker is "
+            detail="It is crontabbed at 8/23/38/53 each hour. A stale row "
+                   "means three expected checks were missed, the checker is "
                    "dead, and its last state below is not current.",
             workstream="P-022",
             fix="ssh root@129.212.176.202 'crontab -l | grep p022'",

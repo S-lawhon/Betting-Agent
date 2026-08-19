@@ -32,6 +32,13 @@ allowed_agents:
   - literature-scout
   - social-scout
 
+# Prevent the globally ranked strategy lane from starving specialist work.
+# A minimum is honored only when that lane has a claimable packet; otherwise
+# the slot immediately falls back to the best available packet in any lane.
+daily_lane_minimums:
+  literature-scout: 1
+  social-scout: 1
+
 limits:
   # Triage intentionally budgets literature/paper packets at 45 minutes.
   # Keeping this at 30 blocks the entire ranked queue before screening can

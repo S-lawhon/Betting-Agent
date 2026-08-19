@@ -360,6 +360,75 @@ def test_deep_only_worker_consumes_screened_queue_with_separate_budget(tmp_path)
     assert provider.last_request["screening_context"]["decision"] == "deep_research"
     assert result["daily_usage"]["attempts"] == 1
     assert (tmp_path / "research/dispositions/a1.json").exists()
+    assert not (tmp_path / "data/research_execution/deep_queue/strategy-scout/a1.json").exists()
+    assert (tmp_path / "data/research_execution/deep_archive/strategy-scout/a1.json").exists()
+
+
+def test_deep_worker_reconciles_completed_queue_packet_without_invocation(tmp_path):
+    dispatches, state, dispositions = setup_packet(tmp_path)
+    deep_packet = state / "deep_queue/strategy-scout/a1.json"
+    deep_packet.parent.mkdir(parents=True)
+    deep_packet.write_bytes((dispatches / "strategy-scout/a1.json").read_bytes())
+    (dispositions / "a1.json").write_text(json.dumps({
+        "assignment_id": "a1", "source_item_id": "s1",
+        "decided_at": "2026-08-03T11:30:00Z", "decision": "reject",
+        "reason_codes": ["done"], "evidence_checked": ["source"],
+        "research_minutes": 1,
+    }))
+    runtime = ResearchAgentWorker(
+        root=tmp_path, dispatches_dir=state / "deep_queue",
+        state_dir=state, dispositions_dir=dispositions,
+        worker_id="deep-worker", limits=WorkerLimits(timeout_seconds=60),
+        screening_enabled=False, stage_mode="deep_only",
+        budget_scope="deep_research", allowed_agents=("strategy-scout",),
+        clock=lambda: NOW)
+
+    result = runtime.run_once(execute=True)
+
+    assert result["status"] == "idle"
+    assert result["reconciled_deep_packets"] == ["a1"]
+    assert not deep_packet.exists()
+    assert (state / "deep_archive/strategy-scout/a1.json").exists()
+
+
+def test_screening_daily_lane_minimum_prevents_specialist_starvation(tmp_path):
+    dispatches, state, dispositions = setup_packet(tmp_path)
+    strategy = json.loads((dispatches / "strategy-scout/a1.json").read_text())
+    for agent, assignment_id, score in (
+            ("literature-scout", "lit1", 20),
+            ("social-scout", "social1", 10)):
+        prompt = tmp_path / ".claude/agents" / f"{agent}.md"
+        prompt.write_text("research only; never trade\n")
+        packet = dict(strategy) | {
+            "id": f"d-{assignment_id}", "assignment_id": assignment_id,
+            "source_item_id": f"s-{assignment_id}",
+            "assigned_agent": agent, "triage_score": score,
+        }
+        path = dispatches / agent / f"{assignment_id}.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(packet))
+    run_dir = state / "runs/2026-08-03"
+    run_dir.mkdir(parents=True)
+    (run_dir / "lit.json").write_text(json.dumps({
+        "budget_scope": "screening", "assigned_agent": "literature-scout",
+        "invocations": [{"phase": "screening"}],
+    }))
+    runtime = ResearchAgentWorker(
+        root=tmp_path, dispatches_dir=dispatches, state_dir=state,
+        dispositions_dir=dispositions, worker_id="screen-worker",
+        limits=WorkerLimits(timeout_seconds=60, max_attempts_per_day=6),
+        screening_enabled=True,
+        screening_agents=("strategy-scout", "literature-scout", "social-scout"),
+        stage_mode="screen_only", budget_scope="screening",
+        allowed_agents=("strategy-scout", "literature-scout", "social-scout"),
+        daily_lane_minimums={"literature-scout": 1, "social-scout": 1},
+        clock=lambda: NOW)
+
+    result = runtime.run_once()
+
+    assert result["status"] == "dry_run"
+    assert result["assignment_id"] == "social1"
+    assert result["daily_lane_runs"] == {"literature-scout": 1}
 
 
 def test_screening_guard_refuses_unscreened_allowed_agent(tmp_path):

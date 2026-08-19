@@ -305,6 +305,7 @@ class ResearchAgentWorker:
         status_filename: str = "worker_status.json",
         execution_enabled: bool = False,
         allowed_agents: Sequence[str] = tuple(ALLOWED_ARTIFACTS),
+        daily_lane_minimums: Optional[Mapping[str, int]] = None,
         clock=None,
     ) -> None:
         if not worker_id.strip():
@@ -338,6 +339,21 @@ class ResearchAgentWorker:
         self.status_filename = status_filename
         self.execution_enabled = bool(execution_enabled)
         self.allowed_agents = tuple(allowed_agents)
+        self.daily_lane_minimums = {
+            str(agent): int(minimum)
+            for agent, minimum in dict(daily_lane_minimums or {}).items()
+        }
+        unknown_minimums = (
+            set(self.daily_lane_minimums) - set(self.allowed_agents))
+        if unknown_minimums:
+            raise ValueError(
+                "daily lane minimum configured for disallowed agents: "
+                f"{sorted(unknown_minimums)}")
+        if any(value < 0 for value in self.daily_lane_minimums.values()):
+            raise ValueError("daily lane minimums cannot be negative")
+        if sum(self.daily_lane_minimums.values()) > limits.max_attempts_per_day:
+            raise ValueError(
+                "daily lane minimums exceed the daily model-attempt limit")
         # An allowed agent outside the screened set would have its packets
         # routed straight to the deep-research call with no screen in front.
         if self.screening_enabled:
@@ -360,25 +376,109 @@ class ResearchAgentWorker:
             path.stem for path in (self.state_dir / "deep_queue").glob("*/*.json")
         }
 
+    def _daily_agent_runs(self, now: datetime) -> Dict[str, int]:
+        """Count attempted packets per lane for this worker budget/day."""
+        directory = self.state_dir / "runs" / now.astimezone(UTC).date().isoformat()
+        counts: Dict[str, int] = {}
+        for path in directory.glob("*.json"):
+            try:
+                row = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if str(row.get("budget_scope") or "combined") != self.budget_scope:
+                continue
+            if not row.get("invocations"):
+                continue
+            agent = str(row.get("assigned_agent") or "")
+            if agent:
+                counts[agent] = counts.get(agent, 0) + 1
+        return counts
+
+    def _preferred_lane_agents(self, now: datetime) -> set[str]:
+        """Return lanes still owed their configured daily coverage."""
+        if self.stage_mode != "screen_only" or not self.daily_lane_minimums:
+            return set()
+        counts = self._daily_agent_runs(now)
+        return {
+            agent for agent, minimum in self.daily_lane_minimums.items()
+            if counts.get(agent, 0) < minimum
+        }
+
+    def _reconcile_completed_deep_packets(self) -> list[str]:
+        """Archive deep packets whose durable disposition already exists.
+
+        A crash can occur after writing the disposition but before cleaning the
+        queue.  Reconciliation is idempotent and preserves the packet under
+        ``deep_archive`` instead of deleting research history.
+        """
+        if self.stage_mode != "deep_only":
+            return []
+        disposition_ids = set()
+        for path in self.dispositions_dir.glob("*.json"):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ResearchWorkerError(
+                    f"cannot reconcile disposition {path}: {exc}") from exc
+            if not isinstance(payload, Mapping):
+                raise ResearchWorkerError(
+                    f"cannot reconcile non-object disposition: {path}")
+            disposition_ids.add(str(payload.get("assignment_id") or path.stem))
+        archived: list[str] = []
+        for source in sorted(self.dispatches_dir.glob("*/*.json")):
+            if source.stem not in disposition_ids:
+                continue
+            destination = (
+                self.state_dir / "deep_archive" / source.parent.name / source.name)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if destination.exists():
+                if destination.read_bytes() != source.read_bytes():
+                    raise ResearchWorkerError(
+                        f"deep archive conflicts with queued packet: {source.stem}")
+                source.unlink()
+            else:
+                os.replace(source, destination)
+            archived.append(source.stem)
+        return archived
+
     def run_once(self, *, execute: bool = False,
                  assignment_id: Optional[str] = None,
                  persist_status: bool = True) -> Dict[str, Any]:
         now = self._clock()
         target_assignment_id = str(assignment_id or "").strip() or None
+        # Preview/dry-run paths are strictly read-only. Reconciliation is an
+        # execution-time queue mutation even though it only archives records
+        # that already have durable dispositions.
+        reconciled = self._reconcile_completed_deep_packets() if execute else []
+        preview_agents = set(self.allowed_agents)
+        preferred_agents = self._preferred_lane_agents(now)
         candidate = preview_next(
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
             dispositions_dir=self.dispositions_dir,
             assignment_id=target_assignment_id,
-            agents=set(self.allowed_agents),
+            agents=(preferred_agents if preferred_agents and
+                    not target_assignment_id else preview_agents),
             exclude_assignment_ids=(
                 self._deep_ready_ids() if self.stage_mode == "screen_only"
                 else None),
             now=now)
+        # A lane minimum reserves coverage only while that lane has claimable
+        # work. It must never idle the worker while another lane can advance.
+        if not candidate and preferred_agents and not target_assignment_id:
+            candidate = preview_next(
+                dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
+                dispositions_dir=self.dispositions_dir,
+                agents=preview_agents,
+                exclude_assignment_ids=(
+                    self._deep_ready_ids() if self.stage_mode == "screen_only"
+                    else None),
+                now=now)
         if not candidate:
             result = self._result(
                 "blocked" if target_assignment_id else "idle", now, plan=None,
                 error=(f"target assignment is not available: "
                        f"{target_assignment_id}" if target_assignment_id else None))
+            result["reconciled_deep_packets"] = reconciled
             return self._finish(result, persist_status)
         packet_path, packet = candidate
         try:
@@ -403,7 +503,9 @@ class ResearchAgentWorker:
         claim = claim_next(
             dispatches_dir=self.dispatches_dir, state_dir=self.state_dir,
             dispositions_dir=self.dispositions_dir, worker_id=self.worker_id,
-            assignment_id=target_assignment_id,
+            # Pin the claim to the previewed packet so lane preference cannot
+            # race back to the globally highest-ranked lane.
+            assignment_id=str(packet.get("assignment_id") or ""),
             agents=set(self.allowed_agents),
             exclude_assignment_ids=(
                 self._deep_ready_ids() if self.stage_mode == "screen_only"
@@ -468,6 +570,7 @@ class ResearchAgentWorker:
                         state_dir=self.state_dir,
                         dispositions_dir=self.dispositions_dir,
                         now=self._clock())
+                    self._reconcile_completed_deep_packets()
                     elapsed = time.monotonic() - started
                     run = self._run_record(
                         "completed", claim, screening_result, now, elapsed,
@@ -532,6 +635,7 @@ class ResearchAgentWorker:
                 disposition_payload=disposition.to_dict(),
                 state_dir=self.state_dir,
                 dispositions_dir=self.dispositions_dir, now=self._clock())
+            self._reconcile_completed_deep_packets()
             run = self._run_record(
                 "completed", claim, provider_result, now, elapsed,
                 artifact_record=artifact_record,
@@ -1140,6 +1244,8 @@ class ResearchAgentWorker:
             "daily_usage": self._daily_usage(now),
             "limits": self.limits.to_dict(),
             "retry_limits": self.retry_limits.to_dict(),
+            "daily_lane_minimums": dict(self.daily_lane_minimums),
+            "daily_lane_runs": self._daily_agent_runs(now),
             "safety": {
                 "trading_execution_allowed": False,
                 "model_invoked": bool(

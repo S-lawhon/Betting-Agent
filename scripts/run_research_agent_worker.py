@@ -129,7 +129,9 @@ def main(argv=None) -> int:
                 config.get("status_filename") or "worker_status.json"),
             screening_agents=list(
                 screening_config.get("agents") or ["strategy-scout"]),
-            allowed_agents=list(config.get("allowed_agents") or []))
+            allowed_agents=list(config.get("allowed_agents") or []),
+            daily_lane_minimums=dict(
+                config.get("daily_lane_minimums") or {}))
         target_assignment_id = (
             str(args.assignment_id or config.get("target_assignment_id") or "").strip()
             or None)

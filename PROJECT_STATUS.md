@@ -1,6 +1,6 @@
 # Betting Pod Shop — Project Status & Continuity Reference
 
-**Last Updated:** July 22, 2026
+**Last Updated:** August 18, 2026
 **VPS:** 129.212.176.202 (DigitalOcean)
 **VPS Path:** `/opt/betting-pod-shop/`
 **Dashboard:** https://dashboard.htxtrades.org/ (TLS + basic auth via Caddy; public :8080 closed)
@@ -108,6 +108,26 @@ Roster as of 2026-08-18. Full per-workstream state, gates, and history live in
 
 **No pod is `tier: production` — nothing has cleared a gate.** All trading is
 paper. Kill switch for the maker unit: `touch data/KILL_MAKER`.
+
+## Current Follow-up Queue (2026-08-18)
+
+1. **MLB props successor trial — IN PROGRESS.** Lock a new forward execution
+   rule that counts scalar settlements at realized value, targets 27 clean ET
+   game-days, and starts no earlier than 2026-08-19.
+2. **P-022 window automation — MONITOR.** Require automatic transition from
+   `NO_WINDOW` into pricing/quoting when a registered window opens; intervene
+   only if an in-window candidate receives no quote.
+3. **Log rotation follow-through — MONITOR ONCE.** Confirm the next automatic
+   rotation refreshes its cron log within 30 hours and leaves rolling manager
+   totals reconciled with the lifetime rollup.
+4. **Retired pods — HOLD.** Keep P-014 disabled and P-016 behind its kill file;
+   decommission or repurpose their units only as an explicit later decision.
+5. **Polymarket US — BACKLOG.** Before unshelving P-002/P-006, build a
+   US-compatible authenticated client and repair their contract matching and
+   strategy-specific validation defects.
+6. **Research throughput — DUE 2026-08-23.** Review the 6-screen/4-deep trial
+   using arrivals, completions, queue age, decisive output, failures and cost;
+   change capacity only from that evidence.
 
 ### P-001 — Kalshi Moneyline Value
 

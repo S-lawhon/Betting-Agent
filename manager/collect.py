@@ -67,10 +67,10 @@ UTC = timezone.utc
 # manager/README.md § git mirror. Overridable via MANAGER_GIT_REPO.
 MIRROR_PATH = Path("/opt/betting-agent-mirror")
 MLB_PROPS_CHECKPOINT_PATH = Path(
-    "/opt/mlb-props/mlb_props_research/data/execution_gate/latest.json"
+    "/opt/mlb-props/mlb_props_research/data/execution_gate_v2/latest.json"
 )
 MLB_PROPS_RULE_SHA256 = (
-    "c76296909b878b70de7eab4a82fb24ee0c7c45158ae0e1d8bb6ed7cc589c8c60"
+    "f9bb16ece81c244e7de4cfbcc770e0d7fabe6cca4a4c5847c0cd022eeba33825"
 )
 GATE_ROLLUP_MAX_AGE_HOURS = 2.0
 
@@ -1033,6 +1033,7 @@ class Collector:
             return out
         if (not isinstance(payload, dict)
                 or payload.get("id") != "R-MLB-PROPS"
+                or payload.get("trial") != "V2"
                 or payload.get("metric") != "clean_execution_game_days"
                 or payload.get("threshold") != 27
                 or payload.get("rule_sha256") != MLB_PROPS_RULE_SHA256):

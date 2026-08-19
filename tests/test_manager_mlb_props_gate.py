@@ -27,7 +27,8 @@ def registry_file(tmp_path: Path) -> Path:
 
 def test_collector_reads_checkpoint_and_rejects_wrong_identity(tmp_path, monkeypatch):
     latest = tmp_path / "latest.json"
-    payload = {"id": "R-MLB-PROPS", "metric": "clean_execution_game_days",
+    payload = {"id": "R-MLB-PROPS", "trial": "V2",
+               "metric": "clean_execution_game_days",
                "progress": 16, "threshold": 27, "verdict": "NO DECISION",
                "rule_sha256": collect.MLB_PROPS_RULE_SHA256}
     latest.write_text(json.dumps(payload), encoding="utf-8")
@@ -46,6 +47,7 @@ def test_collector_reads_checkpoint_and_rejects_wrong_identity(tmp_path, monkeyp
     ("STOP", "gate.R-MLB-PROPS.stop", "warn"),
     ("RESULTS_PENDING", "gate.R-MLB-PROPS.results_pending", "warn"),
     ("UNSCORABLE", "gate.R-MLB-PROPS.unscorable", "info"),
+    ("DATA_ERROR", "gate.R-MLB-PROPS.data_error", "warn"),
 ])
 def test_terminal_gate_states_surface(verdict, key, severity):
     checkpoint = {"verdict": verdict, "progress": 27, "reason": "locked"}
@@ -82,9 +84,9 @@ def test_registry_matches_locked_reader_and_units():
     assert gate["source"] == "mlb_props_checkpoint"
     assert gate["reader"] == "mlb_props_research/execution_checkpoint.py"
     assert gate["rule_document"] == (
-        "mlb_props_research/MLB_PROPS_EXECUTION_RULE.md")
+        "mlb_props_research/MLB_PROPS_EXECUTION_RULE_V2.md")
     assert gate["rule_sha256"] == collect.MLB_PROPS_RULE_SHA256
-    assert str(gate["read_not_before"]) == "2026-08-18"
+    assert str(gate["read_not_before"]) == "2026-09-15"
     units = {row["unit"]: row for row in registry["systemd_units"]}
     assert "mlb-props-execution-checkpoint.timer" in units
     assert "mlb-props-execution-checkpoint.service" in units

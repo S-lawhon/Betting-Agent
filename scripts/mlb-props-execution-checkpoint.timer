@@ -1,13 +1,12 @@
 [Unit]
-Description=Update MLB props execution-gate progress after each completed slate
+Description=Update MLB props V2 execution-gate progress after each completed slate
 
 [Timer]
-# The collector stops at 23:45 ET. August 17 must finish before the 27th
-# possible clean game-day can count, so 00:30 ET is also the earliest read.
+# The collector stops at 23:45 ET. V2 stays outcome-blind until both its 27th
+# clean game-day and the locked 2026-09-15 00:30 ET earliest read.
 OnCalendar=*-*-* 00:30:00 America/New_York
 Persistent=true
 Unit=mlb-props-execution-checkpoint.service
 
 [Install]
 WantedBy=timers.target
-

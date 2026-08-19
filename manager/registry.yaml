@@ -1639,14 +1639,20 @@ workstreams:
   # RESEARCH WORKSTREAMS
   # ---------------------------------------------------------------------------
   - id: R-MLB-PROPS
-    name: MLB Props Research (Phase 3)
-    stage: shelved
+    name: MLB Props Live Execution Gate V2
+    stage: research
     tier: none
     owner_dir: mlb_props_research
-    blocked_on: retired
-    recheck_after: null
-    action_required: null
-    closed:
+    blocked_on: time
+    recheck_after: 2026-09-15
+    action_required: >
+      Inspect the automatically generated V2 checkpoint after 00:30 ET. If 27
+      admissible days have frozen and all settlements are valid, apply the
+      locked BUILD_CANDIDATE/STOP rule without extending or substituting the
+      sample. RESULTS_PENDING waits only for the exact selected settlements;
+      DATA_ERROR requires repairing the settlement source, never dropping a
+      market. A pass authorizes a build/canary proposal only.
+    prior_trial:
       decided: 2026-08-18
       verdict: UNSCORABLE
       reason: >
@@ -1662,14 +1668,14 @@ workstreams:
         A new study must pre-register realized scalar payout treatment before
         collecting or reading outcomes and must start with a new frozen sample.
     collection_status:
-      status: stopped_after_frozen_gate_became_unscorable
+      status: v2_starts_2026-08-19
       script: mlb_props_research/collector.py
       unit: mlb-props-collector.timer -> .service (droplet, 10:00 ET daily)
       data_path: /opt/mlb-props/mlb_props_research/data/live/snapshots_YYYYMMDD.jsonl
-      started: 2026-07-21
+      successor_started: 2026-08-19
       game_days_collected: derived by mlb_props_research/execution_checkpoint.py
       game_days_target: 27
-      expected_complete: 2026-08-18   # earliest possible; later if a day fails coverage
+      expected_complete: 2026-09-15   # earliest read; later if a day fails coverage
       consolidated: >
         All data now lives on the droplet at the data_path above. The two
         historical Mac runs were copied 2026-07-21 as
@@ -1711,9 +1717,11 @@ workstreams:
         runs --rate 2.0, which spreads the same ~570 requests across the full
         cycle: same throughput, peak cut 56%.
     summary: >
-      CLOSED UNSCORABLE 2026-08-18 — no build is authorized. Four finalized
-      scalar settlements permanently invalidate the binary-only locked sample;
-      the tape and checkpoint are retained for audit.
+      V2 LOCKED 2026-08-18 and accumulating from 2026-08-19. It keeps the V1
+      entry/capacity rule and disjoint 27-day power target, but pre-registers
+      scalar settlements at their published realized payout. Outcomes remain
+      blind until 2026-09-15 00:30 ET and 27 admissible days. V1 remains closed
+      UNSCORABLE; its tape and checkpoint are retained for audit.
 
       Phase 3 killed two things. (1) The batter-hits model FAILS: well calibrated
       in isolation but loses to market on Brier (0.2236 vs 0.2210) at every
@@ -1731,9 +1739,9 @@ workstreams:
       threshold: 27
       source: mlb_props_checkpoint
       reader: mlb_props_research/execution_checkpoint.py
-      rule_document: mlb_props_research/MLB_PROPS_EXECUTION_RULE.md
-      rule_sha256: c76296909b878b70de7eab4a82fb24ee0c7c45158ae0e1d8bb6ed7cc589c8c60
-      read_not_before: 2026-08-18
+      rule_document: mlb_props_research/MLB_PROPS_EXECUTION_RULE_V2.md
+      rule_sha256: f9bb16ece81c244e7de4cfbcc770e0d7fabe6cca4a4c5847c0cd022eeba33825
+      read_not_before: 2026-09-15
       decision: >
         CAPACITY IS THE BINDING CONSTRAINT, not edge. Median qualifying market
         trades only 86 contracts in the final 30 min (~$4.30 theoretical edge at

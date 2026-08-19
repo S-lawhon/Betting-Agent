@@ -166,8 +166,9 @@ def build(snap: Dict[str, Any], findings: List[checks.Finding]) -> Dict[str, Any
             "threshold": threshold,
             "pct": min(100.0, 100.0 * current / max(1, threshold)),
             "verdict": mlb_cp.get("verdict"),
-            "note": "{} Outcomes stay blind until 2026-08-18 00:30 ET and 27 clean days."
-                    .format(mlb_cp.get("reason") or ""),
+            "note": "{} Outcomes stay blind until {} and 27 clean days."
+                    .format(mlb_cp.get("reason") or "",
+                            mlb_cp.get("read_not_before_utc") or "the locked read time"),
         })
 
     # Accumulating (blocked on time) — one line each, no detail.

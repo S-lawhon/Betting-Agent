@@ -36,6 +36,13 @@ BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
 RULE_DOCUMENT = "mlb_props_research/MLB_PROPS_EXECUTION_RULE.md"
 RULE_SHA256 = "c76296909b878b70de7eab4a82fb24ee0c7c45158ae0e1d8bb6ed7cc589c8c60"
 
+# Successor gate. V1 remains reproducible through run(); V2 starts a disjoint
+# forward sample and differs only where its new locked document says it does.
+CLEAN_START_V2 = date(2026, 8, 19)
+READ_NOT_BEFORE_V2 = datetime(2026, 9, 15, 4, 30, tzinfo=UTC)
+RULE_DOCUMENT_V2 = "mlb_props_research/MLB_PROPS_EXECUTION_RULE_V2.md"
+RULE_SHA256_V2 = "f9bb16ece81c244e7de4cfbcc770e0d7fabe6cca4a4c5847c0cd022eeba33825"
+
 MONTHS = {name: number for number, name in enumerate(
     ("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"), start=1)}
@@ -81,7 +88,8 @@ def snapshot_files(live_dir: Path) -> list[Path]:
             if not path.stem.endswith("_mac")]
 
 
-def scan_snapshots(paths: Iterable[Path]) -> Dict[str, Any]:
+def scan_snapshots(paths: Iterable[Path],
+                   clean_start: date = CLEAN_START) -> Dict[str, Any]:
     """Return candidate tickers and their final observation inside the window."""
     markets: Dict[str, Dict[str, Any]] = {}
     malformed = 0
@@ -110,7 +118,7 @@ def scan_snapshots(paths: Iterable[Path]) -> Dict[str, Any]:
                     malformed += 1
                     continue
                 scheduled_day = start.astimezone(ET).date()
-                if scheduled_day < CLEAN_START:
+                if scheduled_day < clean_start:
                     continue
                 market = markets.setdefault(ticker, {
                     "ticker": ticker,
@@ -221,6 +229,46 @@ def progress_payload(qualified: Mapping[str, Any], scan: Mapping[str, Any],
     return payload
 
 
+def progress_payload_v2(qualified: Mapping[str, Any], scan: Mapping[str, Any],
+                        now: datetime) -> Dict[str, Any]:
+    """Outcome-blind progress for the disjoint, scalar-aware successor."""
+    admissible = sorted(qualified["entries_by_day"])
+    selected = admissible[:MIN_DAYS]
+    payload = {
+        "id": "R-MLB-PROPS",
+        "trial": "V2",
+        "metric": "clean_execution_game_days",
+        "progress": len(admissible),
+        "threshold": MIN_DAYS,
+        "verdict": "NO DECISION",
+        "rule_document": RULE_DOCUMENT_V2,
+        "rule_sha256": RULE_SHA256_V2,
+        "read_not_before_utc": READ_NOT_BEFORE_V2.isoformat().replace(
+            "+00:00", "Z"),
+        "clean_start_et": CLEAN_START_V2.isoformat(),
+        "selected_days": selected,
+        "first_27_frozen": len(selected) == MIN_DAYS,
+        "files_scanned": scan["files_scanned"],
+        "malformed_rows": scan["malformed_rows"],
+        "day_qualification": qualified["days"],
+        "generated_at_utc": now.astimezone(UTC).isoformat().replace(
+            "+00:00", "Z"),
+        "outcomes_read": False,
+    }
+    if now < READ_NOT_BEFORE_V2:
+        payload["reason"] = (
+            "V2 remains outcome-blind before 2026-09-15 00:30 ET")
+    elif len(selected) < MIN_DAYS:
+        payload["reason"] = (
+            f"{len(selected)} of {MIN_DAYS} admissible completed ET game-days; "
+            "outcomes remain unread")
+    else:
+        payload["reason"] = (
+            "V2 sample is frozen; binary and realized scalar settlements are "
+            "required")
+    return payload
+
+
 def _write_atomic(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -258,6 +306,67 @@ def fetch_result(ticker: str, retries: int = 3) -> Optional[str]:
     return None
 
 
+def load_settlements_v2(path: Path) -> Dict[str, Dict[str, Any]]:
+    """Load only the structured V2 cache; never inherit V1 binary labels."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    records: Dict[str, Dict[str, Any]] = {}
+    for ticker, value in payload.items():
+        if not isinstance(value, dict):
+            continue
+        result = str(value.get("result") or "").lower()
+        if result not in {"yes", "no", "scalar"}:
+            continue
+        records[str(ticker)] = dict(value) | {"result": result}
+    return records
+
+
+def fetch_settlement_v2(ticker: str,
+                        retries: int = 3) -> Optional[Dict[str, Any]]:
+    """Fetch the result plus scalar payout fields required by the V2 rule."""
+    url = f"{BASE_URL}/markets/{quote(ticker, safe='')}"
+    request = Request(
+        url, headers={"User-Agent": "betting-pod-shop/mlb-props-gate-v2"})
+    for attempt in range(retries + 1):
+        try:
+            with urlopen(request, timeout=20) as response:  # noqa: S310
+                payload = json.loads(response.read().decode("utf-8"))
+            market = payload.get("market") or {}
+            result = str(market.get("result") or "").lower()
+            if result not in {"yes", "no", "scalar"}:
+                return None
+            return {
+                "result": result,
+                "status": market.get("status"),
+                "settlement_value_dollars": market.get(
+                    "settlement_value_dollars"),
+                "settlement_value": market.get("settlement_value"),
+            }
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+            if attempt < retries:
+                time.sleep(2.0 * (attempt + 1))
+    return None
+
+
+def settlement_payout_v2(record: Mapping[str, Any]) -> Optional[float]:
+    result = str(record.get("result") or "").lower()
+    if result == "yes":
+        return 1.0
+    if result == "no":
+        return 0.0
+    if result != "scalar":
+        return None
+    value = _number(record.get("settlement_value_dollars"))
+    if value is None:
+        cents = _number(record.get("settlement_value"))
+        value = cents / 100.0 if cents is not None else None
+    return value if value is not None and 0.0 <= value <= 1.0 else None
+
+
 def fill_settlements(entries_by_day: Mapping[str, list[Dict[str, Any]]],
                      selected_days: Sequence[str], cache_path: Path,
                      fetch: bool) -> tuple[Dict[str, str], list[str]]:
@@ -276,9 +385,37 @@ def fill_settlements(entries_by_day: Mapping[str, list[Dict[str, Any]]],
     return results, missing
 
 
+def fill_settlements_v2(
+        entries_by_day: Mapping[str, list[Dict[str, Any]]],
+        selected_days: Sequence[str], cache_path: Path,
+        fetch: bool) -> tuple[Dict[str, Dict[str, Any]], list[str]]:
+    results = load_settlements_v2(cache_path)
+    tickers = sorted({entry["ticker"] for day in selected_days
+                      for entry in entries_by_day[day]})
+    missing = [ticker for ticker in tickers if ticker not in results]
+    if fetch:
+        for ticker in missing:
+            record = fetch_settlement_v2(ticker)
+            if record is not None:
+                results[ticker] = record
+            time.sleep(0.25)
+        _write_atomic(cache_path, results)
+        missing = [ticker for ticker in tickers if ticker not in results]
+    return results, missing
+
+
 def evaluate(entries_by_day: Mapping[str, list[Dict[str, Any]]],
              selected_days: Sequence[str], settlements: Mapping[str, str],
              base: Mapping[str, Any]) -> Dict[str, Any]:
+    payouts = {ticker: 1.0 if result == "yes" else 0.0
+               for ticker, result in settlements.items()}
+    return _evaluate_payouts(entries_by_day, selected_days, payouts, base)
+
+
+def _evaluate_payouts(entries_by_day: Mapping[str, list[Dict[str, Any]]],
+                      selected_days: Sequence[str],
+                      payouts: Mapping[str, float],
+                      base: Mapping[str, Any]) -> Dict[str, Any]:
     daily = []
     all_returns = []
     total_contracts = 0.0
@@ -289,7 +426,7 @@ def evaluate(entries_by_day: Mapping[str, list[Dict[str, Any]]],
         day_pnl = 0.0
         for entry in entries_by_day[day]:
             ask = float(entry["yes_ask"])
-            result = 1.0 if settlements[entry["ticker"]] == "yes" else 0.0
+            result = payouts[entry["ticker"]]
             net = result - ask - 0.07 * ask * (1.0 - ask)
             size = min(float(entry["ask_size"]), MAX_SIZE)
             returns.append(net)
@@ -338,6 +475,30 @@ def evaluate(entries_by_day: Mapping[str, list[Dict[str, Any]]],
     }
 
 
+def evaluate_v2(entries_by_day: Mapping[str, list[Dict[str, Any]]],
+                selected_days: Sequence[str],
+                settlements: Mapping[str, Mapping[str, Any]],
+                base: Mapping[str, Any]) -> Dict[str, Any]:
+    payouts = {
+        ticker: settlement_payout_v2(record)
+        for ticker, record in settlements.items()
+    }
+    # run_v2 proves these are all valid before calling; keep this assertion so
+    # a future caller cannot silently turn an invalid scalar into a zero payout.
+    if any(value is None for value in payouts.values()):
+        raise ValueError("V2 evaluation received an invalid settlement payout")
+    evaluated = _evaluate_payouts(
+        entries_by_day, selected_days,
+        {ticker: float(value) for ticker, value in payouts.items()
+         if value is not None},
+        base,
+    )
+    evaluated["scalar_settlements_count"] = sum(
+        str(record.get("result") or "").lower() == "scalar"
+        for record in settlements.values())
+    return evaluated
+
+
 def run(live_dir: Path, now: datetime, settlements_path: Path,
         fetch: bool = False) -> Dict[str, Any]:
     scan = scan_snapshots(snapshot_files(live_dir))
@@ -376,6 +537,49 @@ def run(live_dir: Path, now: datetime, settlements_path: Path,
     return evaluate(qualified["entries_by_day"], days, settlements, base)
 
 
+def run_v2(live_dir: Path, now: datetime, settlements_path: Path,
+           fetch: bool = False) -> Dict[str, Any]:
+    """Run the disjoint V2 gate with realized scalar payouts."""
+    scan = scan_snapshots(snapshot_files(live_dir), clean_start=CLEAN_START_V2)
+    qualified = qualify_days(scan, now)
+    base = progress_payload_v2(qualified, scan, now)
+    if now < READ_NOT_BEFORE_V2 or base["progress"] < MIN_DAYS:
+        return base
+    days = base["selected_days"]
+    settlements, missing = fill_settlements_v2(
+        qualified["entries_by_day"], days, settlements_path, fetch)
+    if missing:
+        return base | {
+            "verdict": "RESULTS_PENDING",
+            "reason": f"{len(missing)} selected market settlement(s) unavailable",
+            "settlements_missing": len(missing),
+            "outcomes_read": True,
+        }
+
+    selected_tickers = sorted({
+        entry["ticker"] for day in days
+        for entry in qualified["entries_by_day"][day]
+    })
+    invalid_scalar = [
+        ticker for ticker in selected_tickers
+        if settlements[ticker].get("result") == "scalar"
+        and settlement_payout_v2(settlements[ticker]) is None
+    ]
+    if invalid_scalar:
+        return base | {
+            "verdict": "DATA_ERROR",
+            "reason": (
+                f"{len(invalid_scalar)} finalized scalar settlement(s) lack a "
+                "valid realized payout; no guessing, dropping, or substitution "
+                "is authorized"),
+            "invalid_scalar_settlements": invalid_scalar,
+            "outcomes_read": True,
+            "authorization": "none",
+        }
+    return evaluate_v2(
+        qualified["entries_by_day"], days, settlements, base)
+
+
 def _parse_now(value: Optional[str]) -> datetime:
     if not value:
         return datetime.now(UTC)
@@ -393,16 +597,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--fetch-results", action="store_true")
     parser.add_argument("--persist", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--successor-v2", action="store_true",
+                        help="run the 2026-08-18 scalar-aware successor gate")
     parser.add_argument("--now", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     try:
         at = _parse_now(args.now)
-        result = run(args.live_dir, at, args.output_dir / "settlements.json",
-                     fetch=args.fetch_results)
+        output_dir = args.output_dir
+        if args.successor_v2 and output_dir == data / "execution_gate":
+            output_dir = data / "execution_gate_v2"
+        runner = run_v2 if args.successor_v2 else run
+        cache_name = "settlements_v2.json" if args.successor_v2 else "settlements.json"
+        result = runner(args.live_dir, at, output_dir / cache_name,
+                        fetch=args.fetch_results)
         if args.persist:
             stamp = at.strftime("%Y-%m-%dT%H%M%SZ")
-            _write_atomic(args.output_dir / f"checkpoint_{stamp}.json", result)
-            _write_atomic(args.output_dir / "latest.json", result)
+            _write_atomic(output_dir / f"checkpoint_{stamp}.json", result)
+            _write_atomic(output_dir / "latest.json", result)
     except (OSError, ValueError) as exc:
         print(f"MLB props checkpoint failed: {exc}", file=sys.stderr)
         return 1

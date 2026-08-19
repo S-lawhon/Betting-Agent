@@ -82,6 +82,13 @@ def test_locked_rule_hash_matches_document():
     assert hashlib.sha256(rule.read_bytes()).hexdigest() == gate.RULE_SHA256
 
 
+def test_v2_locked_rule_hash_matches_document():
+    import hashlib
+
+    rule = Path(gate.__file__).with_name("MLB_PROPS_EXECUTION_RULE_V2.md")
+    assert hashlib.sha256(rule.read_bytes()).hexdigest() == gate.RULE_SHA256_V2
+
+
 def test_reader_does_not_touch_outcomes_before_read_time(tmp_path, monkeypatch):
     rows = []
     start = date(2026, 7, 22)
@@ -143,6 +150,77 @@ def test_finalized_scalar_makes_locked_sample_unscorable(tmp_path):
     assert "no substitution or sample extension" in result["reason"]
     assert result["authorization"] == (
         "none; successor study requires a new locked rule")
+
+
+def test_v2_is_disjoint_and_outcome_blind_until_locked_read_time(
+        tmp_path, monkeypatch):
+    start = date(2026, 8, 18)
+    rows = [market_row(start + timedelta(days=offset)) for offset in range(28)]
+    write_rows(tmp_path / "snapshots_all.jsonl", rows)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("V2 outcomes were touched while reader was blind")
+
+    monkeypatch.setattr(gate, "load_settlements_v2", forbidden)
+    monkeypatch.setattr(gate, "fetch_settlement_v2", forbidden)
+    result = gate.run_v2(
+        tmp_path, datetime(2026, 9, 15, 4, 0, tzinfo=timezone.utc),
+        tmp_path / "settlements_v2.json", fetch=True)
+
+    assert result["clean_start_et"] == "2026-08-19"
+    assert result["selected_days"][0] == "2026-08-19"
+    assert result["selected_days"][-1] == "2026-09-14"
+    assert result["progress"] == 27
+    assert result["outcomes_read"] is False
+
+
+def test_v2_scalar_counts_at_realized_payout(tmp_path):
+    start = date(2026, 8, 19)
+    rows = [market_row(start + timedelta(days=offset), size=100)
+            for offset in range(27)]
+    write_rows(tmp_path / "snapshots_all.jsonl", rows)
+    settlements = {
+        row["tk"]: {"result": "yes", "settlement_value_dollars": None}
+        for row in rows
+    }
+    settlements[rows[0]["tk"]] = {
+        "result": "scalar", "settlement_value_dollars": "0.34"}
+    cache = tmp_path / "settlements_v2.json"
+    cache.write_text(json.dumps(settlements), encoding="utf-8")
+
+    result = gate.run_v2(
+        tmp_path, datetime(2026, 9, 16, 12, tzinfo=timezone.utc), cache)
+
+    fee = 0.07 * 0.28 * 0.72
+    assert result["verdict"] == "BUILD_CANDIDATE"
+    assert result["scalar_settlements_count"] == 1
+    assert result["daily_results"][0]["net_per_contract"] == pytest.approx(
+        0.34 - 0.28 - fee)
+
+
+def test_v2_scalar_cents_fallback_and_invalid_values():
+    assert gate.settlement_payout_v2(
+        {"result": "scalar", "settlement_value": 34}) == pytest.approx(0.34)
+    assert gate.settlement_payout_v2(
+        {"result": "scalar", "settlement_value_dollars": 1.01}) is None
+    assert gate.settlement_payout_v2({"result": "scalar"}) is None
+
+
+def test_v2_invalid_finalized_scalar_is_data_error(tmp_path):
+    start = date(2026, 8, 19)
+    rows = [market_row(start + timedelta(days=offset)) for offset in range(27)]
+    write_rows(tmp_path / "snapshots_all.jsonl", rows)
+    settlements = {row["tk"]: {"result": "yes"} for row in rows}
+    settlements[rows[0]["tk"]] = {"result": "scalar"}
+    cache = tmp_path / "settlements_v2.json"
+    cache.write_text(json.dumps(settlements), encoding="utf-8")
+
+    result = gate.run_v2(
+        tmp_path, datetime(2026, 9, 16, 12, tzinfo=timezone.utc), cache)
+
+    assert result["verdict"] == "DATA_ERROR"
+    assert result["authorization"] == "none"
+    assert result["invalid_scalar_settlements"] == [rows[0]["tk"]]
 
 
 def test_gate_estimator_equal_weights_days_not_markets():

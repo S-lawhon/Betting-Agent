@@ -933,6 +933,14 @@ def check_gates(snap: Dict[str, Any], registry: Dict[str, Any]) -> List[Finding]
                     "The frozen sample cannot produce the locked statistic."),
             workstream="R-MLB-PROPS",
             value=len(mlb_cp.get("scalar_settlements") or [])))
+    elif mlb_verdict == "DATA_ERROR":
+        out.append(Finding(
+            key="gate.R-MLB-PROPS.data_error", severity="warn",
+            title="MLB props V2 frozen sample has an invalid settlement",
+            detail=(mlb_cp.get("reason") or
+                    "A selected scalar settlement has no valid realized payout."),
+            workstream="R-MLB-PROPS",
+            value=len(mlb_cp.get("invalid_scalar_settlements") or [])))
     return out
 
 

@@ -84,11 +84,22 @@ systemd_units:
   - {id: research-agent-deep-daily.service, unit: research-agent-deep-daily.service, source: scripts/systemd/research-agent-deep-daily.service, severity: warn}
   - {id: betting-strategy-chain.timer, unit: betting-strategy-chain.timer, source: scripts/systemd/betting-strategy-chain.timer, severity: warn}
   - {id: betting-strategy-chain.service, unit: betting-strategy-chain.service, source: scripts/systemd/betting-strategy-chain.service, severity: warn}
+  - {id: laliga-spread-latency.service, unit: laliga-spread-latency.service, source: scripts/systemd/laliga-spread-latency.service, severity: warn}
 
 # -----------------------------------------------------------------------------
 # SERVICES — process-level liveness
 # -----------------------------------------------------------------------------
 services:
+  - id: laliga-spread-latency
+    kind: systemd
+    description: Public forward tape for the preregistered La Liga spread latency gate
+    severity: warn
+    heartbeat:
+      file: data/laliga_spread_latency/status.json
+      # The collector polls every 5 minutes while no match is in its -90/+210
+      # minute window, then every 10 seconds during the match window.
+      max_stale_minutes: 12
+
   # P-022's standalone maker loop. Registered 2026-07-26 because it had been
   # "active" and doing nothing since 2026-07-23 and NOTHING NOTICED — it could
   # not quote at all (far-future close field; see the P-022 workstream), and
@@ -1834,6 +1845,30 @@ workstreams:
       # basis for a few weeks"). Duplicated P-018, which owns the collector
       # (scripts/collect_inplay_basis.py), the data and the backtest gate. One
       # workstream per question; track it there.
+
+  - id: R-LALIGA-SPREAD-LATENCY
+    name: La Liga spread public-information latency
+    stage: validating
+    tier: research
+    blocked_on: time
+    owner_dir: soccer_research
+    action_required: null
+    summary: >
+      Forward-only test of whether KXLALIGASPREAD books incorporate public goals
+      and red cards slowly enough to leave executable stale quotes. Public ESPN
+      wallclocks are joined to raw depth-20 Kalshi books and public trades; the
+      collector has no authenticated client and cannot place an order. The
+      preregistered rule is frozen at commit 20c418a. Wait for 20 completed
+      matches, 20 qualifying shocks and at least 10 matches before reading a
+      verdict.
+    next_step: >
+      No human action. Keep laliga-spread-latency.service healthy through the
+      forward sample, then run `python3 soccer_research/laliga_spread_latency.py
+      --analyze` and apply the frozen kill/pass thresholds without tuning.
+    recheck: 2026-09-15
+    governing_rule: soccer_research/LALIGA_SPREAD_LATENCY_RULE.md
+    status_file: data/laliga_spread_latency/status.json
+    analysis_file: data/laliga_spread_latency/analysis.json
 
   - id: R-SOCCER-BTTS-1H
     name: First-Half Soccer BTTS (Phase 0 feasibility)
